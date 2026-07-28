@@ -1,0 +1,188 @@
+{
+  "schema_id": "PS-PKG-001",
+  "schema_version": "0.1",
+  "catalog_scope": "REPRESENTATIVE",
+  "identity": {
+    "profile_id": "profile.iso19450.2024.draft",
+    "package_version": "0.1.0",
+    "display_name": "ISO 19450:2024 代表性开发配置档",
+    "standard_id": "ISO 19450",
+    "standard_edition": "2024",
+    "text_modality": "OPL",
+    "identity_namespace": "urn:opm:iso19450:2024:draft"
+  },
+  "lifecycle": {
+    "status": "DRAFT",
+    "minimum_reader_schema": "0.1"
+  },
+  "dependencies": [
+    {
+      "role": "RULE_SET",
+      "asset": {
+        "id": "rules.iso19450.2024.draft",
+        "version": "0.1.0",
+        "digest": {
+          "algorithm": "sha256",
+          "digest": "2222222222222222222222222222222222222222222222222222222222222222"
+        }
+      },
+      "required": true,
+      "embedded": true,
+      "load_order": 0
+    },
+    {
+      "role": "SYMBOL_ASSET",
+      "asset": {
+        "id": "symbols.iso19450.2024.draft",
+        "version": "0.1.0",
+        "digest": {
+          "algorithm": "sha256",
+          "digest": "3333333333333333333333333333333333333333333333333333333333333333"
+        }
+      },
+      "required": true,
+      "embedded": true,
+      "load_order": 1
+    },
+    {
+      "role": "GRAMMAR_ASSET",
+      "asset": {
+        "id": "grammar.opl.iso19450.2024.draft",
+        "version": "0.1.0",
+        "digest": {
+          "algorithm": "sha256",
+          "digest": "4444444444444444444444444444444444444444444444444444444444444444"
+        }
+      },
+      "required": true,
+      "embedded": true,
+      "load_order": 2
+    }
+  ],
+  "capability_catalog": [
+    {
+      "capability_id": "CAP-OBJECT-001",
+      "capability_kind": "ELEMENT",
+      "name": "Object",
+      "status": "MUST",
+      "implementation_state": "DECLARED",
+      "core_mapping_level": "CORE",
+      "instance_schema_ref": {
+        "schema_id": "MS-REV-001",
+        "schema_version": "0.1"
+      },
+      "symbol_id": "symbol.object.basic",
+      "text_generation_rule_ids": ["opl.object.declaration.v1"],
+      "source_locator": "ISO 19450:2024 Clause 4, representative only"
+    },
+    {
+      "capability_id": "CAP-PROCESS-001",
+      "capability_kind": "ELEMENT",
+      "name": "Process",
+      "status": "MUST",
+      "implementation_state": "DECLARED",
+      "core_mapping_level": "CORE",
+      "instance_schema_ref": {
+        "schema_id": "MS-REV-001",
+        "schema_version": "0.1"
+      },
+      "symbol_id": "symbol.process.basic",
+      "text_generation_rule_ids": ["opl.process.declaration.v1"],
+      "source_locator": "ISO 19450:2024 Clause 4, representative only"
+    },
+    {
+      "capability_id": "CAP-STATE-001",
+      "capability_kind": "PROPERTY",
+      "name": "Object State",
+      "status": "MUST",
+      "implementation_state": "DECLARED",
+      "core_mapping_level": "CORE",
+      "instance_schema_ref": {
+        "schema_id": "MS-REV-001",
+        "schema_version": "0.1"
+      },
+      "symbol_id": "symbol.state.basic",
+      "text_generation_rule_ids": ["opl.state.declaration.v1"],
+      "source_locator": "ISO 19450:2024 Clause 4, representative only"
+    },
+    {
+      "capability_id": "CAP-CONSUMPTION-001",
+      "capability_kind": "FACT",
+      "name": "Consumption Link",
+      "status": "MUST",
+      "implementation_state": "DECLARED",
+      "core_mapping_level": "CORE",
+      "instance_schema_ref": {
+        "schema_id": "MS-REV-001",
+        "schema_version": "0.1"
+      },
+      "symbol_id": "symbol.link.consumption",
+      "text_generation_rule_ids": ["opl.consumption.v1"],
+      "source_locator": "ISO 19450:2024 Clause 4, representative only"
+    },
+    {
+      "capability_id": "CAP-CONTEXT-001",
+      "capability_kind": "CONTEXT",
+      "name": "System Diagram",
+      "status": "MUST",
+      "implementation_state": "DECLARED",
+      "core_mapping_level": "CORE",
+      "instance_schema_ref": {
+        "schema_id": "MS-REV-001",
+        "schema_version": "0.1"
+      },
+      "symbol_id": "symbol.context.system",
+      "text_generation_rule_ids": ["opl.context.compose.v1"],
+      "source_locator": "ISO 19450:2024 Clause 4, representative only"
+    }
+  ],
+  "name_identity_policy": {
+    "name_scope": "MODEL",
+    "case_policy": "SENSITIVE",
+    "namespace_visibility": "NONE",
+    "stable_id_from_name": false
+  },
+  "symbol_catalog_ref": {
+    "id": "symbols.iso19450.2024.draft",
+    "version": "0.1.0",
+    "digest": {
+      "algorithm": "sha256",
+      "digest": "3333333333333333333333333333333333333333333333333333333333333333"
+    }
+  },
+  "text_grammar_ref": {
+    "id": "grammar.opl.iso19450.2024.draft",
+    "version": "0.1.0",
+    "digest": {
+      "algorithm": "sha256",
+      "digest": "4444444444444444444444444444444444444444444444444444444444444444"
+    }
+  },
+  "normalization_adapter_ref": {
+    "id": "normalization.iso19450.2024.draft",
+    "version": "0.1.0",
+    "digest": {
+      "algorithm": "sha256",
+      "digest": "5555555555555555555555555555555555555555555555555555555555555555"
+    }
+  },
+  "manifest": {
+    "entries": [
+      {
+        "role": "RULE_SET",
+        "logical_path": "rules/representative-rule-set.json",
+        "byte_length": 0,
+        "digest": {
+          "algorithm": "sha256",
+          "digest": "2222222222222222222222222222222222222222222222222222222222222222"
+        },
+        "required": true
+      }
+    ],
+    "capability_universe_size": 96,
+    "package_digest": {
+      "algorithm": "sha256",
+      "digest": "1111111111111111111111111111111111111111111111111111111111111111"
+    }
+  }
+}

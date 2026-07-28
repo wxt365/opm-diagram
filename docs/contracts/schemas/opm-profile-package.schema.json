@@ -1,0 +1,205 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://opm.local/schemas/opm-profile-package/0.1",
+  "title": "OPM Profile Package",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_id",
+    "schema_version",
+    "catalog_scope",
+    "identity",
+    "lifecycle",
+    "dependencies",
+    "capability_catalog",
+    "name_identity_policy",
+    "symbol_catalog_ref",
+    "text_grammar_ref",
+    "normalization_adapter_ref",
+    "manifest"
+  ],
+  "properties": {
+    "schema_id": {"const": "PS-PKG-001"},
+    "schema_version": {"const": "0.1"},
+    "catalog_scope": {"enum": ["REPRESENTATIVE", "FULL"]},
+    "identity": {"$ref": "#/$defs/identity"},
+    "lifecycle": {"$ref": "#/$defs/lifecycle"},
+    "dependencies": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/dependency"}
+    },
+    "capability_catalog": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/capability"}
+    },
+    "name_identity_policy": {"$ref": "#/$defs/namePolicy"},
+    "symbol_catalog_ref": {"$ref": "#/$defs/assetRef"},
+    "text_grammar_ref": {"$ref": "#/$defs/assetRef"},
+    "normalization_adapter_ref": {"$ref": "#/$defs/assetRef"},
+    "manifest": {"$ref": "#/$defs/manifest"}
+  },
+  "allOf": [
+    {
+      "if": {
+        "type": "object",
+        "properties": {"catalog_scope": {"const": "FULL"}}
+      },
+      "then": {
+        "type": "object",
+        "properties": {
+          "capability_catalog": {"type": "array", "minItems": 96, "maxItems": 96}
+        }
+      }
+    },
+    {
+      "if": {
+        "type": "object",
+        "properties": {
+          "lifecycle": {
+            "type": "object",
+            "properties": {"status": {"enum": ["ACTIVE", "DEPRECATED", "RETIRED"]}}
+          }
+        }
+      },
+      "then": {
+        "type": "object",
+        "properties": {"catalog_scope": {"const": "FULL"}}
+      }
+    }
+  ],
+  "$defs": {
+    "stableId": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z][A-Za-z0-9._:-]*$"
+    },
+    "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+(?:\\.[0-9]+)?$"},
+    "digest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["algorithm", "digest"],
+      "properties": {
+        "algorithm": {"const": "sha256"},
+        "digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+      }
+    },
+    "assetRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version", "digest"],
+      "properties": {
+        "id": {"$ref": "#/$defs/stableId"},
+        "version": {"$ref": "#/$defs/version"},
+        "digest": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profile_id", "package_version", "display_name", "standard_id", "standard_edition", "text_modality", "identity_namespace"],
+      "properties": {
+        "profile_id": {"$ref": "#/$defs/stableId"},
+        "package_version": {"$ref": "#/$defs/version"},
+        "display_name": {"type": "string", "minLength": 1},
+        "standard_id": {"type": "string", "minLength": 1},
+        "standard_edition": {"type": "string", "minLength": 1},
+        "text_modality": {"enum": ["OPL", "OPT"]},
+        "identity_namespace": {"type": "string", "minLength": 1}
+      }
+    },
+    "lifecycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "minimum_reader_schema"],
+      "properties": {
+        "status": {"enum": ["DRAFT", "ACTIVE", "DEPRECATED", "RETIRED"]},
+        "minimum_reader_schema": {"$ref": "#/$defs/version"},
+        "supersedes_version": {"$ref": "#/$defs/version"}
+      }
+    },
+    "dependency": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "asset", "required", "embedded", "load_order"],
+      "properties": {
+        "role": {"enum": ["RULE_SET", "SYMBOL_ASSET", "GRAMMAR_ASSET", "EXTENSION_SCHEMA", "NORMALIZATION_DATA"]},
+        "asset": {"$ref": "#/$defs/assetRef"},
+        "required": {"type": "boolean"},
+        "embedded": {"type": "boolean"},
+        "load_order": {"type": "integer", "minimum": 0}
+      }
+    },
+    "schemaRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_id", "schema_version"],
+      "properties": {
+        "schema_id": {"type": "string", "pattern": "^(MS|PS|RS)-[A-Z0-9-]+$"},
+        "schema_version": {"$ref": "#/$defs/version"}
+      }
+    },
+    "capability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capability_id",
+        "capability_kind",
+        "name",
+        "status",
+        "implementation_state",
+        "core_mapping_level",
+        "source_locator"
+      ],
+      "properties": {
+        "capability_id": {"type": "string", "pattern": "^CAP-[A-Z-]+-[0-9]{3}$"},
+        "capability_kind": {"enum": ["ELEMENT", "PROPERTY", "FACT", "MODIFIER", "CONTEXT", "POLICY"]},
+        "name": {"type": "string", "minLength": 1},
+        "status": {"enum": ["MUST", "SHOULD", "DERIVED", "FORBIDDEN", "N_A"]},
+        "implementation_state": {"enum": ["DECLARED", "IMPLEMENTED", "NOT_IMPLEMENTED"]},
+        "core_mapping_level": {"enum": ["CORE", "CONDITIONAL", "DERIVED", "PROFILE_ONLY", "LOSSY", "UNMAPPABLE"]},
+        "instance_schema_ref": {"$ref": "#/$defs/schemaRef"},
+        "symbol_id": {"$ref": "#/$defs/stableId"},
+        "text_generation_rule_ids": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1}
+        },
+        "source_locator": {"type": "string", "minLength": 1}
+      }
+    },
+    "namePolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name_scope", "case_policy", "namespace_visibility", "stable_id_from_name"],
+      "properties": {
+        "name_scope": {"enum": ["MODEL", "CONTEXT", "TYPE_IN_CONTEXT", "PROFILE_DEFINED"]},
+        "case_policy": {"enum": ["SENSITIVE", "INSENSITIVE"]},
+        "namespace_visibility": {"enum": ["NONE", "PUBLIC_PROTECTED_PRIVATE"]},
+        "stable_id_from_name": {"const": false}
+      }
+    },
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "logical_path", "byte_length", "digest", "required"],
+      "properties": {
+        "role": {"type": "string", "minLength": 1},
+        "logical_path": {"type": "string", "pattern": "^(?!/)(?!.*\\.\\.)[A-Za-z0-9._/-]+$"},
+        "byte_length": {"type": "integer", "minimum": 0},
+        "digest": {"$ref": "#/$defs/digest"},
+        "required": {"type": "boolean"}
+      }
+    },
+    "manifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entries", "capability_universe_size", "package_digest"],
+      "properties": {
+        "entries": {"type": "array", "items": {"$ref": "#/$defs/entry"}},
+        "capability_universe_size": {"const": 96},
+        "package_digest": {"$ref": "#/$defs/digest"}
+      }
+    }
+  }
+}

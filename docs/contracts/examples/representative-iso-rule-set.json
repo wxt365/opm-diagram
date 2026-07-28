@@ -1,0 +1,153 @@
+{
+  "schema_id": "RS-PKG-001",
+  "schema_version": "0.1",
+  "coverage_scope": "REPRESENTATIVE",
+  "rule_set_id": "rules.iso19450.2024.draft",
+  "rule_set_version": "0.1.0",
+  "profile_scope": [
+    {
+      "profile_id": "profile.iso19450.2024.draft",
+      "profile_version": "0.1.0"
+    }
+  ],
+  "lifecycle": {
+    "status": "DRAFT",
+    "minimum_engine_schema": "0.1"
+  },
+  "rule_groups": [
+    {
+      "group_id": "ISOR-SYMBOLIC-001",
+      "name": "对象与过程是不同的 Thing 类型",
+      "source_locator": "ISO 19450:2024 Clause 4, representative only",
+      "gate_tags": ["SYMBOLIC", "OPL"],
+      "atomic_rule_ids": ["rule.iso.thing.kind.v1"],
+      "coverage_state": "ATOMIC_INCOMPLETE"
+    },
+    {
+      "group_id": "ISOR-SYMBOLIC-002",
+      "name": "消耗关系端点约束",
+      "source_locator": "ISO 19450:2024 Clause 4, representative only",
+      "gate_tags": ["SYMBOLIC", "OPL"],
+      "atomic_rule_ids": ["rule.iso.consumption.endpoints.v1"],
+      "coverage_state": "ATOMIC_INCOMPLETE"
+    }
+  ],
+  "rules": [
+    {
+      "rule_id": "rule.iso.thing.kind.v1",
+      "rule_version": "0.1.0",
+      "group_ids": ["ISOR-SYMBOLIC-001"],
+      "name": "元素必须是受支持的 Thing 类型",
+      "source_locator": "ISO 19450:2024 Clause 4, representative only",
+      "category": "LANGUAGE",
+      "stage": "PRE_COMMIT",
+      "severity": "BLOCKING",
+      "baseline_policy": "BLOCK",
+      "selector": {
+        "input_root": "REVISION",
+        "target_kind": "ELEMENT",
+        "capability_ids": ["CAP-OBJECT-001", "CAP-PROCESS-001"],
+        "ordering": "STABLE_ID_ASC",
+        "max_results": 10000
+      },
+      "assertion": {
+        "node_id": "expr.thing.kind.root",
+        "node_kind": "NARY",
+        "result_type": "BOOLEAN",
+        "operator": "OR",
+        "arguments": [
+          {
+            "node_id": "expr.thing.is.object",
+            "node_kind": "TYPE_TEST",
+            "result_type": "BOOLEAN",
+            "operator": "IS_KIND",
+            "literal": "OBJECT"
+          },
+          {
+            "node_id": "expr.thing.is.process",
+            "node_kind": "TYPE_TEST",
+            "result_type": "BOOLEAN",
+            "operator": "IS_KIND",
+            "literal": "PROCESS"
+          }
+        ]
+      },
+      "unknown_policy": "FAIL",
+      "finding_template": {
+        "message": "元素类型不在当前代表性 Profile 的允许范围内。",
+        "remediation": "改为对象或过程，或加载声明该能力的 Profile。",
+        "locator_kind": "ENTITY",
+        "field_path": "core_kind",
+        "dedup_fields": ["rule_id", "target_id", "field_path"]
+      },
+      "lifecycle": "DRAFT"
+    },
+    {
+      "rule_id": "rule.iso.consumption.endpoints.v1",
+      "rule_version": "0.1.0",
+      "group_ids": ["ISOR-SYMBOLIC-002"],
+      "name": "消耗关系必须连接对象与过程",
+      "source_locator": "ISO 19450:2024 Clause 4, representative only",
+      "category": "LANGUAGE",
+      "stage": "PRE_COMMIT",
+      "severity": "BLOCKING",
+      "baseline_policy": "BLOCK",
+      "selector": {
+        "input_root": "REVISION",
+        "target_kind": "FACT",
+        "capability_ids": ["CAP-CONSUMPTION-001"],
+        "ordering": "STABLE_ID_ASC",
+        "max_results": 10000
+      },
+      "assertion": {
+        "node_id": "expr.consumption.endpoint.count",
+        "node_kind": "BINARY",
+        "result_type": "BOOLEAN",
+        "operator": "EQ",
+        "arguments": [
+          {
+            "node_id": "expr.consumption.endpoints.length",
+            "node_kind": "UNARY",
+            "result_type": "INTEGER",
+            "operator": "LENGTH",
+            "field_path": "endpoints"
+          },
+          {
+            "node_id": "expr.consumption.expected.count",
+            "node_kind": "LITERAL",
+            "result_type": "INTEGER",
+            "literal": 2
+          }
+        ]
+      },
+      "unknown_policy": "FAIL",
+      "finding_template": {
+        "message": "消耗关系必须具有一个对象端点和一个过程端点。",
+        "remediation": "重新连接关系端点。",
+        "locator_kind": "ENTITY",
+        "field_path": "endpoints",
+        "dedup_fields": ["rule_id", "target_id"]
+      },
+      "lifecycle": "DRAFT"
+    }
+  ],
+  "dependency_edges": [
+    {
+      "predecessor": "rule.iso.thing.kind.v1",
+      "successor": "rule.iso.consumption.endpoints.v1",
+      "kind": "REQUIRES_PASS",
+      "on_fail": "SKIP"
+    }
+  ],
+  "manifest": {
+    "rule_group_universe_size": 103,
+    "dependency_graph_digest": {
+      "algorithm": "sha256",
+      "digest": "6666666666666666666666666666666666666666666666666666666666666666"
+    },
+    "rule_set_digest": {
+      "algorithm": "sha256",
+      "digest": "2222222222222222222222222222222222222222222222222222222222222222"
+    }
+  }
+}

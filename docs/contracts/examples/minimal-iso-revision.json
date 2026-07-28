@@ -1,0 +1,321 @@
+{
+  "schema_id": "MS-REV-001",
+  "schema_version": "0.1",
+  "revision_id": "revision.demo.0001",
+  "model_id": "model.demo.processing",
+  "revision_sequence": 1,
+  "schema_set_ref": {
+    "core_metamodel_version": "0.1",
+    "profile_schema_version": "0.1",
+    "rule_schema_version": "0.1",
+    "storage_schema_version": "1.0"
+  },
+  "profile_binding": {
+    "profile": {
+      "id": "profile.iso19450.2024.draft",
+      "version": "0.1.0",
+      "digest": {
+        "algorithm": "sha256",
+        "digest": "1111111111111111111111111111111111111111111111111111111111111111"
+      }
+    },
+    "rule_set": {
+      "id": "rules.iso19450.2024.draft",
+      "version": "0.1.0",
+      "digest": {
+        "algorithm": "sha256",
+        "digest": "2222222222222222222222222222222222222222222222222222222222222222"
+      }
+    },
+    "text_grammar": {
+      "id": "grammar.opl.iso19450.2024.draft",
+      "version": "0.1.0",
+      "digest": {
+        "algorithm": "sha256",
+        "digest": "4444444444444444444444444444444444444444444444444444444444444444"
+      }
+    },
+    "symbol_catalog": {
+      "id": "symbols.iso19450.2024.draft",
+      "version": "0.1.0",
+      "digest": {
+        "algorithm": "sha256",
+        "digest": "3333333333333333333333333333333333333333333333333333333333333333"
+      }
+    },
+    "normalization_adapter": {
+      "id": "normalization.iso19450.2024.draft",
+      "version": "0.1.0",
+      "digest": {
+        "algorithm": "sha256",
+        "digest": "5555555555555555555555555555555555555555555555555555555555555555"
+      }
+    },
+    "binding_digest": {
+      "algorithm": "sha256",
+      "digest": "7777777777777777777777777777777777777777777777777777777777777777"
+    }
+  },
+  "model_header": {
+    "model_id": "model.demo.processing",
+    "identity_namespace": {
+      "namespace": "urn:opm:demo:processing",
+      "local_name": "demo-processing"
+    },
+    "name": "原料加工系统",
+    "description": "用于验证对象、过程、状态、消耗关系、系统图和 OPL 投影的最小修订。",
+    "root_context_id": "context.sd.root"
+  },
+  "elements": [
+    {
+      "element_id": "element.raw.material",
+      "core_kind": "OBJECT",
+      "capability_ref": {
+        "capability_id": "CAP-OBJECT-001",
+        "profile_id": "profile.iso19450.2024.draft",
+        "profile_version": "0.1.0"
+      },
+      "name": {
+        "namespace": "urn:opm:demo:processing",
+        "local_name": "Raw Material"
+      },
+      "essence": "PHYSICAL",
+      "affiliation": "SYSTEMIC",
+      "perseverance": "PERSISTENT",
+      "state_ids": ["state.raw.available"],
+      "source": {
+        "source_profile_id": "profile.iso19450.2024.draft",
+        "source_profile_version": "0.1.0",
+        "source_kind": "Object",
+        "source_entity_id": "profile.entity.object"
+      },
+      "normalization": {
+        "level": "CORE"
+      }
+    },
+    {
+      "element_id": "element.processing",
+      "core_kind": "PROCESS",
+      "capability_ref": {
+        "capability_id": "CAP-PROCESS-001",
+        "profile_id": "profile.iso19450.2024.draft",
+        "profile_version": "0.1.0"
+      },
+      "name": {
+        "namespace": "urn:opm:demo:processing",
+        "local_name": "Processing"
+      },
+      "essence": "PHYSICAL",
+      "affiliation": "SYSTEMIC",
+      "perseverance": "DYNAMIC",
+      "source": {
+        "source_profile_id": "profile.iso19450.2024.draft",
+        "source_profile_version": "0.1.0",
+        "source_kind": "Process",
+        "source_entity_id": "profile.entity.process"
+      },
+      "normalization": {
+        "level": "CORE"
+      }
+    }
+  ],
+  "states": [
+    {
+      "state_id": "state.raw.available",
+      "owner_element_id": "element.raw.material",
+      "capability_ref": {
+        "capability_id": "CAP-STATE-001",
+        "profile_id": "profile.iso19450.2024.draft",
+        "profile_version": "0.1.0"
+      },
+      "name": {
+        "namespace": "urn:opm:demo:processing",
+        "local_name": "available"
+      },
+      "state_roles": ["INITIAL"],
+      "source": {
+        "source_profile_id": "profile.iso19450.2024.draft",
+        "source_profile_version": "0.1.0",
+        "source_kind": "State",
+        "source_entity_id": "profile.entity.state"
+      },
+      "normalization": {
+        "level": "CORE"
+      }
+    }
+  ],
+  "facts": [
+    {
+      "fact_id": "fact.processing.consumes.raw",
+      "fact_family": "TRANSFORMATION",
+      "capability_ref": {
+        "capability_id": "CAP-CONSUMPTION-001",
+        "profile_id": "profile.iso19450.2024.draft",
+        "profile_version": "0.1.0"
+      },
+      "endpoints": [
+        {
+          "endpoint_id": "endpoint.consumption.object",
+          "role": "CONSUMED_OBJECT",
+          "target_kind": "ELEMENT",
+          "target_id": "element.raw.material",
+          "ordinal": 0,
+          "state_qualification_id": "state.raw.available"
+        },
+        {
+          "endpoint_id": "endpoint.consumption.process",
+          "role": "CONSUMING_PROCESS",
+          "target_kind": "ELEMENT",
+          "target_id": "element.processing",
+          "ordinal": 1
+        }
+      ],
+      "direction": "DIRECTED",
+      "source": {
+        "source_profile_id": "profile.iso19450.2024.draft",
+        "source_profile_version": "0.1.0",
+        "source_kind": "ConsumptionLink",
+        "source_entity_id": "profile.fact.consumption"
+      },
+      "normalization": {
+        "level": "CORE"
+      }
+    }
+  ],
+  "contexts": [
+    {
+      "context_id": "context.sd.root",
+      "context_kind": "SYSTEM_DIAGRAM",
+      "capability_ref": {
+        "capability_id": "CAP-CONTEXT-001",
+        "profile_id": "profile.iso19450.2024.draft",
+        "profile_version": "0.1.0"
+      },
+      "name": {
+        "namespace": "urn:opm:demo:processing",
+        "local_name": "SD"
+      },
+      "occurrence_ids": [
+        "occurrence.raw.material",
+        "occurrence.processing",
+        "occurrence.raw.available",
+        "occurrence.consumption"
+      ],
+      "source": {
+        "source_profile_id": "profile.iso19450.2024.draft",
+        "source_profile_version": "0.1.0",
+        "source_kind": "SystemDiagram",
+        "source_entity_id": "profile.context.system.diagram"
+      }
+    }
+  ],
+  "occurrences": [
+    {
+      "occurrence_id": "occurrence.raw.material",
+      "context_id": "context.sd.root",
+      "target_kind": "ELEMENT",
+      "target_id": "element.raw.material",
+      "ownership": "OWNED",
+      "construct_role": "OBJECT_NODE",
+      "layout_id": "layout.raw.material"
+    },
+    {
+      "occurrence_id": "occurrence.processing",
+      "context_id": "context.sd.root",
+      "target_kind": "ELEMENT",
+      "target_id": "element.processing",
+      "ownership": "OWNED",
+      "construct_role": "PROCESS_NODE",
+      "layout_id": "layout.processing"
+    },
+    {
+      "occurrence_id": "occurrence.raw.available",
+      "context_id": "context.sd.root",
+      "target_kind": "STATE",
+      "target_id": "state.raw.available",
+      "ownership": "OWNED",
+      "construct_role": "STATE_NODE",
+      "layout_id": "layout.raw.available"
+    },
+    {
+      "occurrence_id": "occurrence.consumption",
+      "context_id": "context.sd.root",
+      "target_kind": "FACT",
+      "target_id": "fact.processing.consumes.raw",
+      "ownership": "OWNED",
+      "construct_role": "CONSUMPTION_LINK",
+      "layout_id": "layout.consumption"
+    }
+  ],
+  "layouts": [
+    {
+      "layout_id": "layout.raw.material",
+      "x": 160,
+      "y": 180,
+      "width": 180,
+      "height": 92,
+      "z_order": 2
+    },
+    {
+      "layout_id": "layout.processing",
+      "x": 500,
+      "y": 176,
+      "width": 180,
+      "height": 100,
+      "z_order": 2
+    },
+    {
+      "layout_id": "layout.raw.available",
+      "x": 205,
+      "y": 242,
+      "width": 90,
+      "height": 28,
+      "z_order": 3
+    },
+    {
+      "layout_id": "layout.consumption",
+      "x": 340,
+      "y": 222,
+      "width": 160,
+      "height": 2,
+      "z_order": 1,
+      "route_points": [
+        {"x": 340, "y": 222},
+        {"x": 500, "y": 222}
+      ]
+    }
+  ],
+  "text_artifact": {
+    "artifact_id": "artifact.opl.sd.root",
+    "modality": "OPL",
+    "context_id": "context.sd.root",
+    "sentences": [
+      {
+        "sentence_id": "sentence.consumption.001",
+        "text": "Processing consumes available Raw Material.",
+        "ordinal": 0,
+        "generation_rule_ids": ["opl.consumption.v1"],
+        "input_fact_ids": ["fact.processing.consumes.raw"]
+      }
+    ],
+    "artifact_digest": {
+      "algorithm": "sha256",
+      "digest": "8888888888888888888888888888888888888888888888888888888888888888"
+    }
+  },
+  "validation_summary": {
+    "scope": "POST_COMMIT",
+    "blocking": 0,
+    "warning": 0,
+    "suggestion": 0,
+    "coverage_state": "INCOMPLETE",
+    "report_digest": {
+      "algorithm": "sha256",
+      "digest": "9999999999999999999999999999999999999999999999999999999999999999"
+    }
+  },
+  "revision_digest": {
+    "algorithm": "sha256",
+    "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  }
+}

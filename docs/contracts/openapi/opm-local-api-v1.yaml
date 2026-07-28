@@ -1,0 +1,836 @@
+openapi: 3.1.0
+info:
+  title: OPM Local Modeling API
+  version: 0.1.0-draft
+  summary: P01-P03 与最小版本、校验闭环的本地 HTTP 契约
+  description: >-
+    该契约仅用于首批开发。服务只监听 loopback；写请求除本地会话头外，
+    运行时还必须校验 Host 与 Origin。契约不表示完整 ISO 19450:2024 符合性。
+servers:
+  - url: http://127.0.0.1:{port}/api/v1
+    description: 本地运行时
+    variables:
+      port:
+        default: "17850"
+security:
+  - localSession: []
+tags:
+  - name: Projects
+  - name: Models
+  - name: Contexts
+  - name: Editing
+  - name: Text
+  - name: Validation
+  - name: Versions
+  - name: Tasks
+paths:
+  /projects:
+    get:
+      tags: [Projects]
+      operationId: API-PRJ-001
+      summary: 分页查询本地项目
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/PageSize"
+        - name: query
+          in: query
+          schema: {type: string, maxLength: 200}
+      responses:
+        "200":
+          description: 项目页
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectPageResult"
+        default:
+          $ref: "#/components/responses/ErrorResponse"
+    post:
+      tags: [Projects]
+      operationId: API-PRJ-003
+      summary: 创建本地项目
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProjectRequest"
+      responses:
+        "201":
+          description: 项目已创建
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectCommandResult"
+        "409":
+          $ref: "#/components/responses/ErrorResponse"
+        default:
+          $ref: "#/components/responses/ErrorResponse"
+  /projects/{projectId}:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+    get:
+      tags: [Projects]
+      operationId: API-PRJ-002
+      summary: 读取项目摘要
+      responses:
+        "200":
+          description: 项目摘要
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectQueryResult"
+        "404":
+          $ref: "#/components/responses/ErrorResponse"
+        default:
+          $ref: "#/components/responses/ErrorResponse"
+  /projects/{projectId}/models:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+    get:
+      tags: [Models]
+      operationId: API-PRJ-006
+      summary: 分页查询项目中的模型
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: 模型页
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModelPageResult"
+        default:
+          $ref: "#/components/responses/ErrorResponse"
+    post:
+      tags: [Models]
+      operationId: API-PRJ-007
+      summary: 创建模型、初始草稿和根 Context
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateModelRequest"
+      responses:
+        "201":
+          description: 模型已创建
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModelCommandResult"
+        "409":
+          $ref: "#/components/responses/ErrorResponse"
+        default:
+          $ref: "#/components/responses/ErrorResponse"
+  /projects/{projectId}/models/{modelId}/workspace-session:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+      - $ref: "#/components/parameters/ModelId"
+    get:
+      tags: [Models]
+      operationId: API-PRJ-009
+      summary: 打开模型并取得工作台会话
+      responses:
+        "200":
+          description: 工作台会话
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceSessionResult"
+        "404":
+          $ref: "#/components/responses/ErrorResponse"
+        default:
+          $ref: "#/components/responses/ErrorResponse"
+  /projects/{projectId}/models/{modelId}/contexts/{contextId}/navigation:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+      - $ref: "#/components/parameters/ModelId"
+      - $ref: "#/components/parameters/ContextId"
+      - $ref: "#/components/parameters/Revision"
+    get:
+      tags: [Contexts]
+      operationId: API-CTX-001
+      summary: 读取多 OPD 导航树和当前 Context 路径
+      responses:
+        "200":
+          description: Context 导航投影
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContextNavigationResult"
+        default:
+          $ref: "#/components/responses/ErrorResponse"
+  /projects/{projectId}/models/{modelId}/contexts/{contextId}/projection:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+      - $ref: "#/components/parameters/ModelId"
+      - $ref: "#/components/parameters/ContextId"
+      - $ref: "#/components/parameters/Revision"
+    get:
+      tags: [Contexts]
+      operationId: API-CTX-002
+      summary: 读取 OPD Construct 投影
+      responses:
+        "200":
+          description: 与修订绑定的 OPD 投影
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContextProjectionResult"
+        default:
+          $ref: "#/components/responses/ErrorResponse"
+  /projects/{projectId}/models/{modelId}/contexts/{contextId}/command-capabilities:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+      - $ref: "#/components/parameters/ModelId"
+      - $ref: "#/components/parameters/ContextId"
+      - $ref: "#/components/parameters/Revision"
+    get:
+      tags: [Editing]
+      operationId: API-EDT-001
+      summary: 查询当前选择可执行的建模命令
+      parameters:
+        - name: selection_id
+          in: query
+          schema: {type: string}
+      responses:
+        "200":
+          description: Profile 与 Rule 过滤后的命令能力
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommandCapabilitiesResult"
+        default:
+          $ref: "#/components/responses/ErrorResponse"
+  /projects/{projectId}/models/{modelId}/contexts/{contextId}/commands:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+      - $ref: "#/components/parameters/ModelId"
+      - $ref: "#/components/parameters/ContextId"
+    post:
+      tags: [Editing]
+      operationId: API-EDT-002
+      summary: 原子执行一个语义编辑命令
+      description: >-
+        普通视口缩放、平移和面板状态禁止调用本接口。语义 in/out-zoom、
+        Context 变更和语义布局必须调用本接口并产生新修订。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExecuteEditCommandRequest"
+      responses:
+        "200":
+          description: 命令已原子提交或被业务规则阻断
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EditCommandResult"
+        "409":
+          $ref: "#/components/responses/ErrorResponse"
+        "422":
+          $ref: "#/components/responses/ErrorResponse"
+        default:
+          $ref: "#/components/responses/ErrorResponse"
+  /projects/{projectId}/models/{modelId}/contexts/{contextId}/text-projection:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+      - $ref: "#/components/parameters/ModelId"
+      - $ref: "#/components/parameters/ContextId"
+      - $ref: "#/components/parameters/Revision"
+    get:
+      tags: [Text]
+      operationId: API-TXT-001
+      summary: 读取与当前 OPD 修订一致的 OPL 或 OPT 投影
+      parameters:
+        - name: scope
+          in: query
+          schema:
+            type: string
+            enum: [CONTEXT, SUBTREE, MODEL]
+            default: CONTEXT
+      responses:
+        "200":
+          description: 文本投影和图文追踪索引
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TextProjectionResult"
+        default:
+          $ref: "#/components/responses/ErrorResponse"
+  /projects/{projectId}/models/{modelId}/validation-tasks:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+      - $ref: "#/components/parameters/ModelId"
+    post:
+      tags: [Validation]
+      operationId: API-VAL-001
+      summary: 对固定输入修订启动校验任务
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ValidateModelRequest"
+      responses:
+        "202":
+          description: 校验任务已耐久登记
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskAcceptedResult"
+        "409":
+          $ref: "#/components/responses/ErrorResponse"
+        default:
+          $ref: "#/components/responses/ErrorResponse"
+  /projects/{projectId}/models/{modelId}/revisions:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+      - $ref: "#/components/parameters/ModelId"
+    get:
+      tags: [Versions]
+      operationId: API-VER-001
+      summary: 查询草稿、快照和基线修订
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: 修订页
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RevisionPageResult"
+        default:
+          $ref: "#/components/responses/ErrorResponse"
+  /projects/{projectId}/models/{modelId}/baselines:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+      - $ref: "#/components/parameters/ModelId"
+    post:
+      tags: [Versions]
+      operationId: API-VER-004
+      summary: 在全量校验门槛后创建不可变基线
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateBaselineRequest"
+      responses:
+        "201":
+          description: 基线已创建
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BaselineCommandResult"
+        "202":
+          description: 基线门槛校验任务已耐久登记
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskAcceptedResult"
+        "409":
+          $ref: "#/components/responses/ErrorResponse"
+        "422":
+          $ref: "#/components/responses/ErrorResponse"
+        default:
+          $ref: "#/components/responses/ErrorResponse"
+  /tasks/{taskId}:
+    parameters:
+      - $ref: "#/components/parameters/TaskId"
+    get:
+      tags: [Tasks]
+      operationId: API-TSK-001
+      summary: 查询后台任务状态和结果
+      responses:
+        "200":
+          description: 任务状态
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskQueryResult"
+        "404":
+          $ref: "#/components/responses/ErrorResponse"
+        default:
+          $ref: "#/components/responses/ErrorResponse"
+  /tasks/{taskId}/events:
+    parameters:
+      - $ref: "#/components/parameters/TaskId"
+    get:
+      tags: [Tasks]
+      operationId: API-TSK-004
+      summary: 订阅单个任务的本地 SSE 状态流
+      responses:
+        "200":
+          description: 任务事件流；断线后客户端必须回查 API-TSK-001
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                examples:
+                  - "event: task-progress\ndata: {\"task_id\":\"task.validate.001\",\"state\":\"RUNNING\",\"progress\":40}\n\n"
+        default:
+          $ref: "#/components/responses/ErrorResponse"
+components:
+  securitySchemes:
+    localSession:
+      type: apiKey
+      in: header
+      name: X-OPM-Session
+      description: 启动本地运行时后签发的短期会话值，不表示用户身份或权限。
+  parameters:
+    ProjectId:
+      name: projectId
+      in: path
+      required: true
+      schema: {$ref: "#/components/schemas/StableId"}
+    ModelId:
+      name: modelId
+      in: path
+      required: true
+      schema: {$ref: "#/components/schemas/StableId"}
+    ContextId:
+      name: contextId
+      in: path
+      required: true
+      schema: {$ref: "#/components/schemas/StableId"}
+    TaskId:
+      name: taskId
+      in: path
+      required: true
+      schema: {$ref: "#/components/schemas/StableId"}
+    Revision:
+      name: revision
+      in: query
+      required: true
+      schema: {$ref: "#/components/schemas/StableId"}
+    Cursor:
+      name: cursor
+      in: query
+      schema: {type: string}
+    PageSize:
+      name: page_size
+      in: query
+      schema: {type: integer, minimum: 1, maximum: 200, default: 50}
+  responses:
+    ErrorResponse:
+      description: 结构化错误；具体 HTTP 状态由错误类别决定
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+  schemas:
+    StableId:
+      type: string
+      minLength: 3
+      maxLength: 160
+      pattern: "^[A-Za-z][A-Za-z0-9._:-]*$"
+    Version:
+      type: string
+      pattern: "^[0-9]+\\.[0-9]+(?:\\.[0-9]+)?$"
+    Timestamp:
+      type: string
+      format: date-time
+    Freshness:
+      type: string
+      enum: [current, stale, historical, not-applicable]
+    PageInfo:
+      type: object
+      additionalProperties: false
+      required: [has_more]
+      properties:
+        next_cursor: {type: [string, "null"]}
+        has_more: {type: boolean}
+    ProfileRuleGuard:
+      type: object
+      additionalProperties: false
+      required: [profile_id, profile_version, rule_set_id, rule_version]
+      properties:
+        profile_id: {$ref: "#/components/schemas/StableId"}
+        profile_version: {$ref: "#/components/schemas/Version"}
+        rule_set_id: {$ref: "#/components/schemas/StableId"}
+        rule_version: {$ref: "#/components/schemas/Version"}
+    WriteGuard:
+      type: object
+      required: [request_id, command_id]
+      properties:
+        request_id: {$ref: "#/components/schemas/StableId"}
+        command_id: {$ref: "#/components/schemas/StableId"}
+        base_revision: {$ref: "#/components/schemas/StableId"}
+        binding: {$ref: "#/components/schemas/ProfileRuleGuard"}
+    Project:
+      type: object
+      additionalProperties: false
+      required: [project_id, name, archive_state, updated_at]
+      properties:
+        project_id: {$ref: "#/components/schemas/StableId"}
+        name: {type: string, minLength: 1, maxLength: 256}
+        description: {type: string, maxLength: 4000}
+        archive_state: {type: string, enum: [ACTIVE, ARCHIVED]}
+        model_count: {type: integer, minimum: 0}
+        updated_at: {$ref: "#/components/schemas/Timestamp"}
+    Model:
+      type: object
+      additionalProperties: false
+      required: [model_id, project_id, name, head_revision, profile_id, profile_version, rule_version]
+      properties:
+        model_id: {$ref: "#/components/schemas/StableId"}
+        project_id: {$ref: "#/components/schemas/StableId"}
+        name: {type: string, minLength: 1, maxLength: 256}
+        head_revision: {$ref: "#/components/schemas/StableId"}
+        profile_id: {$ref: "#/components/schemas/StableId"}
+        profile_version: {$ref: "#/components/schemas/Version"}
+        rule_version: {$ref: "#/components/schemas/Version"}
+        access_mode: {type: string, enum: [EDITABLE_DRAFT, READONLY_SNAPSHOT, READONLY_BASELINE]}
+    RevisionSummary:
+      type: object
+      additionalProperties: false
+      required: [revision_id, sequence, kind, created_at, immutable]
+      properties:
+        revision_id: {$ref: "#/components/schemas/StableId"}
+        sequence: {type: integer, minimum: 1}
+        kind: {type: string, enum: [DRAFT, SNAPSHOT, BASELINE]}
+        name: {type: string}
+        created_at: {$ref: "#/components/schemas/Timestamp"}
+        immutable: {type: boolean}
+        blocking_count: {type: integer, minimum: 0}
+    QueryMeta:
+      type: object
+      additionalProperties: false
+      required: [request_id, freshness, generated_at]
+      properties:
+        request_id: {$ref: "#/components/schemas/StableId"}
+        read_revision: {oneOf: [{$ref: "#/components/schemas/StableId"}, {type: "null"}]}
+        profile_version: {oneOf: [{$ref: "#/components/schemas/Version"}, {type: "null"}]}
+        rule_version: {oneOf: [{$ref: "#/components/schemas/Version"}, {type: "null"}]}
+        freshness: {$ref: "#/components/schemas/Freshness"}
+        generated_at: {$ref: "#/components/schemas/Timestamp"}
+        page_info: {$ref: "#/components/schemas/PageInfo"}
+    CommandMeta:
+      type: object
+      additionalProperties: false
+      required: [request_id, command_id, status, autosave_state]
+      properties:
+        request_id: {$ref: "#/components/schemas/StableId"}
+        command_id: {$ref: "#/components/schemas/StableId"}
+        status: {type: string, enum: [COMMITTED, BLOCKED, FAILED, ACCEPTED]}
+        committed_revision: {oneOf: [{$ref: "#/components/schemas/StableId"}, {type: "null"}]}
+        autosave_state: {type: string, enum: [pending, saving, saved, failed, not-applicable]}
+        projection_state:
+          type: object
+          additionalProperties: {type: string, enum: [current, stale, generating, failed]}
+    ProjectPageResult:
+      type: object
+      required: [meta, data]
+      properties:
+        meta: {$ref: "#/components/schemas/QueryMeta"}
+        data: {type: array, items: {$ref: "#/components/schemas/Project"}}
+    ProjectQueryResult:
+      type: object
+      required: [meta, data]
+      properties:
+        meta: {$ref: "#/components/schemas/QueryMeta"}
+        data: {$ref: "#/components/schemas/Project"}
+    ModelPageResult:
+      type: object
+      required: [meta, data]
+      properties:
+        meta: {$ref: "#/components/schemas/QueryMeta"}
+        data: {type: array, items: {$ref: "#/components/schemas/Model"}}
+    RevisionPageResult:
+      type: object
+      required: [meta, data]
+      properties:
+        meta: {$ref: "#/components/schemas/QueryMeta"}
+        data: {type: array, items: {$ref: "#/components/schemas/RevisionSummary"}}
+    CreateProjectRequest:
+      type: object
+      unevaluatedProperties: false
+      allOf:
+        - $ref: "#/components/schemas/WriteGuard"
+        - type: object
+          required: [name]
+          properties:
+            name: {type: string, minLength: 1, maxLength: 256}
+            description: {type: string, maxLength: 4000}
+    CreateModelRequest:
+      type: object
+      unevaluatedProperties: false
+      allOf:
+        - $ref: "#/components/schemas/WriteGuard"
+        - type: object
+          required: [name, binding]
+          properties:
+            name: {type: string, minLength: 1, maxLength: 256}
+            description: {type: string, maxLength: 4000}
+            binding: {$ref: "#/components/schemas/ProfileRuleGuard"}
+    ProjectCommandResult:
+      type: object
+      required: [meta, data]
+      properties:
+        meta: {$ref: "#/components/schemas/CommandMeta"}
+        data: {$ref: "#/components/schemas/Project"}
+    ModelCommandResult:
+      type: object
+      required: [meta, data]
+      properties:
+        meta: {$ref: "#/components/schemas/CommandMeta"}
+        data: {$ref: "#/components/schemas/Model"}
+    WorkspaceSessionResult:
+      type: object
+      required: [meta, data]
+      properties:
+        meta: {$ref: "#/components/schemas/QueryMeta"}
+        data:
+          type: object
+          required: [model, root_context_id, current_context_id, viewport_state, panel_state]
+          properties:
+            model: {$ref: "#/components/schemas/Model"}
+            root_context_id: {$ref: "#/components/schemas/StableId"}
+            current_context_id: {$ref: "#/components/schemas/StableId"}
+            viewport_state: {type: object, additionalProperties: true}
+            panel_state: {type: object, additionalProperties: true}
+    ContextNavigationResult:
+      type: object
+      required: [meta, data]
+      properties:
+        meta: {$ref: "#/components/schemas/QueryMeta"}
+        data:
+          type: object
+          required: [current_path, process_tree, object_forest, views]
+          properties:
+            current_path: {type: array, items: {$ref: "#/components/schemas/StableId"}}
+            process_tree: {type: array, items: {$ref: "#/components/schemas/NavigationNode"}}
+            object_forest: {type: array, items: {$ref: "#/components/schemas/NavigationNode"}}
+            views: {type: array, items: {$ref: "#/components/schemas/NavigationNode"}}
+    NavigationNode:
+      type: object
+      required: [context_id, label, context_kind, has_children]
+      properties:
+        context_id: {$ref: "#/components/schemas/StableId"}
+        label: {type: string}
+        context_kind: {type: string}
+        has_children: {type: boolean}
+    ContextProjectionResult:
+      type: object
+      required: [meta, data]
+      properties:
+        meta: {$ref: "#/components/schemas/QueryMeta"}
+        data:
+          type: object
+          required: [context_id, constructs]
+          properties:
+            context_id: {$ref: "#/components/schemas/StableId"}
+            constructs:
+              type: array
+              items:
+                type: object
+                required: [occurrence_id, target_id, construct_role, layout]
+                properties:
+                  occurrence_id: {$ref: "#/components/schemas/StableId"}
+                  target_id: {$ref: "#/components/schemas/StableId"}
+                  construct_role: {type: string}
+                  label: {type: string}
+                  layout: {type: object, additionalProperties: true}
+    CommandCapabilitiesResult:
+      type: object
+      required: [meta, data]
+      properties:
+        meta: {$ref: "#/components/schemas/QueryMeta"}
+        data:
+          type: object
+          required: [allowed, forbidden]
+          properties:
+            allowed: {type: array, items: {type: string}}
+            forbidden:
+              type: array
+              items:
+                type: object
+                required: [command_type, reason_code]
+                properties:
+                  command_type: {type: string}
+                  reason_code: {type: string}
+    ExecuteEditCommandRequest:
+      type: object
+      unevaluatedProperties: false
+      allOf:
+        - $ref: "#/components/schemas/WriteGuard"
+        - type: object
+          required: [base_revision, binding, command_type, payload]
+          properties:
+            base_revision: {$ref: "#/components/schemas/StableId"}
+            binding: {$ref: "#/components/schemas/ProfileRuleGuard"}
+            command_type:
+              type: string
+              enum:
+                - CREATE_ELEMENT
+                - CREATE_FACT
+                - UPDATE_PROPERTY
+                - DELETE_CONSTRUCT
+                - CREATE_CONTEXT
+                - UPDATE_LAYOUT
+                - UPDATE_SEMANTIC_LAYOUT
+                - STATE_EXPLICIT
+                - STATE_SUPPRESS
+                - UNFOLD
+                - FOLD
+                - SEMANTIC_IN_ZOOM
+                - SEMANTIC_OUT_ZOOM
+            payload: {type: object, additionalProperties: true}
+    EditCommandResult:
+      type: object
+      required: [meta, data]
+      properties:
+        meta: {$ref: "#/components/schemas/CommandMeta"}
+        data:
+          type: object
+          required: [affected_ids, text_trace_ids, validation_summary]
+          properties:
+            affected_ids: {type: array, items: {$ref: "#/components/schemas/StableId"}}
+            text_trace_ids: {type: array, items: {$ref: "#/components/schemas/StableId"}}
+            validation_summary: {$ref: "#/components/schemas/ValidationSummary"}
+    TextProjectionResult:
+      type: object
+      required: [meta, data]
+      properties:
+        meta: {$ref: "#/components/schemas/QueryMeta"}
+        data:
+          type: object
+          required: [artifact_id, modality, sentences, traces]
+          properties:
+            artifact_id: {$ref: "#/components/schemas/StableId"}
+            modality: {type: string, enum: [OPL, OPT]}
+            sentences:
+              type: array
+              items:
+                type: object
+                required: [sentence_id, text, ordinal]
+                properties:
+                  sentence_id: {$ref: "#/components/schemas/StableId"}
+                  text: {type: string}
+                  ordinal: {type: integer, minimum: 0}
+            traces:
+              type: array
+              items:
+                type: object
+                required: [sentence_id, fact_ids, occurrence_ids]
+                properties:
+                  sentence_id: {$ref: "#/components/schemas/StableId"}
+                  fact_ids: {type: array, items: {$ref: "#/components/schemas/StableId"}}
+                  occurrence_ids: {type: array, items: {$ref: "#/components/schemas/StableId"}}
+    ValidateModelRequest:
+      type: object
+      unevaluatedProperties: false
+      allOf:
+        - $ref: "#/components/schemas/WriteGuard"
+        - type: object
+          required: [input_revision, binding, scope]
+          properties:
+            input_revision: {$ref: "#/components/schemas/StableId"}
+            binding: {$ref: "#/components/schemas/ProfileRuleGuard"}
+            scope: {type: string, enum: [INCREMENTAL, FULL, BASELINE_GATE, CONVERSION]}
+    CreateBaselineRequest:
+      type: object
+      unevaluatedProperties: false
+      allOf:
+        - $ref: "#/components/schemas/WriteGuard"
+        - type: object
+          required: [base_revision, binding, name, evidence_summary_token]
+          properties:
+            base_revision: {$ref: "#/components/schemas/StableId"}
+            binding: {$ref: "#/components/schemas/ProfileRuleGuard"}
+            name: {type: string, minLength: 1, maxLength: 256}
+            description: {type: string, maxLength: 4000}
+            evidence_summary_token: {type: string, minLength: 16}
+    BaselineCommandResult:
+      type: object
+      required: [meta, data]
+      properties:
+        meta: {$ref: "#/components/schemas/CommandMeta"}
+        data:
+          type: object
+          required: [baseline_id, revision_id, immutable]
+          properties:
+            baseline_id: {$ref: "#/components/schemas/StableId"}
+            revision_id: {$ref: "#/components/schemas/StableId"}
+            immutable: {const: true}
+    ValidationSummary:
+      type: object
+      required: [blocking, warning, suggestion, coverage_state]
+      properties:
+        blocking: {type: integer, minimum: 0}
+        warning: {type: integer, minimum: 0}
+        suggestion: {type: integer, minimum: 0}
+        coverage_state: {type: string, enum: [COMPLETE, INCOMPLETE, EVIDENCE_MISSING]}
+    TaskDescriptor:
+      type: object
+      additionalProperties: false
+      required: [task_id, task_type, state, stage, cancellable, created_at]
+      properties:
+        task_id: {$ref: "#/components/schemas/StableId"}
+        task_type: {type: string}
+        state: {type: string, enum: [QUEUED, RUNNING, CANCELLING, CANCELLED, COMPLETED, FAILED]}
+        stage: {type: string}
+        progress: {type: [integer, "null"], minimum: 0, maximum: 100}
+        input_revision: {$ref: "#/components/schemas/StableId"}
+        profile_version: {$ref: "#/components/schemas/Version"}
+        rule_version: {$ref: "#/components/schemas/Version"}
+        cancellable: {type: boolean}
+        result_ref: {type: [string, "null"]}
+        error: {oneOf: [{$ref: "#/components/schemas/ErrorDetail"}, {type: "null"}]}
+        created_at: {$ref: "#/components/schemas/Timestamp"}
+        started_at: {oneOf: [{$ref: "#/components/schemas/Timestamp"}, {type: "null"}]}
+        finished_at: {oneOf: [{$ref: "#/components/schemas/Timestamp"}, {type: "null"}]}
+    TaskAcceptedResult:
+      type: object
+      required: [meta, data]
+      properties:
+        meta: {$ref: "#/components/schemas/CommandMeta"}
+        data: {$ref: "#/components/schemas/TaskDescriptor"}
+    TaskQueryResult:
+      type: object
+      required: [meta, data]
+      properties:
+        meta: {$ref: "#/components/schemas/QueryMeta"}
+        data: {$ref: "#/components/schemas/TaskDescriptor"}
+    ErrorEnvelope:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error: {$ref: "#/components/schemas/ErrorDetail"}
+    ErrorDetail:
+      type: object
+      additionalProperties: false
+      required: [code, category, message, retryable, diagnostic_id]
+      properties:
+        code:
+          type: string
+          enum:
+            - INVALID_ARGUMENT
+            - NOT_FOUND
+            - CURSOR_EXPIRED
+            - IDEMPOTENCY_MISMATCH
+            - REVISION_CONFLICT
+            - READ_ONLY_REVISION
+            - RULE_VERSION_CONFLICT
+            - PROFILE_FORBIDDEN
+            - DOMAIN_REJECTED
+            - VALIDATION_BLOCKED
+            - TEXT_GENERATION_BLOCKED
+            - PERSISTENCE_FAILED
+            - TASK_FAILED
+            - LOCAL_SESSION_INVALID
+        category:
+          type: string
+          enum: [INPUT, DOMAIN, PROFILE, VALIDATION, TEXT, REVISION, PERSISTENCE, FORMAT, SECURITY, TASK, SYSTEM]
+        message: {type: string, minLength: 1}
+        retryable: {type: boolean}
+        field_errors: {type: array, items: {type: object, additionalProperties: true}}
+        locators: {type: array, items: {type: object, additionalProperties: true}}
+        rule_refs: {type: array, items: {type: object, additionalProperties: true}}
+        current_revision: {oneOf: [{$ref: "#/components/schemas/StableId"}, {type: "null"}]}
+        diagnostic_id: {$ref: "#/components/schemas/StableId"}

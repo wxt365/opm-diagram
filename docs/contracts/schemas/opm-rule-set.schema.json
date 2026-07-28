@@ -1,0 +1,227 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://opm.local/schemas/opm-rule-set/0.1",
+  "title": "OPM Rule Set Package",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_id",
+    "schema_version",
+    "coverage_scope",
+    "rule_set_id",
+    "rule_set_version",
+    "profile_scope",
+    "lifecycle",
+    "rule_groups",
+    "rules",
+    "dependency_edges",
+    "manifest"
+  ],
+  "properties": {
+    "schema_id": {"const": "RS-PKG-001"},
+    "schema_version": {"const": "0.1"},
+    "coverage_scope": {"enum": ["REPRESENTATIVE", "FULL"]},
+    "rule_set_id": {"$ref": "#/$defs/stableId"},
+    "rule_set_version": {"$ref": "#/$defs/version"},
+    "profile_scope": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/profileRef"}
+    },
+    "lifecycle": {"$ref": "#/$defs/lifecycle"},
+    "rule_groups": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/ruleGroup"}},
+    "rules": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/rule"}},
+    "dependency_edges": {"type": "array", "items": {"$ref": "#/$defs/dependencyEdge"}},
+    "manifest": {"$ref": "#/$defs/manifest"}
+  },
+  "allOf": [
+    {
+      "if": {
+        "type": "object",
+        "properties": {"coverage_scope": {"const": "FULL"}}
+      },
+      "then": {
+        "type": "object",
+        "properties": {"rule_groups": {"type": "array", "minItems": 103, "maxItems": 103}}
+      }
+    },
+    {
+      "if": {
+        "type": "object",
+        "properties": {
+          "lifecycle": {
+            "type": "object",
+            "properties": {"status": {"enum": ["ACTIVE", "DEPRECATED", "RETIRED"]}}
+          }
+        }
+      },
+      "then": {
+        "type": "object",
+        "properties": {"coverage_scope": {"const": "FULL"}}
+      }
+    }
+  ],
+  "$defs": {
+    "stableId": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 160,
+      "pattern": "^[A-Za-z][A-Za-z0-9._:-]*$"
+    },
+    "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+(?:\\.[0-9]+)?$"},
+    "digest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["algorithm", "digest"],
+      "properties": {
+        "algorithm": {"const": "sha256"},
+        "digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+      }
+    },
+    "profileRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profile_id", "profile_version"],
+      "properties": {
+        "profile_id": {"$ref": "#/$defs/stableId"},
+        "profile_version": {"$ref": "#/$defs/version"}
+      }
+    },
+    "lifecycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "minimum_engine_schema"],
+      "properties": {
+        "status": {"enum": ["DRAFT", "ACTIVE", "DEPRECATED", "RETIRED"]},
+        "minimum_engine_schema": {"$ref": "#/$defs/version"}
+      }
+    },
+    "ruleGroup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["group_id", "name", "source_locator", "gate_tags", "atomic_rule_ids", "coverage_state"],
+      "properties": {
+        "group_id": {"type": "string", "pattern": "^ISOR-[A-Z]+-[0-9]{3}$"},
+        "name": {"type": "string", "minLength": 1},
+        "source_locator": {"type": "string", "minLength": 1},
+        "gate_tags": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"enum": ["SYMBOLIC", "METHOD", "TOOL_GUIDE", "OPL", "PROFILE"]}
+        },
+        "atomic_rule_ids": {"type": "array", "items": {"$ref": "#/$defs/stableId"}},
+        "coverage_state": {"enum": ["GROUP_ONLY", "ATOMIC_INCOMPLETE", "ATOMIC_COMPLETE"]}
+      }
+    },
+    "selector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["input_root", "target_kind", "ordering", "max_results"],
+      "properties": {
+        "input_root": {"enum": ["REVISION", "CHANGE_SET", "COMMAND", "CONVERSION_CANDIDATE", "EVIDENCE_SET"]},
+        "target_kind": {"enum": ["MODEL", "ELEMENT", "STATE", "FACT", "CONTEXT", "OCCURRENCE", "SENTENCE"]},
+        "capability_ids": {
+          "type": "array",
+          "items": {"type": "string", "pattern": "^CAP-[A-Z-]+-[0-9]{3}$"}
+        },
+        "where": {"$ref": "#/$defs/expression"},
+        "ordering": {"enum": ["STABLE_ID_ASC", "CONTEXT_THEN_STABLE_ID"]},
+        "max_results": {"type": "integer", "minimum": 1, "maximum": 100000}
+      }
+    },
+    "expression": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["node_id", "node_kind", "result_type"],
+      "properties": {
+        "node_id": {"$ref": "#/$defs/stableId"},
+        "node_kind": {"enum": ["LITERAL", "FIELD_REF", "PARAM_REF", "UNARY", "BINARY", "NARY", "QUANTIFIER", "AGGREGATE", "TYPE_TEST", "SET_CONSTRUCTOR", "CONDITIONAL"]},
+        "result_type": {"enum": ["BOOLEAN", "INTEGER", "DECIMAL", "STRING", "ENUM", "ENTITY_REF", "SET", "LIST", "RECORD", "UNKNOWN"]},
+        "operator": {
+          "enum": [
+            "NOT", "AND", "OR", "XOR", "IMPLIES", "EQ", "NE", "LT", "LE", "GT", "GE", "BETWEEN",
+            "CONTAINS", "IN", "SUBSET", "SET_EQUALS", "INTERSECTS", "UNIQUE", "IS_EMPTY", "LENGTH",
+            "MATCHES_RESTRICTED_PATTERN", "STARTS_WITH", "ENDS_WITH", "IS_KIND", "IS_CAPABILITY", "REF_EXISTS",
+            "SAME_ID", "SAME_OWNER", "ADD", "SUBTRACT", "MULTIPLY", "DIVIDE", "SUM", "MIN", "MAX",
+            "ALL", "ANY", "NONE", "EXACTLY_ONE", "COUNT", "IS_ACYCLIC", "IS_CONNECTED", "REACHABLE",
+            "IN_DEGREE", "OUT_DEGREE", "OCCURS_IN", "IS_ANCESTOR", "REFINES", "VISIBLE_IN"
+          ]
+        },
+        "field_path": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_]*(?:\\.[A-Za-z][A-Za-z0-9_]*)*$"},
+        "literal": {},
+        "arguments": {"type": "array", "items": {"$ref": "#/$defs/expression"}}
+      }
+    },
+    "findingTemplate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["message", "locator_kind", "dedup_fields"],
+      "properties": {
+        "message": {"type": "string", "minLength": 1},
+        "remediation": {"type": "string", "minLength": 1},
+        "locator_kind": {"enum": ["MODEL", "CONTEXT", "ENTITY", "FIELD", "TEXT_TRACE", "EVIDENCE"]},
+        "field_path": {"type": "string"},
+        "dedup_fields": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}}
+      }
+    },
+    "rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rule_id",
+        "rule_version",
+        "group_ids",
+        "name",
+        "source_locator",
+        "category",
+        "stage",
+        "severity",
+        "baseline_policy",
+        "selector",
+        "assertion",
+        "unknown_policy",
+        "finding_template",
+        "lifecycle"
+      ],
+      "properties": {
+        "rule_id": {"$ref": "#/$defs/stableId"},
+        "rule_version": {"$ref": "#/$defs/version"},
+        "group_ids": {"type": "array", "minItems": 1, "items": {"type": "string", "pattern": "^ISOR-[A-Z]+-[0-9]{3}$"}},
+        "name": {"type": "string", "minLength": 1},
+        "source_locator": {"type": "string", "minLength": 1},
+        "category": {"enum": ["LANGUAGE", "METHOD", "QUALITY", "CONFORMANCE", "TEXT"]},
+        "stage": {"enum": ["COMMAND_FILTER", "PRE_COMMIT", "POST_COMMIT", "BASELINE_GATE", "CONVERSION"]},
+        "severity": {"enum": ["BLOCKING", "WARNING", "SUGGESTION"]},
+        "baseline_policy": {"enum": ["BLOCK", "ALLOW", "NOT_APPLICABLE"]},
+        "selector": {"$ref": "#/$defs/selector"},
+        "assertion": {"$ref": "#/$defs/expression"},
+        "unknown_policy": {"enum": ["FAIL", "SKIP", "EVALUATION_ERROR"]},
+        "finding_template": {"$ref": "#/$defs/findingTemplate"},
+        "depends_on": {"type": "array", "items": {"$ref": "#/$defs/stableId"}},
+        "lifecycle": {"enum": ["DRAFT", "ACTIVE", "DEPRECATED", "RETIRED"]}
+      }
+    },
+    "dependencyEdge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["predecessor", "successor", "kind", "on_fail"],
+      "properties": {
+        "predecessor": {"$ref": "#/$defs/stableId"},
+        "successor": {"$ref": "#/$defs/stableId"},
+        "kind": {"enum": ["REQUIRES_PASS", "REQUIRES_RESULT", "ORDERS_AFTER"]},
+        "on_fail": {"enum": ["SKIP", "BLOCK", "EVALUATE_ANYWAY"]}
+      }
+    },
+    "manifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rule_group_universe_size", "dependency_graph_digest", "rule_set_digest"],
+      "properties": {
+        "rule_group_universe_size": {"const": 103},
+        "dependency_graph_digest": {"$ref": "#/$defs/digest"},
+        "rule_set_digest": {"$ref": "#/$defs/digest"}
+      }
+    }
+  }
+}

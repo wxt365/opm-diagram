@@ -141,3 +141,9 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+.codex
+.harness
+reference
+
+# 保证前端依赖锁文件不受用户级忽略规则影响
+!package-lock.json

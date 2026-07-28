@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OPM Studio - 交互原型</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="global-header">
+      <button class="brand" type="button" data-page-link="P01" aria-label="返回项目库">
+        <span class="brand-mark" aria-hidden="true">OP</span>
+        <span>OPM Studio</span>
+      </button>
+      <nav class="page-nav" aria-label="原型页面">
+        <button type="button" data-page-link="P01">项目</button>
+        <button type="button" data-page-link="P02">模型</button>
+        <button type="button" data-page-link="P03">工作台</button>
+        <button type="button" data-page-link="P04">版本</button>
+        <button type="button" data-page-link="P05">校验</button>
+        <button type="button" data-page-link="P06">本地数据</button>
+      </nav>
+      <div class="runtime-state"><span class="status-dot"></span>本地运行</div>
+    </header>
+
+    <main>
+      <section class="page active" data-page="P01" aria-labelledby="p01-title">
+        <div class="page-heading">
+          <div>
+            <p class="breadcrumb">本地项目库</p>
+            <h1 id="p01-title">项目</h1>
+          </div>
+          <div class="heading-actions">
+            <button class="button secondary" type="button" data-overlay="OV07"><span aria-hidden="true">⇧</span> 导入</button>
+            <button class="button primary" type="button" data-overlay="OV01"><span aria-hidden="true">＋</span> 新建项目</button>
+          </div>
+        </div>
+        <div class="filter-bar">
+          <label class="search-field"><span aria-hidden="true">⌕</span><input type="search" placeholder="搜索项目、模型或 OPD" aria-label="搜索项目"></label>
+          <div class="segmented" role="group" aria-label="项目范围">
+            <button class="selected" type="button">活动</button>
+            <button type="button">已归档</button>
+          </div>
+          <span class="result-count">2 个项目</span>
+        </div>
+        <div class="project-list">
+          <article class="project-row">
+            <div class="project-symbol">FS</div>
+            <div class="resource-main">
+              <button class="link-title" type="button" data-page-link="P02">柔性制造系统</button>
+              <p>3 个模型 · 最近打开：原料加工系统</p>
+            </div>
+            <span class="profile-pill">ISO 草案 0.1.0</span>
+            <span class="time-cell">2 分钟前</span>
+            <button class="icon-button" type="button" title="更多项目操作" aria-label="更多项目操作">⋯</button>
+          </article>
+          <article class="project-row">
+            <div class="project-symbol alt">LG</div>
+            <div class="resource-main">
+              <button class="link-title" type="button" data-page-link="P02">物流履约系统</button>
+              <p>2 个模型 · 最近打开：订单履约</p>
+            </div>
+            <span class="profile-pill neutral">OPM 基础配置</span>
+            <span class="time-cell">昨天</span>
+            <button class="icon-button" type="button" title="更多项目操作" aria-label="更多项目操作">⋯</button>
+          </article>
+        </div>
+      </section>
+
+      <section class="page" data-page="P02" aria-labelledby="p02-title">
+        <div class="page-heading">
+          <div>
+            <p class="breadcrumb"><button type="button" data-page-link="P01">项目</button> / 柔性制造系统</p>
+            <h1 id="p02-title">柔性制造系统</h1>
+          </div>
+          <div class="heading-actions">
+            <button class="button secondary" type="button" data-page-link="P06">本地数据</button>
+            <button class="button primary" type="button" data-overlay="OV02"><span aria-hidden="true">＋</span> 新建模型</button>
+          </div>
+        </div>
+        <div class="summary-band">
+          <div><span>模型</span><strong>3</strong></div>
+          <div><span>当前草稿</span><strong>3</strong></div>
+          <div><span>本地基线</span><strong>1</strong></div>
+          <div><span>最近备份</span><strong>今天 09:42</strong></div>
+        </div>
+        <div class="section-toolbar">
+          <h2>模型</h2>
+          <label class="search-field compact"><span aria-hidden="true">⌕</span><input type="search" placeholder="搜索模型" aria-label="搜索模型"></label>
+        </div>
+        <div class="model-table" role="table" aria-label="模型列表">
+          <div class="table-row table-head" role="row">
+            <span>名称</span><span>Profile</span><span>修订</span><span>状态</span><span>操作</span>
+          </div>
+          <div class="table-row" role="row">
+            <div><strong>原料加工系统</strong><small>SD + 3 张细化 OPD</small></div>
+            <span>ISO 草案 0.1.0</span><span>r18</span><span class="state-label good">已保存</span>
+            <div class="row-actions"><button type="button" data-page-link="P03">打开</button><button type="button" data-overlay="OV04">转换</button></div>
+          </div>
+          <div class="table-row" role="row">
+            <div><strong>设备维护系统</strong><small>SD + 1 张细化 OPD</small></div>
+            <span>ISO 草案 0.1.0</span><span>r7</span><span class="state-label warn">校验过期</span>
+            <div class="row-actions"><button type="button" data-page-link="P03">打开</button><button type="button" data-overlay="OV04">转换</button></div>
+          </div>
+          <div class="table-row" role="row">
+            <div><strong>产线排程</strong><small>仅根系统图</small></div>
+            <span>OPM 基础配置</span><span>r3</span><span class="state-label">草稿</span>
+            <div class="row-actions"><button type="button" data-page-link="P03">打开</button><button type="button" data-overlay="OV04">转换</button></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="page workbench-page" data-page="P03" aria-labelledby="p03-title">
+        <div class="workbench-context">
+          <div class="context-title">
+            <p class="breadcrumb"><button type="button" data-page-link="P02">柔性制造系统</button> / 原料加工系统 / SD</p>
+            <div class="title-line"><h1 id="p03-title">原料加工系统</h1><span class="revision-badge">草稿 r18</span><span class="save-state"><span class="status-dot"></span>已保存</span></div>
+          </div>
+          <div class="profile-state"><span>ISO 19450:2024 草案</span><strong>Profile 0.1.0 · Rule 0.1.0</strong></div>
+          <div class="workbench-actions">
+            <button class="icon-button semantic-action" type="button" title="撤销" aria-label="撤销">↶</button>
+            <button class="icon-button semantic-action" type="button" title="重做" aria-label="重做">↷</button>
+            <button class="button secondary" type="button" data-action="validate">校验</button>
+            <button class="button secondary" type="button" data-overlay="OV05">快照</button>
+            <button class="button primary" type="button" data-overlay="OV06">生成基线</button>
+          </div>
+        </div>
+        <div class="readonly-banner" hidden><strong>只读基线 BL-001</strong><span>语义写入已禁用</span><button type="button" data-action="draft-from-baseline">基于基线创建草稿</button></div>
+
+        <div class="workbench-grid">
+          <aside class="model-navigator" aria-label="模型导航">
+            <div class="panel-tabs" role="tablist">
+              <button class="active" type="button">过程树</button>
+              <button type="button">对象树</button>
+              <button type="button">视图</button>
+            </div>
+            <label class="tree-search"><span aria-hidden="true">⌕</span><input type="search" placeholder="定位 OPD 或元素" aria-label="定位 OPD 或元素"></label>
+            <div class="tree-block">
+              <button class="tree-node current" type="button"><span class="tree-caret">▾</span><span class="tree-icon">SD</span><span>系统图</span><small>1</small></button>
+              <button class="tree-node child" type="button"><span class="tree-caret">▾</span><span class="tree-icon process-mini"></span><span>加工细化</span></button>
+              <button class="tree-node grandchild" type="button"><span class="tree-caret"></span><span class="tree-icon opd-mini">1</span><span>物料准备</span></button>
+              <button class="tree-node grandchild" type="button"><span class="tree-caret"></span><span class="tree-icon opd-mini">2</span><span>质量确认</span><small>1</small></button>
+            </div>
+            <div class="navigator-footer"><button type="button">系统地图</button><button type="button" data-overlay="OV11">影响分析</button></div>
+          </aside>
+
+          <section class="canvas-region" aria-label="OPD 画布">
+            <div class="canvas-toolbar" role="toolbar" aria-label="画布工具">
+              <div class="tool-group">
+                <button class="tool active" type="button" data-tool="select" title="选择">↖<span>选择</span></button>
+                <button class="tool" type="button" data-tool="pan" title="平移">✥<span>平移</span></button>
+              </div>
+              <div class="tool-group">
+                <button class="tool semantic-action" type="button" data-tool="object"><span class="object-icon"></span><span>对象</span></button>
+                <button class="tool semantic-action" type="button" data-tool="process"><span class="process-icon"></span><span>过程</span></button>
+                <button class="tool semantic-action" type="button" data-tool="consumption"><span aria-hidden="true">→</span><span>消耗</span></button>
+              </div>
+              <div class="tool-group">
+                <button class="tool semantic-action" type="button" data-overlay="OV03"><span aria-hidden="true">↳</span><span>细化 OPD</span></button>
+                <button class="tool semantic-action" type="button" data-overlay="SEMANTIC_ZOOM"><span aria-hidden="true">⊙</span><span>过程内缩放</span></button>
+              </div>
+              <div class="viewport-tools">
+                <button class="icon-button" type="button" data-zoom="out" title="缩小视图" aria-label="缩小视图">−</button>
+                <output id="zoom-output">100%</output>
+                <button class="icon-button" type="button" data-zoom="in" title="放大视图" aria-label="放大视图">＋</button>
+                <button class="icon-button" type="button" data-zoom="fit" title="适配画布" aria-label="适配画布">⌗</button>
+              </div>
+            </div>
+            <div class="canvas-surface" id="canvas-surface" tabindex="0" aria-label="SD 系统图画布">
+              <div class="canvas-meta"><span>SD</span><span id="canvas-mode">选择模式</span></div>
+              <div class="canvas-stage" id="canvas-stage">
+                <svg class="edge-layer" viewBox="0 0 900 520" aria-hidden="true">
+                  <defs>
+                    <marker id="closed-arrow" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto" markerUnits="strokeWidth">
+                      <path d="M 0 0 L 10 4 L 0 8 z"></path>
+                    </marker>
+                  </defs>
+                  <path class="opm-edge" data-select="consumption" d="M 340 250 L 510 250" marker-end="url(#closed-arrow)"></path>
+                </svg>
+                <button class="opm-node object selected" type="button" style="left: 180px; top: 200px" data-select="raw-material">
+                  <span>Raw Material</span>
+                  <span class="state-node initial">available</span>
+                </button>
+                <button class="opm-node process" type="button" style="left: 510px; top: 205px" data-select="processing">Processing</button>
+                <div class="system-boundary" aria-hidden="true"><span>System</span></div>
+              </div>
+            </div>
+          </section>
+
+          <aside class="property-inspector" aria-label="属性检查器">
+            <div class="panel-heading"><h2>属性</h2><span class="selection-kind">对象</span></div>
+            <div id="inspector-content">
+              <label class="field"><span>名称</span><input value="Raw Material" class="semantic-field"></label>
+              <div class="field-row"><label class="field"><span>类型</span><select class="semantic-field"><option>Object</option></select></label><label class="field"><span>归属</span><select class="semantic-field"><option>Systemic</option></select></label></div>
+              <div class="read-field"><span>稳定标识</span><code>element.raw.material</code></div>
+              <div class="read-field"><span>Capability</span><code>CAP-OBJECT-001</code></div>
+              <fieldset><legend>状态</legend><div class="state-list"><span>available <small>初始</small></span><button class="icon-button semantic-action" type="button" title="添加状态" aria-label="添加状态">＋</button></div></fieldset>
+              <button class="button primary full semantic-action" type="button" data-action="commit-property">应用更改</button>
+            </div>
+          </aside>
+
+          <section class="bottom-workspace" aria-label="文本、问题与历史">
+            <div class="bottom-tabs" role="tablist">
+              <button class="active" type="button" data-bottom-tab="opl">OPL <span class="current-dot"></span></button>
+              <button type="button" data-bottom-tab="findings">问题 <span class="count-badge">1</span></button>
+              <button type="button" data-bottom-tab="history">操作历史</button>
+              <button type="button" data-bottom-tab="method">架构方法</button>
+              <span class="projection-revision">当前 · r18</span>
+            </div>
+            <div class="bottom-content" data-bottom-panel="opl">
+              <button class="opl-sentence selected" type="button" data-select="consumption"><span class="line-number">1</span><strong>Processing</strong> consumes <strong>available Raw Material</strong>.</button>
+            </div>
+            <div class="bottom-content" data-bottom-panel="findings" hidden>
+              <button class="finding-row" type="button" data-select="raw-material"><span class="severity warning">警告</span><span><strong>对象缺少说明</strong><small>RULE-QUALITY-012 · element.raw.material</small></span><span>定位</span></button>
+            </div>
+            <div class="bottom-content" data-bottom-panel="history" hidden>
+              <div class="history-row"><span>r18</span><strong>创建消耗关系</strong><small>刚刚 · 已提交并保存</small></div>
+              <div class="history-row"><span>r17</span><strong>添加 available 状态</strong><small>4 分钟前 · 已提交并保存</small></div>
+            </div>
+            <div class="bottom-content" data-bottom-panel="method" hidden>
+              <div class="method-grid"><div><span>功能层</span><strong>1 个主过程</strong></div><div><span>架构层</span><strong>待分类</strong></div><div><span>实现层</span><strong>未展开</strong></div></div>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <section class="page" data-page="P04" aria-labelledby="p04-title">
+        <div class="page-heading">
+          <div><p class="breadcrumb"><button type="button" data-page-link="P03">原料加工系统</button> / 版本</p><h1 id="p04-title">版本与基线</h1></div>
+          <div class="heading-actions"><button class="button secondary" type="button" data-overlay="OV05">创建快照</button><button class="button primary" type="button" data-overlay="OV06">生成基线</button></div>
+        </div>
+        <div class="version-layout">
+          <section class="version-timeline">
+            <div class="section-toolbar"><h2>修订时间线</h2><span>18 个修订</span></div>
+            <article class="version-item current"><span class="version-point"></span><div><strong>r18 · 当前草稿</strong><p>创建消耗关系 · 已保存</p></div><button type="button" data-page-link="P03">打开</button></article>
+            <article class="version-item"><span class="version-point"></span><div><strong>SN-003 · 结构确认</strong><p>命名快照 · 今天 09:18</p></div><button type="button">比较</button></article>
+            <article class="version-item baseline"><span class="version-point"></span><div><strong>BL-001 · 方案基线</strong><p>不可变基线 · 昨天 17:40</p></div><button type="button" data-action="open-baseline">只读打开</button></article>
+          </section>
+          <section class="diff-panel">
+            <div class="section-toolbar"><h2>版本比较</h2><span class="state-label good">结果当前</span></div>
+            <div class="compare-selects"><select aria-label="左侧修订"><option>SN-003</option></select><span>→</span><select aria-label="右侧修订"><option>r18</option></select><button class="button secondary" type="button">比较</button></div>
+            <div class="diff-tabs"><button class="active" type="button">语义 2</button><button type="button">上下文 1</button><button type="button">布局 3</button><button type="button">OPL 1</button></div>
+            <div class="diff-row add"><span>＋</span><div><strong>新增 Consumption Fact</strong><code>fact.processing.consumes.raw</code></div></div>
+            <div class="diff-row add"><span>＋</span><div><strong>新增 available State</strong><code>state.raw.available</code></div></div>
+          </section>
+        </div>
+      </section>
+
+      <section class="page" data-page="P05" aria-labelledby="p05-title">
+        <div class="page-heading">
+          <div><p class="breadcrumb"><button type="button" data-page-link="P03">原料加工系统</button> / 标准与校验</p><h1 id="p05-title">标准、校验与符合性</h1></div>
+          <div class="heading-actions"><button class="button secondary" type="button" data-overlay="OV04">转换预检</button><button class="button primary" type="button" data-action="validate">运行全量校验</button></div>
+        </div>
+        <div class="conformance-banner">
+          <div><span>当前 Profile</span><strong>ISO 19450:2024 草案 · 0.1.0</strong></div>
+          <div><span>输入修订</span><strong>r18 · Rule 0.1.0</strong></div>
+          <div><span>符合性</span><strong class="unknown">证据未就绪</strong></div>
+          <div class="validation-progress"><span id="validation-label">校验结果当前</span><progress id="validation-progress" value="100" max="100"></progress></div>
+        </div>
+        <div class="conformance-layout">
+          <section class="finding-panel">
+            <div class="section-toolbar"><h2>问题</h2><div class="segmented small"><button class="selected" type="button">全部 1</button><button type="button">阻断 0</button><button type="button">警告 1</button></div></div>
+            <button class="finding-card selected" type="button" data-action="locate-finding"><span class="severity warning">警告</span><strong>对象缺少说明</strong><p>建议补充业务含义，以便下游语义资产复用。</p><small>RULE-QUALITY-012 · Raw Material · r18</small></button>
+          </section>
+          <section class="rule-detail">
+            <div class="section-toolbar"><h2>规则与证据</h2><span class="state-label warn">原子规则待补齐</span></div>
+            <dl><dt>规则</dt><dd>RULE-QUALITY-012</dd><dt>阶段</dt><dd>POST_COMMIT</dd><dt>等级</dt><dd>WARNING</dd><dt>定位</dt><dd>element.raw.material.description</dd></dl>
+            <h3>配置档覆盖</h3>
+            <div class="coverage-bar"><span style="width: 5%"></span></div>
+            <p class="coverage-text">代表性资产 5 / 96 Capability · 2 / 103 规则组</p>
+            <div class="evidence-note"><strong>无法形成 ISO 符合性结论</strong><span>完整符号、原子规则与 Annex A Grammar 证据尚未就绪。</span></div>
+          </section>
+        </div>
+      </section>
+
+      <section class="page" data-page="P06" aria-labelledby="p06-title">
+        <div class="page-heading">
+          <div><p class="breadcrumb"><button type="button" data-page-link="P02">柔性制造系统</button> / 本地数据</p><h1 id="p06-title">本地数据、备份与恢复</h1></div>
+          <div class="heading-actions"><button class="button secondary" type="button" data-overlay="OV07">导入</button><button class="button secondary" type="button" data-overlay="OV08">导出</button><button class="button primary" type="button" data-overlay="OV09">立即备份</button></div>
+        </div>
+        <div class="storage-band"><div class="storage-icon">DB</div><div><span>项目存储</span><strong>~/OPM Studio/柔性制造系统</strong><small>SQLite schema 1.0 · 资产完整 · 24.8 MB</small></div><span class="state-label good">健康</span><button class="button secondary" type="button">打开位置</button></div>
+        <div class="local-grid">
+          <section>
+            <div class="section-toolbar"><h2>自动备份</h2><label class="switch"><input type="checkbox" checked><span></span><em>已启用</em></label></div>
+            <div class="settings-row"><label>频率<select><option>每天</option></select></label><label>保留数量<input type="number" value="14" min="1"></label><button class="button secondary" type="button">保存策略</button></div>
+          </section>
+          <section>
+            <div class="section-toolbar"><h2>备份记录</h2><button class="button secondary" type="button" data-overlay="OV10">恢复备份</button></div>
+            <div class="backup-row"><span class="backup-type">完整</span><div><strong>backup-20260727-0942.opmb</strong><small>今天 09:42 · 24.8 MB · 校验通过</small></div><button class="icon-button" type="button" title="更多备份操作">⋯</button></div>
+            <div class="backup-row"><span class="backup-type">完整</span><div><strong>backup-20260726-1800.opmb</strong><small>昨天 18:00 · 24.1 MB · 校验通过</small></div><button class="icon-button" type="button" title="更多备份操作">⋯</button></div>
+          </section>
+          <section class="task-section">
+            <div class="section-toolbar"><h2>最近任务</h2><span>全部完成</span></div>
+            <div class="task-row"><span class="state-label good">完成</span><strong>项目备份</strong><span>写入 manifest</span><small>09:42</small></div>
+            <div class="task-row"><span class="state-label good">完成</span><strong>导出基线</strong><span>生成 .opmp 包</span><small>昨天</small></div>
+          </section>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="overlay-dialog" aria-labelledby="dialog-title">
+    <form method="dialog" id="overlay-form">
+      <div class="dialog-header"><div><span id="dialog-id"></span><h2 id="dialog-title"></h2></div><button class="icon-button" type="button" data-close-dialog aria-label="关闭">×</button></div>
+      <div class="dialog-content" id="dialog-content"></div>
+      <div class="dialog-actions"><button class="button secondary" type="button" data-close-dialog>取消</button><button class="button primary" id="dialog-submit" type="submit">确认</button></div>
+    </form>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+  <script src="./app.js"></script>
+</body>
+</html>

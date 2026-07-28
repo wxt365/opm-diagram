@@ -1,0 +1,17 @@
+spring:
+  application:
+    name: opm-local-runtime
+
+server:
+  address: 127.0.0.1
+  port: 17850
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      probes:
+        enabled: true

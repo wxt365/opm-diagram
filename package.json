@@ -1,0 +1,24 @@
+{
+  "name": "opm-modeling-tool",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "npm@10.9.4",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "contract:validate": "node scripts/validate-contracts.mjs",
+    "lint": "npm run lint --workspace=@opm/web",
+    "typecheck": "npm run typecheck --workspace=@opm/web",
+    "test": "npm run contract:validate && npm run test --workspace=@opm/web",
+    "build": "npm run contract:validate && npm run build --workspace=@opm/web",
+    "test:e2e": "playwright test --config=tests/e2e/playwright.config.ts",
+    "backend:verify": "./mvnw verify"
+  },
+  "devDependencies": {
+    "@apidevtools/swagger-parser": "10.1.1",
+    "@playwright/test": "1.57.0",
+    "ajv": "8.17.1",
+    "ajv-formats": "3.0.1"
+  }
+}
