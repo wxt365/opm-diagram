@@ -41,6 +41,9 @@ build/Release
 node_modules/
 jspm_packages/
 
+# Java/Maven 构建产物
+**/target/
+
 # Snowpack dependency directory (https://snowpack.dev/)
 web_modules/
 
