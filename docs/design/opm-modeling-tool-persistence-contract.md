@@ -1,10 +1,10 @@
 # OPM 单机建模工具逻辑持久化契约
 
-文档版本：`v0.3-draft`
+文档版本：`v0.4-draft`
 
 文档状态：逻辑数据与事务契约冻结；SQLite V1 物理设计已验证
 
-更新时间：2026-07-27
+更新时间：2026-07-28
 
 ## Task Type
 
@@ -99,7 +99,7 @@ Project 归档只修改目录可见状态，不删除 Model、Revision 或 Basel
 | 分区 | 所有者 | 最小内容 | 是否正式事实 |
 | --- | --- | --- | --- |
 | Revision Header | M09 | revision_id、parent、sequence、Profile/规则版本、原因、提交摘要和 digest | 是 |
-| Semantic Partition | M04 | Element、Fact、属性、端点、修饰、来源和扩展隔离 | 是 |
+| Semantic Partition | M04 | Element、Fact、属性、端点、受控 Modifier、独立 Condition、来源和扩展隔离 | 是 |
 | Context Partition | M05 | Context、Occurrence、Refinement Edge、View Definition、普通/语义 Layout | Context 和语义布局是；普通布局是正式图形表达 |
 | Text Partition | M08 | Text Artifact、Paragraph/Sentence、grammar version | 只读正式派生物 |
 | Trace Partition | M08 | Fact-Construct-Sentence-Rule 多对多映射 | 正式追踪 |
@@ -107,6 +107,33 @@ Project 归档只修改目录可见状态，不删除 Model、Revision 或 Basel
 | Method Partition | M11 | 架构分类、决策和豁免的版本化记录 | 方法事实，与语言事实分区 |
 
 正式提交包必须能在不读取页面缓存的情况下重建当前 OPD、导航、OPL/OPT 和提交时的追踪。详细 POST_COMMIT/FULL Validation Report 可以作为绑定 Revision 的独立不可变派生物保存，但不得冒充提交时原子摘要。
+
+#### 5.2.1 ISO Control 的 Revision 表示
+
+Control 作为基础 Fact 的组合语义进入同一 Semantic Partition。以下是逻辑 Canonical JSON 形状；对象包络和 CapabilityRef 物理编码由机器 Schema 冻结，但两个 key/value 不得改名：
+
+```json
+{
+  "fact_id": "fact-consumption-001",
+  "fact_family": "TRANSFORMATION",
+  "capability_ref": {
+    "capability_id": "CAP-ISO-PROC-001",
+    "profile_id": "iso-19450-2024",
+    "profile_version": "2024.1"
+  },
+  "modifiers": [
+    {"modifier_id": "control.capability", "value": "CAP-ISO-CTRL-001"},
+    {"modifier_id": "control.segment", "value": "PROCESS_INPUT"}
+  ]
+}
+```
+
+1. `fact_id` 和基础 Procedural Capability 不因增加/删除 Control 改变；
+2. Inline JSON 省略 MS-MOD-001 的 `target_ref/capability_ref`：owning Fact 隐含 target，两个逻辑 capability_ref 均由 `control.capability.value` 确定；
+3. 两个 Modifier 以 `modifier_id` 字典序规范化，作为同一 Revision digest、semantic change set、Text Trace 和 Operation Record 输入；
+4. 添加、替换或删除 Control pair 与 OPL、Trace、提交校验摘要和 Draft Head 移动属于同一 TX-002；
+5. 只有确有独立谓词时才持久化 `condition_id/MS-COND-001`，不得复制 `control.capability` 已表达的 Event/Condition；
+6. 读取到单项、重复项、未知 segment 或独立 ISO Control Fact 时，Revision 标记不兼容/无效，不进行猜测修复。
 
 ### 5.3 版本、基线和历史
 
@@ -156,7 +183,7 @@ Named Snapshot 和 Baseline 不复制第二份可写 Semantic Model，可以引�
 | `model_id/base_revision/next_revision` | 冲突守卫和新修订身份 |
 | `command_id/command_digest` | 幂等和请求一致性 |
 | `profile/rule/grammar versions` | 解释和生成上下文 |
-| `semantic_change_set` | Element/Fact 增删改及来源 |
+| `semantic_change_set` | Element/Fact/Modifier/Condition 增删改及来源 |
 | `context_change_set` | Context/Occurrence/Refinement/Layout 变化 |
 | `text_artifact_delta` | 受影响正式文本或确定性重建引用 |
 | `trace_delta` | Fact/Construct/Sentence/Rule 追踪变化 |

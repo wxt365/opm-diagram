@@ -16,7 +16,7 @@
       </button>
       <div class="header-context">
         <span class="header-context__label">本地设计确认</span>
-        <span class="header-context__state">Mock adapter</span>
+        <span class="header-context__state">Local Runtime · P03 设计确认</span>
       </div>
       <button
         class="header-toggle"

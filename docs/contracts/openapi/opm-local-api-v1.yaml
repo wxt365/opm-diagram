@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: OPM Local Modeling API
-  version: 0.1.0-draft
+  version: 0.2.0-draft
   summary: P01-P03 与最小版本、校验闭环的本地 HTTP 契约
   description: >-
     该契约仅用于首批开发。服务只监听 loopback；写请求除本地会话头外，
@@ -194,6 +194,20 @@ paths:
         - name: selection_id
           in: query
           schema: {type: string}
+        - name: intent
+          in: query
+          description: 完整画布候选查询意图；未提供时保持 P0 命令目录行为。
+          schema:
+            type: string
+            enum: [CREATE_FEATURE, CREATE_STATE, CREATE_FACT, UPDATE_STATE, UPDATE_FACT, DELETE_CONSTRUCT]
+        - name: endpoint
+          in: query
+          description: 用户选择顺序的 endpoint locator，可重复；服务端返回规范化端点。
+          style: form
+          explode: true
+          schema:
+            type: array
+            items: {$ref: "#/components/schemas/StableId"}
       responses:
         "200":
           description: Profile 与 Rule 过滤后的命令能力
@@ -634,25 +648,39 @@ components:
                   target_id: {$ref: "#/components/schemas/StableId"}
                   construct_role: {type: string}
                   label: {type: string}
+                  owner_id: {$ref: "#/components/schemas/StableId"}
+                  state_roles: {type: array, items: {type: string, enum: [INITIAL, DEFAULT, FINAL]}}
+                  explicitness: {type: string, enum: [EXPLICIT, SUPPRESSED]}
+                  fold_state: {type: string, enum: [UNFOLDED, FOLDED]}
+                  direction: {type: string, enum: [DIRECTED, BIDIRECTIONAL, UNDIRECTED]}
+                  capability_id: {type: string}
+                  endpoints: {type: array, items: {type: object, additionalProperties: true}}
+                  modifiers: {type: array, items: {type: object, additionalProperties: true}}
+                  labels: {type: array, items: {type: object, additionalProperties: true}}
+                  collection_completeness: {type: string, enum: [COMPLETE, INCOMPLETE, NOT_APPLICABLE]}
                   layout: {type: object, additionalProperties: true}
     CommandCapabilitiesResult:
       type: object
+      additionalProperties: false
       required: [meta, data]
       properties:
         meta: {$ref: "#/components/schemas/QueryMeta"}
         data:
           type: object
-          required: [allowed, forbidden]
+          additionalProperties: false
+          required: [allowed, forbidden, capability_query_id, options]
           properties:
-            allowed: {type: array, items: {type: string}}
+            allowed:
+              type: array
+              items: {$ref: "#/components/schemas/EditCommandType"}
             forbidden:
               type: array
               items:
-                type: object
-                required: [command_type, reason_code]
-                properties:
-                  command_type: {type: string}
-                  reason_code: {type: string}
+                $ref: "#/components/schemas/ForbiddenCommand"
+            capability_query_id: {$ref: "#/components/schemas/StableId"}
+            options:
+              type: array
+              items: {$ref: "#/components/schemas/CommandCapabilityOption"}
     ExecuteEditCommandRequest:
       type: object
       unevaluatedProperties: false
@@ -663,23 +691,434 @@ components:
           properties:
             base_revision: {$ref: "#/components/schemas/StableId"}
             binding: {$ref: "#/components/schemas/ProfileRuleGuard"}
-            command_type:
-              type: string
-              enum:
-                - CREATE_ELEMENT
-                - CREATE_FACT
-                - UPDATE_PROPERTY
-                - DELETE_CONSTRUCT
-                - CREATE_CONTEXT
-                - UPDATE_LAYOUT
-                - UPDATE_SEMANTIC_LAYOUT
-                - STATE_EXPLICIT
-                - STATE_SUPPRESS
-                - UNFOLD
-                - FOLD
-                - SEMANTIC_IN_ZOOM
-                - SEMANTIC_OUT_ZOOM
-            payload: {type: object, additionalProperties: true}
+            command_type: {$ref: "#/components/schemas/EditCommandType"}
+        - oneOf:
+            - $ref: "#/components/schemas/CreateElementCommand"
+            - $ref: "#/components/schemas/CreateFeatureCommand"
+            - $ref: "#/components/schemas/CreateFactCommand"
+            - $ref: "#/components/schemas/CreateStateCommand"
+            - $ref: "#/components/schemas/UpdateStateCommand"
+            - $ref: "#/components/schemas/UpdateFactCommand"
+            - $ref: "#/components/schemas/DeleteConstructCommand"
+            - $ref: "#/components/schemas/StateExplicitCommand"
+            - $ref: "#/components/schemas/StateSuppressCommand"
+            - $ref: "#/components/schemas/UnfoldCommand"
+            - $ref: "#/components/schemas/FoldCommand"
+            - $ref: "#/components/schemas/LegacyEditCommand"
+    EditCommandType:
+      type: string
+      enum:
+        - CREATE_ELEMENT
+        - CREATE_FEATURE
+        - CREATE_FACT
+        - CREATE_STATE
+        - UPDATE_STATE
+        - UPDATE_FACT
+        - UPDATE_PROPERTY
+        - DELETE_CONSTRUCT
+        - CREATE_CONTEXT
+        - UPDATE_LAYOUT
+        - UPDATE_SEMANTIC_LAYOUT
+        - STATE_EXPLICIT
+        - STATE_SUPPRESS
+        - UNFOLD
+        - FOLD
+        - SEMANTIC_IN_ZOOM
+        - SEMANTIC_OUT_ZOOM
+    CapabilityReference:
+      type: object
+      additionalProperties: false
+      required: [capability_id]
+      properties:
+        capability_id: {$ref: "#/components/schemas/StableId"}
+        version: {$ref: "#/components/schemas/Version"}
+    AssetReference:
+      type: object
+      additionalProperties: false
+      required: [id, version, digest]
+      properties:
+        id: {$ref: "#/components/schemas/StableId"}
+        version: {$ref: "#/components/schemas/Version"}
+        digest: {type: string, pattern: "^[a-f0-9]{64}$"}
+    TargetLocator:
+      type: object
+      additionalProperties: false
+      required: [target_kind, target_id]
+      properties:
+        target_kind: {type: string, enum: [ELEMENT, STATE, FACT, FEATURE, CONTEXT]}
+        target_id: {$ref: "#/components/schemas/StableId"}
+        occurrence_id: {$ref: "#/components/schemas/StableId"}
+    NormalizedEndpoint:
+      type: object
+      additionalProperties: false
+      required: [role, target_ref, ordinal]
+      properties:
+        role: {type: string, minLength: 1, maxLength: 128}
+        target_ref: {$ref: "#/components/schemas/TargetLocator"}
+        ordinal: {type: integer, minimum: 0}
+        state_qualification: {$ref: "#/components/schemas/StableId"}
+    RequiredField:
+      type: object
+      additionalProperties: false
+      required: [field_id, field_kind, required]
+      properties:
+        field_id: {type: string, minLength: 1, maxLength: 128}
+        field_kind: {type: string, enum: [TEXT, ENUM, LIST, ENDPOINT, LAYOUT, TOKEN]}
+        required: {type: boolean}
+        allowed_values: {type: array, items: {type: string}}
+    AllowedModifier:
+      type: object
+      additionalProperties: false
+      required: [modifier_id, value_options, min_occurs, max_occurs]
+      properties:
+        modifier_id: {$ref: "#/components/schemas/StableId"}
+        value_options: {type: array, items: {type: string}}
+        min_occurs: {type: integer, minimum: 0}
+        max_occurs: {type: integer, minimum: 0}
+        atomic_group_id: {type: string, minLength: 1, maxLength: 128}
+    ImpactSummary:
+      type: object
+      additionalProperties: false
+      required: [affected_construct_count, affected_context_count, affected_sentence_count, affected_finding_count]
+      properties:
+        affected_construct_count: {type: integer, minimum: 0}
+        affected_context_count: {type: integer, minimum: 0}
+        affected_sentence_count: {type: integer, minimum: 0}
+        affected_finding_count: {type: integer, minimum: 0}
+    CapabilityReasonCode:
+      type: string
+      enum:
+        - PROFILE_CAPABILITY_DISABLED
+        - SYMBOL_ASSET_MISSING
+        - TEXT_TEMPLATE_MISSING
+        - ENDPOINT_KIND_MISMATCH
+        - STATE_OWNER_MISMATCH
+        - CONTEXT_NOT_ALLOWED
+        - FACT_ALREADY_EXISTS
+        - MODIFIER_COMBINATION_INVALID
+        - READ_ONLY_REVISION
+        - REVISION_STALE
+    ForbiddenCommand:
+      type: object
+      additionalProperties: false
+      required: [command_type, reason_code]
+      properties:
+        command_type: {$ref: "#/components/schemas/EditCommandType"}
+        reason_code: {$ref: "#/components/schemas/CapabilityReasonCode"}
+    CommandCapabilityOption:
+      type: object
+      additionalProperties: false
+      required:
+        - capability_query_id
+        - option_id
+        - command_type
+        - capability_ref
+        - display_name
+        - group_path
+        - normalized_endpoints
+        - required_fields
+        - allowed_modifiers
+        - symbol_descriptor
+        - template_family
+        - rule_refs
+        - enabled
+        - reason_codes
+        - expires_with_revision
+      properties:
+        capability_query_id: {$ref: "#/components/schemas/StableId"}
+        option_id: {$ref: "#/components/schemas/StableId"}
+        command_type: {$ref: "#/components/schemas/EditCommandType"}
+        capability_ref: {$ref: "#/components/schemas/CapabilityReference"}
+        base_fact_capability_ref: {$ref: "#/components/schemas/CapabilityReference"}
+        display_name: {type: string, minLength: 1, maxLength: 256}
+        group_path: {type: array, items: {type: string, minLength: 1, maxLength: 128}}
+        normalized_endpoints: {type: array, items: {$ref: "#/components/schemas/NormalizedEndpoint"}}
+        required_fields: {type: array, items: {$ref: "#/components/schemas/RequiredField"}}
+        allowed_modifiers: {type: array, items: {$ref: "#/components/schemas/AllowedModifier"}}
+        symbol_descriptor: {$ref: "#/components/schemas/AssetReference"}
+        template_family: {$ref: "#/components/schemas/AssetReference"}
+        rule_refs: {type: array, items: {$ref: "#/components/schemas/AssetReference"}}
+        enabled: {type: boolean}
+        reason_codes: {type: array, items: {$ref: "#/components/schemas/CapabilityReasonCode"}}
+        impact_summary: {$ref: "#/components/schemas/ImpactSummary"}
+        impact_token: {type: string, minLength: 16, maxLength: 2048}
+        expires_with_revision: {$ref: "#/components/schemas/StableId"}
+      allOf:
+        - if:
+            properties:
+              command_type: {const: DELETE_CONSTRUCT}
+            required: [command_type]
+          then:
+            required: [impact_summary, impact_token]
+          else:
+            not:
+              anyOf:
+                - required: [impact_summary]
+                - required: [impact_token]
+    OccurrenceInput:
+      type: object
+      additionalProperties: false
+      required: [ownership, construct_role]
+      properties:
+        ownership: {type: string, enum: [OWNED, REFERENCED]}
+        construct_role: {type: string, minLength: 1, maxLength: 128}
+    Point:
+      type: object
+      additionalProperties: false
+      required: [x, y]
+      properties:
+        x: {type: number}
+        y: {type: number}
+    NodeLayoutInput:
+      type: object
+      additionalProperties: false
+      required: [x, y]
+      properties:
+        x: {type: number}
+        y: {type: number}
+        width: {type: number, exclusiveMinimum: 0}
+        height: {type: number, exclusiveMinimum: 0}
+    FactLayoutInput:
+      type: object
+      additionalProperties: false
+      properties:
+        x: {type: number}
+        y: {type: number}
+        route_points: {type: array, items: {$ref: "#/components/schemas/Point"}}
+        label_positions: {type: array, items: {$ref: "#/components/schemas/Point"}}
+        junction_position: {$ref: "#/components/schemas/Point"}
+    StateRoles:
+      type: array
+      uniqueItems: true
+      items: {type: string, enum: [INITIAL, DEFAULT, FINAL]}
+    LabelInput:
+      type: object
+      additionalProperties: false
+      required: [slot_id, text]
+      properties:
+        slot_id: {type: string, minLength: 1, maxLength: 128}
+        text: {type: string, maxLength: 4000}
+    ModifierInput:
+      type: object
+      additionalProperties: false
+      required: [modifier_id]
+      properties:
+        modifier_id: {$ref: "#/components/schemas/StableId"}
+        value: {type: [string, number, boolean, "null"]}
+    ConditionInput:
+      type: object
+      additionalProperties: false
+      required: [condition_id]
+      properties:
+        condition_id: {$ref: "#/components/schemas/StableId"}
+        value: {type: string, maxLength: 4000}
+    LogicalGroupInput:
+      type: object
+      additionalProperties: false
+      required: [group_id, endpoint_ordinals]
+      properties:
+        group_id: {$ref: "#/components/schemas/StableId"}
+        endpoint_ordinals: {type: array, minItems: 1, items: {type: integer, minimum: 0}}
+    CreateElementPayload:
+      type: object
+      additionalProperties: false
+      required: [kind, name, layout]
+      properties:
+        kind: {type: string, enum: [OBJECT, PROCESS]}
+        element_id: {$ref: "#/components/schemas/StableId"}
+        name: {type: string, minLength: 1, maxLength: 256}
+        layout: {$ref: "#/components/schemas/NodeLayoutInput"}
+    LegacyConsumptionPayload:
+      type: object
+      additionalProperties: false
+      required: [kind, object_id, process_id]
+      properties:
+        kind: {const: CONSUMPTION}
+        fact_id: {$ref: "#/components/schemas/StableId"}
+        object_id: {$ref: "#/components/schemas/StableId"}
+        state_id:
+          description: 可选；存在时必须由 object_id 所指的 Object 持有，作为消耗端点。
+          $ref: "#/components/schemas/StableId"
+        process_id: {$ref: "#/components/schemas/StableId"}
+        layout: {$ref: "#/components/schemas/NodeLayoutInput"}
+    CreateStatePayload:
+      type: object
+      additionalProperties: false
+      required: [context_id, owner_ref, capability_ref, name_or_value, state_roles, occurrence, layout, capability_query_id, selected_option_id]
+      properties:
+        context_id: {$ref: "#/components/schemas/StableId"}
+        owner_ref: {$ref: "#/components/schemas/TargetLocator"}
+        capability_ref: {$ref: "#/components/schemas/CapabilityReference"}
+        name_or_value: {type: string, minLength: 1, maxLength: 4000}
+        state_roles: {$ref: "#/components/schemas/StateRoles"}
+        occurrence: {$ref: "#/components/schemas/OccurrenceInput"}
+        layout: {$ref: "#/components/schemas/NodeLayoutInput"}
+        capability_query_id: {$ref: "#/components/schemas/StableId"}
+        selected_option_id: {$ref: "#/components/schemas/StableId"}
+    CreateFeaturePayload:
+      type: object
+      additionalProperties: false
+      required: [context_id, owner_element_id, feature_kind, capability_ref, name, occurrence, layout, capability_query_id, selected_option_id]
+      properties:
+        context_id: {$ref: "#/components/schemas/StableId"}
+        owner_element_id: {$ref: "#/components/schemas/StableId"}
+        feature_kind: {type: string, enum: [ATTRIBUTE, OPERATION]}
+        capability_ref: {$ref: "#/components/schemas/CapabilityReference"}
+        name: {type: string, minLength: 1, maxLength: 256}
+        occurrence: {$ref: "#/components/schemas/OccurrenceInput"}
+        layout: {$ref: "#/components/schemas/NodeLayoutInput"}
+        capability_query_id: {$ref: "#/components/schemas/StableId"}
+        selected_option_id: {$ref: "#/components/schemas/StableId"}
+    UpdateStatePayload:
+      type: object
+      additionalProperties: false
+      required: [state_id, expected_owner_ref, changes, capability_query_id, selected_option_id]
+      properties:
+        state_id: {$ref: "#/components/schemas/StableId"}
+        expected_owner_ref: {$ref: "#/components/schemas/TargetLocator"}
+        changes:
+          type: object
+          additionalProperties: false
+          minProperties: 1
+          properties:
+            name_or_value: {type: string, minLength: 1, maxLength: 4000}
+            state_roles: {$ref: "#/components/schemas/StateRoles"}
+            ordinal: {type: integer, minimum: 0}
+        capability_query_id: {$ref: "#/components/schemas/StableId"}
+        selected_option_id: {$ref: "#/components/schemas/StableId"}
+    CreateFactPayload:
+      type: object
+      additionalProperties: false
+      required: [context_id, capability_ref, fact_family, normalized_endpoints, direction, labels, modifiers, logical_groups, occurrence, layout, capability_query_id, selected_option_id]
+      properties:
+        context_id: {$ref: "#/components/schemas/StableId"}
+        capability_ref: {$ref: "#/components/schemas/CapabilityReference"}
+        fact_family: {type: string, enum: [PROCEDURAL, CONTROL, STRUCTURAL, TRANSFORMATION, ENABLING, PROFILE_FACT]}
+        normalized_endpoints: {type: array, minItems: 2, items: {$ref: "#/components/schemas/NormalizedEndpoint"}}
+        direction: {type: string, enum: [DIRECTED, BIDIRECTIONAL, UNDIRECTED]}
+        labels: {type: array, items: {$ref: "#/components/schemas/LabelInput"}}
+        modifiers: {type: array, items: {$ref: "#/components/schemas/ModifierInput"}}
+        condition: {$ref: "#/components/schemas/ConditionInput"}
+        logical_groups: {type: array, items: {$ref: "#/components/schemas/LogicalGroupInput"}}
+        collection_completeness: {type: string, enum: [COMPLETE, INCOMPLETE, NOT_APPLICABLE]}
+        occurrence: {$ref: "#/components/schemas/OccurrenceInput"}
+        layout: {$ref: "#/components/schemas/FactLayoutInput"}
+        capability_query_id: {$ref: "#/components/schemas/StableId"}
+        selected_option_id: {$ref: "#/components/schemas/StableId"}
+    UpdateFactPayload:
+      type: object
+      additionalProperties: false
+      required: [fact_id, expected_capability_ref, replacement, capability_query_id, selected_option_id]
+      properties:
+        fact_id: {$ref: "#/components/schemas/StableId"}
+        expected_capability_ref: {$ref: "#/components/schemas/CapabilityReference"}
+        replacement:
+          type: object
+          additionalProperties: false
+          minProperties: 1
+          properties:
+            normalized_endpoints: {type: array, minItems: 2, items: {$ref: "#/components/schemas/NormalizedEndpoint"}}
+            direction: {type: string, enum: [DIRECTED, BIDIRECTIONAL, UNDIRECTED]}
+            labels: {type: array, items: {$ref: "#/components/schemas/LabelInput"}}
+            modifiers: {type: array, items: {$ref: "#/components/schemas/ModifierInput"}}
+            condition: {$ref: "#/components/schemas/ConditionInput"}
+            logical_groups: {type: array, items: {$ref: "#/components/schemas/LogicalGroupInput"}}
+            collection_completeness: {type: string, enum: [COMPLETE, INCOMPLETE, NOT_APPLICABLE]}
+        capability_query_id: {$ref: "#/components/schemas/StableId"}
+        selected_option_id: {$ref: "#/components/schemas/StableId"}
+    DeleteConstructPayload:
+      type: object
+      additionalProperties: false
+      required: [construct_kind, construct_id, impact_token]
+      properties:
+        construct_kind: {type: string, enum: [ELEMENT, STATE, FACT, FEATURE, CONTEXT]}
+        construct_id: {$ref: "#/components/schemas/StableId"}
+        impact_token: {type: string, minLength: 16, maxLength: 2048}
+    StatePresentationPayload:
+      type: object
+      additionalProperties: false
+      required: [context_id, state_id]
+      properties:
+        context_id: {$ref: "#/components/schemas/StableId"}
+        state_id: {$ref: "#/components/schemas/StableId"}
+        layout: {$ref: "#/components/schemas/NodeLayoutInput"}
+    CreateElementCommand:
+      type: object
+      required: [command_type, payload]
+      properties:
+        command_type: {const: CREATE_ELEMENT}
+        payload: {$ref: "#/components/schemas/CreateElementPayload"}
+    CreateFeatureCommand:
+      type: object
+      required: [command_type, payload]
+      properties:
+        command_type: {const: CREATE_FEATURE}
+        payload: {$ref: "#/components/schemas/CreateFeaturePayload"}
+    CreateFactCommand:
+      type: object
+      required: [command_type, payload]
+      properties:
+        command_type: {const: CREATE_FACT}
+        payload:
+          oneOf:
+            - $ref: "#/components/schemas/LegacyConsumptionPayload"
+            - $ref: "#/components/schemas/CreateFactPayload"
+    CreateStateCommand:
+      type: object
+      required: [command_type, payload]
+      properties:
+        command_type: {const: CREATE_STATE}
+        payload: {$ref: "#/components/schemas/CreateStatePayload"}
+    UpdateStateCommand:
+      type: object
+      required: [command_type, payload]
+      properties:
+        command_type: {const: UPDATE_STATE}
+        payload: {$ref: "#/components/schemas/UpdateStatePayload"}
+    UpdateFactCommand:
+      type: object
+      required: [command_type, payload]
+      properties:
+        command_type: {const: UPDATE_FACT}
+        payload: {$ref: "#/components/schemas/UpdateFactPayload"}
+    DeleteConstructCommand:
+      type: object
+      required: [command_type, payload]
+      properties:
+        command_type: {const: DELETE_CONSTRUCT}
+        payload: {$ref: "#/components/schemas/DeleteConstructPayload"}
+    StateExplicitCommand:
+      type: object
+      required: [command_type, payload]
+      properties:
+        command_type: {const: STATE_EXPLICIT}
+        payload: {$ref: "#/components/schemas/StatePresentationPayload"}
+    StateSuppressCommand:
+      type: object
+      required: [command_type, payload]
+      properties:
+        command_type: {const: STATE_SUPPRESS}
+        payload: {$ref: "#/components/schemas/StatePresentationPayload"}
+    UnfoldCommand:
+      type: object
+      required: [command_type, payload]
+      properties:
+        command_type: {const: UNFOLD}
+        payload: {$ref: "#/components/schemas/StatePresentationPayload"}
+    FoldCommand:
+      type: object
+      required: [command_type, payload]
+      properties:
+        command_type: {const: FOLD}
+        payload: {$ref: "#/components/schemas/StatePresentationPayload"}
+    LegacyEditCommand:
+      type: object
+      required: [command_type, payload]
+      properties:
+        command_type:
+          type: string
+          enum: [UPDATE_PROPERTY, CREATE_CONTEXT, UPDATE_LAYOUT, UPDATE_SEMANTIC_LAYOUT, SEMANTIC_IN_ZOOM, SEMANTIC_OUT_ZOOM]
+        payload: {type: object, additionalProperties: true}
     EditCommandResult:
       type: object
       required: [meta, data]

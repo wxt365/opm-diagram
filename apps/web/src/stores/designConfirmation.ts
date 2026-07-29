@@ -1,14 +1,25 @@
 import { computed, reactive, ref } from "vue";
 import { defineStore } from "pinia";
 
+import {
+  advanceMockRevision,
+  completeMockValidation,
+  createMockConsumption,
+  createMockFindings,
+  createMockModel,
+  createMockNode,
+  createMockProject,
+  createMockTextTraces,
+  createMockWorkspaceProjection,
+  mockModelFixtures,
+  mockProjectFixtures,
+} from "@/shared/api/mock/designConfirmationAdapter";
 import type {
   AccessMode,
   BottomTab,
   CanvasTool,
   CommandState,
-  ConsumptionRelation,
   ContextSummary,
-  FindingSummary,
   ModelSummary,
   OpdNode,
   OverlayState,
@@ -16,130 +27,11 @@ import type {
   ProjectSummary,
   ResourceState,
   SaveState,
-  TextProjectionState,
-  TextTrace,
-  ValidationState,
 } from "@/shared/types/modeling";
 
-const initialProjects: ProjectSummary[] = [
-  { id: "project-raw-material", name: "原料加工系统", description: "原料加工、处理与质量检查的最小 OPM 建模确认。", profile: "ISO 19450:2024 草案 0.1.0", modelCount: 1, lastOpenedAt: "今天 09:42", status: "active" },
-  { id: "project-warehouse", name: "智能仓储系统", description: "仓储作业与设备协同建模。", profile: "OPM 基础配置 1.0.0", modelCount: 2, lastOpenedAt: "昨天 16:20", status: "active" },
-  { id: "project-archived", name: "历史制造线", description: "已归档设计确认项目。", profile: "ISO 19450:2024 草案 0.1.0", modelCount: 3, lastOpenedAt: "2026-07-21", status: "archived" },
-];
-
-const initialModels: ModelSummary[] = [
-  { id: "model-processing", projectId: "project-raw-material", name: "原料加工模型", description: "根 SD、对象、过程与 Consumption 的最小闭环。", profile: "ISO 19450:2024 草案 0.1.0", revision: 18, baselineCount: 1, validation: "current", contextCount: 3, lastSavedAt: "09:42" },
-  { id: "model-warehouse", projectId: "project-warehouse", name: "仓储履约模型", description: "入库、拣选、出库的初始模型。", profile: "OPM 基础配置 1.0.0", revision: 6, baselineCount: 0, validation: "stale", contextCount: 2, lastSavedAt: "昨天 16:20" },
-];
-
-function createNode(
-  id: string,
-  label: string,
-  kind: OpdNode["kind"],
-  x: number,
-  y: number,
-  occurrenceRole: OpdNode["occurrenceRole"] = "owned",
-): OpdNode {
-  return {
-    id,
-    occurrenceId: `occ-${id}-${occurrenceRole}`,
-    label,
-    kind,
-    x,
-    y,
-    valueDomain: kind === "object" ? "待定义状态/值域" : "不适用",
-    visibility: "public",
-    multiplicity: "1",
-    architectureLayer: kind === "object" ? "产品" : "功能",
-    occurrenceRole,
-  };
-}
-
-function createConsumption(source: OpdNode, target: OpdNode, suffix = ""): ConsumptionRelation {
-  return {
-    id: `consumption-${source.id}-${target.id}${suffix}`,
-    sourceId: source.id,
-    targetId: target.id,
-    sourceOccurrenceId: source.occurrenceId,
-    targetOccurrenceId: target.occurrenceId,
-    symbolRef: "symbol.consumption.v1",
-    layoutRef: `layout-${source.id}-${target.id}${suffix}`,
-  };
-}
-
-function createContext(
-  id: string,
-  name: string,
-  kind: ContextSummary["kind"],
-  nodes: OpdNode[],
-  relations: ConsumptionRelation[],
-  parentContextId?: string,
-  refineeId?: string,
-): ContextSummary {
-  return { id, name, kind, occurrenceCount: nodes.length, nodes, relations, parentContextId, refineeId };
-}
-
-function seedContexts(model: ModelSummary): ContextSummary[] {
-  if (model.id === "model-warehouse") {
-    const inventory = createNode("inventory", "Inventory", "object", 120, 188);
-    const fulfillment = createNode("fulfillment", "Fulfillment", "process", 430, 180);
-    const batch = createNode("fulfillment-batch", "Fulfillment Batch", "object", 120, 188);
-    const dispatch = createNode("dispatch", "Dispatch", "process", 430, 180);
-    return [
-      createContext("warehouse-sd", "SD · 智能仓储系统", "system-diagram", [inventory, fulfillment], [createConsumption(inventory, fulfillment)]),
-      createContext("fulfillment-refinement", "Fulfillment refinement", "process-refinement", [batch, dispatch], [createConsumption(batch, dispatch)], "warehouse-sd", "fulfillment"),
-    ];
-  }
-  if (model.id !== "model-processing") return [createContext("root-sd", "SD · 新模型", "system-diagram", [], [])];
-
-  const rawMaterial = createNode("raw-material", "Raw Material", "object", 120, 188);
-  const processing = createNode("processing", "Processing", "process", 430, 180);
-  const input = createNode("processing-input", "Processing Input", "object", 120, 188);
-  const qualityCheck = createNode("quality-check", "Quality Check", "process", 430, 180);
-  const rawMaterialReference = { ...rawMaterial, occurrenceId: "occ-raw-material-reference", occurrenceRole: "reference" as const };
-  const inspectMaterial = createNode("inspect-material", "Inspect Material", "process", 430, 180);
-  return [
-    createContext("raw-material-sd", "SD · 原料加工系统", "system-diagram", [rawMaterial, processing], [createConsumption(rawMaterial, processing)]),
-    createContext("processing-refinement", "Processing refinement", "process-refinement", [input, qualityCheck], [createConsumption(input, qualityCheck)], "raw-material-sd", "processing"),
-    createContext("raw-material-refinement", "Raw Material refinement", "object-refinement", [rawMaterialReference, inspectMaterial], [createConsumption(rawMaterialReference, inspectMaterial)], "raw-material-sd", "raw-material"),
-    createContext("quality-view", "质量检查视图", "model-view", [], [], "raw-material-sd"),
-  ];
-}
-
-function seedFindings(contexts: ContextSummary[], revision: number): FindingSummary[] {
-  return contexts.flatMap((context) => {
-    const target = context.nodes[0];
-    if (!target) return [];
-    return [{
-      id: `finding-${context.id}-${target.id}`,
-      severity: "警告" as const,
-      ruleId: "VAL-TRACE-001",
-      message: `${target.label} 的说明待补充，点击定位。`,
-      contextId: context.id,
-      constructId: target.id,
-      inputRevision: revision,
-    }];
-  });
-}
-
-function buildTrace(context: ContextSummary): TextTrace[] {
-  return context.relations.flatMap((relation) => {
-    const source = context.nodes.find((node) => node.id === relation.sourceId);
-    const target = context.nodes.find((node) => node.id === relation.targetId);
-    if (!source || !target) return [];
-    return [{
-      sentenceId: `sentence-${relation.id}`,
-      contextId: context.id,
-      relationId: relation.id,
-      constructIds: [source.id, target.id, relation.id],
-      sentence: `${target.label} consumes available ${source.label}.`,
-    }];
-  });
-}
-
 export const useDesignConfirmationStore = defineStore("design-confirmation", () => {
-  const projects = ref<ProjectSummary[]>(structuredClone(initialProjects));
-  const models = ref<ModelSummary[]>(structuredClone(initialModels));
+  const projects = ref<ProjectSummary[]>(structuredClone(mockProjectFixtures));
+  const models = ref<ModelSummary[]>(structuredClone(mockModelFixtures));
   const projectScope = ref<ProjectScope>("active");
   const projectSearch = ref("");
   const activeProjectId = ref("project-raw-material");
@@ -149,10 +41,10 @@ export const useDesignConfirmationStore = defineStore("design-confirmation", () 
   const isSidebarCollapsed = ref(false);
   let validationTimer: number | undefined;
 
-  const initialContexts = seedContexts(initialModels[0]!);
+  const initialProjection = createMockWorkspaceProjection(mockModelFixtures[0]!);
   const workbench = reactive({
     resourceState: "ready" as ResourceState,
-    revision: 18,
+    revision: initialProjection.revision,
     accessMode: "editable-draft" as AccessMode,
     commandState: "idle" as CommandState,
     commandFeedback: "",
@@ -161,27 +53,27 @@ export const useDesignConfirmationStore = defineStore("design-confirmation", () 
     zoom: 100,
     bottomTab: "text" as BottomTab,
     navigationMode: "process-tree",
-    validationState: "current" as ValidationState,
-    validationProgress: 100,
-    textState: "current" as TextProjectionState,
+    validationState: initialProjection.validationState,
+    validationProgress: initialProjection.validationProgress,
+    textState: initialProjection.textState,
     blockingFindings: 0,
-    baselineCreated: true,
+    baselineCreated: initialProjection.baselineCreated,
     snapshotCount: 0,
     lastSnapshotName: "",
     autosaveState: "saved" as SaveState,
     lastAction: "已打开 Draft r18",
-    activeContextId: initialContexts[0]?.id ?? "",
-    contexts: initialContexts,
-    nodes: initialContexts[0]?.nodes ?? [],
-    relations: initialContexts[0]?.relations ?? [],
-    findings: seedFindings(initialContexts, 18),
+    activeContextId: initialProjection.contexts[0]?.id ?? "",
+    contexts: initialProjection.contexts,
+    nodes: initialProjection.contexts[0]?.nodes ?? [],
+    relations: initialProjection.contexts[0]?.relations ?? [],
+    findings: initialProjection.findings,
   });
 
   const activeProject = computed(() => projects.value.find((project) => project.id === activeProjectId.value));
   const activeModel = computed(() => models.value.find((model) => model.id === activeModelId.value));
   const projectModels = computed(() => models.value.filter((model) => model.projectId === activeProjectId.value));
   const activeContext = computed(() => workbench.contexts.find((context) => context.id === workbench.activeContextId));
-  const activeTextTraces = computed(() => activeContext.value ? buildTrace(activeContext.value) : []);
+  const activeTextTraces = computed(() => activeContext.value ? createMockTextTraces(activeContext.value) : []);
   const activeFindings = computed(() => workbench.findings.filter((finding) => finding.contextId === workbench.activeContextId));
   const selectedNode = computed(() => workbench.nodes.find((node) => node.id === workbench.selectedId));
   const selectedRelation = computed(() => workbench.relations.find((relation) => relation.id === workbench.selectedId));
@@ -230,27 +122,27 @@ export const useDesignConfirmationStore = defineStore("design-confirmation", () 
   }
 
   function resetWorkbenchForModel(model: ModelSummary) {
-    const contexts = seedContexts(model);
-    const context = contexts[0];
-    workbench.resourceState = context ? "ready" : "empty";
-    workbench.revision = model.revision;
+    const projection = createMockWorkspaceProjection(model);
+    const context = projection.contexts[0];
+    workbench.resourceState = projection.resourceState;
+    workbench.revision = projection.revision;
     workbench.accessMode = "editable-draft";
     workbench.commandState = "idle";
     workbench.commandFeedback = "";
     workbench.zoom = 100;
     workbench.bottomTab = "text";
     workbench.navigationMode = "process-tree";
-    workbench.validationState = model.validation;
-    workbench.validationProgress = model.validation === "current" ? 100 : 0;
-    workbench.textState = model.validation === "current" ? "current" : "stale";
+    workbench.validationState = projection.validationState;
+    workbench.validationProgress = projection.validationProgress;
+    workbench.textState = projection.textState;
     workbench.blockingFindings = 0;
-    workbench.baselineCreated = model.baselineCount > 0;
+    workbench.baselineCreated = projection.baselineCreated;
     workbench.snapshotCount = 0;
     workbench.lastSnapshotName = "";
     workbench.autosaveState = "saved";
     workbench.lastAction = `已打开 Draft r${model.revision}`;
-    workbench.contexts = contexts;
-    workbench.findings = seedFindings(contexts, model.revision);
+    workbench.contexts = projection.contexts;
+    workbench.findings = projection.findings;
     if (context) applyContextProjection(context);
   }
 
@@ -299,8 +191,25 @@ export const useDesignConfirmationStore = defineStore("design-confirmation", () 
     }
   }
 
+  function restoreWorkbenchLocation(requestedRevision: number | undefined, requestedContextId: string | undefined) {
+    const defaultContext = workbench.contexts[0];
+    if (!defaultContext) return { revision: workbench.revision, contextId: "" };
+
+    const isCurrentRevision = requestedRevision === undefined || requestedRevision === workbench.revision;
+    const context = isCurrentRevision && requestedContextId
+      ? workbench.contexts.find((item) => item.id === requestedContextId)
+      : undefined;
+    const resolvedContext = context ?? defaultContext;
+
+    applyContextProjection(resolvedContext);
+    if (!isCurrentRevision || (requestedContextId && !context)) {
+      workbench.lastAction = "请求的修订或 Context 不可用，已打开当前 Draft 的根 Context。";
+    }
+    return { revision: workbench.revision, contextId: resolvedContext.id };
+  }
+
   function createProject(name: string, description: string) {
-    const project: ProjectSummary = { id: `project-${Date.now()}`, name, description: description || "待补充项目说明。", profile: "ISO 19450:2024 草案 0.1.0", modelCount: 0, lastOpenedAt: "刚刚", status: "active" };
+    const project = createMockProject(`project-${Date.now()}`, name, description);
     projects.value.unshift(project);
     activeProjectId.value = project.id;
     closeOverlay();
@@ -311,7 +220,7 @@ export const useDesignConfirmationStore = defineStore("design-confirmation", () 
   function createModel(name: string) {
     const project = activeProject.value;
     if (!project) return null;
-    const model: ModelSummary = { id: `model-${Date.now()}`, projectId: project.id, name, description: "新建模型的设计确认态。", profile: project.profile, revision: 1, baselineCount: 0, validation: "stale", contextCount: 1, lastSavedAt: "刚刚" };
+    const model = createMockModel(`model-${Date.now()}`, project, name);
     models.value.unshift(model);
     project.modelCount += 1;
     activeModelId.value = model.id;
@@ -349,13 +258,17 @@ export const useDesignConfirmationStore = defineStore("design-confirmation", () 
     workbench.tool = tool;
   }
 
+  function blockCanvasTool(message: string) {
+    blockCommand(message);
+  }
+
   function addCandidate(kind: "object" | "process") {
     if (isReadonly.value || !activeContext.value) {
       blockCommand("当前访问模式不允许创建语义候选。");
       return;
     }
     const count = workbench.nodes.filter((node) => node.kind === kind).length + 1;
-    const node = createNode(`${kind}-${Date.now()}`, `${kind === "object" ? "Object" : "Process"} ${count}`, kind, kind === "object" ? 120 : 430, 80 + Math.max(0, count - 2) * 70);
+    const node = createMockNode(`${kind}-${Date.now()}`, `${kind === "object" ? "Object" : "Process"} ${count}`, kind, kind === "object" ? 120 : 430, 80 + Math.max(0, count - 2) * 70);
     workbench.nodes.push(node);
     activeContext.value.occurrenceCount = workbench.nodes.length;
     workbench.selectedId = node.id;
@@ -374,7 +287,7 @@ export const useDesignConfirmationStore = defineStore("design-confirmation", () 
       blockCommand("至少创建一个 Object 和一个 Process 后，才能选择 Consumption 候选。");
       return;
     }
-    const relation = createConsumption(objectNode, processNode, `-${Date.now()}`);
+    const relation = createMockConsumption(objectNode, processNode, `-${Date.now()}`);
     workbench.relations.push(relation);
     workbench.selectedId = relation.id;
     workbench.lastAction = `Consumption 候选已连接 ${objectNode.label} 与 ${processNode.label}`;
@@ -399,10 +312,7 @@ export const useDesignConfirmationStore = defineStore("design-confirmation", () 
       node.multiplicity = updates.multiplicity.trim() || node.multiplicity;
       node.architectureLayer = updates.architectureLayer;
     }
-    workbench.revision += 1;
-    workbench.textState = "current";
-    workbench.validationState = "stale";
-    workbench.validationProgress = 0;
+    Object.assign(workbench, advanceMockRevision(workbench.revision));
     workbench.lastAction = `属性候选已确认到设计修订 r${workbench.revision}`;
     completeLocalCommand("属性候选已确认到本地设计状态，未调用后端命令。");
   }
@@ -413,10 +323,7 @@ export const useDesignConfirmationStore = defineStore("design-confirmation", () 
       return;
     }
     workbench.commandState = "submitting";
-    workbench.revision += 1;
-    workbench.textState = "current";
-    workbench.validationState = "stale";
-    workbench.validationProgress = 0;
+    Object.assign(workbench, advanceMockRevision(workbench.revision));
     workbench.lastAction = `SEMANTIC_IN_ZOOM 已形成设计修订 r${workbench.revision}`;
     closeOverlay();
     completeLocalCommand("语义缩放已确认：Context、Occurrence、Revision 与 OPL 将同步更新。");
@@ -432,9 +339,7 @@ export const useDesignConfirmationStore = defineStore("design-confirmation", () 
       if (workbench.validationProgress >= 100) {
         window.clearInterval(validationTimer);
         validationTimer = undefined;
-        workbench.validationProgress = 100;
-        workbench.validationState = "current";
-        workbench.lastAction = `校验结果当前，绑定 r${workbench.revision}`;
+        Object.assign(workbench, completeMockValidation(workbench.revision));
         notify("校验完成：阻断 0，警告 1，ISO 证据未就绪。");
       }
     }, 150);
@@ -470,9 +375,7 @@ export const useDesignConfirmationStore = defineStore("design-confirmation", () 
       return;
     }
     workbench.accessMode = "editable-draft";
-    workbench.revision += 1;
-    workbench.validationState = "stale";
-    workbench.validationProgress = 0;
+    Object.assign(workbench, advanceMockRevision(workbench.revision));
     workbench.lastAction = `已从只读版本建立 Draft r${workbench.revision}`;
     completeLocalCommand("已从只读版本创建可编辑草稿。");
   }
@@ -507,7 +410,7 @@ export const useDesignConfirmationStore = defineStore("design-confirmation", () 
       return false;
     }
     const refinee = { ...preview.refinee, occurrenceId: `occ-${preview.refinee.id}-reference-${Date.now()}`, occurrenceRole: "reference" as const };
-    const companion = createNode(
+    const companion = createMockNode(
       `${preview.refinee.kind}-detail-${Date.now()}`,
       preview.refinee.kind === "process" ? `${preview.refinee.label} Input` : `Inspect ${preview.refinee.label}`,
       preview.refinee.kind === "process" ? "object" : "process",
@@ -515,13 +418,19 @@ export const useDesignConfirmationStore = defineStore("design-confirmation", () 
       180,
     );
     const nodes = preview.refinee.kind === "process" ? [companion, { ...refinee, x: 430, y: 180 }] : [{ ...refinee, x: 120, y: 188 }, companion];
-    const context = createContext(`context-${Date.now()}`, contextName, preview.kind, nodes, [createConsumption(nodes[0] as OpdNode, nodes[1] as OpdNode)], preview.parentContext.id, preview.refinee.id);
+    const context = {
+      id: `context-${Date.now()}`,
+      name: contextName,
+      kind: preview.kind,
+      occurrenceCount: nodes.length,
+      nodes,
+      relations: [createMockConsumption(nodes[0] as OpdNode, nodes[1] as OpdNode)],
+      parentContextId: preview.parentContext.id,
+      refineeId: preview.refinee.id,
+    };
     workbench.contexts.push(context);
-    workbench.revision += 1;
-    workbench.textState = "current";
-    workbench.validationState = "stale";
-    workbench.validationProgress = 0;
-    workbench.findings.push(...seedFindings([context], workbench.revision));
+    Object.assign(workbench, advanceMockRevision(workbench.revision));
+    workbench.findings.push(...createMockFindings([context], workbench.revision));
     applyContextProjection(context);
     workbench.lastAction = `${contextName} 已创建并打开；细化对象为 ${preview.refinee.label}`;
     closeOverlay();
@@ -530,7 +439,7 @@ export const useDesignConfirmationStore = defineStore("design-confirmation", () 
   }
 
   function locateTextTrace(sentenceId: string) {
-    const trace = workbench.contexts.flatMap(buildTrace).find((item) => item.sentenceId === sentenceId);
+    const trace = workbench.contexts.flatMap(createMockTextTraces).find((item) => item.sentenceId === sentenceId);
     if (!trace) {
       blockCommand("目标在当前修订不存在，已清除旧选择。");
       workbench.selectedId = "";
@@ -583,6 +492,7 @@ export const useDesignConfirmationStore = defineStore("design-confirmation", () 
     closeOverlay,
     selectProject,
     selectModel,
+    restoreWorkbenchLocation,
     createProject,
     createModel,
     selectConstruct,
@@ -591,6 +501,7 @@ export const useDesignConfirmationStore = defineStore("design-confirmation", () 
     setNavigationMode,
     setBottomTab,
     setCanvasTool,
+    blockCanvasTool,
     addCandidate,
     selectConsumption,
     commitProperty,

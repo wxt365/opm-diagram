@@ -1,10 +1,10 @@
 # OPM 完整画布工具链设计
 
-文档版本：`v0.1-draft`
+文档版本：`v0.4-draft`
 
-文档状态：完整画布开发输入冻结；机器契约扩展与标准资产实现待开发
+文档状态：完整画布及 Control/Structural OPL/Trace 开发输入冻结；机器资产、视觉、E2E 与性能证据待实现
 
-更新时间：2026-07-28
+更新时间：2026-07-29
 
 ## Task Type
 
@@ -29,6 +29,17 @@
 6. `API-EDT-001/002` 后续机器契约扩展输入和验收矩阵。
 
 本文档不替代 [配置档能力矩阵](../requirements/opm-profile-capability-matrix.md)、[核心元模型字段 Schema](opm-core-metamodel-field-schema.md)、[应用 API 契约](opm-modeling-tool-application-api-contract.md) 或 [符号与文本生成实现契约](opm-symbol-and-text-generation-implementation-contract.md)。
+
+### 1.1 Canonical 责任边界
+
+1. Capability 编号和 Profile 支持级别以配置档能力矩阵为准；
+2. `CommandCapabilityQuery/Option` 与 command payload 以应用 API 契约为准；
+3. Relation/Marker/Label Slot 逻辑字段以 Profile Package 字段级 Schema 为准；
+4. 页面 selection、State/relation candidate 以工作台状态模型为准，字段编辑性与组件事件分别以字段明细和组件交互文档为准；
+5. line/marker/route/template/golden 以符号与文本生成实现契约为准；
+6. 自动化层级、用例和发布门槛以测试策略为准，拆包依赖和回滚以开发执行包为准。
+
+本文档负责跨责任源的专题映射，不建立第二份冲突定义。发现差异时先修正对应 Canonical 文档，再同步本专题映射。
 
 ## 2. 范围、非目标与声明边界
 
@@ -56,9 +67,10 @@
 | --- | --- |
 | 事实 | Profile Capability Matrix 已定义 16/8/10 能力，State 为 ISO 配置档 `MUST` |
 | 事实 | State 是 Object/Attribute 的从属语义，不是独立 Thing，ISO 配置档禁止 Process State |
-| 事实 | 当前 OpenAPI 有 `CREATE_FACT`，但没有 `CREATE_STATE`、`UPDATE_STATE`、`UPDATE_FACT` |
-| 事实 | 当前 OpenAPI 的 `CommandCapabilitiesResult` 只有字符串 `allowed/forbidden`，不足以表达端点、符号、模板和原因的结构化候选 |
+| 事实 | 当前工作区 OpenAPI 草案已出现 `CREATE_STATE/UPDATE_STATE/CREATE_FACT/UPDATE_FACT` 和结构化 `CommandCapabilityOption`，但尚无对应完成证据 |
+| 事实 | 当前草案仍缺 Control option 的 `base_fact_capability_ref`、Modifier 基数/原子组；Revision Schema 的 Fact 也尚无 `modifiers` |
 | 冻结设计 | 本文定义工具行为、候选 DTO 和命令 payload 的后续契约输入 |
+| 冻结设计 | 8 类 Control 的 20 个 concrete OPL 组合、10 类 Structural 变体、Token/Trace、golden manifest 和性能阈值由符号/文本契约及 DEV-CANVAS-05/06 规格承接 |
 | 待实现证据 | 完整 Symbol/Rule/Grammar 资产、API 契约测试、浏览器视觉证据和 E2E |
 
 ## 3. 设计原则
@@ -255,9 +267,12 @@ stateDiagram-v2
     preview --> idle: 取消
     submitting --> committed: 返回 committed_revision
     submitting --> blocked: 领域/文本/规则阻断
+    submitting --> failed: 系统或持久化失败
     submitting --> source_selected: revision conflict 后刷新候选
     blocked --> filtering: 更换端点/类型/修饰
     blocked --> idle: 放弃
+    failed --> submitting: 重试
+    failed --> idle: 放弃
     committed --> armed: 连续创建开启
     committed --> idle: 单次创建结束
 ```
@@ -366,6 +381,15 @@ Control Link 是对进入 Process 的合法基础 Transforming/Enabling Link 的
 
 Effect 的 Event/Condition 只修饰 Object/State 到 Process 的输入段；输出段不是独立 Event/Condition Link。前端必须使用后端返回的 segment role，不按折线路径方向判断。
 
+### 10.1 Control 的 Fact/Modifier 表示
+
+1. 画布中的 Control 仍选择、更新和追踪同一个基础 Procedural Fact，不创建第二条 edge 或 `fact_family=CONTROL` 的伪 Fact；
+2. 正式提交只使用 `control.capability=<CAP-ISO-CTRL-001~008>` 与 `control.segment=PROCESS_INPUT` 两个成对 Modifier；
+3. Candidate Option 的 `capability_ref` 返回 Control Capability，`base_fact_capability_ref` 返回被修饰的 Procedural Capability，并给出两个 Modifier 的精确值；不允许前端从关系分组名称或折线路径组装；
+4. X6 根据 `control.capability` 映射 `e/c`，并根据 `control.segment` 定位规范 Process 输入段；Projection 不保存额外 Control edge ID；
+5. OPL Planner 和 Trace 以基础 `fact_id` 为主身份，并把两个 Modifier key/value 纳入 token range、rule evidence 和 digest；
+6. `condition` 只承载独立谓词，不用于重复保存 Event/Condition 类型。Control pair 的 Canonical 字段与 API wire 结构分别以核心元模型和应用 API 契约为准。
+
 ## 11. ISO Structural Link 工具映射
 
 | Capability | 菜单路径 | 规范端点概要 | Symbol ID | 标签槽位 | OPL template family |
@@ -378,8 +402,8 @@ Effect 的 Event/Condition 只修饰 Object/State 到 Process 的输入段；输
 | `CAP-ISO-STRUCT-006` Exhibition-characterization | 结构关系/基本/展示特征 | Exhibitor -> Attribute/Operation | `symbol.link.structural.exhibition` | 无 | `opl.structural.exhibition.*` |
 | `CAP-ISO-STRUCT-007` Generalization-specialization | 结构关系/基本/泛化特化 | General -> Specialized Things | `symbol.link.structural.generalization` | 无 | `opl.structural.generalization.*` |
 | `CAP-ISO-STRUCT-008` Classification-instantiation | 结构关系/基本/分类实例 | Class -> Instance Things | `symbol.link.structural.classification` | 无 | `opl.structural.classification.*` |
-| `CAP-ISO-STRUCT-009` State-specified Characterization | 结构关系/状态指定/特征 | Thing/State -> Feature/Value State | `symbol.link.structural.exhibition.state` | 无 | `opl.structural.exhibition.state.*` |
-| `CAP-ISO-STRUCT-010` State-specified Tagged | 结构关系/状态指定/标记 | source、target 或双端 State 指定 | `symbol.link.structural.tagged.state` | 按 tagged variant | `opl.structural.tagged.state.*` |
+| `CAP-ISO-STRUCT-009` State-specified Characterization | 结构关系/状态指定/特征 | Specialized Object -> 继承 Attribute 的 Value State | `symbol.link.structural.exhibition.state` | 无 | `opl.structural.exhibition.state.*` |
+| `CAP-ISO-STRUCT-010` State-specified Tagged | 结构关系/状态指定/标记 | Object/owned Object State；source、target 或双端 State 指定 | `symbol.link.structural.tagged.state` | 按 tagged variant | `opl.structural.tagged.state.*` |
 
 Structural Link 默认不连接 Object 与 Process；Exhibition-characterization 只按 Profile Endpoint Schema 允许的 Attribute/Operation 例外开放。完整/不完整 refinee 集合是同一 Fact 的集合状态，不复制为另一种关系类型。
 
@@ -426,12 +450,28 @@ CREATE_STATE {
   state_roles[]
   occurrence { ownership, construct_role }
   layout { x, y, width?, height? }
+  capability_query_id
+  selected_option_id
+}
+
+CREATE_FEATURE {
+  context_id
+  owner_element_id
+  feature_kind              // ATTRIBUTE | OPERATION
+  capability_ref            // CAP-FEAT-ATTRIBUTE-001 | CAP-FEAT-OPERATION-001
+  name
+  occurrence { ownership, construct_role }
+  layout { x, y, width?, height? }
+  capability_query_id
+  selected_option_id
 }
 
 UPDATE_STATE {
   state_id
   expected_owner_ref
   changes { name_or_value?, state_roles?, ordinal? }
+  capability_query_id
+  selected_option_id
 }
 
 CREATE_FACT {
@@ -446,7 +486,7 @@ CREATE_FACT {
   logical_groups[]
   collection_completeness?
   occurrence { ownership, construct_role }
-  layout { route_points[]?, label_positions[]? }
+  layout { route_points[]?, label_positions[]?, junction_position? }
   capability_query_id
   selected_option_id
 }
@@ -463,18 +503,25 @@ UPDATE_FACT {
     collection_completeness?
   }
   capability_query_id
+  selected_option_id
 }
 ```
 
-State 删除继续使用 `DELETE_CONSTRUCT`，但 payload 必须包含 `construct_kind=STATE`、`state_id` 和未过期 impact token。State 显式/抑制继续使用现有 `STATE_EXPLICIT/STATE_SUPPRESS`。`CREATE_ELEMENT` 不得接收 State。
+State 删除继续使用 `DELETE_CONSTRUCT`，但 payload 必须包含 `construct_kind=STATE`、`construct_id` 和未过期 impact token。State 显式/抑制继续使用现有 `STATE_EXPLICIT/STATE_SUPPRESS`。`CREATE_ELEMENT` 不得接收 State。
+
+`CREATE_FEATURE` 只接受已存在 Element 作为 owner，并原子维护 owner 的 `feature_ids`。它不创建独立 Thing，不接收自由 `value_schema_ref`，也不替代 `CREATE_ELEMENT`。首期 P03 使用两个目录入口“属性”“操作”：用户先选择 owner Element，Runtime 对 `CREATE_FEATURE` 返回唯一可用 option；未选 owner 时返回 `ENDPOINT_KIND_MISMATCH`。投影 construct role 固定为 `ATTRIBUTE_NODE` 或 `OPERATION_NODE`，Feature Value State 为 `FEATURE_STATE_NODE`。Feature 结点和 Feature Value State 均由 Runtime Projection 返回，前端不得由关系端点临时拼接。
+
+`CREATE_STATE.owner_ref` 允许 `ELEMENT` 或 `FEATURE`。当 owner 是 Feature 时，Runtime 只返回 `CAP-FEAT-STATE-001`，投影为 `FEATURE_STATE_NODE`；当 owner 是 Element 时，保持既有 `CAP-STATE-001` Object State 行为。
 
 ### 12.4 `API-EDT-001` 候选返回
 
 ```text
 CommandCapabilityOption {
+  capability_query_id
   option_id
   command_type
   capability_ref
+  base_fact_capability_ref?
   display_name
   group_path[]
   normalized_endpoints[]
@@ -485,11 +532,15 @@ CommandCapabilityOption {
   rule_refs[]
   enabled
   reason_codes[]
+  impact_summary?
+  impact_token?
   expires_with_revision
 }
 ```
 
-现有 OpenAPI 的字符串 `allowed/forbidden` 无法承载该结构。完整 State/关系开发必须先完成 `DEV-CANVAS-00`，版本化扩展 `API-EDT-001/002` 并生成前端类型；禁止在前端手写临时 DTO 后宣称契约闭合。
+`impact_summary/impact_token` 仅在 `DELETE_CONSTRUCT` option 返回，且必须绑定 construct、影响集合摘要、Revision 和 Profile/Rule/Symbol/Grammar binding；前端不得从 Trace 数量或当前 Projection 自行生成 token。
+
+当前工作区 OpenAPI 草案已开始承载结构化 option 和 State/Fact command union，但尚未覆盖 `base_fact_capability_ref`、Modifier 基数/原子组及 Revision Fact `modifiers`。完整 State/关系联调必须先由 `DEV-CANVAS-00` 补齐版本化契约、生成前端类型并通过正反 contract test；禁止把草案文件存在或前端手写临时 DTO 宣称为契约闭合。
 
 ## 13. 检查器设计
 
@@ -569,7 +620,7 @@ CommandCapabilityOption {
 4. 关系目录 34 项可直接渲染，不需要虚拟滚动；Context/搜索结果按真实规模决定虚拟化；
 5. 性能不满足门槛时允许降低非语义动画，不允许省略 marker、标签、State 或 Finding。
 
-准确帧率、响应时间和测试机器由性能任务规格冻结；本文不伪造已验证数值。
+准确阈值、采样方法和测试环境已由 `DEV-CANVAS-06` 规格冻结：300/600 基线为 frame P95 `<=32 ms`、选择 P95 `<=100 ms`，1,000/2,000 压力集为 `<=50 ms`、`<=200 ms`；10,000 结点模型保存/快照/全量校验分别 `<=10/15/60 s`。这些仍是待实现验收目标，不是当前运行事实或 ISO 要求。
 
 ### 16.2 错误与恢复
 
@@ -606,7 +657,7 @@ X6 SVG 内部生成的 DOM 层级和 class 不作为 E2E 选择器。Construct �
 | Candidate 单元 | Profile、端点、Context、State、已有 Fact 过滤与归一化 | 拖线顺序反转仍得到规范端点；歧义不自动提交 |
 | API 契约 | `API-EDT-001/002` 候选和命令 DTO 可生成且错误稳定 | CREATE/UPDATE State、CREATE/UPDATE Fact、旧 revision 失效 |
 | 领域集成 | State owner、fan、modifier、文本与原子 Revision 闭合 | 任一文本/规则失败无 partial revision |
-| OPL golden | 每个 Capability 至少一个正例和关键组合反例 | 16/8/10 全覆盖、字节/Trace/digest 可重复 |
+| OPL golden | Control 20 个基础组合、Structural 全部合法 variant 和关键组合反例 | 主 ID + variant manifest、字节/Token/Trace/digest 可重复 |
 | 浏览器视觉 | 标准符号、长标签、缩放、折叠、Finding 不重叠 | `25%/100%/400%` + 桌面/窄屏截图和 canvas pixel 检查 |
 | E2E | 用户从工具选择到 committed Projection/OPL/Trace | State、过程关系、控制修饰、结构 fan、blocked/conflict/readonly |
 | 性能 | 大图下工具选择、候选和视口操作可用 | 独立性能规格与固定 fixture/机器报告 |
@@ -625,7 +676,7 @@ X6 SVG 内部生成的 DOM 层级和 class 不作为 E2E 选择器。Construct �
 3. `DEV-CANVAS-02`：16 类 Procedural Link；
 4. `DEV-CANVAS-03`：8 类 Control Link 组合；
 5. `DEV-CANVAS-04`：10 类 Structural Link、fan、标签和完整性；
-6. `DEV-CANVAS-05`：完整 OPL/Trace/Rule/golden 和错误闭环；
-7. `DEV-CANVAS-06`：浏览器视觉、E2E、性能、移动降级和分批启用。
+6. [`DEV-CANVAS-05`](../../specs/opm-dev-canvas-05-opl-trace-golden-task-spec.md)：完整 OPL/Trace/Rule/golden 和错误闭环；
+7. [`DEV-CANVAS-06`](../../specs/opm-dev-canvas-06-toolchain-release-task-spec.md)：浏览器视觉、E2E、性能、移动降级和分批启用。
 
 上述包的依赖、DoD 和回滚由 [开发执行包](opm-development-execution-pack.md) 承接。`DEV-CANVAS-00` 未完成前，只允许开发纯 Symbol 组件和无提交原型，不允许把完整 State/关系标记为可联调。

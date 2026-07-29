@@ -1,10 +1,10 @@
 # OPM 单机建模工具页面组件树与交互状态表
 
-文档版本：`v0.3-draft`
+文档版本：`v0.4-draft`
 
-文档状态：组件职责与交互契约经原型验证并进入 handoff
+文档状态：P0 组件经原型验证；完整画布组件、事件与测试入口冻结待实现
 
-更新时间：2026-07-27
+更新时间：2026-07-28
 
 ## Task Type
 
@@ -23,6 +23,7 @@
 3. `docs/design/opm-modeling-workbench-field-region-detail.md`
 4. `docs/design/opm-modeling-tool-module-design.md`
 5. `docs/design/opm-modeling-tool-application-api-contract.md`
+6. `docs/design/opm-complete-canvas-toolchain-design.md`
 
 ## 3. 使用原则
 
@@ -160,14 +161,31 @@ page-modeling-workbench
 │   ├── block-system-map
 │   └── block-model-search
 ├── panel-opd-editor
-│   ├── editor-tool-palette
+│   ├── editor-toolchain
+│   │   ├── tool-group-pointer
+│   │   ├── tool-group-things
+│   │   │   ├── tool-create-object
+│   │   │   ├── tool-create-process
+│   │   │   └── tool-create-state
+│   │   ├── tool-relation-split-button
+│   │   │   ├── tool-relation-primary
+│   │   │   └── menu-relation-catalog
+│   │   ├── tool-group-semantic
+│   │   └── tool-group-layout
 │   ├── editor-canvas
-│   ├── editor-selection-layer
-│   ├── editor-command-preview
+│   │   ├── editor-projection-layer
+│   │   ├── editor-candidate-layer
+│   │   ├── editor-selection-layer
+│   │   ├── editor-finding-layer
+│   │   └── editor-focus-layer
+│   ├── editor-context-popover
+│   ├── editor-command-feedback
 │   └── editor-viewport-controls
 ├── panel-property-inspector
 │   ├── block-selection-summary
-│   ├── block-profile-driven-fields
+│   ├── inspector-element-fields
+│   ├── inspector-state-fields
+│   ├── inspector-relation-fields
 │   ├── block-layout-fields
 │   └── block-trace-summary
 └── panel-workbench-bottom
@@ -205,8 +223,15 @@ flowchart LR
 | `viewport-fit-requested` | viewport-controls | viewport_state | 否 | M01 本地视图 |
 | `selection-changed` | selection-layer | selection_state | 否 | M01 + 追踪查询 |
 | `node-create-previewed` | tool-palette/canvas | edit_submit=preview | 否 | Profile 候选过滤 |
-| `relation-create-previewed` | canvas | edit_submit=preview | 否 | 端点和关系候选过滤 |
+| `state-create-requested` | toolchain/canvas | state_candidate=placing/editing | 否 | owner 与 Profile 候选过滤 |
+| `state-candidate-changed` | state inspector/inline editor | state_candidate=editing/preview | 否 | name/value/roles/layout 候选 |
+| `relation-tool-selected` | relation split-button/catalog | relation_candidate=armed | 否 | Capability 或目录入口 |
+| `relation-endpoint-selected` | canvas | source-selected/filtering | 否 | API-EDT-001 端点归一化 |
+| `relation-option-selected` | relation catalog/candidate popover | relation_candidate=preview | 否 | 采用 option 的规范端点和资产引用 |
+| `relation-candidate-changed` | relation inspector/canvas | filtering/preview | 否 | 标签、modifier、fan 成员变化后重算 |
+| `construct-delete-impact-requested` | State/Relation inspector | capability_option_resource=loading/current | 否 | API-EDT-001 返回 impact summary/token |
 | `edit-command-submitted` | command-preview/inspector | submitting -> result | 是，成功时 | M03 |
+| `candidate-cancelled` | candidate layer/feedback | candidate -> idle/ready | 否 | 不改变 committed Projection |
 | `semantic-inzoom-requested` | 语义细化菜单 | preview -> submitting | 是 | M03/M05/M06/M07/M08 |
 | `semantic-outzoom-requested` | 语义细化菜单 | preview -> submitting | 是 | M03/M05/M06/M07/M08 |
 
@@ -230,6 +255,7 @@ flowchart LR
 | --- | --- |
 | no-selection | 显示 Context 摘要和当前 Profile，只读 |
 | single-element | 按 Profile Schema 显示 Element 与 occurrence 分区 |
+| state | 显示 State ID、owner、name/value、roles、显式性、布局和 Trace；owner 只读 |
 | relation | 显示端点、方向和允许的 modifier，变更前重算候选 |
 | multi-element | 只显示对齐、分布和安全公共字段 |
 | sentence/finding | 显示只读追踪和定位动作 |
@@ -245,6 +271,27 @@ flowchart LR
 3. 当前焦点在文本筛选、名称表单或弹层时，不得把输入键解释为画布快捷键；
 4. 关系创建必须能通过键盘选择源、目标和候选类型；
 5. Esc 按优先级取消拖拽/关系预览、关闭非提交菜单、关闭可安全取消弹层，不撤销已提交修订。
+
+### 8.6 完整工具链组件边界与测试入口
+
+| 组件 | 输入 | 输出 | 稳定 `data-testid` |
+| --- | --- | --- | --- |
+| `editor-toolchain` | access mode、Profile/Symbol binding、active tool | tool mode | `P03-canvas-toolchain` |
+| `tool-create-state` | owner selection、State option | state-create-requested | `P03-tool-state` |
+| `tool-relation-split-button` | recent relation、Capability options | relation armed/catalog open | `P03-tool-relation-primary/menu` |
+| `menu-relation-catalog` | search、16/8/10 分组、option/reason | option selected | `P03-relation-search/option-{capabilityId}` |
+| `editor-candidate-layer` | normalized endpoints、descriptor、route preview | submit/cancel | `P03-relation-candidate` |
+| `inspector-state-fields` | State DTO、role options、Trace | State candidate changes | `P03-inspector-state-*` |
+| `inspector-relation-fields` | Fact、endpoints、labels、modifiers、fan | relation candidate changes | `P03-inspector-relation-*` |
+| `editor-command-feedback` | submitting/blocked/conflict/failed | retry/cancel/locate | `P03-command-feedback` |
+
+约束：
+
+1. 通用操作按钮使用统一图标组件；OPM Object/Process/State/Relation 使用当前 Symbol Catalog 缩略符号；
+2. `menu-relation-catalog` 只渲染 API-EDT-001 option，不维护 16/8/10 合法性副本；
+3. candidate layer 只渲染临时 ViewModel，Projection layer 只渲染固定 read revision；
+4. State 是 owner 内 construct，不复用 Element node component 冒充独立 Thing；
+5. fundamental fan 在 Projection 层保持一个 Fact/junction/branches 组件组；Control annotation 不复制基础 edge。
 
 ## 9. P04 版本与基线组件树
 
@@ -366,7 +413,8 @@ overlay-*
 | 组件/事件族 | 应用契约或查询 | 模块 |
 | --- | --- | --- |
 | 项目/模型页面 | OpenProject、项目/模型生命周期查询与命令 | M02 |
-| editor 意图 | ExecuteEditCommand | M03 |
+| editor 候选 | GetCommandCapabilities | M06，API-EDT-001 |
+| editor 意图 | ExecuteEditCommand | M03，API-EDT-002 |
 | 画布/导航投影 | Context、Occurrence、System map Query | M05 |
 | 工具候选/动态表单 | Profile、Capability、Symbol、Rule Query | M06 |
 | 问题/符合性 | ValidateModel、Finding/Conformance Query | M07 |
@@ -376,7 +424,7 @@ overlay-*
 | 方法面板 | Method Check、Decision/Asset Query | M11 |
 | 任务进度 | Task Query/Cancel，通过上层端口 | M12 实现 |
 
-稳定应用操作编号、通用包络、错误码和任务协议由 `opm-modeling-tool-application-api-contract.md` 承接；HTTP/OpenAPI、DTO 和通知传输仍待后续冻结。
+稳定应用操作编号、通用包络、错误码和任务协议由 `opm-modeling-tool-application-api-contract.md` 承接；P0 HTTP/OpenAPI 已冻结，完整画布结构化 Option/command DTO 由 DEV-CANVAS-00 映射，通知传输保持既有任务协议。
 
 ## 14. 可访问性与视觉状态
 
@@ -398,6 +446,8 @@ overlay-*
 6. 键盘可以完成创建结点、选择端点、选择关系、提交、撤销和问题定位主路径；
 7. 弹层取消、高风险确认和任务取消在各阶段行为明确。
 
+现有原型验收只覆盖 P0 工具链和通用页面状态，不构成 State、16/8/10 符号、关系目录、fan、Control annotation 或完整键盘路径证据；这些由 DEV-CANVAS-01~06 的组件、视觉和 E2E 承接。
+
 ## 16. 事实与建议
 
 ### 16.1 已确认事实
@@ -411,6 +461,7 @@ overlay-*
 ### 16.2 已冻结与待实现
 
 1. 组件名和事件名是逻辑 handoff 输入，不是已实现代码；
-2. 公共组件粒度已通过无构建原型初验，生产 Vue 组件仍按实际复用收敛；
+2. 公共组件粒度已通过原型初验，当前 Vue 设计确认前端只实现 P0 Object/Process/Consumption 工具，不等于完整画布组件已实现；
 3. 最小视口与基础 ARIA 名称已验证，全键盘画布和屏幕阅读器细节由 DEV-08/09 承接；
 4. 图形库固定为 X6，其焦点、非颜色标识和大图性能仍需生产 PoC 与自动化测试。
+5. 完整工具链逻辑组件与稳定测试入口已冻结；目录文件和具体组件拆分由前端任务按复用情况确定，不改变事件和状态契约。

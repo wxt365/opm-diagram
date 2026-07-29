@@ -7,7 +7,9 @@
     "apps/*"
   ],
   "scripts": {
-    "contract:validate": "node scripts/validate-contracts.mjs",
+    "contract:generate": "node scripts/generate-api-edt-contracts.mjs",
+    "contract:check": "node scripts/generate-api-edt-contracts.mjs --check",
+    "contract:validate": "npm run contract:check && node scripts/validate-contracts.mjs",
     "lint": "npm run lint --workspace=@opm/web",
     "typecheck": "npm run typecheck --workspace=@opm/web",
     "test": "npm run contract:validate && npm run test --workspace=@opm/web",

@@ -1,10 +1,10 @@
 # OPM 单机建模工具物理数据与迁移设计
 
-文档版本：`v0.1-draft`
+文档版本：`v0.2-draft`
 
 文档状态：SQLite 首批开发冻结基线
 
-更新时间：2026-07-27
+更新时间：2026-07-28
 
 ## Task Type
 
@@ -103,6 +103,15 @@ PRAGMA temp_store = MEMORY;
 - `commit_reason`、`created_at` 仅记录，不参与并发排序；
 - `immutable=1` 检查约束，禁止 UPDATE/DELETE 由 Repository 和触发器双重保护。
 
+#### 6.1.1 ISO Control Modifier 的物理归属
+
+1. `control.capability/control.segment` 只进入 `revision_document.document_json` 中基础 Fact 的 `modifiers[]`，不增加 Control 业务表、列或外键；
+2. `fact_endpoint_index` 继续只索引基础 Fact 端点。候选、Rule、X6、OPL 和 Trace 从固定 Revision 的 Canonical Fact/Modifier 读取，不把索引变成第二事实源；
+3. Canonical JSON 按 `modifier_id` 排序，两个 key/value、所选 Control Capability、基础 Fact 和 Profile binding 全部进入 `document_digest`；
+4. 本次设计不要求修改 SQLite V1 或新增 Flyway migration，`storage_schema_version` 不因纯 document schema 扩展而变化；
+5. 当前 `opm-revision.schema.json` 的 Fact 尚未承载 `modifiers`。DEV-CANVAS-00/03 必须发布兼容的机器 Schema/reader/writer/roundtrip 测试，并更新 `core_metamodel_version` 或对应 schema set 版本，不能依赖未校验 JSON；
+6. 旧 Revision 保持不可变。读取不含 Control pair 的旧基础 Fact 等价于“无 Control”；读取半对、重复键或未知值必须报告结构/语义错误，不猜测补全。
+
 ### 6.2 Draft Head、Snapshot 与 Baseline
 
 1. `model_catalog.draft_head_revision_id` 是唯一可移动指针；
@@ -151,6 +160,8 @@ migrations/sqlite/
 3. Switch：新代码改读新结构，保留旧字段；
 4. Contract：至少跨一个可回滚版本后删除旧结构；
 5. SQLite 重建表时使用新表复制、行数/digest 校验、事务内 rename，禁止原地猜测转换。
+
+纯 Revision document schema 扩展若不改变表、列、约束和索引，不创建空 Flyway 版本；其兼容性由版本化 JSON Schema、reader/writer 和 Revision roundtrip 承接。
 
 ### 8.3 V1 验证
 

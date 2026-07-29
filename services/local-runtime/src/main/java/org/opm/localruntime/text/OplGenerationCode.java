@@ -1,0 +1,10 @@
+package org.opm.localruntime.text;
+
+public enum OplGenerationCode {
+    TEXT_PLAN_UNSUPPORTED,
+    TEXT_CAPABILITY_UNSUPPORTED,
+    TEXT_TEMPLATE_MISSING,
+    TEXT_GRAMMAR_BINDING_MISMATCH,
+    TEXT_COMPOSITION_FAILED,
+    TEXT_TRACE_INCOMPLETE
+}

@@ -162,6 +162,22 @@ describe("designConfirmation", () => {
     expect(store.activeFindings[0]?.contextId).toBe("processing-refinement");
   });
 
+  it("恢复有效 URL 定位并将无效 revision 或 Context 回退到根 Context", () => {
+    const store = useDesignConfirmationStore();
+
+    expect(store.restoreWorkbenchLocation(18, "processing-refinement")).toEqual({
+      revision: 18,
+      contextId: "processing-refinement",
+    });
+    expect(store.workbench.activeContextId).toBe("processing-refinement");
+
+    expect(store.restoreWorkbenchLocation(17, "processing-refinement")).toEqual({
+      revision: 18,
+      contextId: "raw-material-sd",
+    });
+    expect(store.workbench.lastAction).toContain("根 Context");
+  });
+
   it("文本 Trace 与 Finding 通过稳定定位切换 Context 和选中目标", () => {
     const store = useDesignConfirmationStore();
     store.selectContext("processing-refinement");

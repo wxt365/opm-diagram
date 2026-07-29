@@ -1,10 +1,10 @@
 # OPM 符号与文本生成实现契约
 
-文档版本：`v0.2-draft`
+文档版本：`v0.4-draft`
 
-文档状态：P0 实现契约与完整画布符号设计冻结；完整资产、Clause 15 排序和 Annex A 语法仍待实现
+文档状态：P0 实现契约、完整画布符号设计及 Control/Structural concrete OPL 输入冻结；机器 Grammar、golden 与运行证据待实现
 
-更新时间：2026-07-28
+更新时间：2026-07-29
 
 ## Task Type
 
@@ -18,7 +18,7 @@ P0 生产实现只承诺 `Object / Process / Consumption / System Diagram / Revi
 
 完整工具栏分组、State 交互、关系候选和 API 扩展前置见 [OPM 完整画布工具链设计](opm-complete-canvas-toolchain-design.md)。
 
-本文档不授予“符合 ISO 19450:2024”的产品声明。代表性 Profile 和规则仍为 `DRAFT`，未完成 96 项 Capability、103 个规则组、511 个原子 `shall`、完整 Clause 7-10 符号资产和 Annex A Grammar 前，界面只能显示“ISO 草案配置档”与证据缺口。
+本文档不授予“符合 ISO 19450:2024”的产品声明。代表性 Profile 和规则仍为 `DRAFT`，未完成 96 项 Capability、103 个规则组、511 个原子 `shall`、Clause 4 符号目录及 Clause 7-10 对应图形语义的完整资产和 Annex A Grammar 前，界面只能显示“ISO 草案配置档”与证据缺口。
 
 ## 2. 规范依据与实现边界
 
@@ -36,7 +36,9 @@ P0 生产实现只承诺 `Object / Process / Consumption / System Diagram / Revi
 | Tagged Structural | 10.2 | 空心箭头、双向 harpoon 与标签槽位 |
 | Fundamental Structural | 10.3 | 四类三角 junction、fan、完整/不完整集合 |
 | State-specified Structural | 10.4 | State qualification 与对应结构关系组合 |
-| OPD 层级与 OPL | 6.2.6.3、Clause 14、Clause 15 | 多 OPD 导航、语义缩放事件分离、确定性句子和追踪 |
+| OPD 层级与 OPL | 6.2.6.3、Clause 14、Annex A | 多 OPD 导航、语义缩放事件分离、确定性句子和追踪 |
+
+ISO 19450:2024 在 Clause 14 后直接进入规范性 Annex A，不存在 Clause 15。本契约中所有 precedence 必须明确区分 `14.2.4.1.4` 的 Procedural Link 语义强度、`A.3.1` 的 EBNF 运算符优先级和产品自己的确定性句序；三者不得互相替代。
 
 ISO 只定义符号和语义要求，不定义浏览器像素尺寸、配色、X6 Cell 结构或交互命令。第 4-6 章的像素和事件值是本工具的实现约束，不冒充标准原文。
 
@@ -243,6 +245,8 @@ State-specified Effect 的双 marker 仍表达 Effect 语义，输入/输出 Sta
 
 Event/Condition 注记属于基础 Fact 的控制语义组合，不绘制第二条重叠边。Effect 只在 Object/State -> Process 的输入段放置注记；输出段不放置 `e/c`。
 
+Renderer 和 OPL Planner 只读取基础 Fact 上的受控 pair：`control.capability` 决定 8 类 Control template family 以及 `e/c` annotation，`control.segment=PROCESS_INPUT` 决定 annotation slot。两项缺失、重复或不匹配时返回 `MODIFIER_COMBINATION_INVALID`，不得根据 X6 edge direction、显示名称或可选 `condition` 推断并补画。Text Trace 使用原基础 `fact_id`，同时追踪两个 Modifier，不生成独立 Control Fact/Sentence 身份。
+
 ### 5.7 Structural Link 描述符
 
 | Capability | Symbol ID | Marker | Label slot | Route family | Template family |
@@ -358,7 +362,7 @@ TextGenerationInput {
 
 1. 对应 `capability_id` 和可接受的 Endpoint Schema；
 2. 单端、双端、State-specified、fan、完整/不完整集合与标签变体；
-3. Sentence Plan precedence、列表合成、正反方向句子数量和 token emphasis；
+3. Sentence Plan ordering policy、列表合成、正反方向句子数量和 token emphasis；
 4. 输入 Fact/State/Feature/Condition/Modifier 到 token range 的完整 Trace；
 5. 不支持组合的稳定失败码。
 
@@ -372,21 +376,174 @@ TextGenerationInput {
 
 Control template family 必须按实际基础关系继续细分到 concrete template。例如 Transforming Event 至少区分 Consumption 与 Effect 输入段；8 个 Capability family 不是只实现 8 个字符串模板。
 
-### 7.4 确定性排序
+#### 7.3.2 Control concrete OPL 与基础 Fact 合成
+
+Control 不生成第二个 Fact，也不在基础句之外追加第二个 Control 句。Planner 以原基础 `fact_id` 生成一个 `SentencePlan`，使用 `control.capability/control.segment` 选择下表 concrete template，并用合成后的 Control 句替换该 Fact 的独立基础句。移除 Control pair 后才恢复基础 Fact 模板。`base_fact_capability_ref`、两个 Modifier、Endpoint、State 和生成 Rule 必须全部进入同一 Sentence Trace。
+
+下表冻结 Annex A `A.4.5.4.2~A.4.5.4.3` 的 canonical generator 变体，共 `20` 个正向组合。`{state}`、`{input-state}` 和 `{output-state}` 输出 State 的规范小写标识；同一占位符重复出现时必须引用同一稳定实体。模板文本统一使用单个 ASCII 空格、ASCII 逗号和句点，不保留 EBNF 排版中的行尾空格。
+
+| Control | 基础 Fact | Concrete template ID | Canonical OPL |
+| --- | --- | --- | --- |
+| `CAP-ISO-CTRL-001` | `CAP-ISO-PROC-001` Consumption | `opl.control.event.transforming.consumption.v1` | `{Object} initiates {Process}, which consumes {Object}.` |
+| `CAP-ISO-CTRL-001` | `CAP-ISO-PROC-003` Effect | `opl.control.event.transforming.effect.v1` | `{Object} initiates {Process}, which affects {Object}.` |
+| `CAP-ISO-CTRL-002` | `CAP-ISO-PROC-004` Agent | `opl.control.event.enabling.agent.v1` | `{Agent} initiates and handles {Process}.` |
+| `CAP-ISO-CTRL-002` | `CAP-ISO-PROC-005` Instrument | `opl.control.event.enabling.instrument.v1` | `{Instrument} initiates {Process}, which requires {Instrument}.` |
+| `CAP-ISO-CTRL-003` | `CAP-ISO-PROC-006` State Consumption | `opl.control.event.transforming.state.consumption.v1` | `{input-state} {Object} initiates {Process}, which consumes {Object}.` |
+| `CAP-ISO-CTRL-003` | `CAP-ISO-PROC-008` Input-output Effect | `opl.control.event.transforming.state.effect.input-output.v1` | `{input-state} {Object} initiates {Process}, which changes {Object} from {input-state} to {output-state}.` |
+| `CAP-ISO-CTRL-003` | `CAP-ISO-PROC-009` Input-specified Effect | `opl.control.event.transforming.state.effect.input.v1` | `{input-state} {Object} initiates {Process}, which changes {Object} from {input-state}.` |
+| `CAP-ISO-CTRL-003` | `CAP-ISO-PROC-010` Output-specified Effect | `opl.control.event.transforming.state.effect.output.v1` | `{Object} in any state initiates {Process}, which changes {Object} to {output-state}.` |
+| `CAP-ISO-CTRL-004` | `CAP-ISO-PROC-011` State Agent | `opl.control.event.enabling.state.agent.v1` | `{state} {Agent} initiates and handles {Process}.` |
+| `CAP-ISO-CTRL-004` | `CAP-ISO-PROC-012` State Instrument | `opl.control.event.enabling.state.instrument.v1` | `{state} {Instrument} initiates {Process}, which requires {state} {Instrument}.` |
+| `CAP-ISO-CTRL-005` | `CAP-ISO-PROC-001` Consumption | `opl.control.condition.transforming.consumption.v1` | `{Process} occurs if {Object} exists, in which case {Object} is consumed, otherwise {Process} is skipped.` |
+| `CAP-ISO-CTRL-005` | `CAP-ISO-PROC-003` Effect | `opl.control.condition.transforming.effect.v1` | `{Process} occurs if {Object} exists, in which case {Process} affects {Object}, otherwise {Process} is skipped.` |
+| `CAP-ISO-CTRL-006` | `CAP-ISO-PROC-004` Agent | `opl.control.condition.enabling.agent.v1` | `{Process} occurs if {Agent} exists, else {Process} is skipped.` |
+| `CAP-ISO-CTRL-006` | `CAP-ISO-PROC-005` Instrument | `opl.control.condition.enabling.instrument.v1` | `{Process} occurs if {Instrument} exists, else {Process} is skipped.` |
+| `CAP-ISO-CTRL-007` | `CAP-ISO-PROC-006` State Consumption | `opl.control.condition.transforming.state.consumption.v1` | `{Process} occurs if {Object} is {input-state}, in which case {Object} is consumed, otherwise {Process} is skipped.` |
+| `CAP-ISO-CTRL-007` | `CAP-ISO-PROC-008` Input-output Effect | `opl.control.condition.transforming.state.effect.input-output.v1` | `{Process} occurs if there is {input-state} {Object}, in which case {Process} changes {Object} from {input-state} to {output-state}, else {Process} is skipped.` |
+| `CAP-ISO-CTRL-007` | `CAP-ISO-PROC-009` Input-specified Effect | `opl.control.condition.transforming.state.effect.input.v1` | `{Process} occurs if there is {input-state} {Object} in which case {Process} changes {Object} from {input-state}, else {Process} is skipped.` |
+| `CAP-ISO-CTRL-007` | `CAP-ISO-PROC-010` Output-specified Effect | `opl.control.condition.transforming.state.effect.output.v1` | `{Process} occurs if {Object} exists, in which case {Process} changes {Object} to {output-state}, otherwise {Process} is skipped.` |
+| `CAP-ISO-CTRL-008` | `CAP-ISO-PROC-011` State Agent | `opl.control.condition.enabling.state.agent.v1` | `{Process} occurs if {state} {Agent} exists, else {Process} is skipped.` |
+| `CAP-ISO-CTRL-008` | `CAP-ISO-PROC-012` State Instrument | `opl.control.condition.enabling.state.instrument.v1` | `{Process} occurs if {state} {Instrument} exists, else {Process} is skipped.` |
+
+Canonical generator 对 Condition 固定使用 Annex A 每个产生式的第一种 `occurs if ... is skipped` 形式；Parser 可以接受同一产生式中的 `If ... otherwise bypass ...` 或 `else bypass ...` 替代形式，但不得把替代形式重新生成为随机输出。Agent 与 Instrument Condition 的表面句式相同是标准产生式的结果，二者仍由基础 Fact Capability、symbol、Rule 和 Trace 区分。
+
+以下组合必须在 Planner 前阻断：Result、State Result、Effect 输出 segment、Control 与基础 Capability 不匹配、非 `PROCESS_INPUT` segment、缺任一 Modifier、重复 Modifier、同一 Fact 同时存在 Event 与 Condition。阻断时不得保留基础句冒充已接受 Control。
+
+#### 7.3.3 Structural concrete OPL
+
+下表冻结 `A.4.6` 及 `10.4.1~10.4.2` 的 generator 句式。`CAP-ISO-STRUCT-003` 固定生成两个 Sentence，`CAP-ISO-STRUCT-004` 固定生成一个互惠 Sentence；两者不得因图形符号相似而共用句数策略。
+
+| Structural | Concrete template ID/variant | Canonical OPL |
+| --- | --- | --- |
+| `CAP-ISO-STRUCT-001` | `opl.structural.tagged.unidirectional.v1` | `{Source} {forward-tag} {Destination}.` |
+| `CAP-ISO-STRUCT-002` | `opl.structural.null-tagged.unidirectional.v1` | `{Source} relates to {Destination}.` |
+| `CAP-ISO-STRUCT-003` | `opl.structural.tagged.bidirectional.forward.v1` | `{Source} {forward-tag} {Destination}.` |
+| `CAP-ISO-STRUCT-003` | `opl.structural.tagged.bidirectional.reverse.v1` | `{Destination} {reverse-tag} {Source}.` |
+| `CAP-ISO-STRUCT-004` | `opl.structural.tagged.reciprocal.v1` | `{A} and {B} are {reciprocal-tag}.` |
+| `CAP-ISO-STRUCT-004` | `opl.structural.null-tagged.reciprocal.v1` | `{A} and {B} are related.` |
+| `CAP-ISO-STRUCT-005` | `opl.structural.aggregation.complete.v1` | `{Whole} consists of {part-list}.` |
+| `CAP-ISO-STRUCT-005` | `opl.structural.aggregation.incomplete.v1` | `{Whole} consists of {known-part-list} and at least one other part.` |
+| `CAP-ISO-STRUCT-006` | `opl.structural.characterization.complete.v1` | `{Exhibitor} exhibits {feature-list}.` |
+| `CAP-ISO-STRUCT-006` | `opl.structural.characterization.incomplete.v1` | `{Exhibitor} exhibits {feature-list}, and at least one other {feature-kind}.` |
+| `CAP-ISO-STRUCT-006` | `opl.structural.characterization.mixed.complete.v1` | `{Exhibitor} exhibits {attribute-list}, as well as {operator-list}.` |
+| `CAP-ISO-STRUCT-006` | `opl.structural.characterization.mixed.incomplete.v1` | `{Exhibitor} exhibits {attribute-list}, and at least one other attribute, as well as {operator-list}, and at least one other operator.` |
+| `CAP-ISO-STRUCT-006` | `opl.structural.exhibition.v1` | `{Feature} of {Exhibitor} is {value-or-feature-list}.` |
+| `CAP-ISO-STRUCT-007` | `opl.structural.generalization.object.single.v1` | `{SpecialObject} is a {GeneralObject}.` |
+| `CAP-ISO-STRUCT-007` | `opl.structural.generalization.process.single.v1` | `{SpecialProcess} is {GeneralProcess}.` |
+| `CAP-ISO-STRUCT-007` | `opl.structural.generalization.multiple.v1` | `{specialization-list} are {General}.` |
+| `CAP-ISO-STRUCT-007` | `opl.structural.generalization.incomplete.v1` | `{specialization-list} and other specializations are {General}.` |
+| `CAP-ISO-STRUCT-008` | `opl.structural.classification.single.v1` | `{Instance} is an instance of {Class}.` |
+| `CAP-ISO-STRUCT-008` | `opl.structural.classification.multiple.v1` | `{instance-list} are instances of {Class}.` |
+| `CAP-ISO-STRUCT-009` | `opl.structural.characterization.state.v1` | `{SpecializedObject} exhibits {value-state} {Attribute}.` |
+| `CAP-ISO-STRUCT-010` | `opl.structural.tagged.state.unidirectional.v1` | `{qualified-source} {forward-tag-or-relates-to} {qualified-destination}.` |
+| `CAP-ISO-STRUCT-010` | `opl.structural.tagged.state.bidirectional.forward.v1` | `{qualified-source} {forward-tag} {qualified-destination}.` |
+| `CAP-ISO-STRUCT-010` | `opl.structural.tagged.state.bidirectional.reverse.v1` | `{qualified-destination} {reverse-tag} {qualified-source}.` |
+| `CAP-ISO-STRUCT-010` | `opl.structural.tagged.state.reciprocal.v1` | `{qualified-source} and {qualified-destination} are {reciprocal-tag-or-related}.` |
+
+`CAP-ISO-STRUCT-006` 的 Canonical Generator 对 Canonical Fact 默认输出 Characterization 方向，即 `exhibits` 句；`A.4.6.4` 的 Exhibition 句作为受控 parser/import 产生式保留，只有输入显式携带该产生式身份时才原样重建，不能从用户拖线方向猜测。`feature-kind` 只能为 `attribute` 或 `operator`。
+
+`CAP-ISO-STRUCT-001~004` 只接受 Object-Object 或 Process-Process 同类端点；`CAP-ISO-STRUCT-005/007/008` 的 refineable/refinee 也必须同为 Object 或同为 Process；`CAP-ISO-STRUCT-006` 是允许 Exhibitor Thing 连接 Attribute/Operation 的例外。`CAP-ISO-STRUCT-009` 严格归一化为 Specialized Object -> 该对象继承 Attribute 的 Value State；source State 或任意 Feature State 均不得替代 Specialized Object。`CAP-ISO-STRUCT-010` 只接受 Object/owned Object State，不接受 Process。
+
+`CAP-ISO-STRUCT-010` 的限定端写成 `{state} {Object}`。标准定义七种语义类型：单向 source、单向 destination、单向双端、双向单端、双向双端、互惠单端、互惠双端。机器 fixture 必须进一步展开“单端”为 source/destination 两个输入位置，并为单向和互惠分别覆盖 tagged/null-tagged；双向必须有两个标签并生成两句。
+
+#### 7.3.4 Structural fan、列表与完整性
+
+1. `CAP-ISO-STRUCT-005~008` 的 Fundamental relation 始终是一个 Fact、一个 junction、一个 refineable endpoint 和按 `ordinal` 排序的 refinee endpoints；增删、重排或完整性切换均保持 `fact_id`。
+2. Refineable 固定为 endpoint ordinal `0`，refinee 从 `1` 开始连续编号。Composer 只读取 ordinal，不读取 X6 分支的屏幕位置或 route point。
+3. 完整列表：一项输出 `A`，两项输出 `A and B`，三项及以上输出 `A, B and C`；不使用 Oxford comma。
+4. Aggregation 不完整集合在已知 part 列表尾部输出 `and at least one other part`；即使只有一个已知 part，也输出 `A and at least one other part`。
+5. Characterization 的不完整性按 Attribute 和 Operator 两个分组分别输出 `at least one other attribute/operator`；混合分组使用 `as well as`，不得合并为无类型的 `other feature`。
+6. Generalization 完整集合输出单个/多个 specialization 句，不完整集合输出 `and other specializations are`。
+7. Classification 只支持单个或多个 instance，不支持 completeness 字段、marker 或“不完整实例集合”句式；收到 completeness 非 `NOT_APPLICABLE` 时返回 `MODIFIER_COMBINATION_INVALID`。
+8. `CAP-ISO-STRUCT-009/010` 不使用 Fundamental completeness。任一 fan 为空、endpoint ordinal 重复/断裂、refineable 多于一个或 junction 多于一个时阻断文本生成。
+
+### 7.4 Precedence 与确定性排序
+
+#### 7.4.1 ISO 中三个不同概念
+
+| 来源 | 冻结含义 | 禁止用途 |
+| --- | --- | --- |
+| `14.2.4.1.4` | out-zoom/fold 冲突消解使用的 Procedural Link 语义强度 | 不作为 OPL Sentence 全局排序 |
+| `A.3.1` | EBNF 运算符解析优先级 | 不作为 Link 强度或 Sentence 排序 |
+| `A.4.1/A.4.3` | Paragraph、Sentence 和 List 产生式 | 不推导标准未定义的全局句序 |
+
+`14.2.4.1.4` 的完整语义强度序列冻结为：
+
+```text
+consumption event
+> consumption = result
+> consumption condition
+> effect event
+> effect
+> effect condition
+> agent event
+> agent
+> agent condition
+> instrument event
+> instrument
+> instrument condition
+```
+
+`A.3.1` 的 EBNF 运算符优先级从高到低冻结为：
+
+```text
+* > - > , > | > = > ;
+```
+
+括号、引号、注释、option、repeat 和 special-sequence 按 `A.3.1` 覆盖普通运算符优先级。ISO 19450:2024 不存在 Clause 15，也没有规定跨全部 OPL Sentence 的全局输出顺序。
+
+#### 7.4.2 产品确定性句序
 
 P0 只启用单个根 Context 中的基础 Consumption。排序键冻结为：
 
 ```text
 context_path_ordinal
-+ grammar_precedence
-+ primary_process_stable_id
++ product_sentence_family_rank
++ primary_subject_stable_id
 + fact_stable_id
++ sentence_slot_rank
++ template_id
 + sentence_id
 ```
 
-完整 ISO OPL 的 precedence、链接扇、合句和段落规则必须由 Clause 15 规则资产替换 `grammar_precedence`。某一模型出现 P0 未覆盖的多关系合成场景时，生成器返回 unsupported 并阻断正式 OPL，不得仅靠 stable ID 排序后声称符合标准。
+`product_sentence_family_rank` 固定为 Thing Description `100`、Structural `200`、Procedural `300`、Context Management `400`。这是版本化 Grammar 资产中的产品确定性策略，不是 ISO precedence。Control 合成句的 `sentence_slot_rank=0` 且不保留基础句；Bidirectional forward/reverse 分别为 `0/1`；Reciprocal、fan 和其他单句为 `0`。列表成员继续按 endpoint ordinal 输出。
 
-### 7.5 实时与原子性
+同一 Grammar 版本不得改变 rank；需要调整时发布新 Grammar 版本和 digest。某一模型出现未覆盖的合句或段落场景时返回 `TEXT_PLAN_UNSUPPORTED`，不得仅靠 stable ID 排序后声称标准已定义该顺序。
+
+### 7.5 Token 与 Trace 映射
+
+`SentenceToken` 的最小逻辑字段冻结如下；后续机器 Schema 可以采用等价命名，但不得改变偏移口径：
+
+```text
+SentenceToken {
+  token_id
+  sentence_id
+  ordinal
+  text
+  token_kind
+  start_utf8_byte
+  end_utf8_byte
+  source_refs[] {
+    source_kind
+    stable_id
+    field_path?
+    endpoint_ordinal?
+    sentence_slot?
+  }
+}
+```
+
+1. Range 使用 UTF-8 byte 的半开区间 `[start_utf8_byte, end_utf8_byte)`；起止必须位于合法字符边界、按 ordinal 严格有序、不得重叠或越界。
+2. Sentence 的每个 byte 必须恰好被一个 token 覆盖，包括空格、逗号、`and/as well as` 和句点；token kind 至少支持 `ENTITY`、`STATE`、`RELATION_VERB`、`CONTROL_KEYWORD`、`LIST_SEPARATOR`、`PUNCTUATION`、`WHITESPACE`。
+3. 名称 token 映射到 Element/Feature、对应 endpoint target 和当前/引用 Occurrence；State token 还必须映射 State、owner 和 endpoint ordinal。
+4. 基础动词 token 映射原 `fact_id`、基础 Procedural/Structural Capability、具体 endpoint 和生成 Rule。
+5. `initiates`、`occurs if`、`in which case`、`otherwise/else`、`is skipped` 映射原 `fact_id`、`control.capability`、`control.segment`、Control Capability 和 Control Rule；不得创建 Control Fact ref。
+6. list item 映射自己的 endpoint ordinal；逗号、`and`、`as well as` 和 completeness 尾句映射 concrete template、Grammar list production、相邻 endpoint ordinals 及 completeness 字段。
+7. Bidirectional 两句映射同一 `fact_id`，分别使用 `FORWARD/REVERSE` sentence slot、对应 label field 和 endpoint 顺序；Reciprocal 一句使用 `RECIPROCAL` slot。
+8. Sentence 级 Trace 必须闭合 Fact、适用的 Element/Feature/State/Modifier、Occurrence、concrete Template、Grammar、全部生成/组合 Rule 和 binding digest。任一必需引用缺失返回 `TEXT_TRACE_INCOMPLETE`。
+9. 纯文本统一编码为 UTF-8、换行为 LF、名称规范化为 NFC；同 Revision、同输入资产 digest 重放时 Sentence、token range、Trace 顺序和 artifact digest 必须字节一致。
+
+### 7.6 实时与原子性
 
 1. 拖动、连线和表单编辑期间只生成候选预览，不更新正式 Text Artifact；
 2. 提交命令时依次执行 Candidate Builder、Rule Filter、领域校验、OPL 生成、Text Trace、Post-commit 校验和持久化；
@@ -422,8 +579,8 @@ context_path_ordinal
 | Golden ID 范围 | Capability 范围 | 最低正例 | 关键反例/边界 |
 | --- | --- | --- | --- |
 | `G-OPL-PROC-001~016` | `CAP-ISO-PROC-001~016` | 每个 Capability 一个独立可提交模型 | 端点反转、错误 State owner、缺持续时间、Self ID 不同 |
-| `G-OPL-CTRL-001~008` | `CAP-ISO-CTRL-001~008` | 每个 Capability 覆盖全部允许的基础关系变体 | Result 控制、Effect 输出段控制、Event+Condition 非法组合 |
-| `G-OPL-STRUCT-001~010` | `CAP-ISO-STRUCT-001~010` | 每个 Capability 一个基础正例；多形态能力覆盖全部允许变体 | Object-Process 非法 tagged、标签缺失、fan 空集合、State owner 错误 |
+| `G-OPL-CTRL-001~008` | `CAP-ISO-CTRL-001~008` | 第 7.3.2 节 `20` 个基础 Fact 组合逐项建 fixture | Result/State Result、Effect 输出段、pair 缺失/重复/不匹配、Event+Condition |
+| `G-OPL-STRUCT-001~010` | `CAP-ISO-STRUCT-001~010` | 第 7.3.3~7.3.4 节每个合法 sentence/list/state/方向变体逐项建 fixture | Object-Process 非法 tagged、标签缺失、fan 空集合、State owner、非法 completeness |
 
 每个 golden fixture 必须同时断言：
 
@@ -434,9 +591,43 @@ context_path_ordinal
 5. Profile/Rule/Grammar/Symbol binding digest；
 6. 重开 Projection 和同 Revision 重放字节一致。
 
-Structural fan 还必须覆盖单 refinee、多 refinee、添加/删除 refinee、完整/不完整切换和 Classification 无完整性标记。Bidirectional Tagged 必须产生两个方向的语句；Reciprocal 按 Grammar 产生互惠句，不能复制双向句后只隐藏一个标签。
+Structural fan 还必须覆盖 `1/2/3` 个 refinee、添加/删除/重排 refinee、完整/不完整切换和 Classification 无完整性标记。Bidirectional Tagged 必须产生两个方向的语句；Reciprocal 按 Grammar 产生互惠句，不能复制双向句后只隐藏一个标签。
 
-`CAP-ISO-STRUCT-010` 还必须覆盖 source State、destination State、双端 State 与 unidirectional/bidirectional/reciprocal 的全部 Profile 允许组合。Control golden 的 ID 可以在 `-001A/-001B` 等 case suffix 下扩展，`001~008` 表示 Capability 主集合而不是只允许 8 个 fixture。
+`CAP-ISO-STRUCT-010` 还必须覆盖 source State、destination State、双端 State 与 unidirectional/bidirectional/reciprocal 的全部 Profile 允许组合，以及适用的 tagged/null-tagged。`001~008` 和 `001~010` 只是 Capability 主集合，不表示 fixture 只能各有 8 或 10 个。
+
+### 9.2 Golden manifest 冻结
+
+Case ID 使用 `<主 ID>.<VARIANT>.<EXPECTATION>`，例如 `G-OPL-CTRL-003.EFFECT_INPUT_OUTPUT.PASS`、`G-OPL-STRUCT-010.RECIPROCAL_BOTH_STATE_NULL_TAG.PASS` 和 `G-OPL-CTRL-001.RESULT.BLOCKED`。主 ID 不变，variant 使用大写 ASCII snake case；禁止使用无语义的 `A/B/C` 后缀。
+
+每个 manifest entry 至少包含：
+
+```text
+GoldenCase {
+  case_id
+  capability_id
+  base_fact_capability_id?
+  variant_key
+  expectation: PASS | BLOCKED
+  input_revision_fixture
+  profile_ref + digest
+  rule_set_ref + digest
+  grammar_ref + digest
+  symbol_catalog_ref + digest
+  expected_normalized_fact
+  expected_projection
+  expected_sentences[] {
+    sentence_slot
+    template_id
+    utf8_text
+    tokens[]
+    trace
+  }
+  expected_error_code?
+  expected_artifact_sha256?
+}
+```
+
+Manifest 校验器必须证明：`case_id/variant_key` 唯一；所有 Profile 允许组合被覆盖；所有禁止组合至少落入一个稳定 BLOCKED case；PASS case 的 Symbol、Sentence、Token、Trace 和 digest 全闭合；BLOCKED case 没有 committed Revision 或 partial Text Artifact。相同 Revision 连续重放至少两次，序列化后的 UTF-8 文本、token/trace 顺序和 `expected_artifact_sha256` 必须完全一致。
 
 ## 10. 测试与完成定义
 
@@ -471,4 +662,4 @@ P0 可直接依据本契约实现：
 4. `opl.consumption.v1` Planner/Generator/Composer/Trace；
 5. golden、digest、阻断和图文定位测试。
 
-以下事项不阻断 P0 框架开发，但阻断对应完整能力启用和 ISO 声明：完整 Symbol Catalog 机器资产、96 Capability、103 规则组及原子规则、Clause 15 完整排序/合句、Annex A Grammar 可执行化、全部 `G-OPL-PROC/CTRL/STRUCT` 证据、中文 OPT 正式配置档和第三方互操作证据。
+以下事项不阻断 P0 框架开发，但阻断对应完整能力启用和 ISO 声明：完整 Symbol Catalog 机器资产、96 Capability、103 规则组及原子规则、Annex A Grammar 可执行化、全部 `G-OPL-PROC/CTRL/STRUCT` 机器证据、中文 OPT 正式配置档和第三方互操作证据。第 7.4 节已冻结 ISO precedence 的正确边界和产品确定性句序，但这仍是设计输入，不是资产或符合性证据。

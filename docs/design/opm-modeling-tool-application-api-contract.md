@@ -1,10 +1,10 @@
 # OPM 单机建模工具应用 API 契约
 
-文档版本：`v0.3-draft`
+文档版本：`v0.5-draft`
 
-文档状态：应用语义冻结；P0 HTTP/OpenAPI 已形成并验证
+文档状态：应用语义与完整画布逻辑命令冻结；P0 HTTP/OpenAPI 已验证，完整画布机器契约已有部分草案但未闭环
 
-更新时间：2026-07-27
+更新时间：2026-07-28
 
 ## Task Type
 
@@ -38,6 +38,8 @@
 10. `docs/design/opm-core-metamodel-field-schema.md`
 11. `docs/design/opm-profile-package-field-schema.md`
 12. `docs/design/opm-rule-definition-field-schema.md`
+13. `docs/design/opm-complete-canvas-toolchain-design.md`
+14. `docs/design/opm-symbol-and-text-generation-implementation-contract.md`
 
 ## 3. 设计原则
 
@@ -169,7 +171,165 @@
 | API-EDT-004 | RedoEditCommand | Command | M03-M09/M12 | P03 | 新 committed_revision |
 | API-EDT-005 | GetEditSessionState | Query | M03/M09 | P03 | revision、Undo/Redo、脏状态和保存状态 |
 
-`ExecuteEditCommand` 的 `command_type` 首期至少覆盖结点/关系创建与删除、属性修改、Context 创建/移动/删除、普通布局、语义布局、状态显式/抑制、展开/折叠和语义 in/out-zoom。新增 command_type 必须先补 Profile 能力、校验、文本、持久化和验收映射。
+`ExecuteEditCommand` 的 P0 机器契约覆盖结点/基础关系创建与删除、属性修改、Context 创建、普通/语义布局、状态显式/抑制、展开/折叠和语义 in/out-zoom。完整画布在相同 operationId 下扩展 State/Fact command union；新增 command_type 必须先补 Profile 能力、校验、文本、持久化和验收映射。
+
+#### 7.2.1 `API-EDT-001 CommandCapabilityQuery`
+
+```text
+CommandCapabilityQuery {
+  input_revision
+  intent                    // CREATE_ELEMENT | CREATE_FEATURE | CREATE_STATE | CREATE_FACT |
+                            // UPDATE_STATE | UPDATE_FACT | DELETE_CONSTRUCT |
+                            // SEMANTIC_REFINEMENT
+  selection_locators[]
+  first_endpoint_locator?
+  second_endpoint_locator?
+  requested_capability_ref?
+  existing_construct_ref?
+  draft_fields?
+}
+```
+
+查询固定读取 `input_revision + profile/rule/symbol/grammar binding`。`draft_fields` 只携带候选过滤所需的标签、State role、modifier 或完整性摘要，不接收 X6 Cell、DOM、viewport、菜单状态或任意 Map。
+
+```text
+CommandCapabilityOption {
+  capability_query_id
+  option_id
+  command_type
+  capability_ref            // 当前候选能力；Control 时为 CAP-ISO-CTRL-*
+  base_fact_capability_ref? // Control 时必填，为被修饰 Procedural Capability
+  display_name
+  group_path[]
+  normalized_endpoints[]
+  required_fields[]
+  allowed_modifiers[]
+  symbol_descriptor_ref + digest
+  template_family_ref + digest
+  rule_refs[]
+  enabled
+  reason_codes[]
+  impact_summary?
+  impact_token?
+  expires_with_revision
+}
+```
+
+其中 `allowed_modifiers[]` 使用封闭逻辑结构，不返回任意 Map：
+
+```text
+AllowedModifierOption {
+  modifier_id
+  value_options[]           // 当前候选允许的精确值；不得由前端扩展
+  min_occurs
+  max_occurs
+  atomic_group_id?          // 同组字段必须作为一个原子单元提交
+}
+```
+
+Control option 必须恰好返回 `control.capability` 与 `control.segment` 两项，二者的 `min_occurs=max_occurs=1`、`atomic_group_id=iso-control`；前者 `value_options` 只包含该 option 的 `CAP-ISO-CTRL-*`，后者只包含 `PROCESS_INPUT`。非 Control option 不得借用该 atomic group。
+
+返回规则：
+
+1. `normalized_endpoints` 使用 `MS-FACT-002 FactEndpoint` 的 role/target/state qualification 语义，不按用户拖线顺序返回；
+2. `FORBIDDEN/N_A` Capability 不作为可见 option 返回；活动 Profile 中因当前端点/Context/资产不可用的能力可以 `enabled=false` 返回稳定原因；
+3. 同一端点组合存在多个合法关系时返回多个 option，顺序不代表默认提交；
+4. option 绑定 `input_revision`，Revision、Context、Profile binding、端点或 draft field 改变后失效；
+5. 当前完整画布稳定 reason code 至少覆盖 `PROFILE_CAPABILITY_DISABLED/SYMBOL_ASSET_MISSING/TEXT_TEMPLATE_MISSING/ENDPOINT_KIND_MISMATCH/STATE_OWNER_MISMATCH/CONTEXT_NOT_ALLOWED/FACT_ALREADY_EXISTS/MODIFIER_COMBINATION_INVALID/READ_ONLY_REVISION/REVISION_STALE`；
+6. `DELETE_CONSTRUCT` option 必须返回固定 `input_revision` 的 `impact_summary + impact_token`；其他 intent 禁止返回 impact token，前端不得自行拼装；
+7. impact token 绑定 construct、影响集合摘要、Revision 和 binding，任一项变化即失效；
+8. reason code 是候选解释，不替代第 11 章提交错误码。
+9. Control option 的 `capability_ref` 是所选 `CAP-ISO-CTRL-*`，`base_fact_capability_ref` 是允许被修饰的 Procedural Capability；非 Control option 禁止返回后者。
+
+#### 7.2.2 `API-EDT-002` 完整画布 command union
+
+P0 已有 command_type 保持兼容。完整画布新增 `CREATE_STATE/UPDATE_STATE/UPDATE_FACT`，并冻结 `CREATE_FACT` 的完整 payload。State 不是 Element，`CREATE_ELEMENT` 必须拒绝 State payload。
+
+```text
+CreateStatePayload {
+  context_id
+  owner_ref                 // Element/Feature
+  capability_ref
+  name_or_value
+  state_roles[]             // INITIAL/DEFAULT/FINAL，组合由 Profile 决定
+  occurrence { ownership, construct_role }
+  layout { x, y, width?, height? }
+  capability_query_id
+  selected_option_id
+}
+
+UpdateStatePayload {
+  state_id
+  expected_owner_ref
+  changes { name_or_value?, state_roles?, ordinal? }
+  capability_query_id
+  selected_option_id
+}
+
+CreateFactPayload {
+  context_id
+  capability_ref             // 正式基础 Fact Capability，不写 CAP-ISO-CTRL-*
+  fact_family
+  normalized_endpoints[]
+  direction
+  labels[]
+  modifiers[]               // { modifier_id, value } 封闭集合
+  condition?                // 独立谓词，不用于重复表达 ISO Control 类型
+  logical_groups[]
+  collection_completeness?
+  occurrence { ownership, construct_role }
+  layout { route_points[]?, label_positions[]?, junction_position? }
+  capability_query_id
+  selected_option_id
+}
+
+UpdateFactPayload {
+  fact_id
+  expected_capability_ref
+  replacement {
+    normalized_endpoints[]?
+    labels[]?
+    modifiers[]?
+    condition?
+    logical_groups[]?
+    collection_completeness?
+  }
+  capability_query_id
+  selected_option_id
+}
+
+DeleteConstructPayload {
+  construct_kind            // ELEMENT | STATE | FACT | FEATURE | CONTEXT
+  construct_id
+  impact_token
+}
+```
+
+Payload 规则：
+
+1. `changes/replacement` 至少包含一个字段，未出现字段保持不变；显式清空使用字段 schema 定义的空集合或 null 语义，禁止含糊 merge patch；
+2. `labels[]` 按 Symbol Descriptor 的稳定 slot ID 保存，双向标签不能交换 slot 改变方向；
+3. `collection_completeness` 只适用于允许完整/不完整 refinee 集合的 fundamental relation，Classification-instantiation 禁止该字段；
+4. ISO Control 使用基础 Fact 的两个受控 Modifier，不创建脱离基础关系的自由 Fact，也不把基础 Fact 的 `fact_family/capability_ref` 改为 Control；
+5. fundamental fan 的多个 refinee 是同一 Fact 的 ordered endpoints，更新成员保持 Fact ID；
+6. `UPDATE_STATE` 不允许改变 owner；跨 owner 移动需要未来专用影响分析命令；
+7. `DELETE_CONSTRUCT` 的 impact token 必须由固定 Revision 的影响查询产生，过期或影响集合变化时阻断；
+8. capability query/option ID 必须属于相同 base revision、binding、intent 和候选摘要，不能跨命令复用。
+
+ISO Control 的 wire payload 冻结为：
+
+```text
+modifiers: [
+  { modifier_id: "control.capability", value: "CAP-ISO-CTRL-001" },
+  { modifier_id: "control.segment", value: "PROCESS_INPUT" }
+]
+```
+
+其中 `control.capability` 的值域仅为 `CAP-ISO-CTRL-001~008`，`control.segment` 当前仅允许 `PROCESS_INPUT`。两项必须成对且各唯一，`CREATE_FACT` 原子创建，`UPDATE_FACT.replacement.modifiers` 原子替换整组；缺项、重复项、未知项、输出段、Result 基础 Fact、Control Capability 与基础 Fact/State 端点不匹配均返回 `MODIFIER_COMBINATION_INVALID`。
+
+Wire payload 不重复传递 MS-MOD-001 的 `target_ref/capability_ref`：target 由 owning Fact 隐含，两个 Modifier 的逻辑 `capability_ref` 均由 `control.capability.value` 确定。服务端必须验证该值等于 selected option 的 Control `capability_ref`，并验证 payload 的基础 `capability_ref` 等于 option 的 `base_fact_capability_ref`。
+
+`condition` 不参与 ISO Control 类型判定。只有 Profile 明确允许独立 `MS-COND-001` 谓词时才可提交；若内容仅重复 Event/Condition、segment 或 Control Capability，则阻断。Candidate Option 的 `allowed_modifiers` 必须返回两个键、精确值域和成对约束，X6 不得从折线路径反推 `control.segment`。
 
 ### 7.3 文本、校验和方法
 
@@ -220,9 +380,17 @@
 
 ## 8. 关键操作明细
 
-### 8.1 API-EDT-002 ExecuteEditCommand
+### 8.1 API-EDT-001 GetCommandCapabilities
 
-输入：`RequestContext`、`command_type`、结构化 payload、候选影响摘要可选。
+输入：`RequestContext`、固定 `input_revision` 和第 7.2.1 节 `CommandCapabilityQuery`。
+
+成功：返回结构化 `CommandCapabilityOption[]`、read_revision 和 binding；无合法候选是成功查询结果，不伪装为系统失败。
+
+失败：Revision/Profile/Rule/Symbol/Grammar 无法解析时返回对应结构化错误。查询不产生 Command、Revision、Operation Record 或自动修复。
+
+### 8.2 API-EDT-002 ExecuteEditCommand
+
+输入：`RequestContext`、`command_type`、第 7.2.2 节对应的封闭 payload、适用的 capability option 或 impact token。
 
 成功：返回 `COMMITTED`、唯一 committed_revision、autosave_state、受影响 Context/Element/Fact/Sentence/Rule 标识和投影状态。
 
@@ -230,7 +398,7 @@
 
 页面映射：P03 画布、属性检查器、Context 导航和语义细化菜单。
 
-### 8.2 API-VAL-001 ValidateModel
+### 8.3 API-VAL-001 ValidateModel
 
 输入：model_id、固定 input_revision、profile/rule version、范围 `INCREMENTAL/FULL/BASELINE_GATE/CONVERSION`。
 
@@ -238,7 +406,7 @@
 
 过期：任务照常保存为历史报告，但 `freshness=stale`，不得替换当前工作台摘要。
 
-### 8.3 API-VER-004 CreateBaseline
+### 8.4 API-VER-004 CreateBaseline
 
 输入：command_id、base_revision、基线名称/说明、Profile/规则版本和用户已查看的 evidence summary token。
 
@@ -246,15 +414,15 @@
 
 成功：原子创建不可变 Baseline 和 Operation Record。失败不产生 Baseline ID；校验阻断返回可定位 Finding。
 
-### 8.4 API-PRJ-011/012 配置档转换
+### 8.5 API-PRJ-011/012 配置档转换
 
 Analyse 固定源 revision 和目标 Profile，返回每个事实的 `CORE/CONDITIONAL/DERIVED/LOSSY/UNMAPPABLE`、目标试校验和试生成文本结果。Apply 必须引用未过期 report_id 和 report_digest；只创建新目标修订，不改写源修订或源基线。
 
-### 8.5 API-XFR-001/002 导入
+### 8.6 API-XFR-001/002 导入
 
 Inspect 只在隔离 staging 中解析原生包，返回格式/Profile/规则兼容性、引用完整性、身份碰撞、资源限制、目标模式和 Import Plan。Commit 必须引用未过期 plan_id 和 plan_digest；成功前不改变活动项目。
 
-### 8.6 API-XFR-008/009 恢复
+### 8.7 API-XFR-008/009 恢复
 
 Inspect 返回 Restore Plan、备份完整性、格式迁移、目标项目、回退点和覆盖影响。Restore 默认创建新项目；覆盖模式必须传入额外确认 token，并在原子替换前创建可恢复回退点。
 
@@ -356,6 +524,8 @@ Inspect 返回 Restore Plan、备份完整性、格式迁移、目标项目、�
 | 命令幂等和 revision | FR-EDIT-*、FR-VER-001、NFR-REL-003 | 重放同命令不重复，旧 revision 不覆盖 |
 | 图文原子提交 | FR-TEXT-*、NFR-REL-001~002 | 成功返回同 revision；失败无部分结果 |
 | 页面主动作 | P01-P06、OV01-OV11 | 每个事件有操作、守卫、结果和错误 |
+| 完整画布候选 | CAP-ELEM-004、CAP-ISO-PROC/CTRL/STRUCT | option 结构、端点归一化、失效和不可用原因 |
+| State/Fact 命令 | FR-EDIT-001~011、完整画布专题设计 | State 非 Element、fan 单 Fact、Control 组合、失败无部分 Revision |
 | 基线 | FR-VER-004~006、FR-ASSET-003 | 证据 current、无阻断、不可变 |
 | 导入恢复 | FR-IO-001~004、FR-LOCAL-005 | 先 Inspect/Plan，后原子 Commit |
 | 后台任务 | NFR-PERF-004、页面 task states | 固定输入、过期隔离、取消阶段明确 |
@@ -369,11 +539,12 @@ Inspect 返回 Restore Plan、备份完整性、格式迁移、目标项目、�
 2. M01 只调用应用用例，M12 不直接暴露给页面；
 3. 正式语义写操作使用 command_id、base_revision、Profile 和规则版本；
 4. 导入、转换、基线和恢复都需要预检/证据与显式提交；
-5. 本文档没有改变 API、代码或运行系统，因为当前尚无实现。
+5. 当前工作区 OpenAPI 草案已出现完整画布 option/command 类型，但仍缺本节冻结的 Control/base Fact 分字段、Modifier 原子组和 Revision JSON 承载，且没有据此确认完整 command handler/roundtrip；本文档没有修改运行 API、代码或数据。
 
 ### 14.2 设计建议/待确认
 
 1. 操作编号和语义建议作为后续 OpenAPI/进程内接口的稳定来源；
 2. 最终传输方式、DTO 类型、分页上限、任务通知方式和 HTTP 映射待技术选型；
-3. 逻辑字段级 schema 已形成，下一步需要把 ExecuteEditCommand payload 拆成可执行的 command schema；
-4. 原型验收后，需要校准页面一次加载所需的查询聚合粒度，避免过多细碎调用。
+3. 完整画布逻辑 command/query schema 已由第 7.2 节冻结；DEV-CANVAS-00 必须补齐当前 OpenAPI 草案与本节的差异，并形成版本化机器 Schema、generated client 和正反 contract test，不得手写分叉 DTO；
+4. 机器扩展必须保留 P0 客户端兼容或发布明确的新 schema/API 版本；部分字段已进入草案不等于该兼容性和生成结果已验证；
+5. 一次加载所需的查询聚合粒度仍需通过真实浏览器和大图性能测试校准。

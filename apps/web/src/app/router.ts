@@ -23,6 +23,7 @@ export const router = createRouter({
     },
     {
       path: "/projects/:projectId/models/:modelId/workbench",
+      name: "workbench",
       component: WorkbenchView,
       meta: { title: "建模工作台" },
     },

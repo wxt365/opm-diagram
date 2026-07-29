@@ -25,3 +25,27 @@ migrations/sqlite/             SQLite Flyway V1 和验证 SQL
 2. OpenAPI 必须可解析、operationId 唯一、所有本地写入口声明 `localSession`。
 3. V1 必须能在空 SQLite 数据库执行，外键检查为零，不可变 Revision 触发器生效。
 4. 任何验证未执行时只能报告“设计资产已形成”，不能报告运行契约已验证。
+
+# 机器契约与代表性资产
+
+`schemas/` 和 `examples/` 是设计期机器契约及其代表样例。样例中的摘要可以用于 JSON Schema 结构校验，但不是运行时受信任的资产摘要。
+
+DEV-01 的可加载代表性离线资产位于仓库根 `packages/profiles/<profile-id>/<package-version>/`。运行时只根据 manifest 的逻辑相对路径、字节长度、SHA-256 和精确 `id + version` 加载所需 Rule、Symbol、Grammar 与 Normalization 资产；其目录、摘要算法及失败语义以 `specs/opm-dev-01-asset-loader-task-spec.md` 为准。
+
+## SQLite 迁移运行方式
+
+`services/local-runtime` 在构建时将唯一的 V1 来源 `migrations/sqlite/V1__initial_schema.sql` 复制到 classpath `db/migration`，由 Flyway 执行；不在服务资源目录维护第二份 SQL。项目数据库固定为 `opm.storage.root/projects/<project-id>/project.db`，默认 root 为 `runtime-data`。
+
+打开项目库时，适配器先校验已应用迁移的状态和 checksum，再为既有库创建恢复点后执行 pending migration。V1 包含 SQLite PRAGMA 与 DDL，Flyway 因此仅在 SQLite 适配器中允许混合语句。迁移失败会创建同目录 `.recovery-required` marker，调用者只能获得 `RECOVERY_REQUIRED` 状态，不能取得可写数据库对象。
+
+## API-EDT 0.2 草案扩展
+
+`openapi/opm-local-api-v1.yaml` 的 `0.2.0-draft` 在不改变 `API-EDT-001/002`
+operationId 的前提下，保留 P0 的 Object、Process 与 Consumption 命令，并补充了
+State、完整 Fact、候选 option 和删除 impact token 的结构契约。生成类型由
+`npm run contract:generate` 写入前端和 Local Runtime，`npm run contract:check` 用于检测
+OpenAPI 与生成产物漂移。
+
+本扩展不表示 State、完整关系、Capability 选择或前端工具已启用。当前 Local Runtime
+仅返回空的 `options`，并继续拒绝未实现的完整画布命令；领域语义、持久化与 UI 由后续
+DEV-CANVAS 包实现。

@@ -1,0 +1,15 @@
+org/opm/localruntime/command/CandidateRevisionCommitterTest.class
+org/opm/localruntime/text/OplTextGenerationServiceTest.class
+org/opm/localruntime/application/LocalApiServiceTest$ProceduralExpectation.class
+org/opm/localruntime/api/LocalRuntimeBootstrapControllerTest.class
+org/opm/localruntime/command/CandidateRevisionCommitterTest$RecordingRepository.class
+org/opm/localruntime/storage/ProjectDatabaseFactoryTest.class
+org/opm/localruntime/api/LocalApiControllerTest$1.class
+org/opm/localruntime/application/LocalApiServiceTest.class
+org/opm/localruntime/assets/FileProfilePackageLoaderTest.class
+org/opm/localruntime/storage/SqliteRevisionCommitRepositoryTest.class
+org/opm/localruntime/semantic/SemanticRevisionReaderTest.class
+org/opm/localruntime/api/LocalApiControllerTest.class
+org/opm/localruntime/LocalRuntimeApplicationTest.class
+org/opm/localruntime/semantic/SemanticRevisionValidatorTest.class
+org/opm/localruntime/application/LocalApiServiceTest$ControlExpectation.class

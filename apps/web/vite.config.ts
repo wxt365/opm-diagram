@@ -15,6 +15,10 @@ export default defineConfig({
   server: {
     host: "127.0.0.1",
     proxy: {
+      "/opm-bootstrap.js": {
+        target: runtimeOrigin,
+        changeOrigin: true,
+      },
       "/api/v1": {
         target: runtimeOrigin,
         changeOrigin: true,

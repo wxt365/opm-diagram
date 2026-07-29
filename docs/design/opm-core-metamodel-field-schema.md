@@ -1,10 +1,10 @@
 # OPM 核心元模型字段级 Schema
 
-文档版本：`v0.1-draft`
+文档版本：`v0.2-draft`
 
-文档状态：逻辑字段级 schema 草案，待机器可读 schema 和代表性模型验证
+文档状态：逻辑字段级 schema 与 ISO Control Modifier 表示冻结；机器 schema 和代表性模型验证待完成
 
-更新时间：2026-07-27
+更新时间：2026-07-28
 
 ## Task Type
 
@@ -189,6 +189,21 @@ State 不是独立 Thing。该 schema 表达对象/特征的从属状态或配�
 | `value_schema_ref` | SchemaId+Version | 否 | 属性值存在时必填 |
 | `source/normalization/extensions` | 对应公共结构 | 是/条件 | 不丢失原始语义 |
 
+### 5.3.1 完整画布 Feature 最小落地边界
+
+`DEV-CANVAS-04` 仅启用 `ATTRIBUTE` 与 `OPERATION` 两种 FeatureDefinition，且必须归属一个现有 Element。Feature 不是 Element，不得使用 `OBJECT` 或 `PROCESS` 代替 Feature endpoint。
+
+Feature 的 `state_ids` 由 owner 关系派生，不写入 `FeatureDefinition`；归属 Feature 的 State 必须为 Value State。首期不开放 `PROFILE_FEATURE`、Feature 更新/删除、value schema 编辑或独立 Feature OPL/Trace。
+
+`MS-STATE-001.owner_ref` 在本包扩展为 `EntityRef<Element/Feature>`：
+
+| owner_ref.target_kind | 允许 capability | State 语义 |
+| --- | --- | --- |
+| `ELEMENT` | `CAP-STATE-001` | 既有 Object State |
+| `FEATURE` | `CAP-FEAT-STATE-001` | Feature Value State |
+
+Feature Value State 只能归属 `ATTRIBUTE/OPERATION` Feature；它可作为 `CAP-ISO-STRUCT-009` 的 `FEATURE_VALUE_STATE` 端点，不能作为 Procedural/Control 或既有 Object State 的端点。
+
 ### 5.4 `MS-ELEM-004 PropertyValue`
 
 | 字段 | 类型 | 必填 | 约束 |
@@ -211,8 +226,8 @@ State 不是独立 Thing。该 schema 表达对象/特征的从属状态或配�
 | `capability_ref` | CapabilityRef | 是 | 必须是 Relation/Fact 类能力 |
 | `endpoints` | OrderedList<MS-FACT-002> | 是 | 数量、角色、顺序和类型满足 Endpoint Schema |
 | `direction` | Enum | 是 | `DIRECTED/BIDIRECTIONAL/UNDIRECTED/PROFILE_DEFINED`；必须被 Capability 允许 |
-| `modifier_ids` | OrderedList<StableId> | 否 | 引用 MS-MOD-001，组合合法 |
-| `condition_id` | StableId | 否 | 引用 MS-COND-001，关系允许条件/事件时才可用 |
+| `modifier_ids` | OrderedList<QualifiedName> | 否 | 在本 Fact scope 内引用 MS-MOD-001 `modifier_id`，组合合法且顺序规范化 |
+| `condition_id` | StableId | 否 | 引用独立 MS-COND-001 谓词；不得仅为表达 ISO Event/Condition Control 类型而创建 |
 | `logical_group_ids` | OrderedList<StableId> | 否 | 引用 MS-LOGIC-001 |
 | `source` | SourceProvenance | 是 | 保存原始关系类型和 ID |
 | `normalization` | NormalizationRecord | 是 | 端点、方向、修饰均纳入结论 |
@@ -234,11 +249,29 @@ State 不是独立 Thing。该 schema 表达对象/特征的从属状态或配�
 
 | 字段 | 类型 | 必填 | 约束 |
 | --- | --- | --- | --- |
-| `modifier_id` | StableId | 是 | Model 内唯一 |
+| `modifier_id` | QualifiedName | 是 | `target_ref` 内唯一的受控语义键；正式键必须来自 PS-CAP-004，如 `control.capability` |
 | `capability_ref` | CapabilityRef | 是 | Modifier 类能力 |
 | `target_ref` | EntityRef<Fact/Endpoint/LogicGroup> | 是 | 目标范围受 Capability 限制 |
 | `value` | TypedValue | 是 | 按 Modifier Value Schema 校验 |
 | `source/normalization` | 公共结构 | 是 | 保留来源和转换结论 |
+
+#### 6.3.1 ISO Control Modifier Pair
+
+ISO Event/Condition Control 不创建独立 Fact。它在一个合法的基础 Procedural Fact 上使用以下两个 MS-MOD-001 值对象：
+
+| `modifier_id` | `capability_ref` | `value` | `target_ref` | 基数 |
+| --- | --- | --- | --- | --- |
+| `control.capability` | 所选 `CAP-ISO-CTRL-*` | 与 capability_ref 相同 | 基础 Fact | Control 存在时恰好 1 |
+| `control.segment` | 同一 `CAP-ISO-CTRL-*` | 常量 `PROCESS_INPUT` | 同一基础 Fact | Control 存在时恰好 1 |
+
+冻结规则：
+
+1. 基础 Fact 的 `fact_id`、`fact_family`、`capability_ref` 和 endpoints 继续表达 Consumption/Effect/Agent/Instrument 等 Procedural 事实；ISO Profile 禁止为此使用 `fact_family=CONTROL`；
+2. 两个 Modifier 必须同时出现、同时更新或同时删除，同一 Fact 不得出现第二组 Control pair；
+3. pair 中两个 `capability_ref` 必须相同，且 `control.capability.value` 必须等于该引用的 Capability ID；`CAP-ISO-CTRL-001~004` 依赖 Event/CAP-MOD-003，`CAP-ISO-CTRL-005~008` 依赖 Condition/CAP-MOD-004；
+4. 具体 Transforming/Enabling 和 State-specified 合法性由基础 Fact Capability、端点与 Profile Rule 联合判定；`control.segment` 在当前 ISO Profile 中只有 `PROCESS_INPUT`，Effect 输出 segment、Result Link 和自由画布 segment 均不得保存 Control；
+5. `condition_id` 仅承载独立、可引用的谓词/subject expression。仅有 Control Link 时保持为空，不能与 `control.capability` 重复表达 Event/Condition；
+6. Revision 摘要、Normalization、OPL/Trace 和 Rule Evidence 必须覆盖两个 Modifier；删除任一项形成的半对状态在 PRE_COMMIT 阻断。
 
 ### 6.4 `MS-MOD-002 Multiplicity`
 
@@ -506,10 +539,13 @@ ViewQuery 只能返回既有 Element/Fact/State/Feature 引用，不得构造新
 | MS-INV-008 | 每个正式 Sentence/Construct 可追溯到 Fact 和 Rule | PRE_COMMIT/BASELINE_GATE |
 | MS-INV-009 | Revision 中所有分区使用同一 Profile/rule/schema set 和 input revision | PRE_COMMIT |
 | MS-INV-010 | Baseline 引用不可变 Revision，schema 升级不得原地改写 | CONVERSION |
+| MS-INV-011 | ISO Control 仅以基础 Fact 上唯一、成对的 `control.capability/control.segment` 表达；禁止独立 Control Fact、输出段 Control 和重复 condition | COMMAND_FILTER/PRE_COMMIT |
 
 ## 12. Schema 兼容与迁移
 
 ### 12.1 兼容分类
+
+本次 Control 冻结将草案期 `modifier_id` 身份明确为 `(target_ref, modifier_id)`，Revision inline 表示由 owning Fact 隐含 target。当前尚无已发布的 Modifier 机器 Schema，因此这是设计期校准；任何已按“Model 内全局 modifier_id”实现的试验代码都必须迁移并通过 roundtrip，不能同时保留两种身份口径。
 
 | 变更 | 兼容级别 | 要求 |
 | --- | --- | --- |

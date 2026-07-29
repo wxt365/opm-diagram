@@ -1,10 +1,10 @@
 # OPM 配置档能力矩阵
 
-文档版本：`v0.3-draft`
+文档版本：`v0.4-draft`
 
 文档状态：配置档需求基线草案，条款规则组已建立，待原子规则和执行证据
 
-更新时间：2026-07-27
+更新时间：2026-07-29
 
 ## Task Type
 
@@ -121,8 +121,8 @@ Event 和 Condition 是进入 Process 的 Transforming/Enabling Link 的控制�
 | CAP-ISO-STRUCT-006 | Exhibition-characterization | Exhibitor Thing -> Attribute/Operation Thing | `MUST` | 10.3.3 | 表达事物及其特征 |
 | CAP-ISO-STRUCT-007 | Generalization-specialization | General Thing -> Specialized Things | `MUST` | 10.3.4 | 表达特化及继承 |
 | CAP-ISO-STRUCT-008 | Classification-instantiation | Class Thing -> Instance Things | `MUST` | 10.3.5 | 表达类与实例 |
-| CAP-ISO-STRUCT-009 | State-specified Characterization | Thing/State 与其特征 | `MUST` | 10.4.1 | 文本必须保留状态限定 |
-| CAP-ISO-STRUCT-010 | State-specified Tagged Structural | 指定源状态、目标状态或双端状态 | `MUST` | 10.4.2 | 文本必须保留方向、标签和状态限定 |
+| CAP-ISO-STRUCT-009 | State-specified Characterization | Specialized Object -> 继承 Attribute 的 Value State | `MUST` | 10.4.1 | `{SpecializedObject} exhibits {value-state} {Attribute}.` |
+| CAP-ISO-STRUCT-010 | State-specified Tagged Structural | Object/owned Object State；指定源状态、目标状态或双端状态 | `MUST` | 10.4.2 | 保留方向、标签和状态限定；不接受 Process |
 
 ISO Structural Link 默认不得连接 Object 与 Process，Exhibition-characterization 是标准明确的例外。端点合法性必须由具体关系和条款规则进一步收窄。
 

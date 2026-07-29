@@ -13,7 +13,7 @@
         class="button button--primary"
         type="button"
         data-testid="p01-create-project"
-        @click="store.openOverlay('project')"
+        @click="openDialog"
       >
         新建项目
       </button>
@@ -23,27 +23,23 @@
       <label class="search-control">
         <span class="sr-only">搜索项目</span>
         <input
-          v-model="store.projectSearch"
+          v-model="projectSearch"
           data-testid="p01-search"
           type="search"
           placeholder="搜索项目或模型"
         >
       </label>
-      <div class="segmented-control" aria-label="项目范围">
-        <button
-          v-for="scope in scopes"
-          :key="scope.value"
-          :class="{ 'is-active': store.projectScope === scope.value }"
-          type="button"
-          @click="store.projectScope = scope.value"
-        >
-          {{ scope.label }}
-        </button>
-      </div>
-      <span class="toolbar-count">{{ store.filteredProjects.length }} 个项目</span>
+      <span class="toolbar-count">{{ store.projects.length }} 个项目</span>
     </div>
 
-    <div class="resource-table" role="table">
+    <div v-if="store.projectListResource === 'loading'" class="empty-state" role="status">
+      正在读取本地项目…
+    </div>
+    <div v-else-if="store.projectListResource === 'error'" class="empty-state" role="alert">
+      <p>{{ store.projectListError }}</p>
+      <button class="button" type="button" @click="loadProjects">重试</button>
+    </div>
+    <div v-else class="resource-table" role="table">
       <div class="resource-table__head" role="row">
         <span>项目</span>
         <span>默认 Profile</span>
@@ -52,7 +48,7 @@
         <span>操作</span>
       </div>
       <article
-        v-for="project in store.filteredProjects"
+        v-for="project in store.projects"
         :key="project.id"
         class="resource-row"
         role="row"
@@ -70,7 +66,7 @@
         </button>
         <span class="profile-tag">{{ project.profile }}</span>
         <span>{{ project.modelCount }}</span>
-        <span>{{ project.lastOpenedAt }}</span>
+        <span>{{ project.updatedAt }}</span>
         <button
           class="text-action"
           type="button"
@@ -80,7 +76,7 @@
         </button>
       </article>
       <div
-        v-if="store.filteredProjects.length === 0"
+        v-if="store.projectListResource === 'empty'"
         class="empty-state"
       >
         没有匹配项目
@@ -88,25 +84,30 @@
     </div>
 
     <div
-      v-if="store.overlay?.kind === 'project'"
+      v-if="isDialogOpen"
       class="overlay-backdrop"
-      @click.self="store.closeOverlay()"
+      @click.self="closeDialog"
     >
       <form
+        :ref="setDialogElement"
         class="dialog-panel"
         data-testid="ov01-create-project"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="ov01-create-project-title"
+        @keydown="onDialogKeydown"
         @submit.prevent="submitProject"
       >
         <div class="dialog-panel__header">
           <div>
             <p class="page-kicker">OV01</p>
-            <h2>创建项目</h2>
+            <h2 id="ov01-create-project-title">创建项目</h2>
           </div>
           <button
             class="icon-control"
             type="button"
             aria-label="关闭创建项目"
-            @click="store.closeOverlay()"
+            @click="closeDialog"
           >
             x
           </button>
@@ -133,20 +134,22 @@
           <span>本地位置</span>
           <code>~/OPM Studio/&lt;项目名称&gt;</code>
         </div>
-        <p class="dialog-note">提交只创建浏览器内的设计确认项目，不写入本地运行时。</p>
+        <p v-if="store.projectListError" class="dialog-note" role="alert">{{ store.projectListError }}</p>
+        <p v-else class="dialog-note">提交后将创建本地项目并进入项目详情。</p>
         <div class="dialog-panel__footer">
           <button
             class="button"
             type="button"
-            @click="store.closeOverlay()"
+            @click="closeDialog"
           >
             取消
           </button>
           <button
             class="button button--primary"
             type="submit"
+            :disabled="store.isCreatingProject"
           >
-            创建并继续
+            {{ store.isCreatingProject ? '正在创建…' : '创建并继续' }}
           </button>
         </div>
       </form>
@@ -155,28 +158,46 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 
-import { useDesignConfirmationStore } from "@/stores/designConfirmation";
+import { useDialogFocus } from "@/shared/composables/useDialogFocus";
+import { useProjectModelStore } from "@/stores/projectModel";
 
 const router = useRouter();
-const store = useDesignConfirmationStore();
+const store = useProjectModelStore();
 const projectName = ref("智能仓储系统");
 const projectDescription = ref("仓储作业与设备协同建模");
-const scopes = [
-  { value: "active", label: "活动" },
-  { value: "archived", label: "归档" },
-  { value: "all", label: "全部" },
-] as const;
+const projectSearch = ref("");
+const isDialogOpen = ref(false);
+const { captureTrigger, closeDialog, onDialogKeydown, setDialogElement } = useDialogFocus(
+  computed(() => isDialogOpen.value),
+  () => { isDialogOpen.value = false; },
+);
+onMounted(loadProjects);
+
+watch(projectSearch, loadProjects);
+
+function loadProjects() {
+  return store.loadProjects(projectSearch.value);
+}
 
 function openProject(projectId: string) {
-  store.selectProject(projectId);
   router.push(`/projects/${projectId}`);
 }
 
-function submitProject() {
-  const project = store.createProject(projectName.value, projectDescription.value);
-  router.push(`/projects/${project.id}`);
+function openDialog() {
+  captureTrigger();
+  isDialogOpen.value = true;
+}
+
+async function submitProject() {
+  try {
+    const project = await store.createProject(projectName.value, projectDescription.value);
+    closeDialog();
+    await router.push(`/projects/${project.id}`);
+  } catch {
+    // 错误已映射到页面可恢复提示。
+  }
 }
 </script>

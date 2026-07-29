@@ -1,10 +1,10 @@
 # OPM Profile Package 字段级 Schema
 
-文档版本：`v0.1-draft`
+文档版本：`v0.3-draft`
 
-文档状态：逻辑字段级 schema 草案，待机器可读 schema、配置档资产和离线加载验证
+文档状态：逻辑字段级 schema 与完整关系 Symbol Descriptor 冻结；机器资产和离线加载证据待实现
 
-更新时间：2026-07-27
+更新时间：2026-07-28
 
 ## Task Type
 
@@ -20,7 +20,7 @@ Profile Package 回答“当前配置档允许表达什么、如何解释、如�
 
 1. 不把公共语义内核发布为第三配置档；
 2. 不在本文重复 96 项 `CAP-*` 的业务定义；
-3. 不定义 Clause 4 的像素级绘制参数或 Annex A 的完整 EBNF；
+3. 不把 Clause 4 符号目录及 Clause 7-10 的图形语义伪造为浏览器像素参数，也不在本文定义 Annex A 完整 EBNF；
 4. 不生成 JSON Schema、Protobuf、DDL、Flyway 或运行时代码；
 5. 不允许任意属性 Map、包内脚本或网络调用作为扩展机制。
 
@@ -32,6 +32,8 @@ Profile Package 回答“当前配置档允许表达什么、如何解释、如�
 4. `docs/design/opm-core-metamodel-field-schema.md`
 5. `docs/design/opm-rule-definition-field-schema.md`
 6. `docs/design/opm-native-exchange-package-contract.md`
+7. `docs/design/opm-symbol-and-text-generation-implementation-contract.md`
+8. `docs/design/opm-complete-canvas-toolchain-design.md`
 
 ## 3. Schema 约定
 
@@ -165,12 +167,24 @@ Profile Package 回答“当前配置档允许表达什么、如何解释、如�
 | 字段 | 类型 | 必填 | 约束 |
 | --- | --- | --- | --- |
 | `modifier_schema_id/version` | SchemaId+Version | 是 | 稳定 |
+| `modifier_key` | QualifiedName | 是 | API/Revision 中稳定语义键；禁止客户端自定义 |
 | `modifier_capability_id` | StableId | 是 | 指向 MOD/CTRL 能力 |
 | `target_kinds/capabilities` | 受控集合 | 是 | 不允许自由目标 |
 | `value_schema` | TypedValueSchema | 是 | Event、Condition、概率等结构明确 |
 | `cardinality` | `{min,max}` | 是 | target scope 内执行 |
 | `allowed_with/forbidden_with` | OrderedSet<CapabilityRef> | 否 | 复杂组合仍由 RuleRef 判定 |
 | `combination_rule_refs` | OrderedList<RuleRef> | 否 | 规则必须在绑定 Rule Set 中存在 |
+
+#### 5.4.1 ISO Control ModifierSchema 投影
+
+每个 `CAP-ISO-CTRL-001~008` Capability Definition 必须解析两个配对的 PS-CAP-004：
+
+| `modifier_key` | `modifier_capability_id` | `value_schema` | 基数 |
+| --- | --- | --- | --- |
+| `control.capability` | 当前 `CAP-ISO-CTRL-*` | 常量为当前 Capability ID | `{1,1}` |
+| `control.segment` | 同一 `CAP-ISO-CTRL-*` | 常量 `PROCESS_INPUT` | `{1,1}` |
+
+两项共享同一组 `target_kinds/capabilities` 和 `combination_rule_refs`，只能附加到该 Control Capability 允许的基础 Procedural Fact。`CAP-ISO-CTRL-001~004` 的规则依赖必须包含 `CAP-MOD-003`，`CAP-ISO-CTRL-005~008` 必须包含 `CAP-MOD-004`。Profile 不得开放第二个 segment 值、自由字符串 Control ID 或单项缺失的降级表示。
 
 ### 5.5 `PS-CAP-005 ContextSchema`
 
@@ -204,6 +218,7 @@ Profile Package 回答“当前配置档允许表达什么、如何解释、如�
 | --- | --- | --- | --- |
 | `catalog_id/version` | VersionRef | 是 | ProfileBinding 精确引用 |
 | `entries` | PS-SYM-002 集合 | 是 | 所有可绘制 MUST/已实现 SHOULD 能力有映射 |
+| `markers` | PS-SYM-004 集合 | 是 | Relation Descriptor 引用的 marker/annotation 全部可离线解析 |
 | `rendering_units` | Enum | 是 | 逻辑单位明确，像素密度不改变语义 |
 | `fallback_policy` | Enum | 是 | 未知 required 符号必须 `BLOCK`，不得用通用图形冒充 |
 | `asset_digest` | DigestRef | 是 | 覆盖全部符号资产 |
@@ -219,10 +234,64 @@ Profile Package 回答“当前配置档允许表达什么、如何解释、如�
 | `anchors/ports` | OrderedList<Record> | 是 | 每个端口有角色、方向和连接限制 |
 | `line_style/markers` | Record | 条件 | 关系符号必须声明 |
 | `state_overlay/label_slots` | Record | 否 | 状态、标签和修饰位置 |
+| `relation_descriptor` | PS-SYM-003 | 关系时是 | 冻结 line、marker、annotation、route、endpoint role 和文本模板族 |
 | `semantic_layout_effect` | Boolean+PropertyRef | 是 | true 时必须引用受控语义布局字段和 RuleRef |
 | `accessibility_label` | LocalizedTextSet | 是 | 不只依赖颜色区分 |
 
-### 6.3 `PS-TEXT-001 TextGrammarPackage`
+### 6.3 `PS-SYM-003 RelationSymbolDescriptor`
+
+| 字段 | 类型 | 必填 | 约束 |
+| --- | --- | --- | --- |
+| `descriptor_id/version` | VersionRef | 是 | 同版本内容不可变 |
+| `capability_ref` | CapabilityRef | 是 | 必须与父 SymbolDefinition 的 relation Capability 一致 |
+| `line_family` | Enum | 是 | `SOLID/LIGHTNING/PROFILE_DEFINED`；PROFILE_DEFINED 需要 required AssetRef |
+| `source_marker_ref/target_marker_ref` | MarkerRef | 条件 | 二元关系按标准端点声明；无 marker 显式为空 |
+| `junction_marker_ref` | MarkerRef | 条件 | fundamental fan 必填，二元关系禁止 |
+| `control_annotation_ref` | MarkerRef | 条件 | Event/Condition 组合按基础关系输入段声明 |
+| `completeness_annotation_ref` | MarkerRef | 条件 | 允许不完整 refinee 集合的 fundamental relation 使用 |
+| `endpoint_roles` | OrderedList<EndpointRoleBinding> | 是 | role、ordinal、marker slot 与 PS-CAP-003 一致 |
+| `label_slots` | OrderedList<PS-SYM-005> | 否 | 标签、State qualification、duration、completeness 等稳定槽位 |
+| `route_family` | Enum | 是 | `BINARY_ORTHOGONAL/STATE_BINARY/STATE_EFFECT/PROCESS_INVOCATION/PROCESS_SELF_LOOP/PROCESS_EXCEPTION/BINARY_STRUCTURAL/FUNDAMENTAL_FAN/STATE_FUNDAMENTAL/STATE_STRUCTURAL/PROFILE_DEFINED` |
+| `template_family_ref` | AssetRef+FamilyId | 是 | 指向同一 Profile 依赖闭包中的 OPL/OPT 模板族 |
+| `rule_refs` | OrderedList<RuleRef> | 是 | 端点、组合、完整性和渲染语义守卫 |
+| `source_locator` | StandardRef | 是 | 定位标准条款/图形来源，不保存页面截图测量值 |
+
+约束：
+
+1. `CAP-ISO-PROC-001~016`、`CAP-ISO-CTRL-001~008`、`CAP-ISO-STRUCT-001~010` 各自恰有一个主 RelationSymbolDescriptor；允许变体通过同 descriptor 的受控 variant 或独立 versioned child descriptor 表达；
+2. Control descriptor 复用基础 relation line/marker，只增加规范输入 segment 的 `e/c` annotation，不创建第二条重叠 relation symbol；
+3. fundamental fan 使用一个 junction marker 和多个 ordered refinee branches，不能资产化为多条互不相关的 binary edge；
+4. Classification-instantiation 禁止 completeness annotation；Aggregation/Exhibition/Generalization 按集合完整性决定是否显示 annotation；
+5. `template_family_ref` 必须能进一步解析到具体 template ID；通配 family 不能直接写入 Revision 或 Sentence Plan。
+
+### 6.4 `PS-SYM-004 MarkerDescriptor`
+
+| 字段 | 类型 | 必填 | 约束 |
+| --- | --- | --- | --- |
+| `marker_id/version` | VersionRef | 是 | Catalog 内唯一，同版本不可变 |
+| `semantic_role` | Enum | 是 | `ENDPOINT/JUNCTION/CONTROL_ANNOTATION/COMPLETENESS_ANNOTATION/STATE_OVERLAY` |
+| `primitive/asset_ref` | Enum+AssetRef | 是 | 参数化 PATH/TEXT/COMPOSITE；禁止脚本 |
+| `normalized_geometry` | Record | 是 | 逻辑坐标，不冒充标准浏览器像素 |
+| `fill/stroke` | Record | 是 | 空心/实心和轮廓语义明确，颜色不是唯一信号 |
+| `anchor/alignment` | Record | 是 | 相对端点、junction、segment 或 owner 的稳定位置 |
+| `direction_policy` | Enum | 是 | `SOURCE_FACING/TARGET_FACING/BIDIRECTIONAL/NONE/PROFILE_DEFINED` |
+| `hit_area_policy` | Record | 是 | 交互命中不改变可见标准几何 |
+| `accessibility_label` | LocalizedTextSet | 是 | 工具缩略符号和画布可读名称 |
+| `source_locator` | StandardRef | 是 | 证据可追溯 |
+
+### 6.5 `PS-SYM-005 LabelSlotDefinition`
+
+| 字段 | 类型 | 必填 | 约束 |
+| --- | --- | --- | --- |
+| `slot_id` | StableId | 是 | Descriptor 内稳定，如 `shaft-forward/process-input-near` |
+| `semantic_role` | Enum | 是 | `FORWARD_TAG/REVERSE_TAG/RECIPROCAL_TAG/STATE_QUALIFICATION/DURATION/COMPLETENESS/PROFILE_DEFINED` |
+| `field_binding` | FieldPathBinding | 是 | 回到 Fact/Endpoint/State/Modifier 字段 |
+| `cardinality` | Record | 是 | 必填、可选、单值或多值 |
+| `anchor_policy` | Record | 是 | 相对 route segment、endpoint 或 junction |
+| `collision_policy` | Enum | 是 | `SHIFT_WITH_LEADER/SHIFT_ON_ROUTE/BLOCK_RENDER/PROFILE_DEFINED` |
+| `direction_lock` | Boolean | 是 | true 时禁止跨 forward/reverse slot 拖动改变语义 |
+
+### 6.6 `PS-TEXT-001 TextGrammarPackage`
 
 | 字段 | 类型 | 必填 | 约束 |
 | --- | --- | --- | --- |
@@ -234,7 +303,7 @@ Profile Package 回答“当前配置档允许表达什么、如何解释、如�
 | `normalization_policy` | Record | 是 | 空白、数字、名称和单位规范化 |
 | `grammar_digest` | DigestRef | 是 | 正式 Text Artifact 绑定 |
 
-### 6.4 `PS-TEXT-002 GenerationMapping`
+### 6.7 `PS-TEXT-002 GenerationMapping`
 
 | 字段 | 类型 | 必填 | 约束 |
 | --- | --- | --- | --- |
@@ -348,6 +417,8 @@ logical_path 不允许绝对路径、`..`、符号链接或重复规范化路径
 | 能力闭包 | 每项 MUST 可解析实例/端点/符号/文本/规则引用 | 悬空 SchemaRef、RuleRef、AssetRef |
 | 配置档隔离 | ISO 与中文草案按各自状态显示和导入 | FORBIDDEN、PROFILE_ONLY 静默进入目标 |
 | 离线依赖 | 断网环境加载 Package 和全部 required 闭包 | 网络地址、digest 不符、循环依赖 |
+| 完整关系符号 | ISO 16/8/10 Capability 均解析 relation/marker/label/route/template descriptor | 缺 marker、错误 junction、Control 重叠 symbol、模板族悬空 |
+| Symbol/Text 绑定 | 每个 Relation Descriptor 的 template family 解析具体 Mapping/Production | 通配 family 写入 Revision、Symbol 与 Grammar digest 不一致 |
 | 往返与转换 | CORE/CONDITIONAL 代表性模型通过明确 roundtrip expectation | LOSSY/UNMAPPABLE 未提示即提交 |
 | 迁移回滚 | staging 迁移成功生成新 Revision | 中途故障后源 Model/Baseline digest 变化 |
 
@@ -358,12 +429,12 @@ logical_path 不允许绝对路径、`..`、符号链接或重复规范化路径
 1. 当前能力矩阵包含 96 个唯一 `CAP-*`，分属 10 个编号族；
 2. Profile Package 是 Model 的解释依赖，不保存 Model Revision；
 3. ISO 与中文草案配置档必须独立发布，公共核心不是第三配置档；
-4. 当前仓库尚无机器可读 Profile Package、符号资产、可执行 Grammar 或加载测试；
+4. 当前已有代表性 Profile Package JSON Schema/样例，但只引用 Symbol/Grammar 外部资产；完整 Relation Symbol/Marker 机器资产、可执行 Grammar 和加载测试尚未形成；
 5. 本任务没有数据库、DDL、Flyway 或 SQL 变更。
 
 ### 11.2 设计建议/待确认
 
 1. `PS-*` 应作为首批 JSON Schema/Protobuf Profile 资产的逻辑输入；
 2. 首个可执行包应至少提供两个 Profile、96 项能力闭包、破损依赖包和跨版本迁移样例；
-3. Clause 4 符号规范和 Annex A 完整 EBNF 形成后，应只补资产内容，不改变 Package 所有权边界；
+3. Clause 4 符号目录及 Clause 7-10 对应图形语义的完整资产、Annex A 完整 EBNF 形成后，应只补资产内容，不改变 Package 所有权边界；
 4. Package 物理容器、签名和可信发布机制仍需独立技术设计。

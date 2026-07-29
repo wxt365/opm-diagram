@@ -1,10 +1,10 @@
 # OPM 单机建模工具页面状态模型
 
-文档版本：`v0.3-draft`
+文档版本：`v0.4-draft`
 
-文档状态：页面状态与守卫经原型和 P0 OpenAPI 验证
+文档状态：P0 页面状态经原型/OpenAPI 验证；完整画布 State/关系候选状态冻结待实现
 
-更新时间：2026-07-27
+更新时间：2026-07-28
 
 ## Task Type
 
@@ -24,6 +24,7 @@
 4. `docs/design/opm-modeling-tool-module-design.md`
 5. `docs/requirements/opm-online-modeling-tool-requirements.md`
 6. `docs/design/opm-modeling-tool-application-api-contract.md`
+7. `docs/design/opm-complete-canvas-toolchain-design.md`
 
 ## 3. 状态建模原则
 
@@ -61,7 +62,9 @@
 | `autosave` | `clean / pending / saving / saved / failed` |
 | `text_projection` | `text-current / generating / text-stale / blocked / failed` |
 | `validation` | `validation-stale / running / current / failed` |
-| `selection` | `no-selection / single-element / multi-element / relation / context / sentence / finding` |
+| `selection` | `no-selection / single-element / state / multi-element / relation / context / sentence / finding` |
+| `state_candidate` | `unavailable / ready / placing / editing / preview / submitting / blocked / failed / committed` |
+| `relation_candidate` | `idle / armed / source-selected / filtering / preview / submitting / blocked / failed / committed` |
 | `overlay_submit` | `closed / editing / preview / submitting / blocked / completed / failed` |
 | `background_task` | `queued / running / cancelling / cancelled / completed / failed` |
 
@@ -193,6 +196,7 @@ stateDiagram-v2
 | --- | --- | --- |
 | `no-selection` | 当前 Context 摘要 | OPL/OPT 保持当前段落 |
 | `single-element` | Element + occurrence 字段 | 突出关联 Sentence/Finding |
+| `state` | State + owner + role + occurrence 字段 | 突出使用该 State 的 Fact/Sentence/Finding |
 | `multi-element` | 安全公共字段和数量摘要 | 汇总相关 Finding，不合并语义值 |
 | `relation` | Relation、端点和修饰符 | 突出对应 Sentence/Fact |
 | `context` | Context、来源和细化信息 | 显示对应 Paragraph/章节 |
@@ -209,6 +213,49 @@ stateDiagram-v2
 | `readonly-snapshot` | 禁止 | 比较、基于快照创建草稿 | 允许 |
 | `readonly-baseline` | 禁止 | 比较、基于基线创建草稿 | 允许正式资产 |
 | `recovery-required` | 禁止 | 仅诊断和恢复 | 仅允许安全诊断包，具体待契约确认 |
+
+### 6.8 State 候选 `state_candidate`
+
+| 状态 | 进入条件 | 页面行为 | 退出 |
+| --- | --- | --- | --- |
+| `unavailable` | 无合法 owner、只读或 Profile 禁止 | State 工具禁用并给出原因 | 选择合法 Object/Attribute -> ready |
+| `ready` | 合法 owner 已选中 | owner 锁定并可进入放置 | 点击工具 -> placing；取消选择 -> unavailable |
+| `placing` | State 工具激活 | 只接受 owner content box 内位置 | 点击合法位置 -> editing；Esc -> ready |
+| `editing` | 候选 State 已创建 | 编辑 name/value 和 role，不显示正式 OPL | 本地格式通过 -> preview；取消 -> ready |
+| `preview` | 候选字段完整 | 显示候选符号、影响和非正式文本预览 | 提交 -> submitting；修改 -> editing |
+| `submitting` | `CREATE_STATE/UPDATE_STATE` 已发出 | 锁定冲突字段，允许 viewport | COMMITTED/BLOCKED/FAILED |
+| `blocked` | Profile/领域/文本阻断 | 保留候选并定位 owner/字段/规则 | 修正 -> editing；放弃 -> ready |
+| `failed` | 持久化/系统失败 | 保留可重试输入，显示最近耐久 Revision | 重试 -> submitting；放弃 -> ready |
+| `committed` | 返回唯一 committed_revision | 采用新 Projection，清除候选 | Projection current -> ready |
+
+规则：
+
+1. `state_candidate` 是 `edit_submit` 的专用细分，提交阶段必须与全局 `edit_submit` 一致，不能一个显示 committed、另一个显示 failed；
+2. owner、Context、Profile binding 或 base revision 变化时，placing/editing/preview 候选进入 blocked(`REVISION_STALE`)并要求重算；
+3. State 拖出 owner 不进入布局 candidate；跨 owner 移动不在本状态机支持；
+4. committed 前的 State 不进入正式 selection、Context Projection、OPL 或 Finding。
+
+### 6.9 关系候选 `relation_candidate`
+
+| 状态 | 进入条件 | 页面行为 | 退出 |
+| --- | --- | --- | --- |
+| `idle` | 未选择关系工具 | 无候选 overlay | 选择目录项/主按钮 -> armed |
+| `armed` | 关系类型或目录已激活 | 等待第一个端点 | 选端点 -> source-selected；Esc -> idle |
+| `source-selected` | 第一个用户端点已选 | 显示端点焦点和可连接目标 | hover/选第二端点 -> filtering |
+| `filtering` | 调用 API-EDT-001 | 展示 loading、多候选或不可用原因 | 唯一/用户选择 -> preview；无候选 -> blocked |
+| `preview` | 规范端点和 option 已冻结 | 显示 descriptor、route、标签/修饰表单和非正式 OPL | 提交 -> submitting；换端点 -> filtering |
+| `submitting` | `CREATE_FACT/UPDATE_FACT` 已发出 | 锁定同一 Fact 候选 | COMMITTED/BLOCKED/FAILED；冲突 -> source-selected |
+| `blocked` | 候选或提交被拒绝 | 保留端点、标签和修饰，显示 reason/error | 修正 -> filtering；放弃 -> idle |
+| `failed` | 系统、持久化或 Projection 回读失败 | 保留可重试输入，显示最近耐久 Revision | 重试 -> submitting；放弃 -> idle |
+| `committed` | 返回唯一 committed_revision | 采用正式 Fact/Trace/Projection | 连续创建 -> armed；否则 -> idle |
+
+规则：
+
+1. `first_endpoint` 只是用户选择顺序；正式 `normalized_endpoints` 只能来自 API-EDT-001 option；
+2. `capability_query_id/option_id` 绑定 base revision、Context、Profile binding、端点和 draft fields，任一变化即失效；
+3. 多候选时不得自动提交排序第一项；最近使用只影响目录排序；
+4. viewport、菜单展开、搜索词和 hover 不改变 candidate 的语义摘要；
+5. Control modifier 复用基础 Fact candidate，fundamental fan 维护一个 Fact candidate 和多个 ordered refinee，不生成重叠/拆分候选。
 
 ## 7. 页面状态模型
 
@@ -244,6 +291,8 @@ stateDiagram-v2
 4. `viewport_state: scale / translation / mode / fit_target`；
 5. `panel_state: left/right/bottom open + size`；
 6. `OV03/OV05/OV06/OV08/OV11 overlay_submit`。
+7. `state_candidate` 和 `relation_candidate`，均绑定当前 Context/base revision；
+8. `capability_option_resource: idle/loading/current/stale/error`，只保存 API-EDT-001 查询结果。
 
 `viewport_state` 变化不得进入 `edit_submit`，不得使 `text_projection` 或语义 `validation` 过期。
 
@@ -336,6 +385,7 @@ stateDiagram-v2
 6. 后台任务结果过期：保存任务结果供查看，但不覆盖当前 revision 的状态摘要；
 7. Context 定位失败：回退到有效父 Context，清除无效选择并说明原因；
 8. 应用异常重开：恢复最近 Autosave Checkpoint，必要时进入 recovery-required。
+9. Candidate Revision 过期：保留用户意图和可编辑字段，清除 option ID/规范端点，刷新 Projection 后重新查询，不直接重放旧 payload。
 
 ## 11. 事实与建议
 
@@ -349,7 +399,8 @@ stateDiagram-v2
 
 ### 11.2 已冻结与待实现
 
-1. 状态切片已映射 P0 OpenAPI 和 handoff；TypeScript DTO 由契约生成；
+1. P0 状态切片已映射现有 OpenAPI；完整画布 State/关系候选已映射应用 API 逻辑契约，TypeScript DTO 必须由 DEV-CANVAS-00 的机器契约生成；
 2. 面板默认尺寸和移动降级已经原型验证，本地偏好与 viewport bookmark 保存周期由生产实现确定；
 3. 任务固定为查询 + SSE，取消点和进度阶段由每类任务实现定义；
 4. 浏览器 route 承载 revision/context 稳定定位，viewport 和未提交状态不进入 URL。
+5. 现有 P0 设计确认前端只实现 Object/Process/Consumption 工具状态，不能作为 State/完整关系 candidate 已实现证据。

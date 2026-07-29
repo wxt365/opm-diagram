@@ -1,0 +1,12 @@
+package org.opm.localruntime.command;
+
+public enum CommitFailureCode {
+    REVISION_CONFLICT,
+    READ_ONLY_REVISION,
+    RULE_VERSION_CONFLICT,
+    VALIDATION_BLOCKED,
+    TEXT_GENERATION_BLOCKED,
+    IDEMPOTENCY_MISMATCH,
+    PERSISTENCE_FAILED,
+    DOMAIN_REJECTED
+}

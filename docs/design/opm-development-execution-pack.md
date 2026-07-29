@@ -1,10 +1,10 @@
 # OPM 单机建模工具开发执行包
 
-文档版本：`v0.2`
+文档版本：`v0.5`
 
 文档状态：P0 与完整画布增量范围冻结，可按开发包进入代码开发
 
-更新时间：2026-07-28
+更新时间：2026-07-29
 
 ## Task Type
 
@@ -140,8 +140,8 @@ prototype
 | DEV-CANVAS-02 | 16 类 Procedural Link | P1 | DEV-CANVAS-00/01 | 过程关系语义、符号和候选闭环 |
 | DEV-CANVAS-03 | 8 类 Control Link 组合 | P1 | DEV-CANVAS-02 | Event/Condition 组合和输入 segment 注记 |
 | DEV-CANVAS-04 | 10 类 Structural Link | P1 | DEV-CANVAS-00/01 | Tagged、fundamental fan、State-specified 结构关系 |
-| DEV-CANVAS-05 | 完整规则、OPL、Trace 和 golden | P1-门槛 | DEV-CANVAS-01~04 | 同版本依赖闭包与 16/8/10 自动化证据 |
-| DEV-CANVAS-06 | 工具链集成、视觉、E2E、性能与分批启用 | P1-门槛 | DEV-CANVAS-05 | 完整画布发布候选和证据报告 |
+| DEV-CANVAS-05 | 完整规则、OPL、Trace 和 golden | P1-门槛 | DEV-CANVAS-01~04 | [独立规格](../../specs/opm-dev-canvas-05-opl-trace-golden-task-spec.md)；同版本依赖闭包与 16/8/10 自动化证据 |
+| DEV-CANVAS-06 | 工具链集成、视觉、E2E、性能与分批启用 | P1-门槛 | DEV-CANVAS-05 | [独立规格](../../specs/opm-dev-canvas-06-toolchain-release-task-spec.md)；完整画布发布候选和证据报告 |
 
 实施顺序为 `DEV-CANVAS-00 -> 01 -> 02 -> 03`，`04` 可在 `02` 后与 `03` 独立开发，随后统一进入 `05 -> 06`。关系组件可提前开发，但在 `05` 完成前生产工具栏保持 feature disabled。
 
@@ -199,7 +199,7 @@ prototype
 
 ### 6.7 DEV-CANVAS-00
 
-1. 为 `API-EDT-001` 冻结结构化 `CommandCapabilityOption`，包含 query/option ID、规范端点、字段、modifier、symbol/template/rule 引用、reason 和失效 Revision；
+1. 为 `API-EDT-001` 冻结结构化 `CommandCapabilityOption`，包含 query/option ID、规范端点、Control `capability_ref`、`base_fact_capability_ref`、字段、带 `min/max/atomic_group_id` 的 modifier、symbol/template/rule 引用、reason、删除影响摘要/token 和失效 Revision；
 2. 为 `API-EDT-002` 增加 `CREATE_STATE/UPDATE_STATE/UPDATE_FACT`，并冻结 `CREATE_FACT` 完整 payload；
 3. `CREATE_ELEMENT` 明确拒绝 State；`DELETE_CONSTRUCT` 支持 State/Fact impact token；
 4. OpenAPI validate、generated TypeScript/Java DTO diff、正反 contract test 通过；
@@ -231,10 +231,13 @@ prototype
 
 1. 8 个 Control Capability 覆盖 Event/Condition、Transforming/Enabling 和 State/non-State，并逐一覆盖每个允许的基础关系变体；
 2. `e/c` 位于规范 Process 输入端，Effect 输出段不能添加 Control；
-3. Control 是基础 Fact 的组合语义，不生成重叠伪 Fact；
-4. wait/skip/trigger 行为与 Rule/OPL/Trace 一致，非法组合有反例。
+3. Control 冻结为基础 Fact 上唯一、成对的 `control.capability=<CAP-ISO-CTRL-001~008>` 与 `control.segment=PROCESS_INPUT`，不生成重叠 edge、独立 CONTROL Fact 或重复 SemanticCondition；
+4. `CREATE_FACT/UPDATE_FACT`、Revision JSON reader/writer、Profile ModifierSchema、X6、OPL/Trace 使用同一 pair，基础 fact_id/Capability 保持不变；
+5. 缺项、重复项、非法 segment、Result/Effect 输出段、Control/base 不匹配和 Event+Condition 双组均有稳定反例；
+6. SQLite V1 无 DDL 变更；版本化 Revision JSON Schema、roundtrip、原子失败和旧 Revision 兼容测试通过；
+7. wait/skip/trigger 行为与 Rule/OPL/Trace 一致，非法组合有反例。
 
-回滚：关闭 Control modifier 编辑入口；保留已有组合的只读投影并阻断不兼容修改。
+回滚：关闭 Control modifier 编辑入口；移除候选 pair 不删除基础 Fact，已有组合保持只读投影并阻断不兼容修改。
 
 ### 6.11 DEV-CANVAS-04
 
@@ -242,28 +245,46 @@ prototype
 2. Bidirectional 两标签/两句、Reciprocal 单标签或无标签/互惠句闭合；
 3. Fundamental fan 是单一 Fact，支持 refinee 增删和 stable Fact ID；
 4. Aggregation/Exhibition/Generalization 完整性标记正确，Classification 不显示完整性标记；
-5. 默认 Object-Process structural 被阻断，Exhibition 例外按 Endpoint Schema 开放。
+5. 默认 Object-Process structural 被阻断，Exhibition 例外按 Endpoint Schema 开放；
+6. State-specified Characterization 只允许 Specialized Object -> 继承 Attribute 的 Value State，State-specified Tagged 只允许 Object/owned Object State。
 
 回滚：按 Capability 关闭结构关系创建/更新；已存在 fan 保持只读和身份不变。
 
 ### 6.12 DEV-CANVAS-05
 
-1. `G-OPL-PROC-001~016`、`G-OPL-CTRL-001~008`、`G-OPL-STRUCT-001~010` 主集合及其全部允许变体全通过；
-2. 每个 fixture 同时断言 Semantic/Projection/Symbol/OPL/Token/Trace/Rule/digest；
-3. Clause 15 precedence、合句、fan 列表和双向/互惠句按 Grammar 资产执行；
-4. 缺模板、规则、符号、Trace 或 digest mismatch 均阻断提交；
-5. 同 Revision 重放字节一致，失败无 partial committed revision。
+范围只包含版本化 Grammar/Template/Rule、Control/Structural concrete OPL、确定性 SentencePlan、Token/Trace、golden manifest 和原子文本提交；不包含 UI、视觉、E2E、性能或生产启用。
+
+1. `G-OPL-PROC-001~016` 的既有主集合及全部受控变体通过；
+2. Control 按 8 个主 Capability 展开 `20` 个允许基础 Fact PASS case，Result/State Result、Effect 输出段、pair 缺失/重复/不匹配及 Event+Condition 均稳定阻断；
+3. Structural 不是 10 个示例，而是覆盖全部合法方向、State、tag/null-tag、`1/2/3` fan 和 complete/incomplete 变体；Bidirectional 同 Fact 两句，Reciprocal 同 Fact 一句；
+4. `14.2.4.1.4` 仅用于 Link 语义强度，`A.3.1` 仅用于 EBNF 解析，跨 Sentence 顺序按版本化产品 rank 执行；不得引用不存在的 Clause 15；
+5. 每个 PASS fixture 同时断言 Semantic/Projection/Symbol/concrete Template/OPL/Token/Trace/Rule/digest，Token 使用 UTF-8 byte 半开区间并覆盖 Sentence 全 byte；
+6. 缺模板、规则、符号、Trace 或 digest mismatch 均阻断提交；
+7. 同 Revision 至少连续重放两次，artifact bytes、Token/Trace 顺序和 SHA-256 一致，失败无 partial committed revision；
+8. 完成本包后 Capability gate 仍关闭，交由 DEV-CANVAS-06 验证后分批启用。
 
 回滚：回退到上一组 ACTIVE Profile/Rule/Grammar/Symbol 绑定；历史 Revision 继续按原 digest 解析，不覆盖资产。
 
 ### 6.13 DEV-CANVAS-06
 
+范围只包含工具链集成、视觉、E2E、性能、恢复、Capability gate 和发布证据；不得新增语义或补写 DEV-CANVAS-05 缺失资产。
+
 1. 固定工具链、State 快捷工具、关系 split-button、搜索分组目录和检查器完整；
 2. 16/8/10 逐 Capability 只在证据通过后启用，禁用项原因可访问；
 3. 1440x900、1280x800、390x844 的符号、菜单、长标签、面板和错误状态无重叠/全局溢出；
 4. `25%/100%/400%` visual golden、canvas pixel、主路径/阻断/conflict/readonly E2E 通过；
-5. 大图 fixture 和固定测试环境的性能报告通过任务规格门槛；
+5. 大图 fixture 和固定测试环境的性能报告通过下表及独立任务规格门槛；
 6. 发布报告明确 ISO 证据状态，不因完整工具菜单自动声明符合。
+
+| 性能场景 | DEV-CANVAS-06 门槛 |
+| --- | --- |
+| 普通编辑反馈 | P95 `<=100 ms` |
+| 语义变更到 OPL 可见 | P95 `<=500 ms` |
+| 300 可见结点/600 关系 | frame P95 `<=32 ms`，选择 P95 `<=100 ms` |
+| 1,000 construct/2,000 edge | frame P95 `<=50 ms`，选择 P95 `<=200 ms`，零 OOM |
+| 10,000 结点模型 | 保存/快照/全量校验每次分别 `<=10/15/60 s`，各 5 次零失败 |
+
+交互指标至少预热 5 次、采样 100 次；frame 连续采样至少 30 秒。使用 release build、Java 21、Node 22、lockfile 对应 Chromium、至少 8 逻辑 CPU/16 GB RAM/SSD，报告 exact 版本、硬件、冷热口径、P50/P95/Max 和失败率。这些是产品阈值，不是 ISO 要求。
 
 回滚：整体或按 Capability 关闭完整画布 enablement gate，回到 P0 工具链；模型数据与历史 Revision 不回退。
 
@@ -280,9 +301,10 @@ prototype
 | DEV-07/08 | generated client、Query/Command projection、view state |
 | DEV-CANVAS-00 | structured capability option、State/Fact command union、impact token |
 | DEV-CANVAS-01 | StateAssertion、State Occurrence、State role/visibility/trace |
-| DEV-CANVAS-02/03 | Procedural Fact、SemanticCondition、segment role、duration |
+| DEV-CANVAS-02/03 | Procedural Fact、Control Modifier pair、独立 SemanticCondition、segment role、duration |
 | DEV-CANVAS-04 | Tagged labels、fundamental fan、collection completeness |
-| DEV-CANVAS-05/06 | 完整 Symbol/Rule/Grammar binding、golden、视觉和性能 fixture |
+| DEV-CANVAS-05 | concrete Template、完整 Symbol/Rule/Grammar binding、Token/Trace、golden manifest/replay |
+| DEV-CANVAS-06 | enablement manifest、视觉/E2E fixture、300/600、1,000/2,000 和 10,000 结点性能 fixture |
 
 代表 fixture 统一使用 `docs/contracts/examples`；实现测试可以复制到 `tests/fixtures`，但必须校验与契约源摘要一致，禁止形成分叉样例。
 
@@ -347,7 +369,7 @@ application API 契约中的其余 operationId 仍保留设计编号，但不允
 -> 桌面/移动视觉与大图性能证据通过
 ```
 
-`DEV-CANVAS-00` 可以直接进入开发；`01~06` 必须按依赖门槛进入。任何关系没有对应 Symbol/Rule/Grammar/golden 证据时只允许组件开发，不能在生产菜单启用。
+`DEV-CANVAS-05/06` 的独立规格、checklist 和设计输入已冻结；是否可启动仍必须在任务开始时核验前序包证据。任何关系没有对应 Symbol/Rule/Grammar/golden 证据时只允许组件开发，不能在生产菜单启用。
 
 ## 10. 回滚方案
 
@@ -371,12 +393,16 @@ DEV-00~09 和 DEV-CANVAS-00~06 每包必须在自己的 task spec 中写更具�
 | 原型验收 | READY | `opm-prototype-acceptance-report.md` |
 | 技术栈/运行拓扑 | READY | ARC-007/008/009 ACCEPTED |
 | 模块/数据所有权 | READY | M01-M12 模块设计 |
-| 核心字段契约 | READY | MS/PS/RS schema 文档与 JSON Schema |
+| P0 核心机器字段契约 | READY | MS/PS/RS schema 文档与代表性 JSON Schema |
+| 完整关系逻辑字段契约 | READY | PS-SYM-003/004/005 Relation/Marker/Label Slot Descriptor；机器资产待 DEV-CANVAS-00/05 |
 | HTTP 契约 | READY | OpenAPI 3.1，16 operationId 已验证 |
 | SQLite 初始 schema | READY | V1/verify SQL 已执行验证 |
 | 符号/OPL P0 | READY | 实现契约 + G-OPL-001/002 |
 | 完整画布专题设计 | READY | 工具链设计 + v0.2 符号契约 + handoff |
-| 完整画布机器契约 | NEXT | DEV-CANVAS-00；当前 OpenAPI 尚缺 State/Fact command union |
+| Control/Structural concrete OPL 输入 | READY | 符号与文本契约 7.3.2~7.3.4；Control 20 变体、Structural 全合法变体 |
+| precedence、Token/Trace、golden manifest | READY | 符号与文本契约 7.4、7.5、9.2；Clause 15 错误已纠正 |
+| DEV-CANVAS-05/06 任务规格 | READY | 两份独立 spec/checklist、范围/非目标/DoD/回滚/性能门槛 |
+| 完整画布机器契约 | NEXT | DEV-CANVAS-00；当前 OpenAPI 仅有部分草案，Control/Revision 契约与验收未闭环 |
 | 完整画布生产证据 | DEFERRED | DEV-CANVAS-01~06 尚未执行 |
 | 测试策略 | READY | `opm-test-strategy.md` |
 | 开发拆包/DoD/回滚 | READY | 本文 DEV-00~09、DEV-CANVAS-00~06 |
@@ -392,9 +418,10 @@ DEV-00~09 和 DEV-CANVAS-00~06 每包必须在自己的 task spec 中写更具�
 3. 代表性 Profile/Rule 不能覆盖完整 ISO 行为，UI 必须持续显示草案/证据未就绪；
 4. OpenAPI 只覆盖首批 16 operationId，后续能力必须从 application API 契约版本化扩展；
 5. 原型固定数据不能证明性能、事务和恢复；DEV-09 承接真实证据。
-6. 完整画布当前最大的确定阻断是 OpenAPI 缺少 State/Fact 更新和结构化 Candidate DTO；DEV-CANVAS-00 必须先闭合，前端不得绕过；
-7. 完整 16/8/10 的 Grammar、Rule 和 Symbol 仍是设计输入而非机器资产；DEV-CANVAS-05 前不得批量启用；
+6. 完整画布当前最大的确定阻断是 OpenAPI 草案缺少 `base_fact_capability_ref`、Modifier 基数/原子组，且 Revision Schema Fact 缺少 `modifiers`；DEV-CANVAS-00/03 必须先闭合，前端不得绕过；
+7. Control/Structural concrete OPL、Trace 和 golden 已冻结为设计输入，但完整 16/8/10 Grammar、Rule、Symbol 和 manifest 仍不是已验收机器资产；DEV-CANVAS-05/06 通过前不得批量启用；
 8. Lucide 当前不是前端直接依赖，完整工具链前端任务需显式允许新增依赖并冻结版本，或通过 ADR 采用现有图标库等价方案。
+9. 当前 Revision JSON Schema 的 Fact 尚未承载 modifiers；不改 SQLite DDL 不代表机器契约已闭合，DEV-CANVAS-00/03 必须先完成版本化 Schema 与 roundtrip。
 
 ## 13. 事实与假设
 

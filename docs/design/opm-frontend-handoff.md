@@ -1,8 +1,8 @@
 # OPM 单机建模工具前端交付标注
 
-文档版本：`v0.2-draft`
+文档版本：`v0.4-draft`
 
-文档状态：P0 前端输入与完整画布增量 handoff 冻结；完整画布机器契约待开发
+文档状态：P0 前端输入与完整画布增量 handoff 冻结；完整画布机器契约已有部分草案但未达到联调门槛
 
 更新时间：2026-07-28
 
@@ -49,7 +49,7 @@
 7. 关系搜索目录、structural fan、双标签、控制修饰和完整性编辑；
 8. 完整方法工作台、跨配置档转换和本体发布。
 
-上述第 5~7 项已具备设计 handoff，但必须先完成 `DEV-CANVAS-00` 的 OpenAPI/Schema 扩展。当前 `API-EDT-001/002` 机器契约不足，不能以手写 DTO 直接进入联调。
+上述第 5~7 项已具备设计 handoff，但必须先完成 `DEV-CANVAS-00` 的 OpenAPI/Schema 闭环。当前草案虽已出现 State/Fact union 和结构化 option，仍缺 Control/base Fact 分字段、Modifier 原子约束和 Revision Fact 承载，不能以部分 DTO 直接进入联调。
 
 ## 4. Screen 与页面映射
 
@@ -168,7 +168,7 @@ apps/web/src/
 | Relation 检查器 | `inspector-relation-fields` | Fact/endpoints/labels/modifiers | requery/update candidate | 先重算再提交 |
 | 命令反馈 | `editor-command-feedback` | submitting/blocked/conflict/failed | retry/cancel/locate | 不把 committed 当 saved |
 
-关系候选状态必须使用 `idle/armed/source-selected/filtering/preview/submitting/blocked/committed`；State 使用 `unavailable/ready/placing/editing/preview/submitting/blocked/failed/committed`。字段、转换和错误恢复以 `opm-complete-canvas-toolchain-design.md` 为唯一专题基线。
+关系候选状态必须使用 `idle/armed/source-selected/filtering/preview/submitting/blocked/failed/committed`；State 使用 `unavailable/ready/placing/editing/preview/submitting/blocked/failed/committed`。字段、转换和错误恢复以 `opm-complete-canvas-toolchain-design.md` 为唯一专题基线。
 
 稳定测试入口：
 
@@ -186,7 +186,7 @@ apps/web/src/
 | `route-context` | project/model/revision/context/page | 未提交表单 |
 | `workspace-resource` | session、Profile binding、access mode | Semantic Model 副本 |
 | `editor-session` | base revision、candidate、submit、undo/redo availability | 领域规则 |
-| `capability-options` | query id、base revision、结构化 option、reason、expiry | 自定义 Capability 判定 |
+| `capability-options` | query id、base revision、结构化 option、reason、impact summary/token、expiry | 自定义 Capability 判定或 impact token 拼装 |
 | `context-projection` | nodes/edges/layout/read revision | X6 作为正式模型 |
 | `view-state` | viewport、selection、panel、active tab | Revision/Fact |
 | `text-projection` | artifact、trace、freshness | 可编辑正式文本 |
@@ -204,7 +204,7 @@ apps/web/src/
 7. 图文高亮由 Text Trace 驱动，不按名称查找。
 8. State 是 owner 内的独立投影 construct，不映射为 Element node；拖出 owner 不能提交布局。
 9. Fundamental Structural fan 映射为一个 Fact + junction + branches，不能拆成多条正式 binary Fact。
-10. Event/Condition 使用基础 edge 的 annotation，不复制重叠 edge；Effect 只修饰输入 segment。
+10. Event/Condition 使用基础 edge 的 annotation，不复制重叠 edge；只读取 `control.capability/control.segment` pair，Effect 只修饰输入 segment。
 11. 完整 marker、label slot 和 route family 只由 Symbol Descriptor 驱动，不在 Vue/X6 adapter 按 Capability 写条件分支绘图。
 
 ## 10. 接口映射总表
@@ -218,13 +218,22 @@ apps/web/src/
 | P03 bootstrap | API-CTX-001/002 | 导航和 OPD Projection |
 | P03 command menu | API-EDT-001 | Profile 过滤的可用命令 |
 | P03 editing | API-EDT-002 | 原子语义命令 |
-| P03 State/complete relation candidate | API-EDT-001 扩展 | 结构化 option、规范端点、symbol/template/rule refs、reason |
-| P03 State/complete relation submit | API-EDT-002 扩展 | `CREATE_STATE/UPDATE_STATE/CREATE_FACT/UPDATE_FACT` 与影响 token |
+| P03 State/complete relation candidate | API-EDT-001 扩展 | 结构化 option、规范端点、Control/base Fact Capability、symbol/template/rule refs、reason；删除时返回 impact summary/token |
+| P03 State/complete relation submit | API-EDT-002 扩展 | `CREATE_STATE/UPDATE_STATE/CREATE_FACT/UPDATE_FACT`；删除命令携带未过期 impact token |
 | P03 text | API-TXT-001 | OPL 与 Trace |
 | P03 validation | API-VAL-001 | 固定 Revision 校验 |
 | P03 task | API-TSK-001/004 | 任务查询与 SSE |
 | P03 versions | API-VER-001 | Revision 选择 |
 | OV06 | API-VER-004 | 基线门槛与创建 |
+
+### 10.1 Control 候选与提交映射
+
+1. `CommandCapabilityOption.capability_ref` 表示所选 `CAP-ISO-CTRL-001~008`；`base_fact_capability_ref` 表示被修饰的基础 Procedural Capability，二者不得互换；
+2. `CreateFactPayload.capability_ref` 和 `UpdateFactPayload.expected_capability_ref` 始终使用基础 Fact Capability，不写 Control Capability；
+3. wire payload 只提交 `{modifier_id,value}`。Control option 必须提供同一 `atomic_group_id=iso-control` 的 `control.capability=<option.capability_ref>` 与 `control.segment=PROCESS_INPUT`，前端不得提交或缓存派生的 Modifier `target_ref/capability_ref`；
+4. 新建基础 Fact 时在一次 `CREATE_FACT` 中提交 pair；修饰既有基础 Fact 时使用 `UPDATE_FACT.replacement.modifiers` 原子替换，并携带该 Fact 其余仍需保留的 Modifier；不得先提交半对再补齐；
+5. committed Projection 继续以基础 `fact_id` 和一个 X6 edge 为身份。pair 只驱动输入段 `e/c` annotation、OPL 和 Trace；`condition` 仅显示/编辑独立谓词；
+6. 缺项、重复项、非法值、Control/base Capability 不匹配或过期 option 时，保留最近 committed Projection，清除候选 annotation，并按 `MODIFIER_COMBINATION_INVALID/REVISION_STALE` 回流。
 
 ## 11. 前端实现顺序
 
@@ -258,7 +267,7 @@ apps/web/src/
 8. Task SSE 断线回查 API-TSK-001；
 9. P01-P03 fixtures 可以独立启动；
 10. 1440x900、1280x800、390x844 截图和无溢出检查可自动执行。
-11. 完整画布开发前，OpenAPI 已生成结构化 `CommandCapabilityOption` 和 State/Fact command union，前端无手写重复 DTO；
+11. 完整画布开发前，OpenAPI 已生成包含 impact summary/token、`base_fact_capability_ref` 和 Modifier `min/max/atomic_group_id` 的结构化 `CommandCapabilityOption` 及 State/Fact command union，前端无手写重复 DTO；
 12. 16/8/10 每项均能从 Capability ID 解析到 symbol/template/rule binding；缺资产项不进入生产菜单；
 13. State、fan、控制注记、双向/互惠标签均有 Projection -> X6 -> screenshot/component golden；
 14. candidate 的 base revision 变化后失效，不能直接重放旧 option id。
@@ -270,7 +279,7 @@ apps/web/src/
 1. P01-P06 原型已通过桌面/移动浏览器验收；
 2. 当前仓库已有 DEV-00 Vue/Vite/TypeScript 工程壳，但不等于 P01-P03 或完整画布业务实现；
 3. P0 OpenAPI 覆盖 16 个 operationId；
-4. 当前 OpenAPI 没有 `CREATE_STATE/UPDATE_STATE/UPDATE_FACT`，`CommandCapabilitiesResult` 也不是结构化候选；
+4. 当前工作区 OpenAPI 草案已有 `CREATE_STATE/UPDATE_STATE/UPDATE_FACT` 和结构化候选，但 `base_fact_capability_ref`、Control Modifier 原子组、Revision Fact `modifiers` 与相应生成/契约测试仍未闭环；
 5. 原型不是生产组件实现。
 
 ### 13.2 建议/待实现

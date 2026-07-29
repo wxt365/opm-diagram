@@ -1,10 +1,10 @@
 # OPM 单机建模工具页面字段与区块明细表
 
-文档版本：`v0.3-draft`
+文档版本：`v0.5-draft`
 
-文档状态：页面字段口径经 Schema、OpenAPI 和原型校准
+文档状态：P0 字段经 Schema/OpenAPI/原型校准；完整画布候选与检查器字段冻结待实现
 
-更新时间：2026-07-27
+更新时间：2026-07-28
 
 ## Task Type
 
@@ -23,6 +23,7 @@
 5. `docs/requirements/opm-profile-capability-matrix.md`
 6. `docs/design/opm-modeling-tool-application-api-contract.md`
 7. `docs/design/opm-modeling-tool-persistence-contract.md`
+8. `docs/design/opm-complete-canvas-toolchain-design.md`
 
 ## 3. 字段分层与来源
 
@@ -48,7 +49,12 @@
 | 口径 | 含义 |
 | --- | --- |
 | `只读` | 仅展示查询或派生值，不产生写命令 |
-| `命令编辑` | 提交结构化应用/领域命令，成功后由新修订回填 |
+| `只读投影` | 固定 read revision 的 Context/Text/Validation 投影；页面不能原地改写 |
+| `只读候选` | 服务端按固定 Revision/binding 返回的短期 option；选择本身不产生写命令 |
+| `命令编辑` | 提交结构化应用/领域命令，成功后由权威结果回填；模型编辑命令返回新 Revision |
+| `语义命令` | `命令编辑` 的严格子类；改变 Semantic Model、Context 语义或文本顺序，成功时必须产生 Revision，并同步 OPL/校验投影 |
+| `布局命令` | 模型命令的受限子类；只改变 Context Layout 并返回新 Revision，语义摘要、OPL 和语义校验结果保持不变 |
+| `候选编辑` | 只修改未提交 candidate ViewModel；提交成功前不得进入 Projection、Revision、正式 OPL 或 Finding |
 | `本地视图` | 只影响页面会话或用户本地偏好，不改变模型语义 |
 | `任务参数` | 仅作为导入、导出、校验、备份等任务输入 |
 | `条件编辑` | 仅在指定 Profile、选择类型或访问模式下可编辑 |
@@ -158,15 +164,21 @@
 | 字段/动作 | 展示口径 | 来源 | 编辑性 | 守卫/说明 |
 | --- | --- | --- | --- | --- |
 | `context_projection` | 当前 OPD Construct | Context Projection | 只读投影 | 图形库不得成为事实源 |
-| `tool_mode` | 选择/框选/平移/创建结点/创建关系 | Derived UI | 本地视图 | 创建类工具受 Profile 过滤 |
-| `node_type_candidates` | 可创建 Thing 类型 | Profile Catalog | 只读候选 | 不显示 FORBIDDEN/N/A 能力 |
-| `relation_candidates` | 关系和修饰候选 | Profile Catalog | 只读候选 | 按源、目标、Context 动态过滤 |
+| `active_tool` | 选择/框选/平移/Object/Process/State/Relation | Derived UI | 本地视图 | 工具选择不进入 Revision |
+| `node_type_candidates` | 可创建 Thing 类型和 symbol ref | API-EDT-001 + Profile Catalog | 只读候选 | 不显示 FORBIDDEN/N/A 能力 |
+| `state_candidate` | owner、name/value、roles、layout、phase | Edit Session + API-EDT-001 | 候选编辑 | State 不是 Element；无合法 owner 时不可创建 |
+| `relation_search/group` | 搜索词、最近/过程/控制/结构分组 | Derived UI | 本地视图 | 搜索和最近项不进入模型 |
+| `relation_candidates` | query/option ID、Capability、Control 的 base Fact Capability、规范端点、字段、reason；删除时含 impact summary/token | API-EDT-001 | 只读候选 | 按 Profile、资产、Context、端点、State、已有 Fact 动态过滤；token 不展示、不拼装 |
+| `relation_candidate_fields` | labels、modifiers、condition、fan members、completeness | Edit Session + Capability Option | 候选编辑 | option/base revision 变化后重新过滤 |
+| `symbol/template/rule_refs` | descriptor、模板族、规则与 digest | API-EDT-001 + Profile Binding | 只读 | 缺任一 required 资产不得提交 |
 | `viewport_scale/translation` | 视图比例和平移 | Derived UI | 本地视图 | 不产生 revision/text/validation 变化 |
 | `fit_view/locate` | 适配画布/定位 | Derived UI | 本地视图 | 与语义 zoom 使用不同事件 |
 | `element_position` | 普通坐标 | Context Projection | 命令编辑 | 只改 Layout，不改 Fact |
 | `semantic_order` | Process in-zoom 垂直偏序 | Context + Semantic Model | 条件编辑 | 必须作为语义命令更新文本 |
 | `semantic_refinement_action` | 显式/抑制、展开/折叠、内/外缩放 | Profile Catalog + M03 | 条件编辑 | 完整名称、确认语义影响、产生 revision |
 | `alignment/layout_action` | 对齐/分布/自动布局 | M03/M05 | 命令编辑 | 完成前后语义散列不变 |
+
+工具链字段的稳定分组、图标来源、候选状态和移动降级由 `opm-complete-canvas-toolchain-design.md` 第 4-16 章承接。本表不复制 16/8/10 菜单项名称，Capability ID 是跨文档唯一连接键。
 
 ### 7.4 右侧选择与属性检查器
 
@@ -185,15 +197,37 @@
 | `appears_in` | 出现的 OPD 列表 | Context Projection | 只读 | 可定位全部 occurrence |
 | `source_revision` | 当前输入修订 | Edit Session | 只读 | 与文本/校验联动 |
 
+#### State 单选
+
+| 字段 | 展示口径 | 来源 | 编辑性 | 守卫/说明 |
+| --- | --- | --- | --- | --- |
+| `state_id` | 稳定 State 标识 | Semantic Model | 只读 | State 不是 Element，不使用 element_id |
+| `owner_ref` | 所属 Object/Attribute 和定位 | Semantic Model | 只读 | 普通字段编辑不能改变 owner |
+| `capability_ref` | State/Value 能力及 Profile | Semantic Model + Profile | 只读 | ISO 使用 Object State，禁止 Process State |
+| `name_or_value` | State 名称或受控值 | Semantic Model | 命令编辑 | 类型和唯一性由 Capability schema 决定 |
+| `state_roles` | Initial/Default/Final 多选 | Semantic Model + Profile | 命令编辑 | 每个角色和组合均由 API-EDT-001/Rule 守卫 |
+| `ordinal` | owner 内语义顺序 | Semantic Model | 条件编辑 | 改变可能更新 OPL，不能作为普通坐标 |
+| `explicitness` | 当前 Context 显式/抑制 | Context Projection | 语义命令 | 不创建或删除 State |
+| `fold_state` | 展开/折叠投影 | Context Projection | 语义命令 | 使用专用命令并产生 Revision |
+| `layout` | owner content box 内位置和尺寸 | Context Projection | 布局命令 | 拖出 owner 被阻断，不触发 re-owner |
+| `fact/text/finding_trace` | 使用 State 的 Fact、Sentence、Finding | M07/M08 Query | 只读 | 删除前影响分析和定位依据 |
+| `delete_impact_summary/token` | 引用数量、受影响 Context/Text/Finding 与不透明 token | API-EDT-001 | 只读候选 | 仅删除 intent 返回；提交必须原样携带未过期 token |
+
 #### Relation 单选
 
 | 字段 | 展示口径 | 来源 | 编辑性 | 守卫/说明 |
 | --- | --- | --- | --- | --- |
-| `relation_id/type` | 稳定标识和关系类型 | Semantic Model | ID 只读、类型条件编辑 | 候选由合法端点和 Profile 决定 |
-| `source/target` | 源、目标 Thing | Semantic Model | 条件编辑 | 改端点前重新过滤关系类型 |
+| `relation_id/type` | Fact ID、Capability 和 family | Semantic Model | ID 只读、类型条件编辑 | 类型改变先重算 Capability Option |
+| `endpoints` | ordered role、target、State qualification、multiplicity | Semantic Model | 条件编辑 | 不压缩为简单 source/target；用户拖线顺序不等于规范方向 |
 | `direction` | 标准方向 | Semantic Model + Profile | 条件编辑 | 不允许仅反转图形箭头 |
-| `modifiers` | 路径、逻辑、概率、状态、条件/事件等 | Semantic Model + Profile | 条件编辑 | 只显示当前关系允许组合 |
+| `labels` | forward/reverse/reciprocal 等稳定 slot | Semantic Model + Symbol | 条件编辑 | 双向标签不得交换 slot 改变语义 |
+| `modifiers` | 路径、逻辑、概率及受控 Control pair | Semantic Model + Profile + API-EDT-001 | 条件编辑 | Control 仅为 `control.capability=<CAP-ISO-CTRL-001~008>` + `control.segment=PROCESS_INPUT`，两项成对原子提交；基础 Fact ID/Capability 不变 |
+| `condition` | 独立 SemanticCondition 谓词 | Semantic Model + Profile | 条件编辑 | 不用于重复表达 Event/Condition 类型；仅有 Control 时为空 |
+| `fan_members` | refineable/refinee ordered endpoints | Semantic Model | 条件编辑 | fundamental relation 保持一个 Fact ID |
+| `collection_completeness` | complete/incomplete/not-applicable | Semantic Model + Profile | 条件编辑 | Classification 必须为 not-applicable |
+| `symbol/route` | line、marker、annotation、junction、route family | Symbol + Context Projection | 语义只读/布局条件编辑 | marker 类型不由前端改写；只允许位置/折点布局 |
 | `fact_trace` | Model Fact 与 Sentence | M04 + M08 Query | 只读 | 可定位对应文本 |
+| `delete_impact_summary/token` | fan/端点/State/Text/Context 影响与不透明 token | API-EDT-001 | 只读候选 | 影响集合、Revision 或 binding 变化后 token 失效 |
 
 #### 多选、Context、Sentence 和 Finding
 
@@ -286,6 +320,7 @@
 3. “是否可生成基线”等动作可用性；其依据来自保存、文本和校验状态；
 4. 当前 OPL/OPT 高亮和 Finding 高亮；
 5. 临时关系候选、拖拽预览和未提交表单值。
+6. capability query/option ID、不可用 reason、最近关系和候选 OPL；这些只用于当前候选会话。
 
 ## 13. 事实与建议
 
@@ -301,5 +336,6 @@
 
 1. P0 字段和主动作已映射机器 Schema 与 OpenAPI；传输 DTO 由契约生成；
 2. 项目/模型重名策略、备份默认参数和 opaque 路径选择仍待产品/后续包确认；
-3. P0 图形符号、锚点和语义布局契约已形成，完整 Clause 4 与 Profile 动态表单继续迭代；
+3. P0 与完整画布的逻辑图形、锚点、marker、label slot、route 和动态字段口径已形成；Clause 4 符号目录及 Clause 7-10 对应图形语义的机器资产仍由 DEV-CANVAS-01~05 实现；
 4. 性能占用、任务进度和存储健康的计算由 M12 生产实现与测试冻结。
+5. 现有 P0 OpenAPI 只提供字符串 allowed/forbidden，完整字段 DTO 必须等待 DEV-CANVAS-00 的 generated client。

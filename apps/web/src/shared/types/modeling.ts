@@ -6,7 +6,17 @@ export type ResourceState = "loading" | "ready" | "empty" | "error";
 export type CommandState = "idle" | "submitting" | "blocked" | "failed";
 export type SaveState = "saved" | "save-failed";
 export type BottomTab = "text" | "findings" | "history" | "method";
-export type CanvasTool = "select" | "pan" | "object" | "process" | "consumption";
+export type CanvasTool = "select" | "pan" | "object" | "process" | "attribute" | "operation" | "consumption" | "state";
+export type RelationCatalogGroup = "procedural" | "control" | "structural";
+
+export interface RelationCatalogItem {
+  capabilityId: string;
+  group: RelationCatalogGroup;
+  label: string;
+  endpointSummary: string;
+  available: boolean;
+  reason?: string;
+}
 
 export interface ProjectSummary {
   id: string;
@@ -35,7 +45,7 @@ export interface OpdNode {
   id: string;
   occurrenceId: string;
   label: string;
-  kind: "object" | "process";
+  kind: "object" | "process" | "attribute" | "operation" | "state";
   x: number;
   y: number;
   valueDomain: string;
@@ -43,6 +53,17 @@ export interface OpdNode {
   multiplicity: string;
   architectureLayer: "任务" | "功能" | "产品";
   occurrenceRole: "owned" | "reference";
+  ownerId?: string;
+  stateRoles?: Array<"INITIAL" | "DEFAULT" | "FINAL">;
+  explicitness?: "EXPLICIT" | "SUPPRESSED";
+  foldState?: "UNFOLDED" | "FOLDED";
+}
+
+export interface ProceduralEndpoint {
+  role: string;
+  targetId: string;
+  targetKind: "ELEMENT" | "STATE" | "FEATURE";
+  ordinal: number;
 }
 
 export interface ConsumptionRelation {
@@ -53,6 +74,14 @@ export interface ConsumptionRelation {
   targetOccurrenceId: string;
   symbolRef: string;
   layoutRef: string;
+  capabilityId?: string;
+  direction?: "DIRECTED" | "BIDIRECTIONAL" | "UNDIRECTED";
+  endpoints?: ProceduralEndpoint[];
+  duration?: string;
+  controlCapability?: string;
+  controlSegment?: "PROCESS_INPUT";
+  labels?: Array<{ slotId: string; text: string }>;
+  collectionCompleteness?: "COMPLETE" | "INCOMPLETE" | "NOT_APPLICABLE";
 }
 
 export interface TextTrace {

@@ -37,6 +37,10 @@
       "type": "array",
       "items": {"$ref": "#/$defs/element"}
     },
+    "features": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/feature"}
+    },
     "states": {
       "type": "array",
       "items": {"$ref": "#/$defs/state"}
@@ -57,6 +61,10 @@
     "layouts": {
       "type": "array",
       "items": {"$ref": "#/$defs/layout"}
+    },
+    "state_presentations": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/statePresentation"}
     },
     "text_artifact": {"$ref": "#/$defs/textArtifact"},
     "validation_summary": {"$ref": "#/$defs/validationSummary"},
@@ -208,7 +216,22 @@
         "essence": {"enum": ["PHYSICAL", "INFORMATICAL"]},
         "affiliation": {"enum": ["SYSTEMIC", "ENVIRONMENTAL"]},
         "perseverance": {"enum": ["STATIC", "DYNAMIC", "PERSISTENT"]},
+        "feature_ids": {"type": "array", "items": {"$ref": "#/$defs/stableId"}},
         "state_ids": {"type": "array", "items": {"$ref": "#/$defs/stableId"}},
+        "source": {"$ref": "#/$defs/source"},
+        "normalization": {"$ref": "#/$defs/normalization"}
+      }
+    },
+    "feature": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["feature_id", "owner_element_id", "feature_kind", "capability_ref", "name", "source", "normalization"],
+      "properties": {
+        "feature_id": {"$ref": "#/$defs/stableId"},
+        "owner_element_id": {"$ref": "#/$defs/stableId"},
+        "feature_kind": {"enum": ["ATTRIBUTE", "OPERATION", "PROFILE_FEATURE"]},
+        "capability_ref": {"$ref": "#/$defs/capabilityRef"},
+        "name": {"$ref": "#/$defs/qualifiedName"},
         "source": {"$ref": "#/$defs/source"},
         "normalization": {"$ref": "#/$defs/normalization"}
       }
@@ -219,6 +242,7 @@
       "required": ["state_id", "owner_element_id", "capability_ref", "name", "source", "normalization"],
       "properties": {
         "state_id": {"$ref": "#/$defs/stableId"},
+        "owner_target_kind": {"enum": ["ELEMENT", "FEATURE"]},
         "owner_element_id": {"$ref": "#/$defs/stableId"},
         "capability_ref": {"$ref": "#/$defs/capabilityRef"},
         "name": {"$ref": "#/$defs/qualifiedName"},
@@ -262,6 +286,31 @@
         "capability_ref": {"$ref": "#/$defs/capabilityRef"},
         "endpoints": {"type": "array", "minItems": 2, "items": {"$ref": "#/$defs/endpoint"}},
         "direction": {"enum": ["DIRECTED", "BIDIRECTIONAL", "UNDIRECTED", "PROFILE_DEFINED"]},
+        "modifiers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["modifier_id", "value"],
+            "properties": {
+              "modifier_id": {"type": "string", "minLength": 1},
+              "value": {"type": "string", "minLength": 1}
+            }
+          }
+        },
+        "labels": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["slot_id", "text"],
+            "properties": {
+              "slot_id": {"type": "string", "minLength": 1},
+              "text": {"type": "string", "minLength": 1, "maxLength": 256}
+            }
+          }
+        },
+        "collection_completeness": {"enum": ["COMPLETE", "INCOMPLETE", "NOT_APPLICABLE"]},
         "source": {"$ref": "#/$defs/source"},
         "normalization": {"$ref": "#/$defs/normalization"}
       }
@@ -291,6 +340,17 @@
         "ownership": {"enum": ["OWNED", "REFERENCED", "VIEW_DERIVED"]},
         "construct_role": {"type": "string", "minLength": 1},
         "layout_id": {"$ref": "#/$defs/stableId"}
+      }
+    },
+    "statePresentation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["context_id", "state_id", "explicitness", "fold_state"],
+      "properties": {
+        "context_id": {"$ref": "#/$defs/stableId"},
+        "state_id": {"$ref": "#/$defs/stableId"},
+        "explicitness": {"enum": ["EXPLICIT", "SUPPRESSED"]},
+        "fold_state": {"enum": ["UNFOLDED", "FOLDED"]}
       }
     },
     "layout": {

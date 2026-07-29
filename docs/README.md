@@ -1,12 +1,12 @@
 # OPM 单机建模工具文档索引
 
-更新时间：2026-07-28
+更新时间：2026-07-29
 
 ## 1. 文档目的
 
 本文档是 OPM 单机建模工具需求、标准、架构和后续开发准备材料的统一入口。
 
-当前文档状态为 P0 与完整画布分阶段开发就绪：需求、架构、模块、P01-P06 页面设计、机器可读 Schema/样例、P0 OpenAPI、SQLite V1、完整画布工具链、符号/OPL 契约、可交互原型、验收报告、handoff、测试策略和开发执行包已经形成。DEV-00 前后端工程壳和依赖锁已存在；P0 业务闭环、完整画布机器契约、完整 ISO 资产、安装包和真实端到端证据尚未形成。
+当前文档状态为 P0 与完整画布分阶段开发就绪：需求、架构、模块、P01-P06 页面设计、机器可读 Schema/样例、P0 OpenAPI、SQLite V1、完整画布工具链、Control/Structural concrete OPL、Token/Trace、golden manifest、可交互原型、验收报告、handoff、测试策略和开发执行包已经形成。DEV-CANVAS-05/06 已有独立规格与 checklist；对应机器资产、完整 ISO 证据、发布候选和真实性能结果尚未形成。
 
 ## 2. 正式入口
 
@@ -50,7 +50,7 @@
 
 1. `design/opm-development-technology-baseline.md`：ARC-007/008/009、运行拓扑、技术栈和工程结构。
 2. `design/opm-physical-data-and-migration-design.md`：SQLite、资产目录、迁移、`.opmp` 和恢复。
-3. `design/opm-symbol-and-text-generation-implementation-contract.md`：P0 与完整画布的 symbol/marker/label slot/route、模板族、OPL 流水线和 golden 集合。
+3. `design/opm-symbol-and-text-generation-implementation-contract.md`：P0 与完整画布的 symbol/marker/label slot/route、Control/Structural concrete OPL、precedence、Token/Trace 和 golden manifest。
 4. `contracts/schemas/*.json`：Revision、Profile、Rule Set JSON Schema 2020-12。
 5. `contracts/examples/*.json`：三个通过 Schema 验证的代表样例。
 6. `contracts/openapi/opm-local-api-v1.yaml`：P0 本地 HTTP OpenAPI 3.1。
@@ -68,6 +68,8 @@
 
 1. `checklists/opm-online-modeling-tool-requirements-checklist.md`：Task 1-18 的 Spec Mapping、范围和验证记录。
 2. `checklists/opm-complete-canvas-toolchain-design-checklist.md`：完整画布设计补齐的 Spec Mapping、覆盖和验证记录。
+3. [`DEV-CANVAS-05 规格`](../specs/opm-dev-canvas-05-opl-trace-golden-task-spec.md) 与 `checklists/opm-dev-canvas-05-opl-trace-golden-checklist.md`：OPL/Trace/golden 机器实现边界。
+4. [`DEV-CANVAS-06 规格`](../specs/opm-dev-canvas-06-toolchain-release-task-spec.md) 与 `checklists/opm-dev-canvas-06-toolchain-release-checklist.md`：工具链、视觉、E2E、性能和发布边界。
 
 ## 3. 建议阅读顺序
 
@@ -107,7 +109,7 @@
 3. 前端 handoff 第 7.4 章及 Store/X6/接口扩展；
 4. 开发执行包 `DEV-CANVAS-00~06`；
 5. 核心元模型、Profile 能力矩阵和应用 API 契约；
-6. OpenAPI 当前缺口说明，首包只从 `DEV-CANVAS-00` 开始。
+6. OpenAPI 当前草案与冻结设计的差异说明，首包从 `DEV-CANVAS-00` 的契约闭环和验收开始。
 
 ## 4. 当前设计职责
 
@@ -121,19 +123,21 @@
 | 顶层技术架构 | 顶层技术架构、技术基线 | 逻辑与 P0 物理方案冻结 |
 | 模块详细设计 | 模块详细设计 | M01-M12 与 P0 边界冻结 |
 | 页面专题与 IA | 页面专题设计包 | P01-P06 经原型验证 |
-| 页面状态模型 | 页面状态模型 | 已映射 OpenAPI/handoff |
-| 页面字段口径 | 页面字段与区块明细 | 已由 Schema/OpenAPI/原型校准 |
-| 页面组件交互 | 页面组件树与交互状态表 | 已进入 handoff |
+| 页面状态模型 | 页面状态模型 | P0 状态及完整画布 State/relation candidate 已冻结 |
+| 页面字段口径 | 页面字段与区块明细 | P0 字段及完整工具链/检查器编辑性已冻结 |
+| 页面组件交互 | 页面组件树与交互状态表 | 完整工具链组件、事件和稳定测试入口已进入 handoff |
 | 完整画布专题设计 | 完整画布工具链设计 | State、工具链、16/8/10、状态/字段/交互已冻结 |
-| 应用 API 契约 | 应用 API + OpenAPI | 应用语义与 P0 HTTP 冻结 |
+| Control/Structural OPL 输入 | 符号与文本契约 | Control 20 个基础组合、Structural 全合法变体、正确 precedence 边界、Token/Trace 和 golden manifest 已冻结 |
+| 应用 API 契约 | 应用 API + OpenAPI | P0 HTTP 已验证；完整画布逻辑 option/command union 已冻结，机器草案部分存在但未闭环 |
 | 逻辑持久化契约 | 持久化契约、物理设计、SQLite V1 | P0 逻辑/物理冻结 |
 | 原生交换包契约 | 交换契约、物理设计 | 容器冻结，golden package 待实现 |
 | 核心元模型字段 | 字段文档 + Revision Schema/样例 | P0 机器验证通过 |
-| Profile Package 字段 | 字段文档 + Profile Schema/样例 | 代表性 DRAFT 验证通过 |
+| Profile Package 字段 | 字段文档 + Profile Schema/样例 | Relation/Marker/Label Slot 逻辑字段已冻结；代表性 DRAFT 机器样例已验证，完整资产待实现 |
 | Rule Definition 字段 | 字段文档 + Rule Schema/样例 | 代表性 DRAFT 验证通过，原子规则待补 |
 | 原型验收 | 原型验收报告 | 通过，无未关闭 P0 原型问题 |
-| handoff、测试与执行包 | 三份开发准备文档 | P0 与完整画布拆包/DoD/回滚已冻结 |
-| 完整画布机器契约 | OpenAPI + DEV-CANVAS-00 | NEXT，当前不冒充已支持 |
+| handoff、测试与执行包 | 三份开发准备文档 | P0 与完整画布 handoff、分层测试、拆包/DoD/回滚已冻结 |
+| DEV-CANVAS-05/06 规格 | 两份 spec + checklist | 范围、非目标、依赖、验收、回滚和性能阈值已冻结；实现未开始 |
+| 完整画布机器契约 | OpenAPI + DEV-CANVAS-00 | NEXT，已有部分草案但缺 Control/Revision 闭环与验收，不冒充已支持 |
 | 完整画布实现证据 | DEV-CANVAS-01~06 | DEFERRED，尚未执行 |
 
 ## 5. 当前关键决策状态
@@ -158,7 +162,10 @@
 | State 不是 Element，ISO Profile 禁止 Process State | 已冻结语义边界 | 核心元模型、完整画布设计 |
 | 通用工具用图标，OPM 工具用 Symbol Catalog 缩略符号 | 已冻结 handoff | 完整画布设计、前端 handoff |
 | 完整关系使用分组搜索目录和服务端候选，不平铺、不前端硬编码合法性 | 已冻结交互边界 | 完整画布设计 |
-| 完整画布先扩 API-EDT-001/002，再按 Capability 分批启用 | 已冻结实施顺序 | 开发执行包 DEV-CANVAS-00~06 |
+| 完整画布先闭合并验收 API-EDT-001/002，再按 Capability 分批启用 | 已冻结实施顺序 | 开发执行包 DEV-CANVAS-00~06 |
+| ISO Control 使用基础 Fact 上的 `control.capability/control.segment` 成对 Modifier，不创建独立 Control Fact | 已冻结持久化边界 | 核心元模型、应用 API、逻辑/物理持久化契约 |
+| ISO 19450:2024 不存在 Clause 15；Link 语义强度、EBNF 优先级和产品句序分离 | 已冻结标准解释边界 | 符号与文本契约 7.4、标准 Annex A |
+| 完整画布性能门槛为产品阈值，不是 ISO 要求 | 已冻结验收边界 | 产品需求 NFR-PERF-001~004、DEV-CANVAS-06 规格 |
 
 ## 6. 维护规则
 
