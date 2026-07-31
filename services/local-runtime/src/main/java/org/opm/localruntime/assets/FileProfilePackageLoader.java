@@ -28,11 +28,30 @@ public final class FileProfilePackageLoader {
     }
 
     FileProfilePackageLoader(Path assetRoot, ObjectMapper objectMapper) {
-        this.assetRoot = Objects.requireNonNull(assetRoot, "assetRoot must not be null").toAbsolutePath().normalize();
+        this.assetRoot = resolveAssetRoot(Objects.requireNonNull(assetRoot, "assetRoot must not be null"));
         this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper must not be null");
     }
 
+    private Path resolveAssetRoot(Path configuredRoot) {
+        Path resolved = configuredRoot.toAbsolutePath().normalize();
+        if (configuredRoot.isAbsolute() || Files.isDirectory(resolved)) return resolved;
+        Path current = Path.of("").toAbsolutePath().normalize();
+        while (current != null) {
+            Path candidate = current.resolve(configuredRoot).normalize();
+            if (Files.isDirectory(candidate)) return candidate;
+            current = current.getParent();
+        }
+        return resolved;
+    }
+
     public ProfileBindingSummary load(String profileId, String packageVersion, String expectedPackageDigest) {
+        return loadPackage(profileId, packageVersion, expectedPackageDigest).binding();
+    }
+
+    /**
+     * 加载经 manifest 验证的 Profile 包描述，供正式语义资产装配使用。
+     */
+    public ProfilePackageDescriptor loadPackage(String profileId, String packageVersion, String expectedPackageDigest) {
         validatePathSegment(profileId, "profile id");
         validatePathSegment(packageVersion, "package version");
         requireSha256(expectedPackageDigest, "expected package digest");
@@ -58,8 +77,13 @@ public final class FileProfilePackageLoader {
                     throw new AssetLoadException("Duplicate required manifest role: " + left.role());
                 }));
 
-        Map<String, AssetReference> dependencyReferences = readDependencyReferences(profile);
-        AssetReference ruleReference = requiredDependency(dependencyReferences, "RULE_SET");
+        List<Dependency> dependencies = readDependencies(profile);
+        Map<String, Dependency> requiredDependencies = dependencies.stream()
+                .filter(Dependency::required)
+                .collect(Collectors.toMap(Dependency::role, Function.identity(), (left, right) -> {
+                    throw new AssetLoadException("Duplicate required profile dependency");
+                }));
+        AssetReference ruleReference = requiredDependency(requiredDependencies, "RULE_SET").reference();
         AssetReference symbolReference = readAssetReference(requiredObject(profile, "symbol_catalog_ref", "profile"));
         AssetReference grammarReference = readAssetReference(requiredObject(profile, "text_grammar_ref", "profile"));
         AssetReference normalizationReference = readAssetReference(requiredObject(profile, "normalization_adapter_ref", "profile"));
@@ -78,12 +102,38 @@ public final class FileProfilePackageLoader {
             throw new AssetLoadException("Requested profile package digest does not match the installed package");
         }
 
-        return new ProfileBindingSummary(
+        ProfileBindingSummary binding = new ProfileBindingSummary(
                 new AssetReference(profileId, packageVersion, calculatedPackageDigest),
                 ruleReference,
                 symbolReference,
                 grammarReference,
                 normalizationReference);
+        Map<String, AssetReference> references = Map.of(
+                "RULE_SET", ruleReference,
+                "SYMBOL_ASSET", symbolReference,
+                "GRAMMAR_ASSET", grammarReference,
+                "NORMALIZATION_DATA", normalizationReference);
+        List<ProfilePackageDescriptor.RequiredAsset> requiredAssets = requiredDependencies.values().stream()
+                .sorted(Comparator.comparingInt(Dependency::loadOrder))
+                .map(dependency -> requiredAsset(packageDirectory, requiredEntries, dependency, references))
+                .toList();
+        return new ProfilePackageDescriptor(binding, requiredAssets, readCapabilities(profile));
+    }
+
+    private ProfilePackageDescriptor.RequiredAsset requiredAsset(
+            Path packageDirectory,
+            Map<String, ManifestEntry> entries,
+            Dependency dependency,
+            Map<String, AssetReference> references) {
+        AssetReference expected = references.get(dependency.role());
+        if (expected == null || !expected.equals(dependency.reference())) {
+            throw new AssetLoadException("Profile dependency reference differs for " + dependency.role());
+        }
+        ManifestEntry entry = entries.get(dependency.role());
+        if (entry == null) {
+            throw new AssetLoadException("Missing required manifest entry for " + dependency.role());
+        }
+        return new ProfilePackageDescriptor.RequiredAsset(dependency.role(), resolveLogicalPath(packageDirectory, entry.logicalPath()), expected);
     }
 
     private void verifyEntry(
@@ -119,27 +169,48 @@ public final class FileProfilePackageLoader {
         }
     }
 
-    private Map<String, AssetReference> readDependencyReferences(JsonNode profile) {
+    private List<Dependency> readDependencies(JsonNode profile) {
         JsonNode dependencies = profile.path("dependencies");
         if (!dependencies.isArray()) {
             throw new AssetLoadException("Profile dependencies must be an array");
         }
-        return stream(dependencies).stream()
-                .filter(dependency -> dependency.path("required").asBoolean(false))
-                .collect(Collectors.toMap(
-                        dependency -> requiredText(dependency, "role", "profile dependency"),
-                        dependency -> readAssetReference(requiredObject(dependency, "asset", "profile dependency")),
-                        (left, right) -> {
-                            throw new AssetLoadException("Duplicate required profile dependency");
-                        }));
+        List<Dependency> result = new ArrayList<>();
+        for (JsonNode dependency : dependencies) {
+            int loadOrder = dependency.path("load_order").asInt(-1);
+            if (loadOrder < 0) throw new AssetLoadException("Profile dependency load_order must be non-negative");
+            result.add(new Dependency(
+                    requiredText(dependency, "role", "profile dependency"),
+                    readAssetReference(requiredObject(dependency, "asset", "profile dependency")),
+                    dependency.path("required").asBoolean(false),
+                    loadOrder));
+        }
+        return List.copyOf(result);
     }
 
-    private AssetReference requiredDependency(Map<String, AssetReference> dependencies, String role) {
-        AssetReference reference = dependencies.get(role);
-        if (reference == null) {
+    private Dependency requiredDependency(Map<String, Dependency> dependencies, String role) {
+        Dependency dependency = dependencies.get(role);
+        if (dependency == null) {
             throw new AssetLoadException("Missing required profile dependency for " + role);
         }
-        return reference;
+        return dependency;
+    }
+
+    private List<ProfilePackageDescriptor.CapabilityBinding> readCapabilities(JsonNode profile) {
+        JsonNode capabilities = profile.path("capability_catalog");
+        if (!capabilities.isArray()) throw new AssetLoadException("Profile capability_catalog must be an array");
+        List<ProfilePackageDescriptor.CapabilityBinding> result = new ArrayList<>();
+        for (JsonNode capability : capabilities) {
+            String capabilityId = requiredText(capability, "capability_id", "profile capability");
+            String ruleRef = optionalText(capability, "rule_ref");
+            String symbolRef = optionalText(capability, "symbol_ref");
+            String templateRef = optionalText(capability, "template_ref");
+            if (ruleRef == null && templateRef == null) continue;
+            if (ruleRef == null || symbolRef == null || templateRef == null) {
+                throw new AssetLoadException("Profile capability text binding is incomplete for " + capabilityId);
+            }
+            result.add(new ProfilePackageDescriptor.CapabilityBinding(capabilityId, ruleRef, symbolRef, templateRef));
+        }
+        return List.copyOf(result);
     }
 
     private List<ManifestEntry> readManifestEntries(JsonNode manifest) {
@@ -239,6 +310,11 @@ public final class FileProfilePackageLoader {
         return value.asText();
     }
 
+    private String optionalText(JsonNode node, String field) {
+        JsonNode value = node.path(field);
+        return value.isTextual() && !value.asText().isBlank() ? value.asText() : null;
+    }
+
     private void validatePathSegment(String value, String name) {
         if (value == null || value.isBlank() || value.contains("/") || value.contains("\\") || value.contains("..")) {
             throw new AssetLoadException("Invalid " + name);
@@ -266,5 +342,8 @@ public final class FileProfilePackageLoader {
     }
 
     private record ManifestEntry(String role, String logicalPath, long byteLength, String sha256, boolean required) {
+    }
+
+    private record Dependency(String role, AssetReference reference, boolean required, int loadOrder) {
     }
 }

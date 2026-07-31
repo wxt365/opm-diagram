@@ -12,6 +12,9 @@ public record OplSentence(String sentenceId, String text, int ordinal, List<OplT
             throw new IllegalArgumentException("ordinal must not be negative");
         }
         tokens = List.copyOf(Objects.requireNonNull(tokens, "tokens must not be null"));
+        if (tokens.isEmpty()) {
+            throw new IllegalArgumentException("tokens must not be empty");
+        }
         generationRuleIds = immutableNonEmpty(generationRuleIds, "generationRuleIds");
         inputFactIds = immutableNonEmpty(inputFactIds, "inputFactIds");
     }
@@ -29,4 +32,5 @@ public record OplSentence(String sentenceId, String text, int ordinal, List<OplT
             throw new IllegalArgumentException(name + " must not be blank");
         }
     }
+
 }

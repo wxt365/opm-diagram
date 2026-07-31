@@ -185,7 +185,7 @@ class LocalRuntimeApi {
       request_id: requestId("request.model"),
       command_id: requestId("command.model"),
       name,
-      binding: defaultBinding(),
+      binding: activeBinding(),
     })).data;
   }
 
@@ -226,7 +226,7 @@ class LocalRuntimeApi {
       request_id: requestId("request.command"),
       command_id: requestId("command.p0"),
       base_revision: baseRevision,
-      binding: defaultBinding(),
+      binding: activeBinding(),
       command_type: command.commandType,
       payload: command.payload,
     });
@@ -237,7 +237,7 @@ class LocalRuntimeApi {
       request_id: requestId("request.validation"),
       command_id: requestId("command.validation"),
       input_revision: revision,
-      binding: defaultBinding(),
+      binding: activeBinding(),
       scope: "FULL",
     });
   }
@@ -280,13 +280,12 @@ class LocalRuntimeApi {
 
 export const localRuntimeApi = new LocalRuntimeApi();
 
-function defaultBinding(): ProfileRuleBinding {
-  return {
-    profile_id: "profile.iso19450.2024.draft",
-    profile_version: "0.1.0",
-    rule_set_id: "rules.iso19450.2024.draft",
-    rule_version: "0.1.0",
-  };
+function activeBinding(): ProfileRuleBinding {
+  const binding = window.__OPM_ACTIVE_PROFILE_BINDING__;
+  if (!binding || !binding.profile_id || !binding.profile_version || !binding.rule_set_id || !binding.rule_version) {
+    throw new LocalRuntimeApiError("RUNTIME_BINDING_UNAVAILABLE", "本地运行时未下发活动 Profile binding，请刷新页面后重试。", true);
+  }
+  return binding;
 }
 
 function requestId(prefix: string): string {

@@ -1,8 +1,10 @@
 # OPM 单机建模工具物理数据与迁移设计
 
-文档版本：`v0.2-draft`
+文档版本：`v1.0`
 
-文档状态：SQLite 首批开发冻结基线
+文档状态：`FROZEN_INCLUDED`；SQLite V1 与 Revision 版本边界冻结
+
+全局设计状态、延期边界和开发准入以 `opm-design-freeze-baseline.md` 为唯一事实源。
 
 更新时间：2026-07-28
 
@@ -109,7 +111,7 @@ PRAGMA temp_store = MEMORY;
 2. `fact_endpoint_index` 继续只索引基础 Fact 端点。候选、Rule、X6、OPL 和 Trace 从固定 Revision 的 Canonical Fact/Modifier 读取，不把索引变成第二事实源；
 3. Canonical JSON 按 `modifier_id` 排序，两个 key/value、所选 Control Capability、基础 Fact 和 Profile binding 全部进入 `document_digest`；
 4. 本次设计不要求修改 SQLite V1 或新增 Flyway migration，`storage_schema_version` 不因纯 document schema 扩展而变化；
-5. 当前 `opm-revision.schema.json` 的 Fact 尚未承载 `modifiers`。DEV-CANVAS-00/03 必须发布兼容的机器 Schema/reader/writer/roundtrip 测试，并更新 `core_metamodel_version` 或对应 schema set 版本，不能依赖未校验 JSON；
+5. 当前 `opm-revision.schema.json` 仍以 0.1 为身份且已出现 Fact `modifiers[]`；DEV-CANVAS-00/03 必须按冻结目标发布独立 0.2 Schema、兼容 reader/writer 和 roundtrip 测试，不能把在 0.1 文件中出现字段等同于 0.2 发布完成；
 6. 旧 Revision 保持不可变。读取不含 Control pair 的旧基础 Fact 等价于“无 Control”；读取半对、重复键或未知值必须报告结构/语义错误，不猜测补全。
 
 ### 6.2 Draft Head、Snapshot 与 Baseline

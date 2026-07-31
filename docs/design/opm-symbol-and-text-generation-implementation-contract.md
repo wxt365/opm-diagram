@@ -1,8 +1,10 @@
 # OPM 符号与文本生成实现契约
 
-文档版本：`v0.4-draft`
+文档版本：`v1.0`
 
-文档状态：P0 实现契约、完整画布符号设计及 Control/Structural concrete OPL 输入冻结；机器 Grammar、golden 与运行证据待实现
+文档状态：`FROZEN_INCLUDED`；当前符号、concrete OPL、Token/Trace 与 golden 输入冻结
+
+全局设计状态、延期边界和开发准入以 `opm-design-freeze-baseline.md` 为唯一事实源。
 
 更新时间：2026-07-29
 
@@ -425,8 +427,8 @@ Canonical generator 对 Condition 固定使用 Annex A 每个产生式的第一�
 | `CAP-ISO-STRUCT-005` | `opl.structural.aggregation.incomplete.v1` | `{Whole} consists of {known-part-list} and at least one other part.` |
 | `CAP-ISO-STRUCT-006` | `opl.structural.characterization.complete.v1` | `{Exhibitor} exhibits {feature-list}.` |
 | `CAP-ISO-STRUCT-006` | `opl.structural.characterization.incomplete.v1` | `{Exhibitor} exhibits {feature-list}, and at least one other {feature-kind}.` |
-| `CAP-ISO-STRUCT-006` | `opl.structural.characterization.mixed.complete.v1` | `{Exhibitor} exhibits {attribute-list}, as well as {operator-list}.` |
-| `CAP-ISO-STRUCT-006` | `opl.structural.characterization.mixed.incomplete.v1` | `{Exhibitor} exhibits {attribute-list}, and at least one other attribute, as well as {operator-list}, and at least one other operator.` |
+| `CAP-ISO-STRUCT-006` | `opl.structural.characterization.mixed.complete.v1` | `{Exhibitor} exhibits {primary-feature-list}, as well as {secondary-feature-list}.` |
+| `CAP-ISO-STRUCT-006` | `opl.structural.characterization.mixed.incomplete.v1` | `{Exhibitor} exhibits {primary-feature-list}, and at least one other {primary-feature-kind}, as well as {secondary-feature-list}, and at least one other {secondary-feature-kind}.` |
 | `CAP-ISO-STRUCT-006` | `opl.structural.exhibition.v1` | `{Feature} of {Exhibitor} is {value-or-feature-list}.` |
 | `CAP-ISO-STRUCT-007` | `opl.structural.generalization.object.single.v1` | `{SpecialObject} is a {GeneralObject}.` |
 | `CAP-ISO-STRUCT-007` | `opl.structural.generalization.process.single.v1` | `{SpecialProcess} is {GeneralProcess}.` |
@@ -440,7 +442,18 @@ Canonical generator 对 Condition 固定使用 Annex A 每个产生式的第一�
 | `CAP-ISO-STRUCT-010` | `opl.structural.tagged.state.bidirectional.reverse.v1` | `{qualified-destination} {reverse-tag} {qualified-source}.` |
 | `CAP-ISO-STRUCT-010` | `opl.structural.tagged.state.reciprocal.v1` | `{qualified-source} and {qualified-destination} are {reciprocal-tag-or-related}.` |
 
-`CAP-ISO-STRUCT-006` 的 Canonical Generator 对 Canonical Fact 默认输出 Characterization 方向，即 `exhibits` 句；`A.4.6.4` 的 Exhibition 句作为受控 parser/import 产生式保留，只有输入显式携带该产生式身份时才原样重建，不能从用户拖线方向猜测。`feature-kind` 只能为 `attribute` 或 `operator`。
+`CAP-ISO-STRUCT-006` 的 Canonical Generator 对 Canonical Fact 默认输出 Characterization 方向，即 `exhibits` 句；`A.4.6.4` 的 Exhibition 句作为受控 parser/import 产生式保留，只有输入显式携带该产生式身份时才原样重建，不能从用户拖线方向猜测。`feature-kind/primary-feature-kind/secondary-feature-kind` 只能为 `attribute` 或 `operator`。
+
+##### `CAP-ISO-STRUCT-006` 产生式身份与端点分区
+
+1. 唯一显式入口是 Fact SourceProvenance tuple：`source_kind=OPL_PRODUCTION`、`source_entity_id=opl.structural.exhibition.v1`；`source_profile_id/version` 二元组必须同时与 Revision `profile_binding.profile.id/version`、Fact `capability_ref.profile_id/profile_version` 两个二元组完全相等。
+2. tuple 是 parser/import 来源身份，不是 Structural Modifier。在线编辑器新建、拖线、改变 route 或反转连线均不得设置它；编辑已有导入 Fact 时保留原 tuple，但变更后的端点不再满足本节约束时必须阻断，不能静默改成 Characterization。
+3. `source_kind != OPL_PRODUCTION` 时始终进入默认 Characterization 分支，即使 `source_entity_id` 文本恰好等于 concrete template ID；`source_kind=OPL_PRODUCTION` 但 ID 未知、Capability 不是 `CAP-ISO-STRUCT-006` 或 Profile 不一致时返回 `TEXT_PRODUCTION_IDENTITY_INVALID`。
+4. 默认 Characterization 使用 ordinal `0` 的 `EXHIBITOR_THING` 和 ordinal `1..n` 的 `FEATURE_THING`，`n>=1`，完整性允许 `COMPLETE/INCOMPLETE`。Object exhibitor 的 mixed 分组固定为 Attribute 后接 Operation；Process exhibitor 固定为 Operation 后接 Attribute，符合 `10.3.3.1` 和 `A.4.6.3`，不能共用写死 Attribute 在前的 pattern。
+5. 显式 Exhibition 使用同一 Endpoint Schema，但按本产品 parser/import normalization 对 ordinal 作受控分区：`0` 是 Exhibitor，`1` 是句首 `{Feature}`，`2..n` 是 `{value-or-feature-list}`，因此 `n>=2`。全部 Feature endpoint 必须是 Attribute/Operation、target ID 不重复、`owner_element_id` 等于 Exhibitor；ordinal 必须从 `0` 连续。该分区不是标准新增的 Endpoint role。
+6. 显式 Exhibition 只承接 `A.4.6.4` 的 `is + feature-list` 分支，`collection_completeness` 固定为 `COMPLETE`。scalar value、value range、range clause 和 Feature Value State 不在本入口表示范围；在不修改 Endpoint Schema 的前提下遇到这些输入返回 `TEXT_PLAN_UNSUPPORTED`，不得伪造 Feature 或复用 completeness 表达值。
+7. Exhibition 右侧列表按 ordinal 分组，并沿用 Object 的 Attribute -> Operation、Process 的 Operation -> Attribute 顺序；单组使用普通 list，多组用 `as well as`。`EXHIBITION_OBJECT_ATTRIBUTE_IMPORT` 和 `EXHIBITION_PROCESS_OPERATOR_IMPORT` 是本入口的两个最小 PASS golden，均生成一条 `SINGLE` Sentence。
+8. Explicit production 的 Trace source catalog 在原 Fact 后追加两个 `FACT` SourceRef，field path 依次为 `source.source_kind`、`source.source_entity_id`；`of`、`is` 及由该身份选择的谓词 Token 必须携带两项来源。Template 仍以 `TEMPLATE` SourceRef 表示，不能用 SourceProvenance 代替 Grammar/Rule/binding 闭包。
 
 `CAP-ISO-STRUCT-001~004` 只接受 Object-Object 或 Process-Process 同类端点；`CAP-ISO-STRUCT-005/007/008` 的 refineable/refinee 也必须同为 Object 或同为 Process；`CAP-ISO-STRUCT-006` 是允许 Exhibitor Thing 连接 Attribute/Operation 的例外。`CAP-ISO-STRUCT-009` 严格归一化为 Specialized Object -> 该对象继承 Attribute 的 Value State；source State 或任意 Feature State 均不得替代 Specialized Object。`CAP-ISO-STRUCT-010` 只接受 Object/owned Object State，不接受 Process。
 
@@ -452,10 +465,10 @@ Canonical generator 对 Condition 固定使用 Annex A 每个产生式的第一�
 2. Refineable 固定为 endpoint ordinal `0`，refinee 从 `1` 开始连续编号。Composer 只读取 ordinal，不读取 X6 分支的屏幕位置或 route point。
 3. 完整列表：一项输出 `A`，两项输出 `A and B`，三项及以上输出 `A, B and C`；不使用 Oxford comma。
 4. Aggregation 不完整集合在已知 part 列表尾部输出 `and at least one other part`；即使只有一个已知 part，也输出 `A and at least one other part`。
-5. Characterization 的不完整性按 Attribute 和 Operator 两个分组分别输出 `at least one other attribute/operator`；混合分组使用 `as well as`，不得合并为无类型的 `other feature`。
+5. Characterization 的不完整性按 Attribute 和 Operator 两个分组分别输出 `at least one other attribute/operator`；混合分组使用 `as well as`，不得合并为无类型的 `other feature`。Object exhibitor 固定 Attribute -> Operation，Process exhibitor 固定 Operation -> Attribute；`primary/secondary` placeholder 必须按 exhibitor kind 解析，不能依赖输入数组偶然顺序。
 6. Generalization 完整集合输出单个/多个 specialization 句，不完整集合输出 `and other specializations are`。
 7. Classification 只支持单个或多个 instance，不支持 completeness 字段、marker 或“不完整实例集合”句式；收到 completeness 非 `NOT_APPLICABLE` 时返回 `MODIFIER_COMBINATION_INVALID`。
-8. `CAP-ISO-STRUCT-009/010` 不使用 Fundamental completeness。任一 fan 为空、endpoint ordinal 重复/断裂、refineable 多于一个或 junction 多于一个时阻断文本生成。
+8. `CAP-ISO-STRUCT-009/010` 不使用 Fundamental completeness。任一 fan 为空、endpoint ordinal 重复/断裂或 refineable 多于一个时阻断文本生成。Junction 是由单一 Fundamental Fact 派生的 Projection cell，不是 Revision/Fact 字段；出现多个 junction 属于 Projection 完整性错误，必须在候选提交前阻断并由 `DEV-CANVAS-04/06` 验证，OPL 生成器不得读取 X6 cell 或为该错误建立 Golden candidate。
 
 ### 7.4 Precedence 与确定性排序
 
@@ -542,6 +555,20 @@ SentenceToken {
 7. Bidirectional 两句映射同一 `fact_id`，分别使用 `FORWARD/REVERSE` sentence slot、对应 label field 和 endpoint 顺序；Reciprocal 一句使用 `RECIPROCAL` slot。
 8. Sentence 级 Trace 必须闭合 Fact、适用的 Element/Feature/State/Modifier、Occurrence、concrete Template、Grammar、全部生成/组合 Rule 和 binding digest。任一必需引用缺失返回 `TEXT_TRACE_INCOMPLETE`。
 9. 纯文本统一编码为 UTF-8、换行为 LF、名称规范化为 NFC；同 Revision、同输入资产 digest 重放时 Sentence、token range、Trace 顺序和 artifact digest 必须字节一致。
+10. `SourceRef` 是 `source_kind + stable_id + field_path? + endpoint_ordinal? + sentence_slot` 五元组值对象；Token 与 Trace 均内嵌有序 `source_refs[]`，Golden 必须复用 Revision Schema，禁止维护 `ref_id/source_ref_ids` 第二种表示。ACTIVE 生成路径的 `sentence_slot` 必填，可选字段无值时省略而不是写 `null`，五元组完全相同的重复项必须阻断。
+11. ACTIVE 生成路径的 Token kind 只允许 `ENTITY/STATE/RELATION_VERB/CONTROL_KEYWORD/LIST_SEPARATOR/PUNCTUATION/WHITESPACE/KEYWORD`，Source kind 不允许 `LEGACY`；`PROCESS/OBJECT` Token kind 和 `LEGACY` SourceRef 只用于历史 Revision 读取兼容。上述收紧及 `TextTrace.binding_digest` 必填使用 `MS-REV-001/0.2`，不得改写 `0.1` 契约；兼容窗口由 `DEV-CANVAS-05 GATE-05-06` 验证。
+12. `TextTrace` 必填 `binding_digest`，其 `{algorithm,digest}` 必须与当前 Revision 的 `profile_binding.binding_digest` 深度相等。Procedural 的 Rule 顺序是基础 Capability 的 `rule_ref`；Control 是基础 Procedural `rule_ref` 后接 Control Capability `rule_ref`；Structural 是 Structural Capability 的 `rule_ref`。Template ID 不得冒充 Rule ID，全部 Rule 必须存在于绑定的 Rule Set。
+13. Trace 不并入 Text Artifact digest；重放时按 `OPL-GOLDEN-TRACE-001/0.1` 生成独立 canonical Trace Bundle，并在报告记录 `trace_sha256`。Bundle、SourceRef 排序、TokenRange 闭包和 mutation 的唯一实施口径见 `DEV-CANVAS-05 GATE-05-04`。
+
+#### 7.5.1 Revision `0.1/0.2` 兼容边界
+
+1. `docs/contracts/schemas/opm-revision.schema.json` 永久表示已冻结的 `MS-REV-001/0.1`，不得在原 `$id` 下增加 Token、Trace 或新的 required 字段；完整 Token/Trace 契约只进入独立的 `opm-revision-v0.2.schema.json`。Reader 必须先读取 `schema_id/schema_version`，再分派到 exact Schema 和 Mapper；禁止用一个宽松 DTO 同时猜测两个版本。
+2. ACTIVE Writer 只输出 `MS-REV-001/0.2`。`0.1` Revision 读取、历史投影和历史文本回放不得改写原始 Revision bytes、Head、Parent 或任一索引；不存在 ACTIVE `0.1` Writer。
+3. `0.1` 中未记录 Token/Trace 时，兼容视图必须返回 `text_evidence_availability=NOT_RECORDED`，不得补造 `LEGACY` SourceRef、空 Token 或伪 Trace。显式 Legacy Reader/Renderer 可在隔离的历史回放对象中使用 `PROCESS/OBJECT/LEGACY`，但这些值不得进入 `0.2` Schema、Golden PASS、ACTIVE Text Artifact 或 committed Revision。
+4. 历史回放必须按 Revision 的 exact Profile package、Rule、Grammar、Symbol、Normalization 和 binding digest 装配旧资产。`0.1.0` family-only Grammar 只能交给与其 digest 绑定的 `LegacyOplRendererV01`；不得交给 `0.2` concrete renderer，不得按 template ID 文本猜测新产生式。
+5. `0.1` base 可以在普通语义命令中由 ACTIVE Writer 产生 `0.2` candidate，前提是五项资产 ref 与 binding digest 完全不变；Schema envelope 升级本身不得改变命令未触及的语义字段。Profile/rule/grammar digest 变化属于语义迁移，必须经独立迁移流程创建新 Revision；普通提交返回既有 `RULE_VERSION_CONFLICT`，detail 为 `PROFILE_MIGRATION_REQUIRED`，不得自动 rebind。
+6. ACTIVE `CandidateRevisionCommand` 不再携带或信任 `grammar` 对象，Grammar 只能来自 `ProfilePackageAssembler`。历史回放使用独立 `HistoricalRevisionReplayRequest`，该请求不能进入 `CandidateRevisionCommitter` 或 SQLite commit 路径。
+7. 兼容矩阵、历史资产摘要、稳定错误、报告和 DEV-CANVAS-06 handoff 的唯一实施口径见 `DEV-CANVAS-05 GATE-05-06`。
 
 ### 7.6 实时与原子性
 

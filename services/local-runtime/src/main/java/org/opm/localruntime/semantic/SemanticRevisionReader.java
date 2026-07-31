@@ -40,7 +40,7 @@ public final class SemanticRevisionReader {
                 throw new SemanticReadException("Revision document must be a JSON object");
             }
             requireExactText(root, "schema_id", "MS-REV-001", "revision");
-            requireExactText(root, "schema_version", "0.1", "revision");
+            requireSupportedSchemaVersion(root, "revision");
             JsonNode modelHeader = requiredObject(root, "model_header", "revision");
             return new SemanticRevision(
                     requiredText(root, "revision_id", "revision"),
@@ -71,6 +71,13 @@ public final class SemanticRevisionReader {
                 assetReference(requiredObject(node, "symbol_catalog", "profile_binding")),
                 assetReference(requiredObject(node, "normalization_adapter", "profile_binding")),
                 digest(requiredObject(node, "binding_digest", "profile_binding")));
+    }
+
+    private void requireSupportedSchemaVersion(JsonNode node, String scope) {
+        String schemaVersion = requiredText(node, "schema_version", scope);
+        if (!"0.1".equals(schemaVersion) && !"0.2".equals(schemaVersion)) {
+            throw new SemanticReadException(scope + " field schema_version must be 0.1 or 0.2");
+        }
     }
 
     private SemanticRevision.AssetReference assetReference(JsonNode node) {

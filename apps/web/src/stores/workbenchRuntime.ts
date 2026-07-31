@@ -250,7 +250,7 @@ export const useWorkbenchRuntimeStore = defineStore("workbench-runtime", () => {
       .map(([slot_id, text]) => ({ slot_id, text: text.trim() }));
     const direction = relationDirection(option, relationCandidate.direction);
     if (!direction) return block("Runtime 结构关系候选缺少方向约束。");
-    const requiredLabelSlots = option.required_fields.find((field) => field.field_id === "labels")?.allowed_values ?? [];
+    const requiredLabelSlots = requiredStructuralLabelSlots(option, direction);
     if (structural && option.required_fields.some((field) => field.field_id === "labels" && field.required)
       && requiredLabelSlots.some((slot) => !labels.some((label) => label.slot_id === slot))) {
       return block("请填写所有必填关系标签。");
@@ -368,12 +368,13 @@ export const useWorkbenchRuntimeStore = defineStore("workbench-runtime", () => {
     if (structuralUpdateCandidate.phase !== "editing" || !option || !relation || relation.id !== structuralUpdateCandidate.factId || !canEdit("UPDATE_FACT")) return;
     const labels = Object.entries(structuralUpdateCandidate.labels).filter(([, text]) => text.trim())
       .map(([slot_id, text]) => ({ slot_id, text: text.trim() }));
-    const requiredLabels = option.required_fields.find((field) => field.field_id === "labels");
-    if (requiredLabels?.required && (requiredLabels.allowed_values ?? []).some((slot) => !labels.some((label) => label.slot_id === slot))) {
-      return block("请填写所有必填关系标签。");
-    }
     const direction = relationDirection(option, structuralUpdateCandidate.direction);
     if (!direction) return block("Runtime 结构关系候选缺少方向约束。");
+    const requiredLabels = requiredStructuralLabelSlots(option, direction);
+    if (option.required_fields.some((field) => field.field_id === "labels" && field.required)
+      && requiredLabels.some((slot) => !labels.some((label) => label.slot_id === slot))) {
+      return block("请填写所有必填关系标签。");
+    }
     const completenessRequired = option.required_fields.some((field) => field.field_id === "collection_completeness");
     const collectionCompleteness = structuralUpdateCandidate.collectionCompleteness;
     const collectionCompletenessValue = collectionCompleteness === "COMPLETE" || collectionCompleteness === "INCOMPLETE"
@@ -408,9 +409,10 @@ export const useWorkbenchRuntimeStore = defineStore("workbench-runtime", () => {
   function placeState(ownerId: string) {
     const owner = workbench.nodes.find((node) => node.id === ownerId);
     if (stateCandidate.phase !== "placing" || !owner || ownerId !== stateCandidate.ownerId) return;
+    const stateCount = workbench.nodes.filter((node) => node.kind === "state" && node.ownerId === ownerId).length;
     stateCandidate.phase = "editing";
     stateCandidate.x = owner.x + 36;
-    stateCandidate.y = owner.y + 38;
+    stateCandidate.y = owner.y + 4 + stateCount * 34;
     workbench.lastAction = "请输入 State 名称并选择角色。";
   }
 
@@ -632,6 +634,11 @@ function relationDirection(option: ApiEdtCommandCapabilityOption, selected: "DIR
   if (!direction) return "DIRECTED";
   const allowedDirections = direction.allowed_values ?? [];
   return allowedDirections.includes(selected) ? selected : allowedDirections[0] as "DIRECTED" | "BIDIRECTIONAL" | undefined;
+}
+
+function requiredStructuralLabelSlots(option: ApiEdtCommandCapabilityOption, direction: "DIRECTED" | "BIDIRECTIONAL" | undefined): string[] {
+  const slots = option.required_fields.find((field) => field.field_id === "labels")?.allowed_values ?? [];
+  return direction === "DIRECTED" ? slots.filter((slot) => slot !== "reverse_tag") : slots;
 }
 
 function toTextLines(sentences: Array<{ sentence_id: string; text: string }>, traces: Array<{ sentence_id: string; fact_ids: string[]; occurrence_ids: string[] }>): RuntimeTextLine[] {

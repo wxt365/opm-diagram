@@ -35,6 +35,7 @@ class ApiExceptionHandler {
             case LOCAL_SESSION_INVALID -> "SECURITY";
             case REVISION_CONFLICT, READ_ONLY_REVISION, IDEMPOTENCY_MISMATCH, RULE_VERSION_CONFLICT -> "REVISION";
             case VALIDATION_BLOCKED -> "VALIDATION";
+            case MODIFIER_COMBINATION_INVALID -> "DOMAIN";
             case TEXT_GENERATION_BLOCKED -> "TEXT";
             case PERSISTENCE_FAILED -> "PERSISTENCE";
             case TASK_FAILED -> "TASK";

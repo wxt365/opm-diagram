@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:opm:contract:dev-canvas-05-handoff:0.1",
+  "title": "OPM DEV-CANVAS-05 Handoff",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "handoff_id", "handoff_status", "generated_at", "source_build", "build_artifacts", "revision_contract", "historical_binding", "active_binding", "gate_evidence", "coverage_summary", "compatibility_summary", "capability_evidence", "production_gate", "limitations", "blockers"],
+  "properties": {
+    "schema_id": {"const": "OPM-DEV-CANVAS-05-HANDOFF-001"},
+    "schema_version": {"const": "0.1"},
+    "handoff_id": {"pattern": "^dev-canvas-05\\.profile\\.iso19450\\.2024\\.draft\\.0\\.2\\.0\\.[a-f0-9]{12}$"},
+    "handoff_status": {"enum": ["BLOCKED", "READY_FOR_DEV_CANVAS_06"]},
+    "generated_at": {"type": "string", "format": "date-time"},
+    "source_build": {"$ref": "#/$defs/sourceBuild"},
+    "build_artifacts": {"type": "array", "items": {"$ref": "#/$defs/fileRef"}},
+    "revision_contract": {"$ref": "#/$defs/revisionContract"},
+    "historical_binding": {"$ref": "#/$defs/binding"},
+    "active_binding": {"$ref": "#/$defs/binding"},
+    "gate_evidence": {"type": "array", "minItems": 6, "maxItems": 6, "items": {"$ref": "#/$defs/gate"}},
+    "coverage_summary": {"$ref": "#/$defs/coverage"},
+    "compatibility_summary": {"$ref": "#/$defs/compatibility"},
+    "capability_evidence": {"type": "array", "minItems": 34, "maxItems": 34, "items": {"$ref": "#/$defs/capability"}},
+    "production_gate": {"$ref": "#/$defs/productionGate"},
+    "limitations": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+    "blockers": {"type": "array", "items": {"$ref": "#/$defs/blocker"}}
+  },
+  "allOf": [
+    {"if": {"properties": {"handoff_status": {"const": "READY_FOR_DEV_CANVAS_06"}}}, "then": {"properties": {"blockers": {"maxItems": 0}}}},
+    {"if": {"properties": {"handoff_status": {"const": "BLOCKED"}}}, "then": {"properties": {"blockers": {"minItems": 1}}}}
+  ],
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "path": {"type": "string", "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$"},
+    "fileRef": {"type": "object", "additionalProperties": false, "required": ["kind", "path", "byte_length", "sha256"], "properties": {"kind": {"type": "string", "minLength": 1}, "path": {"$ref": "#/$defs/path"}, "byte_length": {"type": "integer", "minimum": 0}, "sha256": {"$ref": "#/$defs/digest"}}},
+    "asset": {"type": "object", "additionalProperties": false, "required": ["id", "version", "sha256"], "properties": {"id": {"type": "string"}, "version": {"type": "string"}, "sha256": {"$ref": "#/$defs/digest"}}},
+    "binding": {"type": "object", "additionalProperties": false, "required": ["profile", "rule_set", "text_grammar", "symbol_catalog", "normalization_adapter", "binding_digest"], "properties": {"profile": {"$ref": "#/$defs/asset"}, "rule_set": {"$ref": "#/$defs/asset"}, "text_grammar": {"$ref": "#/$defs/asset"}, "symbol_catalog": {"$ref": "#/$defs/asset"}, "normalization_adapter": {"$ref": "#/$defs/asset"}, "binding_digest": {"$ref": "#/$defs/digest"}}},
+    "sourceBuild": {"type": "object", "additionalProperties": false, "required": ["source_commit", "dirty_before_build", "evidence_output_root", "java_version", "node_version", "os", "build_command", "lockfile_sha256", "pom_sha256"], "properties": {"source_commit": {"pattern": "^[a-f0-9]{40}$"}, "dirty_before_build": {"type": "boolean"}, "evidence_output_root": {"$ref": "#/$defs/path"}, "java_version": {"type": "string", "minLength": 1}, "node_version": {"type": "string", "minLength": 1}, "os": {"type": "string", "minLength": 1}, "build_command": {"type": "string", "minLength": 1}, "lockfile_sha256": {"$ref": "#/$defs/digest"}, "pom_sha256": {"$ref": "#/$defs/digest"}}},
+    "revisionContract": {"type": "object", "additionalProperties": false, "required": ["reader_versions", "active_writer_version", "schemas"], "properties": {"reader_versions": {"const": ["0.1", "0.2"]}, "active_writer_version": {"const": "0.2"}, "schemas": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"$ref": "#/$defs/fileRef"}}}},
+    "gate": {"type": "object", "additionalProperties": false, "required": ["gate_id", "status", "evidence", "summary"], "properties": {"gate_id": {"pattern": "^GATE-05-0[1-6]$"}, "status": {"enum": ["BLOCKED", "MATCHED"]}, "evidence": {"$ref": "#/$defs/fileRef"}, "summary": {"type": "string", "minLength": 1}}},
+    "coverage": {"type": "object", "additionalProperties": false, "required": ["semantic", "atomic", "structural", "control", "failed", "evidence"], "properties": {"semantic": {"const": {"expected": 178, "pass": 130, "blocked": 48}}, "atomic": {"const": {"expected": 19, "matched": 19}}, "structural": {"const": {"expected": 24, "matched": 24}}, "control": {"const": {"expected": 20, "matched": 20}}, "failed": {"const": 0}, "evidence": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/fileRef"}}}},
+    "compatibility": {"type": "object", "additionalProperties": false, "required": ["case_count", "pass_count", "blocked_count", "failed_count", "evidence"], "properties": {"case_count": {"const": 13}, "pass_count": {"const": 6}, "blocked_count": {"const": 7}, "failed_count": {"const": 0}, "evidence": {"$ref": "#/$defs/fileRef"}}},
+    "capability": {"type": "object", "additionalProperties": false, "required": ["capability_id", "family", "eligibility", "coverage_keys", "template_ref", "rule_ref", "symbol_ref", "grammar", "binding_digest", "disabled_reason"], "properties": {"capability_id": {"pattern": "^CAP-ISO-(PROC|CTRL|STRUCT)-\\d{3}$"}, "family": {"enum": ["PROC", "CTRL", "STRUCT"]}, "eligibility": {"enum": ["ELIGIBLE_FOR_RELEASE_VALIDATION", "BLOCKED"]}, "coverage_keys": {"type": "array", "minItems": 1, "items": {"type": "string"}}, "template_ref": {"type": "string"}, "rule_ref": {"type": "string"}, "symbol_ref": {"type": "string"}, "grammar": {"$ref": "#/$defs/asset"}, "binding_digest": {"$ref": "#/$defs/digest"}, "disabled_reason": {"type": "string", "minLength": 1}}},
+    "productionGate": {"type": "object", "additionalProperties": false, "required": ["state", "enabled_capability_ids"], "properties": {"state": {"const": "DISABLED"}, "enabled_capability_ids": {"type": "array", "maxItems": 0}}},
+    "blocker": {"type": "object", "additionalProperties": false, "required": ["code", "owner_gate", "evidence"], "properties": {"code": {"type": "string", "pattern": "^[A-Z0-9_]+$"}, "owner_gate": {"pattern": "^GATE-05-0[1-6]$"}, "evidence": {"$ref": "#/$defs/fileRef"}}}
+  }
+}

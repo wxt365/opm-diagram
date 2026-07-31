@@ -13,11 +13,11 @@ migrations/sqlite/             SQLite Flyway V1 和验证 SQL
 
 ## 状态边界
 
-1. `opm-revision.schema.json` 是首批 Revision 交换/持久化结构基线；后续字段只能按兼容规则演进。
+1. `opm-revision.schema.json` 是 0.1 Revision 交换/持久化结构基线；完整画布必须按冻结目标发布独立 0.2 Schema，不能原地改变历史 0.1 身份。
 2. Profile 和 Rule 样例使用 `REPRESENTATIVE`，用于验证 Package/AST 结构，不是完整 96 能力或 103 规则组发布包。
-3. OpenAPI 只冻结首批 P01-P03 开发入口；未列入的应用操作继续以 `opm-modeling-tool-application-api-contract.md` 为上游。
+3. OpenAPI 冻结 P01-P03 和完整画布 `API-EDT-001/002` 的 0.2 目标输入；未列入的应用操作继续以 `opm-modeling-tool-application-api-contract.md` 为上游。
 4. V1 SQL 是 SQLite 设计基线；开发工程落盘后由 Flyway 执行。当前目录不会自动修改任何用户数据库。
-5. 所有资产仍处于 `draft`，首次产品发布前需要转入正式 contracts 目录、锁定 digest 并完成兼容性评审。
+5. 设计语义由 `docs/design/opm-design-freeze-baseline.md` 冻结；文件名或内部版本带 `draft/representative` 时表示机器发布或覆盖状态，不表示设计门仍开放。首次产品发布前仍须锁定 digest、生成客户端并完成兼容性和运行验证。
 
 ## 验证要求
 
@@ -38,14 +38,15 @@ DEV-01 的可加载代表性离线资产位于仓库根 `packages/profiles/<prof
 
 打开项目库时，适配器先校验已应用迁移的状态和 checksum，再为既有库创建恢复点后执行 pending migration。V1 包含 SQLite PRAGMA 与 DDL，Flyway 因此仅在 SQLite 适配器中允许混合语句。迁移失败会创建同目录 `.recovery-required` marker，调用者只能获得 `RECOVERY_REQUIRED` 状态，不能取得可写数据库对象。
 
-## API-EDT 0.2 草案扩展
+## API-EDT 0.2 冻结目标与当前机器输入
 
-`openapi/opm-local-api-v1.yaml` 的 `0.2.0-draft` 在不改变 `API-EDT-001/002`
-operationId 的前提下，保留 P0 的 Object、Process 与 Consumption 命令，并补充了
-State、完整 Fact、候选 option 和删除 impact token 的结构契约。生成类型由
+`openapi/opm-local-api-v1.yaml` 的 `0.2.0-draft` 是冻结目标的当前机器输入。在不改变
+`API-EDT-001/002` operationId 的前提下，它保留 P0 的 Object、Process 与 Consumption
+命令，并补充 State、完整 Fact、`base_fact_capability_ref`、`AllowedModifier`、候选 option
+和删除 impact token。Control 原子组与 Revision 0.2 的最终机器闭包以冻结基线第 6 章为准。生成类型由
 `npm run contract:generate` 写入前端和 Local Runtime，`npm run contract:check` 用于检测
 OpenAPI 与生成产物漂移。
 
-本扩展不表示 State、完整关系、Capability 选择或前端工具已启用。当前 Local Runtime
-仅返回空的 `options`，并继续拒绝未实现的完整画布命令；领域语义、持久化与 UI 由后续
-DEV-CANVAS 包实现。
+本扩展不表示 State、完整关系、Capability 选择或前端工具已经通过运行验收。实际 handler、
+generated client、兼容 reader、roundtrip 和生产启用状态只能由 DEV-CANVAS-00~06 的 exact
+报告证明，不能从 OpenAPI 文件存在推导。

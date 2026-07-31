@@ -1,8 +1,10 @@
 # OPM 完整画布工具链设计
 
-文档版本：`v0.4-draft`
+文档版本：`v1.0`
 
-文档状态：完整画布及 Control/Structural OPL/Trace 开发输入冻结；机器资产、视觉、E2E 与性能证据待实现
+文档状态：`FROZEN_INCLUDED`；完整画布与 OPL/Trace 开发输入冻结，机器和运行证据按开发包形成
+
+全局设计状态、延期边界和开发准入以 `opm-design-freeze-baseline.md` 为唯一事实源。
 
 更新时间：2026-07-29
 
@@ -540,7 +542,7 @@ CommandCapabilityOption {
 
 `impact_summary/impact_token` 仅在 `DELETE_CONSTRUCT` option 返回，且必须绑定 construct、影响集合摘要、Revision 和 Profile/Rule/Symbol/Grammar binding；前端不得从 Trace 数量或当前 Projection 自行生成 token。
 
-当前工作区 OpenAPI 草案已开始承载结构化 option 和 State/Fact command union，但尚未覆盖 `base_fact_capability_ref`、Modifier 基数/原子组及 Revision Fact `modifiers`。完整 State/关系联调必须先由 `DEV-CANVAS-00` 补齐版本化契约、生成前端类型并通过正反 contract test；禁止把草案文件存在或前端手写临时 DTO 宣称为契约闭合。
+当前工作区 OpenAPI 已承载结构化 option、`base_fact_capability_ref`、Modifier 基数/原子组和 State/Fact command union，Revision 0.1 Schema 已承载 Fact `modifiers[]`。0.2 目标语义由全量冻结基线第 6 章冻结；完整 State/关系联调仍必须先由 `DEV-CANVAS-00` 发布版本化机器契约、生成前端类型并通过正反 contract test，禁止把草案文件存在或前端手写临时 DTO 宣称为已验收。
 
 ## 13. 检查器设计
 
@@ -677,6 +679,6 @@ X6 SVG 内部生成的 DOM 层级和 class 不作为 E2E 选择器。Construct �
 4. `DEV-CANVAS-03`：8 类 Control Link 组合；
 5. `DEV-CANVAS-04`：10 类 Structural Link、fan、标签和完整性；
 6. [`DEV-CANVAS-05`](../../specs/opm-dev-canvas-05-opl-trace-golden-task-spec.md)：完整 OPL/Trace/Rule/golden 和错误闭环；
-7. [`DEV-CANVAS-06`](../../specs/opm-dev-canvas-06-toolchain-release-task-spec.md)：浏览器视觉、E2E、性能、移动降级和分批启用。
+7. [`DEV-CANVAS-06`](../../specs/opm-dev-canvas-06-toolchain-release-task-spec.md)：跨浏览器视觉/E2E、Chromium 性能、窄视口回归和分批启用。
 
 上述包的依赖、DoD 和回滚由 [开发执行包](opm-development-execution-pack.md) 承接。`DEV-CANVAS-00` 未完成前，只允许开发纯 Symbol 组件和无提交原型，不允许把完整 State/关系标记为可联调。

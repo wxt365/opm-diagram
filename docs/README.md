@@ -1,14 +1,19 @@
 # OPM 单机建模工具文档索引
 
-更新时间：2026-07-29
+更新时间：2026-07-30
 
 ## 1. 文档目的
 
 本文档是 OPM 单机建模工具需求、标准、架构和后续开发准备材料的统一入口。
 
-当前文档状态为 P0 与完整画布分阶段开发就绪：需求、架构、模块、P01-P06 页面设计、机器可读 Schema/样例、P0 OpenAPI、SQLite V1、完整画布工具链、Control/Structural concrete OPL、Token/Trace、golden manifest、可交互原型、验收报告、handoff、测试策略和开发执行包已经形成。DEV-CANVAS-05/06 已有独立规格与 checklist；对应机器资产、完整 ISO 证据、发布候选和真实性能结果尚未形成。
+当前全部设计责任已按 `design/opm-design-freeze-baseline.md` 冻结：`20` 项为 `FROZEN_INCLUDED`、`10` 项为 `FROZEN_DEFERRED`、`0` 项为 `BLOCKED`，全局开发门为 `READY_FOR_DEVELOPMENT`。该状态只表示开发输入闭合；对应机器资产、完整 ISO 证据、发布候选和真实性能结果仍以各开发包的实施报告为准。
 
 ## 2. 正式入口
+
+### 2.0 全量设计冻结与开发准入
+
+1. `design/opm-design-freeze-baseline.md`：唯一设计冻结状态源、当前/延期范围、浏览器矩阵、责任 owner、机器契约目标、开发准入算法和变更入口。
+2. `../specs/opm-all-design-freeze-task-spec.md` 与 `checklists/opm-all-design-freeze-checklist.md`：本次冻结规格、Spec Mapping、差异关闭和验证记录。
 
 ### 2.1 产品需求
 
@@ -75,11 +80,12 @@
 
 ### 3.1 产品与标准评审
 
-1. 产品需求规格；
-2. 配置档能力矩阵；
-3. ISO 条款级符合性矩阵；
-4. 公共语义内核；
-5. 需求验收矩阵。
+1. 全量设计冻结基线；
+2. 产品需求规格；
+3. 配置档能力矩阵；
+4. ISO 条款级符合性矩阵；
+5. 公共语义内核；
+6. 需求验收矩阵。
 
 ### 3.2 架构设计评审
 
@@ -93,52 +99,46 @@
 
 按以下顺序进入 P0 开发：
 
-1. 首批开发执行包；
-2. 开发技术基线与顶层架构；
-3. 模块详细设计；
-4. 前端 handoff 与页面四文档；
-5. OpenAPI、JSON Schema 和 SQLite V1；
-6. 符号/OPL 实现契约；
-7. 测试策略；
-8. 原型验收报告。
+1. 全量设计冻结基线；
+2. 首批开发执行包；
+3. 开发技术基线与顶层架构；
+4. 模块详细设计；
+5. 前端 handoff 与页面四文档；
+6. OpenAPI、JSON Schema 和 SQLite V1；
+7. 符号/OPL 实现契约；
+8. 测试策略；
+9. 原型验收报告。
 
 ### 3.4 进入完整画布开发
 
-1. 完整画布工具链设计；
-2. 符号与文本生成实现契约第 3、5、7、9、10 章；
-3. 前端 handoff 第 7.4 章及 Store/X6/接口扩展；
-4. 开发执行包 `DEV-CANVAS-00~06`；
-5. 核心元模型、Profile 能力矩阵和应用 API 契约；
-6. OpenAPI 当前草案与冻结设计的差异说明，首包从 `DEV-CANVAS-00` 的契约闭环和验收开始。
+1. 全量设计冻结基线第 2、6、8 章；
+2. 完整画布工具链设计；
+3. 符号与文本生成实现契约第 3、5、7、9、10 章；
+4. 前端 handoff 第 7.4 章及 Store/X6/接口扩展；
+5. 开发执行包 `DEV-CANVAS-00~06`；
+6. 核心元模型、Profile 能力矩阵和应用 API 契约；
+7. `DEV-CANVAS-00` 将冻结的 OpenAPI/Revision 0.2 目标转为版本化机器契约、generated client 和正反 contract test。
 
 ## 4. 当前设计职责
 
 | 设计职责 | 承接文档 | 状态 |
 | --- | --- | --- |
-| 产品顶层需求 | 产品需求规格 | P0 范围冻结 |
-| 配置档能力目录 | 配置档能力矩阵 | 已形成草案 |
-| ISO 子条款规则组 | ISO 条款级符合性矩阵 | 已形成草案，原子规则待补 |
-| 公共语义边界 | 公共语义内核 | 逻辑边界冻结，机器样例已验证 |
-| 逐项验收入口 | 需求验收矩阵 | 设计入口齐备，生产证据尚无 |
-| 顶层技术架构 | 顶层技术架构、技术基线 | 逻辑与 P0 物理方案冻结 |
-| 模块详细设计 | 模块详细设计 | M01-M12 与 P0 边界冻结 |
-| 页面专题与 IA | 页面专题设计包 | P01-P06 经原型验证 |
-| 页面状态模型 | 页面状态模型 | P0 状态及完整画布 State/relation candidate 已冻结 |
-| 页面字段口径 | 页面字段与区块明细 | P0 字段及完整工具链/检查器编辑性已冻结 |
-| 页面组件交互 | 页面组件树与交互状态表 | 完整工具链组件、事件和稳定测试入口已进入 handoff |
-| 完整画布专题设计 | 完整画布工具链设计 | State、工具链、16/8/10、状态/字段/交互已冻结 |
-| Control/Structural OPL 输入 | 符号与文本契约 | Control 20 个基础组合、Structural 全合法变体、正确 precedence 边界、Token/Trace 和 golden manifest 已冻结 |
-| 应用 API 契约 | 应用 API + OpenAPI | P0 HTTP 已验证；完整画布逻辑 option/command union 已冻结，机器草案部分存在但未闭环 |
-| 逻辑持久化契约 | 持久化契约、物理设计、SQLite V1 | P0 逻辑/物理冻结 |
-| 原生交换包契约 | 交换契约、物理设计 | 容器冻结，golden package 待实现 |
-| 核心元模型字段 | 字段文档 + Revision Schema/样例 | P0 机器验证通过 |
-| Profile Package 字段 | 字段文档 + Profile Schema/样例 | Relation/Marker/Label Slot 逻辑字段已冻结；代表性 DRAFT 机器样例已验证，完整资产待实现 |
-| Rule Definition 字段 | 字段文档 + Rule Schema/样例 | 代表性 DRAFT 验证通过，原子规则待补 |
-| 原型验收 | 原型验收报告 | 通过，无未关闭 P0 原型问题 |
-| handoff、测试与执行包 | 三份开发准备文档 | P0 与完整画布 handoff、分层测试、拆包/DoD/回滚已冻结 |
-| DEV-CANVAS-05/06 规格 | 两份 spec + checklist | 范围、非目标、依赖、验收、回滚和性能阈值已冻结；实现未开始 |
-| 完整画布机器契约 | OpenAPI + DEV-CANVAS-00 | NEXT，已有部分草案但缺 Control/Revision 闭环与验收，不冒充已支持 |
-| 完整画布实现证据 | DEV-CANVAS-01~06 | DEFERRED，尚未执行 |
+| 全量设计状态与开发门 | 全量设计冻结基线 | `FROZEN_INCLUDED`；唯一状态源 |
+| 产品顶层需求 | 产品需求规格 | `FROZEN_INCLUDED` |
+| 配置档能力目录 | 配置档能力矩阵 | `FROZEN_INCLUDED`；中文专属生产启用为 `FROZEN_DEFERRED` |
+| ISO 子条款规则组 | ISO 条款级符合性矩阵 | `FROZEN_INCLUDED`；原子规则与符合性声明为 `FROZEN_DEFERRED` |
+| 公共语义边界 | 公共语义内核 | `FROZEN_INCLUDED` |
+| 逐项验收入口 | 需求验收矩阵 | `FROZEN_INCLUDED`；执行结果单独记录 |
+| 顶层技术架构与模块 | 顶层架构、技术基线、模块设计 | `FROZEN_INCLUDED` |
+| 页面、状态、字段与组件 | 页面四文档 + handoff | `FROZEN_INCLUDED`；P04-P06 生产实现为 `FROZEN_DEFERRED` |
+| 完整画布专题设计 | 完整画布工具链设计 | `FROZEN_INCLUDED` |
+| Control/Structural OPL 输入 | 符号与文本契约 | `FROZEN_INCLUDED` |
+| 应用 API 与完整画布目标机器契约 | 应用 API + OpenAPI + 冻结基线第 6 章 | `FROZEN_INCLUDED`；0.2 发布/生成/测试待实现 |
+| Revision/持久化/交换 | 字段、持久化、物理与交换契约 | `FROZEN_INCLUDED`；Revision 0.2 机器发布待实现 |
+| 原型、handoff、测试与执行包 | 验收报告 + 三份开发准备文档 | `FROZEN_INCLUDED` |
+| DEV-CANVAS-05/06 Gate | 两份 spec + checklist | `FROZEN_INCLUDED`；运行证据以对应报告为准 |
+| 完整 ISO Grammar/Symbol/Conformance | 冻结基线 `DFD-004~007` | `FROZEN_DEFERRED` |
+| 完整画布实现与发布证据 | DEV-CANVAS-00~06 | 实施状态，不参与设计冻结；未执行项保持 `NOT_RUN` |
 
 ## 5. 当前关键决策状态
 
@@ -174,3 +174,4 @@
 3. 架构决策状态必须使用 `ACCEPTED/PROPOSED/DEFERRED`，不得把推荐项静默写成事实。
 4. 新增页面、接口、原型或开发准备文档后，必须同步本索引和建议阅读顺序。
 5. 测试设计、规则实现和执行证据分开管理，不把“有验收入口”表述为“已经通过测试”。
+6. 全局设计状态和开发门只由 `design/opm-design-freeze-baseline.md` 计算；任一冻结输入变化先关闭开发门，再评审和升版。

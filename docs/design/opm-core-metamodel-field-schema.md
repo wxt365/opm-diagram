@@ -1,10 +1,12 @@
 # OPM 核心元模型字段级 Schema
 
-文档版本：`v0.2-draft`
+文档版本：`v1.0`
 
-文档状态：逻辑字段级 schema 与 ISO Control Modifier 表示冻结；机器 schema 和代表性模型验证待完成
+文档状态：`FROZEN_INCLUDED`；逻辑字段、Control Modifier 与 Revision 0.2 目标表示冻结
 
-更新时间：2026-07-28
+全局设计状态、延期边界和开发准入以 `opm-design-freeze-baseline.md` 为唯一事实源。
+
+更新时间：2026-07-29
 
 ## Task Type
 
@@ -83,6 +85,10 @@ LIST 必须声明元素 TypedValue schema；RANGE 必须有兼容的 lower/upper
 | `source_entity_id` | StableId | 是 | 原始事实或构造标识 |
 | `source_package_id` | StableId | 否 | 来自导入时记录 |
 | `origin_namespace` | QualifiedName | 是 | 解释源 ID 的命名空间 |
+
+`OPL_PRODUCTION` 是仅供 parser/import 写入 Fact `source_kind` 的受控值。使用该值时，`source_profile_id/version` 必须等于当前 Revision 绑定的 Profile，`source_entity_id` 必须是该 Profile Grammar 中与 Fact Capability 匹配的 exact concrete `template_id`；编辑器新建或拖线不得产生该值，也不得只凭 `source_entity_id`、端点方向或画布几何推断它。
+
+`CAP-ISO-STRUCT-006` 当前只允许 tuple `OPL_PRODUCTION + opl.structural.exhibition.v1` 触发 Exhibition parser/import 重建。该 tuple 复用既有 SourceProvenance，不新增 Modifier、Fact 字段或 SQLite 列；其他 `source_kind` 继续表示原始构造类型并进入默认 Characterization 生成分支。未知 production、Profile 不一致或 production 与 Capability 不匹配必须阻断，不能回退为默认句式。
 
 ### 3.5 `MS-COM-003 NormalizationRecord`
 
@@ -588,12 +594,12 @@ ViewQuery 只能返回既有 Element/Fact/State/Feature 引用，不得构造新
 1. 公共核心不是面向用户的配置档，活动 Model 只能绑定 ISO 或中文草案 Profile；
 2. State 是从属语义，不得无依据作为独立 Thing；
 3. Element/Fact 是语义事实，Occurrence/Layout 是 Context 表达，Text/Finding 是带 Revision 的投影；
-4. 本文 schema 尚未转换为机器可读文件，也没有运行时验证证据；
+4. 当前已有 0.1 Revision 机器 Schema 和代表样例；完整 0.2 目标、兼容 reader/writer 与运行 roundtrip 仍待开发包验收；
 5. 当前无数据库变更、Flyway migration 或 SQL。
 
-### 14.2 设计建议/待确认
+### 14.2 冻结实现约束
 
-1. `MS-*` 逻辑对象和字段建议作为正式 machine-readable schema 的输入；
-2. ViewQuery、TypedValue RECORD、Profile Extension 和模型值表达式仍需在实现前转换为封闭机器可读定义；
+1. `MS-*` 逻辑对象和字段是正式 machine-readable schema 的上游输入；
+2. ViewQuery、TypedValue RECORD、Profile Extension 和模型值表达式必须按本文现有字段与封闭枚举转换，无法无歧义转换时关闭开发门，不得由实现自行增加开放 Map；
 3. 核心字段应通过 ISO/CN 代表性模型、roundtrip 和破损引用数据集验证；
-4. 物理 schema、索引和查询优化必须在存储技术 PoC 后单独设计。
+4. 物理 schema 固定为 SQLite V1；索引和查询优化只能在不改变语义身份、Revision 不可变性和 API 观察行为的前提下实施。

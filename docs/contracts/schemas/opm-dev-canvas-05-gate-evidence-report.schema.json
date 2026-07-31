@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:opm:contract:dev-canvas-05-gate-evidence-report:0.1",
+  "title": "OPM DEV-CANVAS-05 Gate Evidence Report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "gate_id", "status", "generated_at", "command", "source_refs", "raw_result", "summary"],
+  "properties": {
+    "schema_id": {"const": "OPM-DEV-CANVAS-05-GATE-EVIDENCE-REPORT-001"},
+    "schema_version": {"const": "0.1"},
+    "gate_id": {"enum": ["GATE-05-01", "GATE-05-04"]},
+    "status": {"enum": ["MATCHED", "BLOCKED"]},
+    "generated_at": {"type": "string", "format": "date-time"},
+    "command": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+    "source_refs": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/fileRef"}},
+    "raw_result": {"$ref": "#/$defs/fileRef"},
+    "summary": {"$ref": "#/$defs/summary"}
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "path": {"type": "string", "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$"},
+    "fileRef": {"type": "object", "additionalProperties": false, "required": ["kind", "path", "byte_length", "sha256"], "properties": {"kind": {"type": "string", "minLength": 1}, "path": {"$ref": "#/$defs/path"}, "byte_length": {"type": "integer", "minimum": 0}, "sha256": {"$ref": "#/$defs/digest"}}},
+    "summary": {"type": "object", "additionalProperties": false, "required": ["expected_cases", "observed_cases", "passed_cases", "failed_cases", "errors", "skipped", "checks"], "properties": {"expected_cases": {"type": "integer", "minimum": 1}, "observed_cases": {"type": "integer", "minimum": 0}, "passed_cases": {"type": "integer", "minimum": 0}, "failed_cases": {"type": "integer", "minimum": 0}, "errors": {"type": "integer", "minimum": 0}, "skipped": {"type": "integer", "minimum": 0}, "checks": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}}}}
+  }
+}

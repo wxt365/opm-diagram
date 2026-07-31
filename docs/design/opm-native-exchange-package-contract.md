@@ -1,8 +1,10 @@
 # OPM 原生模型交换包契约
 
-文档版本：`v0.3-draft`
+文档版本：`v1.0`
 
-文档状态：原生交换逻辑与物理容器冻结，字段 Schema/golden package 待实现
+文档状态：`FROZEN_INCLUDED`；原生交换逻辑与物理容器冻结，机器资产按开发包实现
+
+全局设计状态、延期边界和开发准入以 `opm-design-freeze-baseline.md` 为唯一事实源。
 
 更新时间：2026-07-27
 
@@ -333,9 +335,9 @@ sequenceDiagram
 4. 当前没有已确认的 ISO 19450:2024 标准模型交换文件格式或外部工具互操作结论；
 5. 当前仓库已有核心/Profile/Rule 逻辑 schema，但没有原生交换格式实现、物理交换 schema、golden package 或执行证据。
 
-### 16.2 设计建议/待确认
+### 16.2 冻结实现与延期边界
 
-1. 三种 package kind、Manifest、逻辑分区和三份字段级 schema 建议共同作为首个交换格式 schema 的输入；
-2. 物理容器和结构化编码应通过大模型、流式解析、原子写和跨平台路径 PoC 选择；
-3. 正式 `1.0` 前需要 schema、迁移规则、golden package、破损包和版本兼容测试集；
-4. 数字签名、加密、外部 OPM 工具适配和本体发布包属于后续独立设计。
+1. 三种 package kind、Manifest、逻辑分区和三份字段设计共同作为首个交换 machine schema 的输入；
+2. 物理容器固定为 `.opmp` ZIP、Canonical JSON entries、相对路径和 SHA-256；流式解析、原子写和路径安全属于实现验收，不再重新选型；
+3. 正式 `1.0` 发布必须形成 machine schema、迁移规则、golden package、破损包和版本兼容测试集；这些是待实现证据，不是开放设计；
+4. 数字签名和静态加密按 `DFD-009` 延期，外部 OPM 工具适配和本体发布按 `DFD-008` 延期。

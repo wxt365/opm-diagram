@@ -39,12 +39,27 @@ public record SentencePlan(
         }
     }
 
-    public record SortKey(int contextPathOrdinal, int grammarPrecedence, String processStableId, String factStableId, String sentenceId)
+    public record SortKey(
+            int contextPathOrdinal,
+            int grammarPrecedence,
+            String processStableId,
+            String factStableId,
+            int sentenceSlotRank,
+            String templateId,
+            String sentenceId)
             implements Comparable<SortKey> {
         public SortKey {
             requireNonBlank(processStableId, "processStableId");
             requireNonBlank(factStableId, "factStableId");
+            if (sentenceSlotRank < 0) {
+                throw new IllegalArgumentException("sentenceSlotRank must not be negative");
+            }
+            requireNonBlank(templateId, "templateId");
             requireNonBlank(sentenceId, "sentenceId");
+        }
+
+        public SortKey(int contextPathOrdinal, int grammarPrecedence, String processStableId, String factStableId, String sentenceId) {
+            this(contextPathOrdinal, grammarPrecedence, processStableId, factStableId, 0, "legacy", sentenceId);
         }
 
         @Override
@@ -53,6 +68,8 @@ public record SentencePlan(
             if (comparison == 0) comparison = Integer.compare(grammarPrecedence, other.grammarPrecedence);
             if (comparison == 0) comparison = processStableId.compareTo(other.processStableId);
             if (comparison == 0) comparison = factStableId.compareTo(other.factStableId);
+            if (comparison == 0) comparison = Integer.compare(sentenceSlotRank, other.sentenceSlotRank);
+            if (comparison == 0) comparison = templateId.compareTo(other.templateId);
             return comparison == 0 ? sentenceId.compareTo(other.sentenceId) : comparison;
         }
     }

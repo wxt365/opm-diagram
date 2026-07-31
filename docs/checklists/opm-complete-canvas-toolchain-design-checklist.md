@@ -100,8 +100,8 @@
 2. `control.capability` 值域为 `CAP-ISO-CTRL-001~008`，`control.segment` 当前唯一值为 `PROCESS_INPUT`；独立 `condition_id/MS-COND-001` 不重复表达 Event/Condition 类型。
 3. Candidate、command、Profile ModifierSchema、Revision JSON、X6、OPL/Trace、Rule、digest 和前端 handoff 使用同一 pair；Control Capability 与基础 Fact Capability 已分字段承接。
 4. SQLite V1 不新增表、列、索引或 Flyway migration；`fact_endpoint_index` 不成为第二事实源。
-5. 当前机器 `opm-revision.schema.json` 的 Fact 尚未承载 `modifiers`；版本化机器 Schema、reader/writer、roundtrip 和运行证据由 DEV-CANVAS-00/03 承接，本次未修改机器契约或代码。
-6. 当前并行 OpenAPI 草案已有 State/Fact union 和结构化 option，但仍缺 `base_fact_capability_ref`、Modifier 基数/原子组；其存在不计为本轮完成证据，本轮未修改该机器契约。
+5. 当前机器 `opm-revision.schema.json` 仍为 0.1 身份且已出现 Fact `modifiers[]`；独立 0.2 Schema、reader/writer、roundtrip 和运行证据由 DEV-CANVAS-00/03 承接。
+6. 当前 OpenAPI 已有 State/Fact union、结构化 option、`base_fact_capability_ref` 和 Modifier 基数/原子组；0.2 发布、generated DTO/handler 和正反 contract test 仍不计为本轮设计完成证据。
 7. 本任务 14 份文档的相对链接、Markdown 表格列数、尾随空白和限定路径 `git diff --check` 均通过；文档任务未运行代码构建、单元测试或浏览器 E2E。
 
 ## Task 9 - Concrete OPL、Precedence 与 Trace 冻结

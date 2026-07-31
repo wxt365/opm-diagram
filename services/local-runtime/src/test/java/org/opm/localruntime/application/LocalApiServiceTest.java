@@ -714,7 +714,7 @@ class LocalApiServiceTest {
     }
 
     private Map<String, Object> binding() {
-        return map("profile_id", "profile.iso19450.2024.draft", "profile_version", "0.1.0", "rule_set_id", "rules.iso19450.2024.draft", "rule_version", "0.1.0");
+        return map("profile_id", "profile.iso19450.2024.draft", "profile_version", "0.2.0", "rule_set_id", "rules.iso19450.2024.draft", "rule_version", "0.1.0");
     }
 
     private Map<String, Object> completeStatePayload(String contextId) {
@@ -803,9 +803,9 @@ class LocalApiServiceTest {
                 expectation("005", "ENABLING", "symbol.link.instrument", List.of("element.input.001", "element.processing.001"), "Processing requires Input."),
                 expectation("006", "TRANSFORMATION", "symbol.link.consumption.state", List.of("state.input.ready", "element.processing.001"), "Processing consumes Ready Input."),
                 expectation("007", "TRANSFORMATION", "symbol.link.result.state", List.of("element.processing.001", "state.input.ready"), "Processing yields Ready Input."),
-                expectation("008", "TRANSFORMATION", "symbol.link.effect.state.input-output", List.of("state.input.ready", "element.processing.001", "state.output.finished"), "Processing changes Ready Input to Finished Output."),
-                expectation("009", "TRANSFORMATION", "symbol.link.effect.state.input", List.of("state.input.ready", "element.processing.001", "element.output.001"), "Processing changes Ready Input to Output."),
-                expectation("010", "TRANSFORMATION", "symbol.link.effect.state.output", List.of("element.input.001", "element.processing.001", "state.output.finished"), "Processing changes Input to Finished Output."),
+                expectation("008", "TRANSFORMATION", "symbol.link.effect.state.input-output", List.of("state.input.ready", "element.processing.001", "state.output.finished"), "Processing changes Input from Ready to Finished."),
+                expectation("009", "TRANSFORMATION", "symbol.link.effect.state.input", List.of("state.input.ready", "element.processing.001", "element.output.001"), "Processing changes Output from Ready."),
+                expectation("010", "TRANSFORMATION", "symbol.link.effect.state.output", List.of("element.input.001", "element.processing.001", "state.output.finished"), "Processing changes Input to Finished."),
                 expectation("011", "ENABLING", "symbol.link.agent.state", List.of("state.input.ready", "element.processing.001"), "Ready Input handles Processing."),
                 expectation("012", "ENABLING", "symbol.link.instrument.state", List.of("state.input.ready", "element.processing.001"), "Processing requires Ready Input."),
                 expectation("013", "PROFILE_FACT", "symbol.link.invocation", List.of("element.processing.001", "element.handling.001"), "Processing invokes Handling."),

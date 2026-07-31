@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:opm:contract:opl-golden-replay-report:0.2",
+  "title": "OPL Golden Replay Report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "manifest", "runner_version", "case_count", "pass_count", "blocked_count", "failed_count", "cases", "atomic_case_count", "atomic_blocked_count", "atomic_failed_count", "atomic_cases"],
+  "properties": {
+    "schema_id": {"const": "OPL-GOLDEN-REPLAY-REPORT-001"},
+    "schema_version": {"const": "0.2"},
+    "manifest": {"$ref": "#/$defs/manifest"},
+    "runner_version": {"type": "string", "minLength": 1},
+    "profile_binding": {"$ref": "#/$defs/profileBinding"},
+    "case_count": {"type": "integer", "minimum": 0},
+    "pass_count": {"type": "integer", "minimum": 0},
+    "blocked_count": {"type": "integer", "minimum": 0},
+    "failed_count": {"type": "integer", "minimum": 0},
+    "cases": {"type": "array", "items": {"$ref": "#/$defs/case"}},
+    "atomic_case_count": {"type": "integer", "minimum": 0},
+    "atomic_blocked_count": {"type": "integer", "minimum": 0},
+    "atomic_failed_count": {"type": "integer", "minimum": 0},
+    "atomic_cases": {"type": "array", "items": {"$ref": "#/$defs/atomicCase"}}
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "manifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["manifest_id", "manifest_version", "sha256"],
+      "properties": {
+        "manifest_id": {"type": "string", "minLength": 1},
+        "manifest_version": {"type": "string", "minLength": 1},
+        "sha256": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "profileBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["binding_digest"],
+      "properties": {"binding_digest": {"$ref": "#/$defs/digest"}}
+    },
+    "transaction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["revision_delta", "revision_parent_delta", "text_artifact_delta", "text_trace_delta", "finding_delta", "operation_delta", "receipt_delta", "draft_head_changed"],
+      "properties": {
+        "revision_delta": {"type": "integer", "minimum": 0},
+        "revision_parent_delta": {"type": "integer", "minimum": 0},
+        "text_artifact_delta": {"type": "integer", "minimum": 0},
+        "text_trace_delta": {"type": "integer", "minimum": 0},
+        "finding_delta": {"type": "integer", "minimum": 0},
+        "operation_delta": {"type": "integer", "minimum": 0},
+        "receipt_delta": {"type": "integer", "minimum": 0},
+        "draft_head_changed": {"type": "boolean"}
+      }
+    },
+    "attempt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["attempt", "observed_status", "artifact_sha256", "trace_sha256", "stages", "transaction"],
+      "properties": {
+        "attempt": {"enum": [1, 2]},
+        "observed_status": {"enum": ["PASS_MATCHED", "BLOCKED_MATCHED", "FAILED"]},
+        "artifact_sha256": {"type": ["string", "null"], "pattern": "^[a-f0-9]{64}$"},
+        "trace_sha256": {"type": ["string", "null"], "pattern": "^[a-f0-9]{64}$"},
+        "stages": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "error_code": {"type": ["string", "null"], "minLength": 1},
+        "transaction": {"$ref": "#/$defs/transaction"}
+      }
+    },
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["case_id", "expectation", "observed_status", "attempts"],
+      "properties": {
+        "case_id": {"type": "string", "minLength": 1},
+        "expectation": {"enum": ["PASS", "BLOCKED"]},
+        "observed_status": {"enum": ["PASS_MATCHED", "BLOCKED_MATCHED", "FAILED"]},
+        "attempts": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"$ref": "#/$defs/attempt"}}
+      }
+    },
+    "atomicMutation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mutation", "profile_digest", "binding_digest"],
+      "properties": {
+        "mutation": {"type": "string", "minLength": 1},
+        "profile_digest": {"$ref": "#/$defs/digest"},
+        "binding_digest": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "atomicAttempt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["attempt", "observed_status", "commit_code", "detail_code", "fault_stage", "role", "actual_mutation", "transaction"],
+      "properties": {
+        "attempt": {"enum": [1, 2]},
+        "observed_status": {"enum": ["BLOCKED_MATCHED", "FAILED"]},
+        "commit_code": {"type": "string", "minLength": 1},
+        "detail_code": {"type": "string", "minLength": 1},
+        "fault_stage": {"type": "string", "minLength": 1},
+        "role": {"type": ["string", "null"]},
+        "actual_mutation": {"$ref": "#/$defs/atomicMutation"},
+        "transaction": {"$ref": "#/$defs/transaction"}
+      }
+    },
+    "atomicCase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["case_id", "category", "observed_status", "attempts"],
+      "properties": {
+        "case_id": {"type": "string", "minLength": 1},
+        "category": {"enum": ["PRODUCTION", "PROFILE_ASSEMBLY"]},
+        "observed_status": {"enum": ["BLOCKED_MATCHED", "FAILED"]},
+        "attempts": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"$ref": "#/$defs/atomicAttempt"}}
+      }
+    }
+  }
+}

@@ -1,8 +1,10 @@
 # OPM 单机建模工具模块详细设计
 
-文档版本：`v0.5-draft`
+文档版本：`v1.0`
 
-文档状态：M01-M12 职责与 P0 开发边界冻结
+文档状态：`FROZEN_INCLUDED`；M01-M12 职责与开发边界冻结
+
+全局设计状态、延期边界和开发准入以 `opm-design-freeze-baseline.md` 为唯一事实源。
 
 更新时间：2026-07-27
 
@@ -466,4 +468,4 @@ Diff 以稳定 ID 对齐 Element、Fact、Context 和 Occurrence；布局差异�
 - 页面 IA、状态、字段和组件交互已完成原型及 handoff 验证；
 - 首批 OpenAPI、SQLite V1、物理容器、迁移和恢复设计已形成；
 - 原子 `shall` 规则和 Annex A 可执行语法尚未实现；
-- 下游本体映射模型和发布契约尚未设计。
+- 下游本体映射模型和发布契约按 `DFD-008` 冻结延期，不进入当前开发。

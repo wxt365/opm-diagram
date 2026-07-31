@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://opm.local/schemas/opm-opl-golden-candidate-revision/0.1",
+  "title": "OPL Golden Candidate Revision",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_id",
+    "schema_version",
+    "revision_id",
+    "parent_revision_id",
+    "model_id",
+    "revision_sequence",
+    "schema_set_ref",
+    "profile_binding",
+    "model_header",
+    "elements",
+    "states",
+    "facts",
+    "contexts",
+    "occurrences",
+    "layouts"
+  ],
+  "properties": {
+    "schema_id": {"const": "MS-REV-001"},
+    "schema_version": {"const": "0.2"},
+    "revision_id": {"$ref": "https://opm.local/schemas/opm-revision/0.2#/$defs/stableId"},
+    "parent_revision_id": {"$ref": "https://opm.local/schemas/opm-revision/0.2#/$defs/stableId"},
+    "model_id": {"$ref": "https://opm.local/schemas/opm-revision/0.2#/$defs/stableId"},
+    "revision_sequence": {"type": "integer", "minimum": 1},
+    "schema_set_ref": {"$ref": "https://opm.local/schemas/opm-revision/0.2#/$defs/schemaSetRef"},
+    "profile_binding": {"$ref": "https://opm.local/schemas/opm-revision/0.2#/$defs/profileBinding"},
+    "model_header": {"$ref": "https://opm.local/schemas/opm-revision/0.2#/$defs/modelHeader"},
+    "elements": {"type": "array", "items": {"$ref": "https://opm.local/schemas/opm-revision/0.2#/$defs/element"}},
+    "features": {"type": "array", "items": {"$ref": "https://opm.local/schemas/opm-revision/0.2#/$defs/feature"}},
+    "states": {"type": "array", "items": {"$ref": "https://opm.local/schemas/opm-revision/0.2#/$defs/state"}},
+    "facts": {"type": "array", "items": {"$ref": "https://opm.local/schemas/opm-revision/0.2#/$defs/fact"}},
+    "contexts": {"type": "array", "minItems": 1, "items": {"$ref": "https://opm.local/schemas/opm-revision/0.2#/$defs/context"}},
+    "occurrences": {"type": "array", "items": {"$ref": "https://opm.local/schemas/opm-revision/0.2#/$defs/occurrence"}},
+    "layouts": {"type": "array", "items": {"$ref": "https://opm.local/schemas/opm-revision/0.2#/$defs/layout"}},
+    "state_presentations": {"type": "array", "items": {"$ref": "https://opm.local/schemas/opm-revision/0.2#/$defs/statePresentation"}}
+  }
+}

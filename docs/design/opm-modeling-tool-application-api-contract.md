@@ -1,8 +1,10 @@
 # OPM 单机建模工具应用 API 契约
 
-文档版本：`v0.5-draft`
+文档版本：`v1.0`
 
-文档状态：应用语义与完整画布逻辑命令冻结；P0 HTTP/OpenAPI 已验证，完整画布机器契约已有部分草案但未闭环
+文档状态：`FROZEN_INCLUDED`；应用语义与完整画布 0.2 目标契约冻结，机器发布和执行证据待开发包验收
+
+全局设计状态、延期边界和开发准入以 `opm-design-freeze-baseline.md` 为唯一事实源。
 
 更新时间：2026-07-28
 
@@ -539,12 +541,12 @@ Inspect 返回 Restore Plan、备份完整性、格式迁移、目标项目、�
 2. M01 只调用应用用例，M12 不直接暴露给页面；
 3. 正式语义写操作使用 command_id、base_revision、Profile 和规则版本；
 4. 导入、转换、基线和恢复都需要预检/证据与显式提交；
-5. 当前工作区 OpenAPI 草案已出现完整画布 option/command 类型，但仍缺本节冻结的 Control/base Fact 分字段、Modifier 原子组和 Revision JSON 承载，且没有据此确认完整 command handler/roundtrip；本文档没有修改运行 API、代码或数据。
+5. 当前工作区 OpenAPI 已包含 `base_fact_capability_ref`、封闭 `AllowedModifier` 和 State/Fact command union，Revision 0.1 Schema 已包含 Fact `modifiers[]`；这不等于 0.2 机器发布、完整 handler、兼容 reader 或 roundtrip 已验收。
 
-### 14.2 设计建议/待确认
+### 14.2 冻结实现约束
 
-1. 操作编号和语义建议作为后续 OpenAPI/进程内接口的稳定来源；
-2. 最终传输方式、DTO 类型、分页上限、任务通知方式和 HTTP 映射待技术选型；
-3. 完整画布逻辑 command/query schema 已由第 7.2 节冻结；DEV-CANVAS-00 必须补齐当前 OpenAPI 草案与本节的差异，并形成版本化机器 Schema、generated client 和正反 contract test，不得手写分叉 DTO；
-4. 机器扩展必须保留 P0 客户端兼容或发布明确的新 schema/API 版本；部分字段已进入草案不等于该兼容性和生成结果已验证；
-5. 一次加载所需的查询聚合粒度仍需通过真实浏览器和大图性能测试校准。
+1. 操作编号和本文应用语义是后续 OpenAPI/进程内接口的稳定来源；
+2. 当前发布使用本地 HTTP `/api/v1`、生成 DTO、分页查询与查询加 SSE；未映射操作保持传输无关，直到独立开发包补充 OpenAPI；
+3. 完整画布逻辑和 0.2 目标机器契约由第 7.2 节及全量冻结基线第 6 章冻结；DEV-CANVAS-00 必须形成版本化 OpenAPI、generated client 和正反 contract test，不得手写分叉 DTO；
+4. 机器扩展必须保留 P0 客户端兼容或发布明确的新 schema/API 版本；字段已进入草案不等于兼容性和生成结果已验证；
+5. 查询聚合可以在真实浏览器和大图性能测试后优化，但不得改变 revision/binding/freshness、分页和错误语义；需要改变 payload 时必须重新关闭设计门并升版。

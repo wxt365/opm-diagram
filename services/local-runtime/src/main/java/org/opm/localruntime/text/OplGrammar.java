@@ -39,9 +39,20 @@ public record OplGrammar(Binding binding, List<Template> templates) {
         }
     }
 
-    public record Template(String templateId, int precedence) {
+    public record Template(String templateId, String capabilityId, int familyRank, String sentenceSlot, String pattern) {
         public Template {
             requireNonBlank(templateId, "templateId");
+            requireNonBlank(capabilityId, "capabilityId");
+            requireNonBlank(sentenceSlot, "sentenceSlot");
+            requireNonBlank(pattern, "pattern");
+        }
+
+        public Template(String templateId, int precedence) {
+            this(templateId, "legacy", precedence, "SINGLE", templateId);
+        }
+
+        public int precedence() {
+            return familyRank;
         }
     }
 

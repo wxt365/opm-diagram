@@ -10,6 +10,8 @@ import org.opm.localruntime.command.CandidateRevisionCommitter;
 import org.opm.localruntime.command.CommitFailureCode;
 import org.opm.localruntime.command.CommitResult;
 import org.opm.localruntime.command.ProfileRuleBinding;
+import org.opm.localruntime.assets.FileProfilePackageLoader;
+import org.opm.localruntime.assets.ProfilePackageAssembler;
 import org.opm.localruntime.semantic.SemanticRevision;
 import org.opm.localruntime.semantic.SemanticRevisionJsonWriter;
 import org.opm.localruntime.semantic.SemanticRevisionReader;
@@ -21,6 +23,7 @@ import org.opm.localruntime.text.OplGenerationResult;
 import org.opm.localruntime.text.OplGrammar;
 import org.opm.localruntime.text.OplTextGenerationService;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
@@ -44,12 +47,16 @@ import java.util.UUID;
 public class LocalApiService {
 
     private static final String PROFILE_ID = "profile.iso19450.2024.draft";
-    private static final String VERSION = "0.1.0";
-    private static final String PROFILE_DIGEST = "4cc3289722ab5c62e9273127318d5dcb383f7f0bdb801d23293afdef48fcbb00";
+    private static final String PROFILE_VERSION = "0.2.0";
+    private static final String RULE_VERSION = "0.1.0";
+    private static final String GRAMMAR_VERSION = "0.2.0";
+    private static final String SYMBOL_VERSION = "0.1.0";
+    private static final String NORMALIZATION_VERSION = "0.1.0";
+    private static final String PROFILE_DIGEST = "5287d3ceb77c4c664b88c6e34a3a5d1c34f85c36037ab2f587705f9d607f899c";
     private static final String RULE_ID = "rules.iso19450.2024.draft";
     private static final String RULE_DIGEST = "4293cb22cf2e2e92fe212ed3c31119992509c8a675daa554c64a2ccf10457d64";
     private static final String GRAMMAR_ID = "grammar.opl.iso19450.2024.draft";
-    private static final String GRAMMAR_DIGEST = "be315186135f2cfa525128532220b289e083fa4bc70bacb33a4287331467a9d1";
+    private static final String GRAMMAR_DIGEST = "c88e672bd9db7f0405a7ef3fc464043f15cae844931192e3412c94ce05339e7d";
     private static final String SYMBOL_ID = "symbols.iso19450.2024.draft";
     private static final String SYMBOL_DIGEST = "511dbaec2adb6f49ed6a4d28844e69d1310eb7a67f213e4a30b0ddfc21ef6098";
     private static final String NORMALIZATION_ID = "normalization.iso19450.2024.draft";
@@ -61,9 +68,25 @@ public class LocalApiService {
     private final SemanticRevisionJsonWriter revisionWriter = new SemanticRevisionJsonWriter();
     private final OplTextGenerationService textGenerationService = new OplTextGenerationService();
     private final SemanticRevisionValidator semanticValidator = new SemanticRevisionValidator();
+    private final ProfilePackageAssembler profilePackageAssembler;
 
     public LocalApiService(ProjectDatabaseFactory databaseFactory) {
+        this(databaseFactory, new FileProfilePackageLoader(Path.of("packages/profiles")));
+    }
+
+    @Autowired
+    public LocalApiService(ProjectDatabaseFactory databaseFactory, FileProfilePackageLoader profilePackageLoader) {
         this.databaseFactory = databaseFactory;
+        this.profilePackageAssembler = new ProfilePackageAssembler(profilePackageLoader);
+    }
+
+    public Map<String, String> activeProfileRuleBinding() {
+        SemanticRevision.ProfileBinding binding = profileBinding();
+        return Map.of(
+                "profile_id", binding.profile().id(),
+                "profile_version", binding.profile().version(),
+                "rule_set_id", binding.ruleSet().id(),
+                "rule_version", binding.ruleSet().version());
     }
 
     public Map<String, Object> listProjects(String requestId, String query) {
@@ -132,7 +155,7 @@ public class LocalApiService {
                         """)) {
                     statement.setString(1, projectId); statement.setString(2, required(request, "name"));
                     statement.setString(3, normalized(required(request, "name"))); statement.setString(4, optional(request, "description"));
-                    statement.setString(5, PROFILE_ID); statement.setString(6, VERSION); statement.setString(7, now); statement.setString(8, now);
+                    statement.setString(5, PROFILE_ID); statement.setString(6, PROFILE_VERSION); statement.setString(7, now); statement.setString(8, now);
                     statement.executeUpdate();
                 }
                 writeIdempotency(connection, "API-PRJ-003", "projects", commandId, digest, null, project, now);
@@ -177,7 +200,7 @@ public class LocalApiService {
             String revisionId = newId("revision.initial");
             SemanticRevision revision = initialRevision(modelId, revisionId, contextId);
             Map<String, Object> model = Map.of("model_id", modelId, "project_id", projectId, "name", required(request, "name"),
-                    "head_revision", revisionId, "profile_id", PROFILE_ID, "profile_version", VERSION, "rule_version", VERSION,
+                    "head_revision", revisionId, "profile_id", PROFILE_ID, "profile_version", PROFILE_VERSION, "rule_version", RULE_VERSION,
                     "access_mode", "EDITABLE_DRAFT");
             connection.setAutoCommit(false);
             try {
@@ -515,9 +538,9 @@ public class LocalApiService {
                 ? List.of(new ApiEdtContract.AllowedModifier("duration", List.of(), 1, 1, null)) : List.of();
         return new ApiEdtContract.CommandCapabilityOption(queryId, proceduralFactOptionId(queryId, descriptor.capabilityId()),
                 commandType, descriptor.capabilityId(), null, descriptor.displayName(), List.of("过程关系"), endpoints, fields, modifiers,
-                new ApiEdtContract.AssetReference(descriptor.symbolId(), VERSION, SYMBOL_DIGEST),
-                new ApiEdtContract.AssetReference(GRAMMAR_ID, VERSION, GRAMMAR_DIGEST),
-                List.of(new ApiEdtContract.AssetReference(descriptor.ruleId(), VERSION, RULE_DIGEST)), true, List.of(), null, null, revisionId);
+                new ApiEdtContract.AssetReference(descriptor.symbolId(), SYMBOL_VERSION, SYMBOL_DIGEST),
+                new ApiEdtContract.AssetReference(GRAMMAR_ID, GRAMMAR_VERSION, GRAMMAR_DIGEST),
+                List.of(new ApiEdtContract.AssetReference(descriptor.ruleId(), RULE_VERSION, RULE_DIGEST)), true, List.of(), null, null, revisionId);
     }
 
     private ApiEdtContract.CommandCapabilityOption structuralFactOption(
@@ -538,9 +561,9 @@ public class LocalApiService {
         }
         return new ApiEdtContract.CommandCapabilityOption(queryId, structuralFactOptionId(queryId, descriptor.capabilityId()), commandType,
                 descriptor.capabilityId(), null, descriptor.displayName(), List.of("结构关系"), endpoints, fields, List.of(),
-                new ApiEdtContract.AssetReference(descriptor.symbolId(), VERSION, SYMBOL_DIGEST),
-                new ApiEdtContract.AssetReference(descriptor.templateId(), VERSION, GRAMMAR_DIGEST),
-                List.of(new ApiEdtContract.AssetReference(descriptor.ruleId(), VERSION, RULE_DIGEST)), true, List.of(), null, null, revisionId);
+                new ApiEdtContract.AssetReference(descriptor.symbolId(), SYMBOL_VERSION, SYMBOL_DIGEST),
+                new ApiEdtContract.AssetReference(descriptor.templateId(), GRAMMAR_VERSION, GRAMMAR_DIGEST),
+                List.of(new ApiEdtContract.AssetReference(descriptor.ruleId(), RULE_VERSION, RULE_DIGEST)), true, List.of(), null, null, revisionId);
     }
 
     private List<String> structuralDirections(StructuralLinkCatalog.Descriptor descriptor) {
@@ -560,9 +583,9 @@ public class LocalApiService {
         List<ApiEdtContract.RequiredField> fields = List.of(new ApiEdtContract.RequiredField("modifiers", "LIST", true, List.of()));
         return new ApiEdtContract.CommandCapabilityOption(queryId, controlFactOptionId(queryId, descriptor.capabilityId()), ApiEdtContract.CommandType.UPDATE_FACT,
                 descriptor.capabilityId(), baseCapabilityId, descriptor.displayName(), List.of("控制关系"), endpoints, fields, modifiers,
-                new ApiEdtContract.AssetReference(descriptor.symbolId(), VERSION, SYMBOL_DIGEST),
-                new ApiEdtContract.AssetReference(descriptor.templateId(), VERSION, GRAMMAR_DIGEST),
-                List.of(new ApiEdtContract.AssetReference(descriptor.ruleId(), VERSION, RULE_DIGEST)), true, List.of(), null, null, revisionId);
+                new ApiEdtContract.AssetReference(descriptor.symbolId(), SYMBOL_VERSION, SYMBOL_DIGEST),
+                new ApiEdtContract.AssetReference(descriptor.templateId(), GRAMMAR_VERSION, GRAMMAR_DIGEST),
+                List.of(new ApiEdtContract.AssetReference(descriptor.ruleId(), RULE_VERSION, RULE_DIGEST)), true, List.of(), null, null, revisionId);
     }
 
     private ApiEdtContract.CommandCapabilityOption stateCreateOption(String queryId, String revisionId, SemanticRevision.Element owner, SemanticRevision.Feature featureOwner, boolean enabled) {
@@ -573,9 +596,9 @@ public class LocalApiService {
                 new ApiEdtContract.RequiredField("name_or_value", "TEXT", true, List.of()),
                 new ApiEdtContract.RequiredField("state_roles", "LIST", true, List.of("INITIAL", "DEFAULT", "FINAL")),
                 new ApiEdtContract.RequiredField("layout", "LAYOUT", true, List.of()));
-        ApiEdtContract.AssetReference symbol = new ApiEdtContract.AssetReference(featureState ? "symbol.feature.state" : "symbol.state.basic", VERSION, SYMBOL_DIGEST);
-        ApiEdtContract.AssetReference template = new ApiEdtContract.AssetReference(GRAMMAR_ID, VERSION, GRAMMAR_DIGEST);
-        ApiEdtContract.AssetReference rule = new ApiEdtContract.AssetReference(RULE_ID, VERSION, RULE_DIGEST);
+        ApiEdtContract.AssetReference symbol = new ApiEdtContract.AssetReference(featureState ? "symbol.feature.state" : "symbol.state.basic", SYMBOL_VERSION, SYMBOL_DIGEST);
+        ApiEdtContract.AssetReference template = new ApiEdtContract.AssetReference(GRAMMAR_ID, GRAMMAR_VERSION, GRAMMAR_DIGEST);
+        ApiEdtContract.AssetReference rule = new ApiEdtContract.AssetReference(RULE_ID, RULE_VERSION, RULE_DIGEST);
         String reason = owner == null && featureOwner == null ? "ENDPOINT_KIND_MISMATCH" : "PROFILE_CAPABILITY_DISABLED";
         boolean stateEnabled = featureState || enabled;
         return new ApiEdtContract.CommandCapabilityOption(queryId, "option.state." + digest(queryId).substring(0, 24), ApiEdtContract.CommandType.CREATE_STATE,
@@ -596,14 +619,14 @@ public class LocalApiService {
                                                                          List<ApiEdtContract.NormalizedEndpoint> endpoints, List<ApiEdtContract.RequiredField> fields) {
         return new ApiEdtContract.CommandCapabilityOption(queryId, "option.feature." + kind.toLowerCase() + "." + digest(queryId).substring(0, 16), ApiEdtContract.CommandType.CREATE_FEATURE,
                 capabilityId, null, "创建" + ("ATTRIBUTE".equals(kind) ? "属性" : "操作"), List.of("Feature", "ATTRIBUTE".equals(kind) ? "Attribute" : "Operation"), endpoints, fields, List.of(),
-                new ApiEdtContract.AssetReference(symbolId, VERSION, SYMBOL_DIGEST), new ApiEdtContract.AssetReference(GRAMMAR_ID, VERSION, GRAMMAR_DIGEST),
-                List.of(new ApiEdtContract.AssetReference(RULE_ID, VERSION, RULE_DIGEST)), true, List.of(), null, null, revisionId);
+                new ApiEdtContract.AssetReference(symbolId, SYMBOL_VERSION, SYMBOL_DIGEST), new ApiEdtContract.AssetReference(GRAMMAR_ID, GRAMMAR_VERSION, GRAMMAR_DIGEST),
+                List.of(new ApiEdtContract.AssetReference(RULE_ID, RULE_VERSION, RULE_DIGEST)), true, List.of(), null, null, revisionId);
     }
 
     private ApiEdtContract.CommandCapabilityOption stateDeleteOption(String queryId, SemanticRevision revision, SemanticRevision.State state) {
-        ApiEdtContract.AssetReference symbol = new ApiEdtContract.AssetReference("symbol.state.basic", VERSION, SYMBOL_DIGEST);
-        ApiEdtContract.AssetReference template = new ApiEdtContract.AssetReference(GRAMMAR_ID, VERSION, GRAMMAR_DIGEST);
-        ApiEdtContract.AssetReference rule = new ApiEdtContract.AssetReference(RULE_ID, VERSION, RULE_DIGEST);
+        ApiEdtContract.AssetReference symbol = new ApiEdtContract.AssetReference("symbol.state.basic", SYMBOL_VERSION, SYMBOL_DIGEST);
+        ApiEdtContract.AssetReference template = new ApiEdtContract.AssetReference(GRAMMAR_ID, GRAMMAR_VERSION, GRAMMAR_DIGEST);
+        ApiEdtContract.AssetReference rule = new ApiEdtContract.AssetReference(RULE_ID, RULE_VERSION, RULE_DIGEST);
         if (state == null) {
             return new ApiEdtContract.CommandCapabilityOption(queryId, "option.state.delete." + digest(queryId).substring(0, 16), ApiEdtContract.CommandType.DELETE_CONSTRUCT,
                     "CAP-STATE-001", null, "删除 State", List.of("Object", "State"), List.of(), List.of(new ApiEdtContract.RequiredField("impact_token", "TOKEN", true, List.of())), List.of(), symbol, template, List.of(rule), false,
@@ -630,7 +653,7 @@ public class LocalApiService {
         SemanticRevision candidate = applyP0Command(projectId, modelId, current.revision(), required(request, "command_type"), requiredMap(request, "payload"));
         CandidateRevisionCommand command = new CandidateRevisionCommand(projectId, modelId, commandId, baseRevisionId, current.revision(), candidate,
                 binding(current.revision()), grammar(current.revision()), requestDigest(request), "P0_EDIT", Instant.now());
-        CommitResult result = new CandidateRevisionCommitter(new SqliteRevisionCommitRepository(databaseFactory.databasePath(projectId))).commit(command);
+        CommitResult result = new CandidateRevisionCommitter(new SqliteRevisionCommitRepository(databaseFactory.databasePath(projectId)), profilePackageAssembler).commit(command);
         if (result instanceof CommitResult.Rejected rejected) throw rejected(rejected.code());
         String committed = result instanceof CommitResult.Committed value ? value.committedRevisionId() : ((CommitResult.Replayed) result).committedRevisionId();
         List<String> traces = result instanceof CommitResult.Committed value ? value.traceIds() : List.of();
@@ -642,7 +665,7 @@ public class LocalApiService {
     public Map<String, Object> text(String requestId, String projectId, String modelId, String contextId, String revisionId) {
         SemanticRevision revision = revision(projectId, modelId, revisionId);
         context(revision, contextId);
-        OplGenerationResult generated = textGenerationService.generate(revision, contextId, grammar(revision));
+        OplGenerationResult generated = textGenerationService.generate(revision, contextId, profilePackageAssembler.assemble(revision.profileBinding()));
         List<Map<String, Object>> sentences = generated.artifact().paragraphs().getFirst().sentences().stream()
                 .map(sentence -> Map.<String, Object>of("sentence_id", sentence.sentenceId(), "text", sentence.text(), "ordinal", sentence.ordinal())).toList();
         List<Map<String, Object>> traces = generated.traces().stream().map(trace -> Map.<String, Object>of("sentence_id", trace.sentenceIds().getFirst(), "fact_ids", trace.factIds(), "occurrence_ids", trace.occurrenceIds())).toList();
@@ -672,7 +695,7 @@ public class LocalApiService {
                      INSERT INTO background_task(task_id, task_type, state, stage, progress, input_revision_id, profile_id, profile_version, rule_set_id, rule_set_version, cancellable, request_json, result_json, created_at, started_at, finished_at, updated_at)
                      VALUES (?, 'VALIDATE_MODEL', 'COMPLETED', 'COMPLETE', 100, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?)
                      """)) {
-            statement.setString(1, taskId); statement.setString(2, revisionId); statement.setString(3, PROFILE_ID); statement.setString(4, VERSION); statement.setString(5, RULE_ID); statement.setString(6, VERSION);
+            statement.setString(1, taskId); statement.setString(2, revisionId); statement.setString(3, PROFILE_ID); statement.setString(4, PROFILE_VERSION); statement.setString(5, RULE_ID); statement.setString(6, RULE_VERSION);
             statement.setString(7, objectMapper.writeValueAsString(request)); statement.setString(8, objectMapper.writeValueAsString(result));
                 statement.setString(9, now); statement.setString(10, now); statement.setString(11, now); statement.setString(12, now); statement.executeUpdate();
                 Map<String, Object> descriptor = taskDescriptor(taskId, revisionId, "COMPLETED", "COMPLETE", 100, false, result, now, now, now);
@@ -741,7 +764,7 @@ public class LocalApiService {
                     if (result.next()) {
                         Map<String, Object> descriptor = taskDescriptor(result.getString(1), result.getString(5), result.getString(2), result.getString(3), result.getObject(4, Integer.class), result.getInt(6) == 1,
                                 map(result.getString(7)), result.getString(8), result.getString(9), result.getString(10));
-                        return queryResult(requestId, result.getString(5), VERSION, VERSION, "historical", descriptor, false);
+                        return queryResult(requestId, result.getString(5), PROFILE_VERSION, RULE_VERSION, "historical", descriptor, false);
                     }
                 }
             } catch (SQLException exception) { throw persistence(exception); }
@@ -1316,13 +1339,13 @@ public class LocalApiService {
     }
 
     private void installBindingPackages(Connection connection, String now) throws SQLException {
-        insertPackage(connection, "INSERT OR IGNORE INTO profile_package(profile_id, package_version, package_digest, lifecycle_status, package_json, installed_at) VALUES (?, ?, ?, 'DRAFT', '{}', ?)", PROFILE_ID, PROFILE_DIGEST, now);
-        insertPackage(connection, "INSERT OR IGNORE INTO rule_set_package(rule_set_id, rule_set_version, rule_set_digest, lifecycle_status, package_json, installed_at) VALUES (?, ?, ?, 'DRAFT', '{}', ?)", RULE_ID, RULE_DIGEST, now);
-        insertPackage(connection, "INSERT OR IGNORE INTO grammar_package(grammar_id, grammar_version, grammar_digest, text_modality, manifest_json, installed_at) VALUES (?, ?, ?, 'OPL', '{}', ?)", GRAMMAR_ID, GRAMMAR_DIGEST, now);
+        insertPackage(connection, "INSERT OR IGNORE INTO profile_package(profile_id, package_version, package_digest, lifecycle_status, package_json, installed_at) VALUES (?, ?, ?, 'DRAFT', '{}', ?)", PROFILE_ID, PROFILE_VERSION, PROFILE_DIGEST, now);
+        insertPackage(connection, "INSERT OR IGNORE INTO rule_set_package(rule_set_id, rule_set_version, rule_set_digest, lifecycle_status, package_json, installed_at) VALUES (?, ?, ?, 'DRAFT', '{}', ?)", RULE_ID, RULE_VERSION, RULE_DIGEST, now);
+        insertPackage(connection, "INSERT OR IGNORE INTO grammar_package(grammar_id, grammar_version, grammar_digest, text_modality, manifest_json, installed_at) VALUES (?, ?, ?, 'OPL', '{}', ?)", GRAMMAR_ID, GRAMMAR_VERSION, GRAMMAR_DIGEST, now);
     }
 
-    private void insertPackage(Connection connection, String sql, String id, String digest, String now) throws SQLException {
-        try (PreparedStatement statement = connection.prepareStatement(sql)) { statement.setString(1, id); statement.setString(2, VERSION); statement.setString(3, digest); statement.setString(4, now); statement.executeUpdate(); }
+    private void insertPackage(Connection connection, String sql, String id, String version, String digest, String now) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(sql)) { statement.setString(1, id); statement.setString(2, version); statement.setString(3, digest); statement.setString(4, now); statement.executeUpdate(); }
     }
 
     private void insertInitialRevision(Connection connection, SemanticRevision revision, String now) throws Exception {
@@ -1331,8 +1354,8 @@ public class LocalApiService {
                 INSERT INTO revision_document(revision_id, model_id, revision_sequence, schema_version, profile_id, profile_version, rule_set_id, rule_set_version, schema_set_json, profile_binding_json, document_json, document_digest, commit_reason, created_at)
                 VALUES (?, ?, 1, '0.1', ?, ?, ?, ?, '{}', ?, ?, ?, 'INITIAL_MODEL', ?)
                 """)) {
-            statement.setString(1, revision.revisionId()); statement.setString(2, revision.modelId()); statement.setString(3, PROFILE_ID); statement.setString(4, VERSION); statement.setString(5, RULE_ID); statement.setString(6, VERSION);
-            statement.setString(7, objectMapper.writeValueAsString(Map.of("profile_id", PROFILE_ID, "profile_version", VERSION, "rule_set_id", RULE_ID, "rule_version", VERSION)));
+            statement.setString(1, revision.revisionId()); statement.setString(2, revision.modelId()); statement.setString(3, PROFILE_ID); statement.setString(4, PROFILE_VERSION); statement.setString(5, RULE_ID); statement.setString(6, RULE_VERSION);
+            statement.setString(7, objectMapper.writeValueAsString(Map.of("profile_id", PROFILE_ID, "profile_version", PROFILE_VERSION, "rule_set_id", RULE_ID, "rule_version", RULE_VERSION)));
             statement.setString(8, document); statement.setString(9, digest(document)); statement.setString(10, now); statement.executeUpdate();
         }
     }
@@ -1385,8 +1408,8 @@ public class LocalApiService {
         descriptor.put("stage", stage);
         descriptor.put("progress", progress);
         descriptor.put("input_revision", revisionId);
-        descriptor.put("profile_version", VERSION);
-        descriptor.put("rule_version", VERSION);
+        descriptor.put("profile_version", PROFILE_VERSION);
+        descriptor.put("rule_version", RULE_VERSION);
         descriptor.put("cancellable", cancellable);
         descriptor.put("result_ref", result.isEmpty() ? null : taskId + ".result");
         descriptor.put("error", null);
@@ -1413,7 +1436,7 @@ public class LocalApiService {
     private String freshness(String projectId, String modelId, String revisionId) { return currentModel(projectId, modelId).revision().revisionId().equals(revisionId) ? "current" : "historical"; }
     private Map<String, String> labels(SemanticRevision revision) { Map<String, String> result = new LinkedHashMap<>(); revision.elements().forEach(value -> result.put(value.id(), value.name().localName())); revision.features().forEach(value -> result.put(value.id(), value.name().localName())); revision.states().forEach(value -> result.put(value.id(), value.name().localName())); revision.facts().forEach(value -> result.put(value.id(), value.id())); return result; }
     private List<String> affectedIds(SemanticRevision revision) { List<String> ids = new ArrayList<>(); revision.elements().forEach(value -> ids.add(value.id())); revision.facts().forEach(value -> ids.add(value.id())); return ids; }
-    private void validateBinding(Map<String, Object> binding) { if (!PROFILE_ID.equals(required(binding, "profile_id")) || !VERSION.equals(required(binding, "profile_version")) || !RULE_ID.equals(required(binding, "rule_set_id")) || !VERSION.equals(required(binding, "rule_version"))) throw new ApiException(ApiErrorCode.RULE_VERSION_CONFLICT, 409, false, "Profile 或 Rule 版本不匹配"); }
+    private void validateBinding(Map<String, Object> binding) { if (!PROFILE_ID.equals(required(binding, "profile_id")) || !PROFILE_VERSION.equals(required(binding, "profile_version")) || !RULE_ID.equals(required(binding, "rule_set_id")) || !RULE_VERSION.equals(required(binding, "rule_version"))) throw new ApiException(ApiErrorCode.RULE_VERSION_CONFLICT, 409, false, "Profile 或 Rule 版本不匹配"); }
     private ProfileRuleBinding binding(SemanticRevision revision) { return new ProfileRuleBinding(revision.profileBinding().profile().id(), revision.profileBinding().profile().version(), revision.profileBinding().ruleSet().id(), revision.profileBinding().ruleSet().version()); }
     private OplGrammar grammar(SemanticRevision revision) {
         var ref = revision.profileBinding().textGrammar();
@@ -1427,13 +1450,16 @@ public class LocalApiService {
                 new OplGrammar.Template("opl.invocation.v1", 10), new OplGrammar.Template("opl.invocation.self.v1", 10),
                 new OplGrammar.Template("opl.exception.overtime.v1", 10), new OplGrammar.Template("opl.exception.undertime.v1", 10)));
     }
-    private SemanticRevision.ProfileBinding profileBinding() { return new SemanticRevision.ProfileBinding(asset(PROFILE_ID, PROFILE_DIGEST), asset(RULE_ID, RULE_DIGEST), asset(GRAMMAR_ID, GRAMMAR_DIGEST), asset(SYMBOL_ID, SYMBOL_DIGEST), asset(NORMALIZATION_ID, NORMALIZATION_DIGEST), digest(PROFILE_DIGEST + RULE_DIGEST + GRAMMAR_DIGEST + SYMBOL_DIGEST + NORMALIZATION_DIGEST)); }
-    private SemanticRevision.AssetReference asset(String id, String digest) { return new SemanticRevision.AssetReference(id, VERSION, digest); }
-    private SemanticRevision.CapabilityReference capability(String id) { return new SemanticRevision.CapabilityReference(id, PROFILE_ID, VERSION); }
+    private SemanticRevision.ProfileBinding profileBinding() {
+        SemanticRevision.ProfileBinding binding = new SemanticRevision.ProfileBinding(asset(PROFILE_ID, PROFILE_VERSION, PROFILE_DIGEST), asset(RULE_ID, RULE_VERSION, RULE_DIGEST), asset(GRAMMAR_ID, GRAMMAR_VERSION, GRAMMAR_DIGEST), asset(SYMBOL_ID, SYMBOL_VERSION, SYMBOL_DIGEST), asset(NORMALIZATION_ID, NORMALIZATION_VERSION, NORMALIZATION_DIGEST), "pending");
+        return new SemanticRevision.ProfileBinding(binding.profile(), binding.ruleSet(), binding.textGrammar(), binding.symbolCatalog(), binding.normalizationAdapter(), ProfilePackageAssembler.bindingDigest(binding));
+    }
+    private SemanticRevision.AssetReference asset(String id, String version, String digest) { return new SemanticRevision.AssetReference(id, version, digest); }
+    private SemanticRevision.CapabilityReference capability(String id) { return new SemanticRevision.CapabilityReference(id, PROFILE_ID, PROFILE_VERSION); }
     private SemanticRevision.QualifiedName qualifiedName(String localName) { return new SemanticRevision.QualifiedName("urn:opm:runtime", localName); }
-    private SemanticRevision.SourceProvenance source(String kind) { return new SemanticRevision.SourceProvenance(PROFILE_ID, VERSION, kind, "profile." + kind.toLowerCase()); }
+    private SemanticRevision.SourceProvenance source(String kind) { return new SemanticRevision.SourceProvenance(PROFILE_ID, PROFILE_VERSION, kind, "profile." + kind.toLowerCase()); }
     private SemanticRevision.Normalization core() { return new SemanticRevision.Normalization(SemanticRevision.NormalizationLevel.CORE); }
-    private ApiException rejected(CommitFailureCode code) { return switch (code) { case REVISION_CONFLICT -> new ApiException(ApiErrorCode.REVISION_CONFLICT, 409, false, "基础修订不是当前草稿"); case IDEMPOTENCY_MISMATCH -> new ApiException(ApiErrorCode.IDEMPOTENCY_MISMATCH, 409, false, "command_id 已绑定不同请求"); case RULE_VERSION_CONFLICT -> new ApiException(ApiErrorCode.RULE_VERSION_CONFLICT, 409, false, "Profile 或 Rule 版本不匹配"); case VALIDATION_BLOCKED -> new ApiException(ApiErrorCode.VALIDATION_BLOCKED, 422, false, "候选修订未通过校验"); case TEXT_GENERATION_BLOCKED -> new ApiException(ApiErrorCode.TEXT_GENERATION_BLOCKED, 422, false, "无法生成 OPL 文本"); default -> new ApiException(ApiErrorCode.PERSISTENCE_FAILED, 500, true, "修订提交失败"); }; }
+    private ApiException rejected(CommitFailureCode code) { return switch (code) { case REVISION_CONFLICT -> new ApiException(ApiErrorCode.REVISION_CONFLICT, 409, false, "基础修订不是当前草稿"); case IDEMPOTENCY_MISMATCH -> new ApiException(ApiErrorCode.IDEMPOTENCY_MISMATCH, 409, false, "command_id 已绑定不同请求"); case RULE_VERSION_CONFLICT -> new ApiException(ApiErrorCode.RULE_VERSION_CONFLICT, 409, false, "Profile 或 Rule 版本不匹配"); case VALIDATION_BLOCKED -> new ApiException(ApiErrorCode.VALIDATION_BLOCKED, 422, false, "候选修订未通过校验"); case MODIFIER_COMBINATION_INVALID -> new ApiException(ApiErrorCode.MODIFIER_COMBINATION_INVALID, 422, false, "Control 修饰组合无效"); case TEXT_GENERATION_BLOCKED -> new ApiException(ApiErrorCode.TEXT_GENERATION_BLOCKED, 422, false, "无法生成 OPL 文本"); default -> new ApiException(ApiErrorCode.PERSISTENCE_FAILED, 500, true, "修订提交失败"); }; }
     private ApiException profileForbidden() { return new ApiException(ApiErrorCode.PROFILE_FORBIDDEN, 422, false, "当前 Profile 不支持该 P0 命令"); }
     private ApiException domain(String message) { return new ApiException(ApiErrorCode.DOMAIN_REJECTED, 422, false, message); }
     private ApiException notFound(String message) { return new ApiException(ApiErrorCode.NOT_FOUND, 404, false, message); }

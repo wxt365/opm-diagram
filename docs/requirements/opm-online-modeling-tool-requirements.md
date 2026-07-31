@@ -1,10 +1,12 @@
 # OPM 单机建模工具产品需求规格
 
-文档版本：`v0.14-draft`
+文档版本：`v1.0`
 
-文档状态：P0 需求范围冻结，可进入开发；完整 ISO 资产与符合性证据待迭代
+文档状态：`FROZEN_INCLUDED`；当前开发范围冻结，完整 ISO 资产与符合性声明为 `FROZEN_DEFERRED`
 
-更新时间：2026-07-29
+全局设计状态、延期边界和开发准入以 `docs/design/opm-design-freeze-baseline.md` 为唯一事实源。
+
+更新时间：2026-07-30
 
 ## Task Type
 
@@ -561,8 +563,18 @@ Annex A 明确说明其 EBNF 对概率、执行路径和复杂参与约束等表
 | NFR-UX-002 | 不得仅依赖颜色区分元素状态、错误级别或可见性。 |
 | NFR-UX-003 | 所有陌生图标必须提供可读名称或工具提示。 |
 | NFR-UX-004 | 校验错误必须用业务语言说明，不只显示内部规则代码。 |
-| NFR-UX-005 | 支持现代桌面浏览器，正式浏览器矩阵在前端设计阶段冻结。 |
+| NFR-UX-005 | 首发浏览器矩阵固定为 Playwright 1.57.0 对应 Chromium `143.0.7499.4`、Firefox `144.0.2`、WebKit `26.0`；Chromium 承担全部发布 Gate，Firefox/WebKit 承担核心主路径。默认浏览器不满足矩阵时必须阻断进入编辑器。 |
 | NFR-UX-006 | 首期界面至少支持简体中文，模型内容允许用户使用其他语言命名。 |
+
+#### 13.4.1 浏览器和视口冻结口径
+
+1. Chromium 运行 P01-P03、完整画布、视觉、E2E、性能、恢复和 release smoke；Firefox/WebKit 运行 P01-P03、Object/Process/State、16/8/10 候选与提交、OPL/Trace 和重开核心主路径；
+2. 浏览器版本是 lockfile 对应的实际引擎版本，不能替换为“现代浏览器”；未列版本、移动浏览器、WebView 和无头浏览器不进入支持声明；
+3. 默认浏览器不受支持时显示阻断式兼容性页，只允许复制 loopback 地址并在支持浏览器重开，不提供忽略旁路，不发出模型写命令；
+4. `1440x900` 用于主验收、视觉、性能和 smoke，`1280x800` 用于桌面最小布局，`390x844` 只用于窄视口设计回归；
+5. `25%/100%/400%` 用于 State、marker、长标签、fan、候选和检查器的画布极值视觉验收；不代表语义 in/out-zoom。
+
+完整字段、发布阻断层级和变更入口以 `docs/design/opm-design-freeze-baseline.md` 第 3 章为准。
 
 ### 13.5 可维护性与可追溯性
 
@@ -624,7 +636,7 @@ Annex A 明确说明其 EBNF 对概率、执行路径和复杂参与约束等表
 
 ### 14.5 工程验收门槛
 
-进入实现前必须补齐并评审：
+进入实现前必须完成以下设计职责：
 
 - 顶层技术架构和模块详细设计；
 - 元模型与标准符合性矩阵；
@@ -633,6 +645,8 @@ Annex A 明确说明其 EBNF 对概率、执行路径和复杂参与约束等表
 - 原型验收基线；
 - 前端 handoff；
 - 开发执行包和测试策略。
+
+上述职责已由 `docs/design/opm-design-freeze-baseline.md` 归档为 `FROZEN_INCLUDED`，当前全局开发门为 `READY_FOR_DEVELOPMENT`。任何冻结输入变化必须先关闭开发门并建立新 task spec；实现与测试是否完成仍由单个开发包 Gate 判定。
 
 ## 15. 验证方式
 
@@ -665,7 +679,7 @@ Annex A 明确说明其 EBNF 对概率、执行路径和复杂参与约束等表
 - ISO 文本模态称为 OPL，中文草案文本模态称为 OPT；
 - OPM 采用“一个模型、多张相互关联的 OPD”：ISO 配置档以 SD 为 OPD process tree 的唯一根，对象细化形成 OPD object forest，按条件形成的 model view 独立管理；
 - 同一语义元素跨 OPD 出现时必须保持稳定身份和一致语义，每张 OPD 均有对应的文本模态段落或章节；
-- 当前仓库没有生产应用代码；P0 机器契约、SQLite V1、交互原型、handoff、测试策略和开发执行包已经形成，但原子 `shall` 规则、生产实现和 ISO 测试证据尚未形成。
+- 当前仓库已有部分应用、机器契约和测试资产；本需求冻结任务不复核其完成度。原子 `shall` 规则目录、完整标准资产和 ISO 符合性证据尚未形成。
 
 ### 17.2 建议基线
 
@@ -677,15 +691,17 @@ Annex A 明确说明其 EBNF 对概率、执行路径和复杂参与约束等表
 - 模型、OPD、元素、关系、文本模态、版本、校验结果和基线统一作为可演化的业务语义资产管理；
 - OPM 基线只作为本体平台的上游语义源，经过明确映射、校验和受控发布后才能成为下游本体资产。
 
-### 17.3 待产品评审确认
+### 17.3 已冻结决策与延期边界
 
-1. 自动备份的默认位置、频率和保留数量；
-2. 首期是否需要直接编辑 OPL/OPT 文本并反向生成 OPD；
-3. 首期需要兼容哪些现有 OPM 工具及其交换格式；
-4. 模型是否涉及涉密数据、本地加密或国产化环境要求；
-5. 建议性能容量是否符合实际模型规模；
-6. 中文 OPL 草案配置档是按当前草案冻结，还是持续跟踪后续正式版本；
-7. 产品发布时要求达到部分符合、完全符合，还是同时完成工具制造商符合性的正式第三方验证。
+1. 当前发布不提供自动备份周期；P06 生产实现重启时再冻结位置、频率、保留和恢复验收；
+2. OPL/OPT 保持只读投影，直接编辑和反向解析为 `FROZEN_DEFERRED`；
+3. 当前只支持 `.opmp` 原生交换边界，第三方工具格式和互操作为 `FROZEN_DEFERRED`；
+4. 当前不提供静态数据加密、密钥管理、涉密或国产化合规，不得作相关声明；
+5. NFR-PERF-001~004 的阈值、样本和 Gate 已冻结，执行结果不得在本需求文档中预判；
+6. 中文配置档 exact source 固定为 `自动化系统与集成 对象过程语言-20250914`；专属能力、正式 OPT 资产和生产启用为 `FROZEN_DEFERRED`，来源变化必须发布新 Profile version；
+7. 当前 ISO 19450:2024 结论固定为 `EVIDENCE_MISSING/无法判断`；原子规则、完整 Grammar/Symbol 和符合性声明为 `FROZEN_DEFERRED`。
+
+每项延期的 owner、重启条件和禁止实现边界以 `docs/design/opm-design-freeze-baseline.md` 第 5 章为准，不再作为开放式待确认项。
 
 ## 18. 设计输入基线与后续文档
 
@@ -712,19 +728,19 @@ Annex A 明确说明其 EBNF 对概率、执行路径和复杂参与约束等表
 - P0 HTTP 接口与 SQLite V1：由 `docs/contracts/openapi/opm-local-api-v1.yaml` 和 `docs/contracts/migrations/sqlite` 承接。
 - 符号/OPL 实现边界、原型验收、前端 handoff、测试策略和开发拆包：由对应 `docs/design/opm-*.md` 开发准备文档承接。
 
-### 18.2 当前缺失
+### 18.2 冻结延期与待实现证据
 
-- ISO 19450:2024 每个 `shall/shall not` 的原子规则、可执行判定逻辑和自动化测试集；
-- Clause 4 完整图形符号资产；P0 结点、关系、锚点和绘制契约已经形成；
-- OPL/OPT 完整可执行语法资产和完整 golden data；P0 Consumption golden 已形成；
-- 原生交换字段级 schema、迁移器和 golden package；SQLite V1、物理容器和恢复策略已经形成；
-- OPM 业务语义资产到本体平台的映射模型、校验规则和受控发布契约；
-- 生产依赖锁、代码、迁移执行、安装包和端到端运行证据。
+- ISO 原子规则目录、完整 Annex A Grammar、完整 Clause 4 Symbol Catalog 和符合性声明属于 `DFD-004~007`；
+- 中文草案专属能力与正式 OPT 资产属于 `DFD-002`；
+- 外部互操作与本体平台发布属于 `DFD-008`；
+- 静态加密、涉密和国产化部署属于 `DFD-009`；
+- 原生交换 machine schema/migrator/golden、Revision 0.2、生产代码、迁移执行、安装包和 E2E 是待开发或待验证产物，不是未冻结设计。
 
 ### 18.3 推荐后续顺序
 
-1. 按 `opm-development-execution-pack.md` 启动 DEV-00 工程脚手架任务；
-2. 用 lockfile、Maven dependency management 和最小 PoC 验证准确依赖版本；
-3. 按 DEV-01~09 小步实现 P0 语义闭环并保存分层测试证据；
-4. 并行继续拆分 ISO 原子 `shall`、完整 Symbol/Grammar 与 Conformance Suite；
-5. 在 P0 真实 E2E 与恢复 smoke 通过前，不形成生产完成或 ISO 符合性声明。
+1. 先核对 `opm-design-freeze-baseline.md` 的开发门仍为 `READY_FOR_DEVELOPMENT`；
+2. 按 `opm-development-execution-pack.md` 选择依赖满足的单个 DEV 包并建立任务规格；
+3. 用 lockfile、Maven dependency management 和最小 PoC 验证准确依赖版本；
+4. 按 DEV-00~09、DEV-CANVAS-00~06 小步实现并保存分层证据；
+5. 只有新规格正式重启 `FROZEN_DEFERRED` 项后，才能建设 ISO 原子规则、完整 Symbol/Grammar 或 Conformance Suite；
+6. 在真实 E2E、恢复和发布 Gate 通过前，不形成生产完成声明；在完整标准证据通过前，不形成 ISO 符合性声明。

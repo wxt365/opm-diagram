@@ -1,5 +1,7 @@
 package org.opm.localruntime.storage;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.opm.localruntime.command.CandidateRevisionCommand;
@@ -56,8 +58,25 @@ class SqliteRevisionCommitRepositoryTest {
             SemanticRevision reread = new SemanticRevisionReader().read(new ByteArrayInputStream(document.getBytes(StandardCharsets.UTF_8)));
             assertEquals("revision.demo.0002", reread.revisionId());
             assertNotNull(document);
+            JsonNode sentences = new ObjectMapper().readTree(document).required("text_artifact").required("sentences");
+            JsonNode traces = new ObjectMapper().readTree(document).required("text_traces");
+            assertEquals("sha256", traces.get(0).required("binding_digest").required("algorithm").asText());
+            assertEquals(command.candidateRevision().profileBinding().bindingDigest(), traces.get(0).required("binding_digest").required("digest").asText());
+            for (JsonNode sentence : sentences) {
+                String sentenceId = sentence.required("sentence_id").asText();
+                for (JsonNode token : sentence.required("tokens")) {
+                    assertEquals(sentenceId, token.required("sentence_id").asText());
+                }
+            }
             assertEquals(1, integer(connection, "SELECT COUNT(*) FROM revision_document WHERE revision_id = 'revision.demo.0002' AND document_json LIKE '%\"text_artifact\"%'"));
-            assertEquals(1, integer(connection, "SELECT COUNT(*) FROM revision_document WHERE revision_id = 'revision.demo.0002' AND document_json LIKE '%\"commit_validation_summary\"%'"));
+            assertEquals(1, integer(connection, "SELECT COUNT(*) FROM revision_document WHERE revision_id = 'revision.demo.0002' AND document_json LIKE '%\"tokens\"%'"));
+            assertEquals(1, integer(connection, "SELECT COUNT(*) FROM revision_document WHERE revision_id = 'revision.demo.0002' AND document_json LIKE '%\"token_id\"%'"));
+            assertEquals(1, integer(connection, "SELECT COUNT(*) FROM revision_document WHERE revision_id = 'revision.demo.0002' AND document_json LIKE '%\"start_utf8_byte\"%'"));
+            assertEquals(1, integer(connection, "SELECT COUNT(*) FROM revision_document WHERE revision_id = 'revision.demo.0002' AND document_json LIKE '%\"source_refs\"%'"));
+            assertEquals(1, integer(connection, "SELECT COUNT(*) FROM revision_document WHERE revision_id = 'revision.demo.0002' AND document_json LIKE '%\"token_ranges\"%'"));
+            assertEquals(1, integer(connection, "SELECT COUNT(*) FROM revision_document WHERE revision_id = 'revision.demo.0002' AND document_json LIKE '%\"validation_summary\"%'"));
+            assertEquals(1, integer(connection, "SELECT COUNT(*) FROM revision_document WHERE revision_id = 'revision.demo.0002' AND document_json LIKE '%\"grammar_ref\"%'"));
+            assertEquals(0, integer(connection, "SELECT COUNT(*) FROM revision_document WHERE revision_id = 'revision.demo.0002' AND document_json LIKE '%\"grammar_binding\"%'"));
         }
     }
 
@@ -81,8 +100,68 @@ class SqliteRevisionCommitRepositoryTest {
         }
     }
 
+    @Test
+    void rollsBackAllPersistedArtifactsForEveryCommitWriteStage() throws Exception {
+        for (CommitWriteStage stage : CommitWriteStage.values()) {
+            Path database = initializedDatabase(Files.createDirectory(temporaryDirectory.resolve(stage.name().toLowerCase())));
+            SemanticRevision base = base();
+            SqliteRevisionCommitRepository repository = new SqliteRevisionCommitRepository(
+                    SqliteConnectionFactory.create(database), new StageFailureHook(stage));
+
+            CommitResult.Rejected result = assertInstanceOf(CommitResult.Rejected.class,
+                    new CandidateRevisionCommitter(repository).commit(command(base, candidate(base), "command.sqlite.stage." + stage.name().toLowerCase(), "digest.sqlite.stage." + stage.name().toLowerCase())));
+
+            assertEquals(CommitFailureCode.PERSISTENCE_FAILED, result.code(), stage.name());
+            try (Connection connection = raw(database)) {
+                assertEquals("revision.demo.0001", text(connection, "SELECT draft_head_revision_id FROM model_head WHERE model_id = 'model.demo.processing'"), stage.name());
+                assertEquals(1, integer(connection, "SELECT COUNT(*) FROM revision_document"), stage.name());
+                assertEquals(0, integer(connection, "SELECT COUNT(*) FROM revision_parent"), stage.name());
+                assertEquals(0, integer(connection, "SELECT COUNT(*) FROM text_trace_index"), stage.name());
+                assertEquals(0, integer(connection, "SELECT COUNT(*) FROM finding_index"), stage.name());
+                assertEquals(0, integer(connection, "SELECT COUNT(*) FROM operation_record"), stage.name());
+                assertEquals(0, integer(connection, "SELECT COUNT(*) FROM idempotency_record"), stage.name());
+            }
+        }
+    }
+
+    @Test
+    void rejectsTextPreconditionsBeforeAnySqliteWrite() throws Exception {
+        SemanticRevision base = base();
+
+        Path missingTemplateDatabase = initializedDatabase(Files.createDirectory(temporaryDirectory.resolve("missing-template")));
+        OplGrammar grammarWithoutStateTemplate = new OplGrammar(
+                new OplGrammar.Binding(base.profileBinding().textGrammar().id(), base.profileBinding().textGrammar().version(),
+                        base.profileBinding().textGrammar().sha256()),
+                List.of(new OplGrammar.Template("opl.consumption.v1", 10)));
+        CandidateRevisionCommand missingTemplate = command(base, candidate(base), "command.sqlite.missing-template", "digest.sqlite.missing-template",
+                grammarWithoutStateTemplate);
+        assertRejectedWithoutWrites(missingTemplateDatabase,
+                new CandidateRevisionCommitter(new SqliteRevisionCommitRepository(missingTemplateDatabase)).commit(missingTemplate),
+                CommitFailureCode.TEXT_GENERATION_BLOCKED);
+
+        Path grammarMismatchDatabase = initializedDatabase(Files.createDirectory(temporaryDirectory.resolve("grammar-mismatch")));
+        OplGrammar grammarWithUnexpectedDigest = new OplGrammar(
+                new OplGrammar.Binding(base.profileBinding().textGrammar().id(), base.profileBinding().textGrammar().version(), "different-digest"),
+                List.of(new OplGrammar.Template("opl.consumption.v1", 10), new OplGrammar.Template("opl.consumption.state.v1", 10)));
+        CandidateRevisionCommand grammarMismatch = command(base, candidate(base), "command.sqlite.grammar-mismatch", "digest.sqlite.grammar-mismatch",
+                grammarWithUnexpectedDigest);
+        assertRejectedWithoutWrites(grammarMismatchDatabase,
+                new CandidateRevisionCommitter(new SqliteRevisionCommitRepository(grammarMismatchDatabase)).commit(grammarMismatch),
+                CommitFailureCode.TEXT_GENERATION_BLOCKED);
+
+        Path traceIncompleteDatabase = initializedDatabase(Files.createDirectory(temporaryDirectory.resolve("trace-incomplete")));
+        CandidateRevisionCommand traceIncomplete = command(base, traceIncompleteCandidate(base), "command.sqlite.trace-incomplete", "digest.sqlite.trace-incomplete");
+        assertRejectedWithoutWrites(traceIncompleteDatabase,
+                new CandidateRevisionCommitter(new SqliteRevisionCommitRepository(traceIncompleteDatabase)).commit(traceIncomplete),
+                CommitFailureCode.TEXT_GENERATION_BLOCKED);
+    }
+
     private Path initializedDatabase() throws Exception {
-        ProjectDatabaseFactory factory = new ProjectDatabaseFactory(temporaryDirectory);
+        return initializedDatabase(temporaryDirectory);
+    }
+
+    private Path initializedDatabase(Path storageRoot) throws Exception {
+        ProjectDatabaseFactory factory = new ProjectDatabaseFactory(storageRoot);
         ProjectDatabaseOpenResult.Ready ready = assertInstanceOf(ProjectDatabaseOpenResult.Ready.class, factory.open("project.demo"));
         SemanticRevision base = base();
         try (Connection connection = raw(ready.database().databasePath())) {
@@ -140,11 +219,60 @@ class SqliteRevisionCommitRepositoryTest {
                 digest, "EDIT", Instant.parse("2026-07-28T00:00:00Z"));
     }
 
+    private CandidateRevisionCommand command(
+            SemanticRevision base,
+            SemanticRevision candidate,
+            String commandId,
+            String digest,
+            OplGrammar grammar) {
+        var profile = base.profileBinding().profile();
+        var rules = base.profileBinding().ruleSet();
+        return new CandidateRevisionCommand("project.demo", base.modelId(), commandId, base.revisionId(), base, candidate,
+                new ProfileRuleBinding(profile.id(), profile.version(), rules.id(), rules.version()), grammar,
+                digest, "EDIT", Instant.parse("2026-07-28T00:00:00Z"));
+    }
+
     private SemanticRevision base() { return new SemanticRevisionReader().read(fixture()); }
 
     private SemanticRevision candidate(SemanticRevision base) {
         return new SemanticRevision("revision.demo.0002", base.modelId(), 2, base.profileBinding(), base.rootContextId(),
                 base.elements(), base.states(), base.facts(), base.contexts(), base.occurrences(), base.layouts());
+    }
+
+    private SemanticRevision traceIncompleteCandidate(SemanticRevision base) {
+        SemanticRevision.Context root = base.contexts().getFirst();
+        SemanticRevision.Occurrence processing = base.occurrences().stream()
+                .filter(occurrence -> occurrence.id().equals("occurrence.processing"))
+                .findFirst()
+                .orElseThrow();
+        SemanticRevision.Context refinement = new SemanticRevision.Context(
+                "context.processing.refinement", SemanticRevision.ContextKind.PROCESS_REFINEMENT,
+                root.capability(), root.name(), List.of(processing.id()), root.source());
+        SemanticRevision.Context rootWithoutProcessing = new SemanticRevision.Context(
+                root.id(), root.kind(), root.capability(), root.name(),
+                root.occurrenceIds().stream().filter(id -> !id.equals(processing.id())).toList(), root.source());
+        List<SemanticRevision.Occurrence> occurrences = base.occurrences().stream()
+                .map(occurrence -> occurrence.id().equals(processing.id())
+                        ? new SemanticRevision.Occurrence(occurrence.id(), refinement.id(), occurrence.targetKind(), occurrence.targetId(),
+                        occurrence.ownership(), occurrence.constructRole(), occurrence.layoutId())
+                        : occurrence)
+                .toList();
+        return new SemanticRevision("revision.demo.0002", base.modelId(), 2, base.profileBinding(), base.rootContextId(),
+                base.elements(), base.features(), base.states(), base.facts(), List.of(rootWithoutProcessing, refinement),
+                occurrences, base.layouts(), base.statePresentations());
+    }
+
+    private void assertRejectedWithoutWrites(Path database, CommitResult result, CommitFailureCode code) throws SQLException {
+        assertEquals(code, assertInstanceOf(CommitResult.Rejected.class, result).code());
+        try (Connection connection = raw(database)) {
+            assertEquals("revision.demo.0001", text(connection, "SELECT draft_head_revision_id FROM model_head WHERE model_id = 'model.demo.processing'"));
+            assertEquals(1, integer(connection, "SELECT COUNT(*) FROM revision_document"));
+            assertEquals(0, integer(connection, "SELECT COUNT(*) FROM revision_parent"));
+            assertEquals(0, integer(connection, "SELECT COUNT(*) FROM text_trace_index"));
+            assertEquals(0, integer(connection, "SELECT COUNT(*) FROM finding_index"));
+            assertEquals(0, integer(connection, "SELECT COUNT(*) FROM operation_record"));
+            assertEquals(0, integer(connection, "SELECT COUNT(*) FROM idempotency_record"));
+        }
     }
 
     private Path fixture() {
@@ -179,5 +307,54 @@ class SqliteRevisionCommitRepositoryTest {
 
     private void execute(Connection connection, String sql) throws SQLException {
         try (Statement statement = connection.createStatement()) { statement.execute(sql); }
+    }
+
+    private enum CommitWriteStage { REVISION, PARENT, TRACE, FINDING, HEAD, OPERATION, RECEIPT }
+
+    private static final class StageFailureHook implements SqliteRevisionCommitRepository.CommitWriteHook {
+        private final CommitWriteStage stage;
+
+        private StageFailureHook(CommitWriteStage stage) {
+            this.stage = stage;
+        }
+
+        @Override
+        public void beforeHeadUpdate() throws Exception {
+            failAt(CommitWriteStage.HEAD);
+        }
+
+        @Override
+        public void afterRevisionInsert() throws Exception {
+            failAt(CommitWriteStage.REVISION);
+        }
+
+        @Override
+        public void afterParentInsert() throws Exception {
+            failAt(CommitWriteStage.PARENT);
+        }
+
+        @Override
+        public void afterTraceInsert() throws Exception {
+            failAt(CommitWriteStage.TRACE);
+        }
+
+        @Override
+        public void afterFindingInsert() throws Exception {
+            failAt(CommitWriteStage.FINDING);
+        }
+
+        @Override
+        public void afterOperationInsert() throws Exception {
+            failAt(CommitWriteStage.OPERATION);
+        }
+
+        @Override
+        public void afterReceiptInsert() throws Exception {
+            failAt(CommitWriteStage.RECEIPT);
+        }
+
+        private void failAt(CommitWriteStage actual) throws SQLException {
+            if (stage == actual) throw new SQLException("injected write failure at " + actual);
+        }
     }
 }

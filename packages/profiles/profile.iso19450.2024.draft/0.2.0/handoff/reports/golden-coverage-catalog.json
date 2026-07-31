@@ -1,0 +1,2910 @@
+{
+  "schema_id": "OPL-GOLDEN-COVERAGE-CATALOG-001",
+  "schema_version": "0.1",
+  "catalog_id": "coverage.opl.iso19450.2024.draft",
+  "catalog_version": "0.1.0",
+  "summary": {
+    "total": 178,
+    "pass": 130,
+    "blocked": 48
+  },
+  "requirements": [
+    {
+      "coverage_key": "PROC:CAP-ISO-PROC-001:-:CONSUMPTION_OBJECT:PASS",
+      "case_id": "G-OPL-PROC-001.CONSUMPTION_OBJECT.PASS",
+      "family": "PROC",
+      "capability_id": "CAP-ISO-PROC-001",
+      "variant_key": "CONSUMPTION_OBJECT",
+      "expectation": "PASS",
+      "dimensions": {},
+      "required_template_ids": [
+        "opl.consumption.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "PROC:CAP-ISO-PROC-001:-:ENDPOINTS_REVERSED:BLOCKED",
+      "case_id": "G-OPL-PROC-001.ENDPOINTS_REVERSED.BLOCKED",
+      "family": "PROC",
+      "capability_id": "CAP-ISO-PROC-001",
+      "variant_key": "ENDPOINTS_REVERSED",
+      "expectation": "BLOCKED",
+      "dimensions": {},
+      "expected_error_code": "ENDPOINT_KIND_MISMATCH"
+    },
+    {
+      "coverage_key": "PROC:CAP-ISO-PROC-002:-:RESULT_OBJECT:PASS",
+      "case_id": "G-OPL-PROC-002.RESULT_OBJECT.PASS",
+      "family": "PROC",
+      "capability_id": "CAP-ISO-PROC-002",
+      "variant_key": "RESULT_OBJECT",
+      "expectation": "PASS",
+      "dimensions": {},
+      "required_template_ids": [
+        "opl.result.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "PROC:CAP-ISO-PROC-002:-:ENDPOINTS_REVERSED:BLOCKED",
+      "case_id": "G-OPL-PROC-002.ENDPOINTS_REVERSED.BLOCKED",
+      "family": "PROC",
+      "capability_id": "CAP-ISO-PROC-002",
+      "variant_key": "ENDPOINTS_REVERSED",
+      "expectation": "BLOCKED",
+      "dimensions": {},
+      "expected_error_code": "ENDPOINT_KIND_MISMATCH"
+    },
+    {
+      "coverage_key": "PROC:CAP-ISO-PROC-003:-:EFFECT_OBJECT:PASS",
+      "case_id": "G-OPL-PROC-003.EFFECT_OBJECT.PASS",
+      "family": "PROC",
+      "capability_id": "CAP-ISO-PROC-003",
+      "variant_key": "EFFECT_OBJECT",
+      "expectation": "PASS",
+      "dimensions": {},
+      "required_template_ids": [
+        "opl.effect.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "PROC:CAP-ISO-PROC-003:-:ENDPOINTS_REVERSED:BLOCKED",
+      "case_id": "G-OPL-PROC-003.ENDPOINTS_REVERSED.BLOCKED",
+      "family": "PROC",
+      "capability_id": "CAP-ISO-PROC-003",
+      "variant_key": "ENDPOINTS_REVERSED",
+      "expectation": "BLOCKED",
+      "dimensions": {},
+      "expected_error_code": "ENDPOINT_KIND_MISMATCH"
+    },
+    {
+      "coverage_key": "PROC:CAP-ISO-PROC-004:-:AGENT_OBJECT:PASS",
+      "case_id": "G-OPL-PROC-004.AGENT_OBJECT.PASS",
+      "family": "PROC",
+      "capability_id": "CAP-ISO-PROC-004",
+      "variant_key": "AGENT_OBJECT",
+      "expectation": "PASS",
+      "dimensions": {},
+      "required_template_ids": [
+        "opl.agent.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "PROC:CAP-ISO-PROC-004:-:ENDPOINTS_REVERSED:BLOCKED",
+      "case_id": "G-OPL-PROC-004.ENDPOINTS_REVERSED.BLOCKED",
+      "family": "PROC",
+      "capability_id": "CAP-ISO-PROC-004",
+      "variant_key": "ENDPOINTS_REVERSED",
+      "expectation": "BLOCKED",
+      "dimensions": {},
+      "expected_error_code": "ENDPOINT_KIND_MISMATCH"
+    },
+    {
+      "coverage_key": "PROC:CAP-ISO-PROC-005:-:INSTRUMENT_OBJECT:PASS",
+      "case_id": "G-OPL-PROC-005.INSTRUMENT_OBJECT.PASS",
+      "family": "PROC",
+      "capability_id": "CAP-ISO-PROC-005",
+      "variant_key": "INSTRUMENT_OBJECT",
+      "expectation": "PASS",
+      "dimensions": {},
+      "required_template_ids": [
+        "opl.instrument.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "PROC:CAP-ISO-PROC-005:-:ENDPOINTS_REVERSED:BLOCKED",
+      "case_id": "G-OPL-PROC-005.ENDPOINTS_REVERSED.BLOCKED",
+      "family": "PROC",
+      "capability_id": "CAP-ISO-PROC-005",
+      "variant_key": "ENDPOINTS_REVERSED",
+      "expectation": "BLOCKED",
+      "dimensions": {},
+      "expected_error_code": "ENDPOINT_KIND_MISMATCH"
+    },
+    {
+      "coverage_key": "PROC:CAP-ISO-PROC-006:-:CONSUMPTION_STATE:PASS",
+      "case_id": "G-OPL-PROC-006.CONSUMPTION_STATE.PASS",
+      "family": "PROC",
+      "capability_id": "CAP-ISO-PROC-006",
+      "variant_key": "CONSUMPTION_STATE",
+      "expectation": "PASS",
+      "dimensions": {},
+      "required_template_ids": [
+        "opl.consumption.state.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "PROC:CAP-ISO-PROC-006:-:STATE_OWNER_MISMATCH:BLOCKED",
+      "case_id": "G-OPL-PROC-006.STATE_OWNER_MISMATCH.BLOCKED",
+      "family": "PROC",
+      "capability_id": "CAP-ISO-PROC-006",
+      "variant_key": "STATE_OWNER_MISMATCH",
+      "expectation": "BLOCKED",
+      "dimensions": {},
+      "expected_error_code": "STATE_OWNER_MISMATCH"
+    },
+    {
+      "coverage_key": "PROC:CAP-ISO-PROC-007:-:RESULT_STATE:PASS",
+      "case_id": "G-OPL-PROC-007.RESULT_STATE.PASS",
+      "family": "PROC",
+      "capability_id": "CAP-ISO-PROC-007",
+      "variant_key": "RESULT_STATE",
+      "expectation": "PASS",
+      "dimensions": {},
+      "required_template_ids": [
+        "opl.result.state.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "PROC:CAP-ISO-PROC-007:-:STATE_OWNER_MISMATCH:BLOCKED",
+      "case_id": "G-OPL-PROC-007.STATE_OWNER_MISMATCH.BLOCKED",
+      "family": "PROC",
+      "capability_id": "CAP-ISO-PROC-007",
+      "variant_key": "STATE_OWNER_MISMATCH",
+      "expectation": "BLOCKED",
+      "dimensions": {},
+      "expected_error_code": "STATE_OWNER_MISMATCH"
+    },
+    {
+      "coverage_key": "PROC:CAP-ISO-PROC-008:-:EFFECT_INPUT_OUTPUT_STATE:PASS",
+      "case_id": "G-OPL-PROC-008.EFFECT_INPUT_OUTPUT_STATE.PASS",
+      "family": "PROC",
+      "capability_id": "CAP-ISO-PROC-008",
+      "variant_key": "EFFECT_INPUT_OUTPUT_STATE",
+      "expectation": "PASS",
+      "dimensions": {},
+      "required_template_ids": [
+        "opl.effect.state.input-output.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "PROC:CAP-ISO-PROC-008:-:INPUT_STATE_OWNER_MISMATCH:BLOCKED",
+      "case_id": "G-OPL-PROC-008.INPUT_STATE_OWNER_MISMATCH.BLOCKED",
+      "family": "PROC",
+      "capability_id": "CAP-ISO-PROC-008",
+      "variant_key": "INPUT_STATE_OWNER_MISMATCH",
+      "expectation": "BLOCKED",
+      "dimensions": {},
+      "expected_error_code": "STATE_OWNER_MISMATCH"
+    },
+    {
+      "coverage_key": "PROC:CAP-ISO-PROC-008:-:OUTPUT_STATE_OWNER_MISMATCH:BLOCKED",
+      "case_id": "G-OPL-PROC-008.OUTPUT_STATE_OWNER_MISMATCH.BLOCKED",
+      "family": "PROC",
+      "capability_id": "CAP-ISO-PROC-008",
+      "variant_key": "OUTPUT_STATE_OWNER_MISMATCH",
+      "expectation": "BLOCKED",
+      "dimensions": {},
+      "expected_error_code": "STATE_OWNER_MISMATCH"
+    },
+    {
+      "coverage_key": "PROC:CAP-ISO-PROC-009:-:EFFECT_INPUT_STATE:PASS",
+      "case_id": "G-OPL-PROC-009.EFFECT_INPUT_STATE.PASS",
+      "family": "PROC",
+      "capability_id": "CAP-ISO-PROC-009",
+      "variant_key": "EFFECT_INPUT_STATE",
+      "expectation": "PASS",
+      "dimensions": {},
+      "required_template_ids": [
+        "opl.effect.state.input.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "PROC:CAP-ISO-PROC-009:-:INPUT_STATE_OWNER_MISMATCH:BLOCKED",
+      "case_id": "G-OPL-PROC-009.INPUT_STATE_OWNER_MISMATCH.BLOCKED",
+      "family": "PROC",
+      "capability_id": "CAP-ISO-PROC-009",
+      "variant_key": "INPUT_STATE_OWNER_MISMATCH",
+      "expectation": "BLOCKED",
+      "dimensions": {},
+      "expected_error_code": "STATE_OWNER_MISMATCH"
+    },
+    {
+      "coverage_key": "PROC:CAP-ISO-PROC-010:-:EFFECT_OUTPUT_STATE:PASS",
+      "case_id": "G-OPL-PROC-010.EFFECT_OUTPUT_STATE.PASS",
+      "family": "PROC",
+      "capability_id": "CAP-ISO-PROC-010",
+      "variant_key": "EFFECT_OUTPUT_STATE",
+      "expectation": "PASS",
+      "dimensions": {},
+      "required_template_ids": [
+        "opl.effect.state.output.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "PROC:CAP-ISO-PROC-010:-:OUTPUT_STATE_OWNER_MISMATCH:BLOCKED",
+      "case_id": "G-OPL-PROC-010.OUTPUT_STATE_OWNER_MISMATCH.BLOCKED",
+      "family": "PROC",
+      "capability_id": "CAP-ISO-PROC-010",
+      "variant_key": "OUTPUT_STATE_OWNER_MISMATCH",
+      "expectation": "BLOCKED",
+      "dimensions": {},
+      "expected_error_code": "STATE_OWNER_MISMATCH"
+    },
+    {
+      "coverage_key": "PROC:CAP-ISO-PROC-011:-:AGENT_STATE:PASS",
+      "case_id": "G-OPL-PROC-011.AGENT_STATE.PASS",
+      "family": "PROC",
+      "capability_id": "CAP-ISO-PROC-011",
+      "variant_key": "AGENT_STATE",
+      "expectation": "PASS",
+      "dimensions": {},
+      "required_template_ids": [
+        "opl.agent.state.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "PROC:CAP-ISO-PROC-011:-:STATE_OWNER_MISMATCH:BLOCKED",
+      "case_id": "G-OPL-PROC-011.STATE_OWNER_MISMATCH.BLOCKED",
+      "family": "PROC",
+      "capability_id": "CAP-ISO-PROC-011",
+      "variant_key": "STATE_OWNER_MISMATCH",
+      "expectation": "BLOCKED",
+      "dimensions": {},
+      "expected_error_code": "STATE_OWNER_MISMATCH"
+    },
+    {
+      "coverage_key": "PROC:CAP-ISO-PROC-012:-:INSTRUMENT_STATE:PASS",
+      "case_id": "G-OPL-PROC-012.INSTRUMENT_STATE.PASS",
+      "family": "PROC",
+      "capability_id": "CAP-ISO-PROC-012",
+      "variant_key": "INSTRUMENT_STATE",
+      "expectation": "PASS",
+      "dimensions": {},
+      "required_template_ids": [
+        "opl.instrument.state.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "PROC:CAP-ISO-PROC-012:-:STATE_OWNER_MISMATCH:BLOCKED",
+      "case_id": "G-OPL-PROC-012.STATE_OWNER_MISMATCH.BLOCKED",
+      "family": "PROC",
+      "capability_id": "CAP-ISO-PROC-012",
+      "variant_key": "STATE_OWNER_MISMATCH",
+      "expectation": "BLOCKED",
+      "dimensions": {},
+      "expected_error_code": "STATE_OWNER_MISMATCH"
+    },
+    {
+      "coverage_key": "PROC:CAP-ISO-PROC-013:-:INVOCATION_PROCESS:PASS",
+      "case_id": "G-OPL-PROC-013.INVOCATION_PROCESS.PASS",
+      "family": "PROC",
+      "capability_id": "CAP-ISO-PROC-013",
+      "variant_key": "INVOCATION_PROCESS",
+      "expectation": "PASS",
+      "dimensions": {},
+      "required_template_ids": [
+        "opl.invocation.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "PROC:CAP-ISO-PROC-013:-:TARGET_KIND_INVALID:BLOCKED",
+      "case_id": "G-OPL-PROC-013.TARGET_KIND_INVALID.BLOCKED",
+      "family": "PROC",
+      "capability_id": "CAP-ISO-PROC-013",
+      "variant_key": "TARGET_KIND_INVALID",
+      "expectation": "BLOCKED",
+      "dimensions": {},
+      "expected_error_code": "ENDPOINT_KIND_MISMATCH"
+    },
+    {
+      "coverage_key": "PROC:CAP-ISO-PROC-014:-:SELF_INVOCATION_SAME_PROCESS:PASS",
+      "case_id": "G-OPL-PROC-014.SELF_INVOCATION_SAME_PROCESS.PASS",
+      "family": "PROC",
+      "capability_id": "CAP-ISO-PROC-014",
+      "variant_key": "SELF_INVOCATION_SAME_PROCESS",
+      "expectation": "PASS",
+      "dimensions": {},
+      "required_template_ids": [
+        "opl.invocation.self.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "PROC:CAP-ISO-PROC-014:-:SELF_IDENTITY_MISMATCH:BLOCKED",
+      "case_id": "G-OPL-PROC-014.SELF_IDENTITY_MISMATCH.BLOCKED",
+      "family": "PROC",
+      "capability_id": "CAP-ISO-PROC-014",
+      "variant_key": "SELF_IDENTITY_MISMATCH",
+      "expectation": "BLOCKED",
+      "dimensions": {},
+      "expected_error_code": "ENDPOINT_KIND_MISMATCH"
+    },
+    {
+      "coverage_key": "PROC:CAP-ISO-PROC-015:-:OVERTIME_DURATION:PASS",
+      "case_id": "G-OPL-PROC-015.OVERTIME_DURATION.PASS",
+      "family": "PROC",
+      "capability_id": "CAP-ISO-PROC-015",
+      "variant_key": "OVERTIME_DURATION",
+      "expectation": "PASS",
+      "dimensions": {},
+      "required_template_ids": [
+        "opl.exception.overtime.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "PROC:CAP-ISO-PROC-015:-:DURATION_MISSING:BLOCKED",
+      "case_id": "G-OPL-PROC-015.DURATION_MISSING.BLOCKED",
+      "family": "PROC",
+      "capability_id": "CAP-ISO-PROC-015",
+      "variant_key": "DURATION_MISSING",
+      "expectation": "BLOCKED",
+      "dimensions": {},
+      "expected_error_code": "INVALID_ARGUMENT"
+    },
+    {
+      "coverage_key": "PROC:CAP-ISO-PROC-016:-:UNDERTIME_DURATION:PASS",
+      "case_id": "G-OPL-PROC-016.UNDERTIME_DURATION.PASS",
+      "family": "PROC",
+      "capability_id": "CAP-ISO-PROC-016",
+      "variant_key": "UNDERTIME_DURATION",
+      "expectation": "PASS",
+      "dimensions": {},
+      "required_template_ids": [
+        "opl.exception.undertime.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "PROC:CAP-ISO-PROC-016:-:DURATION_MISSING:BLOCKED",
+      "case_id": "G-OPL-PROC-016.DURATION_MISSING.BLOCKED",
+      "family": "PROC",
+      "capability_id": "CAP-ISO-PROC-016",
+      "variant_key": "DURATION_MISSING",
+      "expectation": "BLOCKED",
+      "dimensions": {},
+      "expected_error_code": "INVALID_ARGUMENT"
+    },
+    {
+      "coverage_key": "CTRL:CAP-ISO-CTRL-001:CAP-ISO-PROC-001:CONSUMPTION:PASS",
+      "case_id": "G-OPL-CTRL-001.CONSUMPTION.PASS",
+      "family": "CTRL",
+      "capability_id": "CAP-ISO-CTRL-001",
+      "variant_key": "CONSUMPTION",
+      "expectation": "PASS",
+      "dimensions": {},
+      "base_fact_capability_id": "CAP-ISO-PROC-001",
+      "required_template_ids": [
+        "opl.control.event.transforming.consumption.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "CTRL:CAP-ISO-CTRL-001:CAP-ISO-PROC-003:EFFECT:PASS",
+      "case_id": "G-OPL-CTRL-001.EFFECT.PASS",
+      "family": "CTRL",
+      "capability_id": "CAP-ISO-CTRL-001",
+      "variant_key": "EFFECT",
+      "expectation": "PASS",
+      "dimensions": {},
+      "base_fact_capability_id": "CAP-ISO-PROC-003",
+      "required_template_ids": [
+        "opl.control.event.transforming.effect.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "CTRL:CAP-ISO-CTRL-002:CAP-ISO-PROC-004:AGENT:PASS",
+      "case_id": "G-OPL-CTRL-002.AGENT.PASS",
+      "family": "CTRL",
+      "capability_id": "CAP-ISO-CTRL-002",
+      "variant_key": "AGENT",
+      "expectation": "PASS",
+      "dimensions": {},
+      "base_fact_capability_id": "CAP-ISO-PROC-004",
+      "required_template_ids": [
+        "opl.control.event.enabling.agent.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "CTRL:CAP-ISO-CTRL-002:CAP-ISO-PROC-005:INSTRUMENT:PASS",
+      "case_id": "G-OPL-CTRL-002.INSTRUMENT.PASS",
+      "family": "CTRL",
+      "capability_id": "CAP-ISO-CTRL-002",
+      "variant_key": "INSTRUMENT",
+      "expectation": "PASS",
+      "dimensions": {},
+      "base_fact_capability_id": "CAP-ISO-PROC-005",
+      "required_template_ids": [
+        "opl.control.event.enabling.instrument.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "CTRL:CAP-ISO-CTRL-003:CAP-ISO-PROC-006:CONSUMPTION_STATE:PASS",
+      "case_id": "G-OPL-CTRL-003.CONSUMPTION_STATE.PASS",
+      "family": "CTRL",
+      "capability_id": "CAP-ISO-CTRL-003",
+      "variant_key": "CONSUMPTION_STATE",
+      "expectation": "PASS",
+      "dimensions": {},
+      "base_fact_capability_id": "CAP-ISO-PROC-006",
+      "required_template_ids": [
+        "opl.control.event.transforming.state.consumption.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "CTRL:CAP-ISO-CTRL-003:CAP-ISO-PROC-008:EFFECT_INPUT_OUTPUT:PASS",
+      "case_id": "G-OPL-CTRL-003.EFFECT_INPUT_OUTPUT.PASS",
+      "family": "CTRL",
+      "capability_id": "CAP-ISO-CTRL-003",
+      "variant_key": "EFFECT_INPUT_OUTPUT",
+      "expectation": "PASS",
+      "dimensions": {},
+      "base_fact_capability_id": "CAP-ISO-PROC-008",
+      "required_template_ids": [
+        "opl.control.event.transforming.state.effect.input-output.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "CTRL:CAP-ISO-CTRL-003:CAP-ISO-PROC-009:EFFECT_INPUT:PASS",
+      "case_id": "G-OPL-CTRL-003.EFFECT_INPUT.PASS",
+      "family": "CTRL",
+      "capability_id": "CAP-ISO-CTRL-003",
+      "variant_key": "EFFECT_INPUT",
+      "expectation": "PASS",
+      "dimensions": {},
+      "base_fact_capability_id": "CAP-ISO-PROC-009",
+      "required_template_ids": [
+        "opl.control.event.transforming.state.effect.input.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "CTRL:CAP-ISO-CTRL-003:CAP-ISO-PROC-010:EFFECT_OUTPUT:PASS",
+      "case_id": "G-OPL-CTRL-003.EFFECT_OUTPUT.PASS",
+      "family": "CTRL",
+      "capability_id": "CAP-ISO-CTRL-003",
+      "variant_key": "EFFECT_OUTPUT",
+      "expectation": "PASS",
+      "dimensions": {},
+      "base_fact_capability_id": "CAP-ISO-PROC-010",
+      "required_template_ids": [
+        "opl.control.event.transforming.state.effect.output.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "CTRL:CAP-ISO-CTRL-004:CAP-ISO-PROC-011:AGENT_STATE:PASS",
+      "case_id": "G-OPL-CTRL-004.AGENT_STATE.PASS",
+      "family": "CTRL",
+      "capability_id": "CAP-ISO-CTRL-004",
+      "variant_key": "AGENT_STATE",
+      "expectation": "PASS",
+      "dimensions": {},
+      "base_fact_capability_id": "CAP-ISO-PROC-011",
+      "required_template_ids": [
+        "opl.control.event.enabling.state.agent.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "CTRL:CAP-ISO-CTRL-004:CAP-ISO-PROC-012:INSTRUMENT_STATE:PASS",
+      "case_id": "G-OPL-CTRL-004.INSTRUMENT_STATE.PASS",
+      "family": "CTRL",
+      "capability_id": "CAP-ISO-CTRL-004",
+      "variant_key": "INSTRUMENT_STATE",
+      "expectation": "PASS",
+      "dimensions": {},
+      "base_fact_capability_id": "CAP-ISO-PROC-012",
+      "required_template_ids": [
+        "opl.control.event.enabling.state.instrument.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "CTRL:CAP-ISO-CTRL-005:CAP-ISO-PROC-001:CONSUMPTION:PASS",
+      "case_id": "G-OPL-CTRL-005.CONSUMPTION.PASS",
+      "family": "CTRL",
+      "capability_id": "CAP-ISO-CTRL-005",
+      "variant_key": "CONSUMPTION",
+      "expectation": "PASS",
+      "dimensions": {},
+      "base_fact_capability_id": "CAP-ISO-PROC-001",
+      "required_template_ids": [
+        "opl.control.condition.transforming.consumption.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "CTRL:CAP-ISO-CTRL-005:CAP-ISO-PROC-003:EFFECT:PASS",
+      "case_id": "G-OPL-CTRL-005.EFFECT.PASS",
+      "family": "CTRL",
+      "capability_id": "CAP-ISO-CTRL-005",
+      "variant_key": "EFFECT",
+      "expectation": "PASS",
+      "dimensions": {},
+      "base_fact_capability_id": "CAP-ISO-PROC-003",
+      "required_template_ids": [
+        "opl.control.condition.transforming.effect.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "CTRL:CAP-ISO-CTRL-006:CAP-ISO-PROC-004:AGENT:PASS",
+      "case_id": "G-OPL-CTRL-006.AGENT.PASS",
+      "family": "CTRL",
+      "capability_id": "CAP-ISO-CTRL-006",
+      "variant_key": "AGENT",
+      "expectation": "PASS",
+      "dimensions": {},
+      "base_fact_capability_id": "CAP-ISO-PROC-004",
+      "required_template_ids": [
+        "opl.control.condition.enabling.agent.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "CTRL:CAP-ISO-CTRL-006:CAP-ISO-PROC-005:INSTRUMENT:PASS",
+      "case_id": "G-OPL-CTRL-006.INSTRUMENT.PASS",
+      "family": "CTRL",
+      "capability_id": "CAP-ISO-CTRL-006",
+      "variant_key": "INSTRUMENT",
+      "expectation": "PASS",
+      "dimensions": {},
+      "base_fact_capability_id": "CAP-ISO-PROC-005",
+      "required_template_ids": [
+        "opl.control.condition.enabling.instrument.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "CTRL:CAP-ISO-CTRL-007:CAP-ISO-PROC-006:CONSUMPTION_STATE:PASS",
+      "case_id": "G-OPL-CTRL-007.CONSUMPTION_STATE.PASS",
+      "family": "CTRL",
+      "capability_id": "CAP-ISO-CTRL-007",
+      "variant_key": "CONSUMPTION_STATE",
+      "expectation": "PASS",
+      "dimensions": {},
+      "base_fact_capability_id": "CAP-ISO-PROC-006",
+      "required_template_ids": [
+        "opl.control.condition.transforming.state.consumption.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "CTRL:CAP-ISO-CTRL-007:CAP-ISO-PROC-008:EFFECT_INPUT_OUTPUT:PASS",
+      "case_id": "G-OPL-CTRL-007.EFFECT_INPUT_OUTPUT.PASS",
+      "family": "CTRL",
+      "capability_id": "CAP-ISO-CTRL-007",
+      "variant_key": "EFFECT_INPUT_OUTPUT",
+      "expectation": "PASS",
+      "dimensions": {},
+      "base_fact_capability_id": "CAP-ISO-PROC-008",
+      "required_template_ids": [
+        "opl.control.condition.transforming.state.effect.input-output.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "CTRL:CAP-ISO-CTRL-007:CAP-ISO-PROC-009:EFFECT_INPUT:PASS",
+      "case_id": "G-OPL-CTRL-007.EFFECT_INPUT.PASS",
+      "family": "CTRL",
+      "capability_id": "CAP-ISO-CTRL-007",
+      "variant_key": "EFFECT_INPUT",
+      "expectation": "PASS",
+      "dimensions": {},
+      "base_fact_capability_id": "CAP-ISO-PROC-009",
+      "required_template_ids": [
+        "opl.control.condition.transforming.state.effect.input.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "CTRL:CAP-ISO-CTRL-007:CAP-ISO-PROC-010:EFFECT_OUTPUT:PASS",
+      "case_id": "G-OPL-CTRL-007.EFFECT_OUTPUT.PASS",
+      "family": "CTRL",
+      "capability_id": "CAP-ISO-CTRL-007",
+      "variant_key": "EFFECT_OUTPUT",
+      "expectation": "PASS",
+      "dimensions": {},
+      "base_fact_capability_id": "CAP-ISO-PROC-010",
+      "required_template_ids": [
+        "opl.control.condition.transforming.state.effect.output.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "CTRL:CAP-ISO-CTRL-008:CAP-ISO-PROC-011:AGENT_STATE:PASS",
+      "case_id": "G-OPL-CTRL-008.AGENT_STATE.PASS",
+      "family": "CTRL",
+      "capability_id": "CAP-ISO-CTRL-008",
+      "variant_key": "AGENT_STATE",
+      "expectation": "PASS",
+      "dimensions": {},
+      "base_fact_capability_id": "CAP-ISO-PROC-011",
+      "required_template_ids": [
+        "opl.control.condition.enabling.state.agent.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "CTRL:CAP-ISO-CTRL-008:CAP-ISO-PROC-012:INSTRUMENT_STATE:PASS",
+      "case_id": "G-OPL-CTRL-008.INSTRUMENT_STATE.PASS",
+      "family": "CTRL",
+      "capability_id": "CAP-ISO-CTRL-008",
+      "variant_key": "INSTRUMENT_STATE",
+      "expectation": "PASS",
+      "dimensions": {},
+      "base_fact_capability_id": "CAP-ISO-PROC-012",
+      "required_template_ids": [
+        "opl.control.condition.enabling.state.instrument.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "CTRL:CAP-ISO-CTRL-001:CAP-ISO-PROC-002:RESULT:BLOCKED",
+      "case_id": "G-OPL-CTRL-001.RESULT.BLOCKED",
+      "family": "CTRL",
+      "capability_id": "CAP-ISO-CTRL-001",
+      "variant_key": "RESULT",
+      "expectation": "BLOCKED",
+      "dimensions": {},
+      "base_fact_capability_id": "CAP-ISO-PROC-002",
+      "expected_error_code": "MODIFIER_COMBINATION_INVALID"
+    },
+    {
+      "coverage_key": "CTRL:CAP-ISO-CTRL-001:-:STATE_RESULT:BLOCKED",
+      "case_id": "G-OPL-CTRL-001.STATE_RESULT.BLOCKED",
+      "family": "CTRL",
+      "capability_id": "CAP-ISO-CTRL-001",
+      "variant_key": "STATE_RESULT",
+      "expectation": "BLOCKED",
+      "dimensions": {},
+      "expected_error_code": "MODIFIER_COMBINATION_INVALID"
+    },
+    {
+      "coverage_key": "CTRL:CAP-ISO-CTRL-001:-:EFFECT_OUTPUT_SEGMENT:BLOCKED",
+      "case_id": "G-OPL-CTRL-001.EFFECT_OUTPUT_SEGMENT.BLOCKED",
+      "family": "CTRL",
+      "capability_id": "CAP-ISO-CTRL-001",
+      "variant_key": "EFFECT_OUTPUT_SEGMENT",
+      "expectation": "BLOCKED",
+      "dimensions": {},
+      "expected_error_code": "MODIFIER_COMBINATION_INVALID"
+    },
+    {
+      "coverage_key": "CTRL:CAP-ISO-CTRL-001:-:NON_INPUT_SEGMENT:BLOCKED",
+      "case_id": "G-OPL-CTRL-001.NON_INPUT_SEGMENT.BLOCKED",
+      "family": "CTRL",
+      "capability_id": "CAP-ISO-CTRL-001",
+      "variant_key": "NON_INPUT_SEGMENT",
+      "expectation": "BLOCKED",
+      "dimensions": {},
+      "expected_error_code": "MODIFIER_COMBINATION_INVALID"
+    },
+    {
+      "coverage_key": "CTRL:CAP-ISO-CTRL-001:-:BASE_CAPABILITY_MISMATCH:BLOCKED",
+      "case_id": "G-OPL-CTRL-001.BASE_CAPABILITY_MISMATCH.BLOCKED",
+      "family": "CTRL",
+      "capability_id": "CAP-ISO-CTRL-001",
+      "variant_key": "BASE_CAPABILITY_MISMATCH",
+      "expectation": "BLOCKED",
+      "dimensions": {},
+      "expected_error_code": "MODIFIER_COMBINATION_INVALID"
+    },
+    {
+      "coverage_key": "CTRL:CAP-ISO-CTRL-001:-:MISSING_CONTROL_CAPABILITY:BLOCKED",
+      "case_id": "G-OPL-CTRL-001.MISSING_CONTROL_CAPABILITY.BLOCKED",
+      "family": "CTRL",
+      "capability_id": "CAP-ISO-CTRL-001",
+      "variant_key": "MISSING_CONTROL_CAPABILITY",
+      "expectation": "BLOCKED",
+      "dimensions": {},
+      "expected_error_code": "MODIFIER_COMBINATION_INVALID"
+    },
+    {
+      "coverage_key": "CTRL:CAP-ISO-CTRL-001:-:MISSING_CONTROL_SEGMENT:BLOCKED",
+      "case_id": "G-OPL-CTRL-001.MISSING_CONTROL_SEGMENT.BLOCKED",
+      "family": "CTRL",
+      "capability_id": "CAP-ISO-CTRL-001",
+      "variant_key": "MISSING_CONTROL_SEGMENT",
+      "expectation": "BLOCKED",
+      "dimensions": {},
+      "expected_error_code": "MODIFIER_COMBINATION_INVALID"
+    },
+    {
+      "coverage_key": "CTRL:CAP-ISO-CTRL-001:-:DUPLICATE_CONTROL_CAPABILITY:BLOCKED",
+      "case_id": "G-OPL-CTRL-001.DUPLICATE_CONTROL_CAPABILITY.BLOCKED",
+      "family": "CTRL",
+      "capability_id": "CAP-ISO-CTRL-001",
+      "variant_key": "DUPLICATE_CONTROL_CAPABILITY",
+      "expectation": "BLOCKED",
+      "dimensions": {},
+      "expected_error_code": "MODIFIER_COMBINATION_INVALID"
+    },
+    {
+      "coverage_key": "CTRL:CAP-ISO-CTRL-001:-:DUPLICATE_CONTROL_SEGMENT:BLOCKED",
+      "case_id": "G-OPL-CTRL-001.DUPLICATE_CONTROL_SEGMENT.BLOCKED",
+      "family": "CTRL",
+      "capability_id": "CAP-ISO-CTRL-001",
+      "variant_key": "DUPLICATE_CONTROL_SEGMENT",
+      "expectation": "BLOCKED",
+      "dimensions": {},
+      "expected_error_code": "MODIFIER_COMBINATION_INVALID"
+    },
+    {
+      "coverage_key": "CTRL:CAP-ISO-CTRL-001:-:EVENT_CONDITION_COMBINATION:BLOCKED",
+      "case_id": "G-OPL-CTRL-001.EVENT_CONDITION_COMBINATION.BLOCKED",
+      "family": "CTRL",
+      "capability_id": "CAP-ISO-CTRL-001",
+      "variant_key": "EVENT_CONDITION_COMBINATION",
+      "expectation": "BLOCKED",
+      "dimensions": {},
+      "expected_error_code": "MODIFIER_COMBINATION_INVALID"
+    },
+    {
+      "coverage_key": "CTRL:CAP-ISO-CTRL-001:-:UNKNOWN_CONTROL_CAPABILITY:BLOCKED",
+      "case_id": "G-OPL-CTRL-001.UNKNOWN_CONTROL_CAPABILITY.BLOCKED",
+      "family": "CTRL",
+      "capability_id": "CAP-ISO-CTRL-001",
+      "variant_key": "UNKNOWN_CONTROL_CAPABILITY",
+      "expectation": "BLOCKED",
+      "dimensions": {},
+      "expected_error_code": "MODIFIER_COMBINATION_INVALID"
+    },
+    {
+      "coverage_key": "CTRL:CAP-ISO-CTRL-001:-:MODIFIER_CAPABILITY_REF_MISMATCH:BLOCKED",
+      "case_id": "G-OPL-CTRL-001.MODIFIER_CAPABILITY_REF_MISMATCH.BLOCKED",
+      "family": "CTRL",
+      "capability_id": "CAP-ISO-CTRL-001",
+      "variant_key": "MODIFIER_CAPABILITY_REF_MISMATCH",
+      "expectation": "BLOCKED",
+      "dimensions": {},
+      "expected_error_code": "MODIFIER_COMBINATION_INVALID"
+    },
+    {
+      "coverage_key": "CTRL:CAP-ISO-CTRL-001:-:MODIFIER_VALUE_REF_MISMATCH:BLOCKED",
+      "case_id": "G-OPL-CTRL-001.MODIFIER_VALUE_REF_MISMATCH.BLOCKED",
+      "family": "CTRL",
+      "capability_id": "CAP-ISO-CTRL-001",
+      "variant_key": "MODIFIER_VALUE_REF_MISMATCH",
+      "expectation": "BLOCKED",
+      "dimensions": {},
+      "expected_error_code": "MODIFIER_COMBINATION_INVALID"
+    },
+    {
+      "coverage_key": "CTRL:CAP-ISO-CTRL-001:-:OPTION_PAYLOAD_MISMATCH:BLOCKED",
+      "case_id": "G-OPL-CTRL-001.OPTION_PAYLOAD_MISMATCH.BLOCKED",
+      "family": "CTRL",
+      "capability_id": "CAP-ISO-CTRL-001",
+      "variant_key": "OPTION_PAYLOAD_MISMATCH",
+      "expectation": "BLOCKED",
+      "dimensions": {},
+      "expected_error_code": "MODIFIER_COMBINATION_INVALID"
+    },
+    {
+      "coverage_key": "CTRL:CAP-ISO-CTRL-001:-:INDEPENDENT_CONTROL_FACT:BLOCKED",
+      "case_id": "G-OPL-CTRL-001.INDEPENDENT_CONTROL_FACT.BLOCKED",
+      "family": "CTRL",
+      "capability_id": "CAP-ISO-CTRL-001",
+      "variant_key": "INDEPENDENT_CONTROL_FACT",
+      "expectation": "BLOCKED",
+      "dimensions": {},
+      "expected_error_code": "MODIFIER_COMBINATION_INVALID"
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-001:-:UNIDIRECTIONAL_OBJECT_TAGGED:PASS",
+      "case_id": "G-OPL-STRUCT-001.UNIDIRECTIONAL_OBJECT_TAGGED.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-001",
+      "variant_key": "UNIDIRECTIONAL_OBJECT_TAGGED",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "OBJECT",
+        "direction": "UNIDIRECTIONAL",
+        "tag_mode": "TAGGED"
+      },
+      "required_template_ids": [
+        "opl.structural.tagged.unidirectional.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-001:-:UNIDIRECTIONAL_PROCESS_TAGGED:PASS",
+      "case_id": "G-OPL-STRUCT-001.UNIDIRECTIONAL_PROCESS_TAGGED.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-001",
+      "variant_key": "UNIDIRECTIONAL_PROCESS_TAGGED",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "PROCESS",
+        "direction": "UNIDIRECTIONAL",
+        "tag_mode": "TAGGED"
+      },
+      "required_template_ids": [
+        "opl.structural.tagged.unidirectional.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-002:-:UNIDIRECTIONAL_OBJECT_NULL_TAG:PASS",
+      "case_id": "G-OPL-STRUCT-002.UNIDIRECTIONAL_OBJECT_NULL_TAG.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-002",
+      "variant_key": "UNIDIRECTIONAL_OBJECT_NULL_TAG",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "OBJECT",
+        "direction": "UNIDIRECTIONAL",
+        "tag_mode": "NULL_TAG"
+      },
+      "required_template_ids": [
+        "opl.structural.null-tagged.unidirectional.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-002:-:UNIDIRECTIONAL_PROCESS_NULL_TAG:PASS",
+      "case_id": "G-OPL-STRUCT-002.UNIDIRECTIONAL_PROCESS_NULL_TAG.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-002",
+      "variant_key": "UNIDIRECTIONAL_PROCESS_NULL_TAG",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "PROCESS",
+        "direction": "UNIDIRECTIONAL",
+        "tag_mode": "NULL_TAG"
+      },
+      "required_template_ids": [
+        "opl.structural.null-tagged.unidirectional.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-003:-:BIDIRECTIONAL_OBJECT_TAGGED:PASS",
+      "case_id": "G-OPL-STRUCT-003.BIDIRECTIONAL_OBJECT_TAGGED.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-003",
+      "variant_key": "BIDIRECTIONAL_OBJECT_TAGGED",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "OBJECT",
+        "direction": "BIDIRECTIONAL",
+        "tag_mode": "TAGGED"
+      },
+      "required_template_ids": [
+        "opl.structural.tagged.bidirectional.forward.v1",
+        "opl.structural.tagged.bidirectional.reverse.v1"
+      ],
+      "expected_sentence_slots": [
+        "FORWARD",
+        "REVERSE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-003:-:BIDIRECTIONAL_PROCESS_TAGGED:PASS",
+      "case_id": "G-OPL-STRUCT-003.BIDIRECTIONAL_PROCESS_TAGGED.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-003",
+      "variant_key": "BIDIRECTIONAL_PROCESS_TAGGED",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "PROCESS",
+        "direction": "BIDIRECTIONAL",
+        "tag_mode": "TAGGED"
+      },
+      "required_template_ids": [
+        "opl.structural.tagged.bidirectional.forward.v1",
+        "opl.structural.tagged.bidirectional.reverse.v1"
+      ],
+      "expected_sentence_slots": [
+        "FORWARD",
+        "REVERSE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-004:-:RECIPROCAL_OBJECT_TAGGED:PASS",
+      "case_id": "G-OPL-STRUCT-004.RECIPROCAL_OBJECT_TAGGED.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-004",
+      "variant_key": "RECIPROCAL_OBJECT_TAGGED",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "OBJECT",
+        "direction": "RECIPROCAL",
+        "tag_mode": "TAGGED"
+      },
+      "required_template_ids": [
+        "opl.structural.tagged.reciprocal.v1"
+      ],
+      "expected_sentence_slots": [
+        "RECIPROCAL"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-004:-:RECIPROCAL_OBJECT_NULL_TAG:PASS",
+      "case_id": "G-OPL-STRUCT-004.RECIPROCAL_OBJECT_NULL_TAG.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-004",
+      "variant_key": "RECIPROCAL_OBJECT_NULL_TAG",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "OBJECT",
+        "direction": "RECIPROCAL",
+        "tag_mode": "NULL_TAG"
+      },
+      "required_template_ids": [
+        "opl.structural.null-tagged.reciprocal.v1"
+      ],
+      "expected_sentence_slots": [
+        "RECIPROCAL"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-004:-:RECIPROCAL_PROCESS_TAGGED:PASS",
+      "case_id": "G-OPL-STRUCT-004.RECIPROCAL_PROCESS_TAGGED.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-004",
+      "variant_key": "RECIPROCAL_PROCESS_TAGGED",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "PROCESS",
+        "direction": "RECIPROCAL",
+        "tag_mode": "TAGGED"
+      },
+      "required_template_ids": [
+        "opl.structural.tagged.reciprocal.v1"
+      ],
+      "expected_sentence_slots": [
+        "RECIPROCAL"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-004:-:RECIPROCAL_PROCESS_NULL_TAG:PASS",
+      "case_id": "G-OPL-STRUCT-004.RECIPROCAL_PROCESS_NULL_TAG.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-004",
+      "variant_key": "RECIPROCAL_PROCESS_NULL_TAG",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "PROCESS",
+        "direction": "RECIPROCAL",
+        "tag_mode": "NULL_TAG"
+      },
+      "required_template_ids": [
+        "opl.structural.null-tagged.reciprocal.v1"
+      ],
+      "expected_sentence_slots": [
+        "RECIPROCAL"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-005:-:AGGREGATION_OBJECT_FAN_1_COMPLETE:PASS",
+      "case_id": "G-OPL-STRUCT-005.AGGREGATION_OBJECT_FAN_1_COMPLETE.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-005",
+      "variant_key": "AGGREGATION_OBJECT_FAN_1_COMPLETE",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "OBJECT",
+        "fan_size": 1,
+        "completeness": "COMPLETE"
+      },
+      "required_template_ids": [
+        "opl.structural.aggregation.complete.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-005:-:AGGREGATION_OBJECT_FAN_1_INCOMPLETE:PASS",
+      "case_id": "G-OPL-STRUCT-005.AGGREGATION_OBJECT_FAN_1_INCOMPLETE.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-005",
+      "variant_key": "AGGREGATION_OBJECT_FAN_1_INCOMPLETE",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "OBJECT",
+        "fan_size": 1,
+        "completeness": "INCOMPLETE"
+      },
+      "required_template_ids": [
+        "opl.structural.aggregation.incomplete.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ],
+      "transition": {
+        "kind": "COMPLETENESS_SWITCH",
+        "base_fan_size": 1,
+        "candidate_fan_size": 1,
+        "preserve_fact_id": true
+      }
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-005:-:AGGREGATION_OBJECT_FAN_2_COMPLETE:PASS",
+      "case_id": "G-OPL-STRUCT-005.AGGREGATION_OBJECT_FAN_2_COMPLETE.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-005",
+      "variant_key": "AGGREGATION_OBJECT_FAN_2_COMPLETE",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "OBJECT",
+        "fan_size": 2,
+        "completeness": "COMPLETE"
+      },
+      "required_template_ids": [
+        "opl.structural.aggregation.complete.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ],
+      "transition": {
+        "kind": "ADD",
+        "base_fan_size": 1,
+        "candidate_fan_size": 2,
+        "preserve_fact_id": true
+      }
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-005:-:AGGREGATION_OBJECT_FAN_2_INCOMPLETE:PASS",
+      "case_id": "G-OPL-STRUCT-005.AGGREGATION_OBJECT_FAN_2_INCOMPLETE.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-005",
+      "variant_key": "AGGREGATION_OBJECT_FAN_2_INCOMPLETE",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "OBJECT",
+        "fan_size": 2,
+        "completeness": "INCOMPLETE"
+      },
+      "required_template_ids": [
+        "opl.structural.aggregation.incomplete.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ],
+      "transition": {
+        "kind": "DELETE",
+        "base_fan_size": 3,
+        "candidate_fan_size": 2,
+        "preserve_fact_id": true
+      }
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-005:-:AGGREGATION_OBJECT_FAN_3_COMPLETE:PASS",
+      "case_id": "G-OPL-STRUCT-005.AGGREGATION_OBJECT_FAN_3_COMPLETE.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-005",
+      "variant_key": "AGGREGATION_OBJECT_FAN_3_COMPLETE",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "OBJECT",
+        "fan_size": 3,
+        "completeness": "COMPLETE"
+      },
+      "required_template_ids": [
+        "opl.structural.aggregation.complete.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ],
+      "transition": {
+        "kind": "REORDER",
+        "base_fan_size": 3,
+        "candidate_fan_size": 3,
+        "preserve_fact_id": true
+      }
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-005:-:AGGREGATION_OBJECT_FAN_3_INCOMPLETE:PASS",
+      "case_id": "G-OPL-STRUCT-005.AGGREGATION_OBJECT_FAN_3_INCOMPLETE.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-005",
+      "variant_key": "AGGREGATION_OBJECT_FAN_3_INCOMPLETE",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "OBJECT",
+        "fan_size": 3,
+        "completeness": "INCOMPLETE"
+      },
+      "required_template_ids": [
+        "opl.structural.aggregation.incomplete.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-005:-:AGGREGATION_PROCESS_FAN_1_COMPLETE:PASS",
+      "case_id": "G-OPL-STRUCT-005.AGGREGATION_PROCESS_FAN_1_COMPLETE.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-005",
+      "variant_key": "AGGREGATION_PROCESS_FAN_1_COMPLETE",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "PROCESS",
+        "fan_size": 1,
+        "completeness": "COMPLETE"
+      },
+      "required_template_ids": [
+        "opl.structural.aggregation.complete.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-005:-:AGGREGATION_PROCESS_FAN_1_INCOMPLETE:PASS",
+      "case_id": "G-OPL-STRUCT-005.AGGREGATION_PROCESS_FAN_1_INCOMPLETE.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-005",
+      "variant_key": "AGGREGATION_PROCESS_FAN_1_INCOMPLETE",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "PROCESS",
+        "fan_size": 1,
+        "completeness": "INCOMPLETE"
+      },
+      "required_template_ids": [
+        "opl.structural.aggregation.incomplete.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-005:-:AGGREGATION_PROCESS_FAN_2_COMPLETE:PASS",
+      "case_id": "G-OPL-STRUCT-005.AGGREGATION_PROCESS_FAN_2_COMPLETE.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-005",
+      "variant_key": "AGGREGATION_PROCESS_FAN_2_COMPLETE",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "PROCESS",
+        "fan_size": 2,
+        "completeness": "COMPLETE"
+      },
+      "required_template_ids": [
+        "opl.structural.aggregation.complete.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-005:-:AGGREGATION_PROCESS_FAN_2_INCOMPLETE:PASS",
+      "case_id": "G-OPL-STRUCT-005.AGGREGATION_PROCESS_FAN_2_INCOMPLETE.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-005",
+      "variant_key": "AGGREGATION_PROCESS_FAN_2_INCOMPLETE",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "PROCESS",
+        "fan_size": 2,
+        "completeness": "INCOMPLETE"
+      },
+      "required_template_ids": [
+        "opl.structural.aggregation.incomplete.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-005:-:AGGREGATION_PROCESS_FAN_3_COMPLETE:PASS",
+      "case_id": "G-OPL-STRUCT-005.AGGREGATION_PROCESS_FAN_3_COMPLETE.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-005",
+      "variant_key": "AGGREGATION_PROCESS_FAN_3_COMPLETE",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "PROCESS",
+        "fan_size": 3,
+        "completeness": "COMPLETE"
+      },
+      "required_template_ids": [
+        "opl.structural.aggregation.complete.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-005:-:AGGREGATION_PROCESS_FAN_3_INCOMPLETE:PASS",
+      "case_id": "G-OPL-STRUCT-005.AGGREGATION_PROCESS_FAN_3_INCOMPLETE.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-005",
+      "variant_key": "AGGREGATION_PROCESS_FAN_3_INCOMPLETE",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "PROCESS",
+        "fan_size": 3,
+        "completeness": "INCOMPLETE"
+      },
+      "required_template_ids": [
+        "opl.structural.aggregation.incomplete.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-006:-:CHARACTERIZATION_OBJECT_ATTRIBUTE_FAN_1_COMPLETE:PASS",
+      "case_id": "G-OPL-STRUCT-006.CHARACTERIZATION_OBJECT_ATTRIBUTE_FAN_1_COMPLETE.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-006",
+      "variant_key": "CHARACTERIZATION_OBJECT_ATTRIBUTE_FAN_1_COMPLETE",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "OBJECT",
+        "feature_kind": "ATTRIBUTE",
+        "fan_size": 1,
+        "completeness": "COMPLETE"
+      },
+      "required_template_ids": [
+        "opl.structural.characterization.complete.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-006:-:CHARACTERIZATION_OBJECT_ATTRIBUTE_FAN_1_INCOMPLETE:PASS",
+      "case_id": "G-OPL-STRUCT-006.CHARACTERIZATION_OBJECT_ATTRIBUTE_FAN_1_INCOMPLETE.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-006",
+      "variant_key": "CHARACTERIZATION_OBJECT_ATTRIBUTE_FAN_1_INCOMPLETE",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "OBJECT",
+        "feature_kind": "ATTRIBUTE",
+        "fan_size": 1,
+        "completeness": "INCOMPLETE"
+      },
+      "required_template_ids": [
+        "opl.structural.characterization.incomplete.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-006:-:CHARACTERIZATION_OBJECT_ATTRIBUTE_FAN_2_COMPLETE:PASS",
+      "case_id": "G-OPL-STRUCT-006.CHARACTERIZATION_OBJECT_ATTRIBUTE_FAN_2_COMPLETE.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-006",
+      "variant_key": "CHARACTERIZATION_OBJECT_ATTRIBUTE_FAN_2_COMPLETE",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "OBJECT",
+        "feature_kind": "ATTRIBUTE",
+        "fan_size": 2,
+        "completeness": "COMPLETE"
+      },
+      "required_template_ids": [
+        "opl.structural.characterization.complete.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-006:-:CHARACTERIZATION_OBJECT_ATTRIBUTE_FAN_2_INCOMPLETE:PASS",
+      "case_id": "G-OPL-STRUCT-006.CHARACTERIZATION_OBJECT_ATTRIBUTE_FAN_2_INCOMPLETE.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-006",
+      "variant_key": "CHARACTERIZATION_OBJECT_ATTRIBUTE_FAN_2_INCOMPLETE",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "OBJECT",
+        "feature_kind": "ATTRIBUTE",
+        "fan_size": 2,
+        "completeness": "INCOMPLETE"
+      },
+      "required_template_ids": [
+        "opl.structural.characterization.incomplete.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-006:-:CHARACTERIZATION_OBJECT_ATTRIBUTE_FAN_3_COMPLETE:PASS",
+      "case_id": "G-OPL-STRUCT-006.CHARACTERIZATION_OBJECT_ATTRIBUTE_FAN_3_COMPLETE.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-006",
+      "variant_key": "CHARACTERIZATION_OBJECT_ATTRIBUTE_FAN_3_COMPLETE",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "OBJECT",
+        "feature_kind": "ATTRIBUTE",
+        "fan_size": 3,
+        "completeness": "COMPLETE"
+      },
+      "required_template_ids": [
+        "opl.structural.characterization.complete.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-006:-:CHARACTERIZATION_OBJECT_ATTRIBUTE_FAN_3_INCOMPLETE:PASS",
+      "case_id": "G-OPL-STRUCT-006.CHARACTERIZATION_OBJECT_ATTRIBUTE_FAN_3_INCOMPLETE.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-006",
+      "variant_key": "CHARACTERIZATION_OBJECT_ATTRIBUTE_FAN_3_INCOMPLETE",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "OBJECT",
+        "feature_kind": "ATTRIBUTE",
+        "fan_size": 3,
+        "completeness": "INCOMPLETE"
+      },
+      "required_template_ids": [
+        "opl.structural.characterization.incomplete.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-006:-:CHARACTERIZATION_OBJECT_OPERATOR_FAN_1_COMPLETE:PASS",
+      "case_id": "G-OPL-STRUCT-006.CHARACTERIZATION_OBJECT_OPERATOR_FAN_1_COMPLETE.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-006",
+      "variant_key": "CHARACTERIZATION_OBJECT_OPERATOR_FAN_1_COMPLETE",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "OBJECT",
+        "feature_kind": "OPERATOR",
+        "fan_size": 1,
+        "completeness": "COMPLETE"
+      },
+      "required_template_ids": [
+        "opl.structural.characterization.complete.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-006:-:CHARACTERIZATION_OBJECT_OPERATOR_FAN_1_INCOMPLETE:PASS",
+      "case_id": "G-OPL-STRUCT-006.CHARACTERIZATION_OBJECT_OPERATOR_FAN_1_INCOMPLETE.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-006",
+      "variant_key": "CHARACTERIZATION_OBJECT_OPERATOR_FAN_1_INCOMPLETE",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "OBJECT",
+        "feature_kind": "OPERATOR",
+        "fan_size": 1,
+        "completeness": "INCOMPLETE"
+      },
+      "required_template_ids": [
+        "opl.structural.characterization.incomplete.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-006:-:CHARACTERIZATION_OBJECT_OPERATOR_FAN_2_COMPLETE:PASS",
+      "case_id": "G-OPL-STRUCT-006.CHARACTERIZATION_OBJECT_OPERATOR_FAN_2_COMPLETE.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-006",
+      "variant_key": "CHARACTERIZATION_OBJECT_OPERATOR_FAN_2_COMPLETE",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "OBJECT",
+        "feature_kind": "OPERATOR",
+        "fan_size": 2,
+        "completeness": "COMPLETE"
+      },
+      "required_template_ids": [
+        "opl.structural.characterization.complete.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-006:-:CHARACTERIZATION_OBJECT_OPERATOR_FAN_2_INCOMPLETE:PASS",
+      "case_id": "G-OPL-STRUCT-006.CHARACTERIZATION_OBJECT_OPERATOR_FAN_2_INCOMPLETE.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-006",
+      "variant_key": "CHARACTERIZATION_OBJECT_OPERATOR_FAN_2_INCOMPLETE",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "OBJECT",
+        "feature_kind": "OPERATOR",
+        "fan_size": 2,
+        "completeness": "INCOMPLETE"
+      },
+      "required_template_ids": [
+        "opl.structural.characterization.incomplete.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-006:-:CHARACTERIZATION_OBJECT_OPERATOR_FAN_3_COMPLETE:PASS",
+      "case_id": "G-OPL-STRUCT-006.CHARACTERIZATION_OBJECT_OPERATOR_FAN_3_COMPLETE.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-006",
+      "variant_key": "CHARACTERIZATION_OBJECT_OPERATOR_FAN_3_COMPLETE",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "OBJECT",
+        "feature_kind": "OPERATOR",
+        "fan_size": 3,
+        "completeness": "COMPLETE"
+      },
+      "required_template_ids": [
+        "opl.structural.characterization.complete.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-006:-:CHARACTERIZATION_OBJECT_OPERATOR_FAN_3_INCOMPLETE:PASS",
+      "case_id": "G-OPL-STRUCT-006.CHARACTERIZATION_OBJECT_OPERATOR_FAN_3_INCOMPLETE.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-006",
+      "variant_key": "CHARACTERIZATION_OBJECT_OPERATOR_FAN_3_INCOMPLETE",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "OBJECT",
+        "feature_kind": "OPERATOR",
+        "fan_size": 3,
+        "completeness": "INCOMPLETE"
+      },
+      "required_template_ids": [
+        "opl.structural.characterization.incomplete.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-006:-:CHARACTERIZATION_PROCESS_ATTRIBUTE_FAN_1_COMPLETE:PASS",
+      "case_id": "G-OPL-STRUCT-006.CHARACTERIZATION_PROCESS_ATTRIBUTE_FAN_1_COMPLETE.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-006",
+      "variant_key": "CHARACTERIZATION_PROCESS_ATTRIBUTE_FAN_1_COMPLETE",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "PROCESS",
+        "feature_kind": "ATTRIBUTE",
+        "fan_size": 1,
+        "completeness": "COMPLETE"
+      },
+      "required_template_ids": [
+        "opl.structural.characterization.complete.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-006:-:CHARACTERIZATION_PROCESS_ATTRIBUTE_FAN_1_INCOMPLETE:PASS",
+      "case_id": "G-OPL-STRUCT-006.CHARACTERIZATION_PROCESS_ATTRIBUTE_FAN_1_INCOMPLETE.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-006",
+      "variant_key": "CHARACTERIZATION_PROCESS_ATTRIBUTE_FAN_1_INCOMPLETE",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "PROCESS",
+        "feature_kind": "ATTRIBUTE",
+        "fan_size": 1,
+        "completeness": "INCOMPLETE"
+      },
+      "required_template_ids": [
+        "opl.structural.characterization.incomplete.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-006:-:CHARACTERIZATION_PROCESS_ATTRIBUTE_FAN_2_COMPLETE:PASS",
+      "case_id": "G-OPL-STRUCT-006.CHARACTERIZATION_PROCESS_ATTRIBUTE_FAN_2_COMPLETE.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-006",
+      "variant_key": "CHARACTERIZATION_PROCESS_ATTRIBUTE_FAN_2_COMPLETE",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "PROCESS",
+        "feature_kind": "ATTRIBUTE",
+        "fan_size": 2,
+        "completeness": "COMPLETE"
+      },
+      "required_template_ids": [
+        "opl.structural.characterization.complete.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-006:-:CHARACTERIZATION_PROCESS_ATTRIBUTE_FAN_2_INCOMPLETE:PASS",
+      "case_id": "G-OPL-STRUCT-006.CHARACTERIZATION_PROCESS_ATTRIBUTE_FAN_2_INCOMPLETE.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-006",
+      "variant_key": "CHARACTERIZATION_PROCESS_ATTRIBUTE_FAN_2_INCOMPLETE",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "PROCESS",
+        "feature_kind": "ATTRIBUTE",
+        "fan_size": 2,
+        "completeness": "INCOMPLETE"
+      },
+      "required_template_ids": [
+        "opl.structural.characterization.incomplete.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-006:-:CHARACTERIZATION_PROCESS_ATTRIBUTE_FAN_3_COMPLETE:PASS",
+      "case_id": "G-OPL-STRUCT-006.CHARACTERIZATION_PROCESS_ATTRIBUTE_FAN_3_COMPLETE.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-006",
+      "variant_key": "CHARACTERIZATION_PROCESS_ATTRIBUTE_FAN_3_COMPLETE",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "PROCESS",
+        "feature_kind": "ATTRIBUTE",
+        "fan_size": 3,
+        "completeness": "COMPLETE"
+      },
+      "required_template_ids": [
+        "opl.structural.characterization.complete.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-006:-:CHARACTERIZATION_PROCESS_ATTRIBUTE_FAN_3_INCOMPLETE:PASS",
+      "case_id": "G-OPL-STRUCT-006.CHARACTERIZATION_PROCESS_ATTRIBUTE_FAN_3_INCOMPLETE.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-006",
+      "variant_key": "CHARACTERIZATION_PROCESS_ATTRIBUTE_FAN_3_INCOMPLETE",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "PROCESS",
+        "feature_kind": "ATTRIBUTE",
+        "fan_size": 3,
+        "completeness": "INCOMPLETE"
+      },
+      "required_template_ids": [
+        "opl.structural.characterization.incomplete.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-006:-:CHARACTERIZATION_PROCESS_OPERATOR_FAN_1_COMPLETE:PASS",
+      "case_id": "G-OPL-STRUCT-006.CHARACTERIZATION_PROCESS_OPERATOR_FAN_1_COMPLETE.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-006",
+      "variant_key": "CHARACTERIZATION_PROCESS_OPERATOR_FAN_1_COMPLETE",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "PROCESS",
+        "feature_kind": "OPERATOR",
+        "fan_size": 1,
+        "completeness": "COMPLETE"
+      },
+      "required_template_ids": [
+        "opl.structural.characterization.complete.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-006:-:CHARACTERIZATION_PROCESS_OPERATOR_FAN_1_INCOMPLETE:PASS",
+      "case_id": "G-OPL-STRUCT-006.CHARACTERIZATION_PROCESS_OPERATOR_FAN_1_INCOMPLETE.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-006",
+      "variant_key": "CHARACTERIZATION_PROCESS_OPERATOR_FAN_1_INCOMPLETE",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "PROCESS",
+        "feature_kind": "OPERATOR",
+        "fan_size": 1,
+        "completeness": "INCOMPLETE"
+      },
+      "required_template_ids": [
+        "opl.structural.characterization.incomplete.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-006:-:CHARACTERIZATION_PROCESS_OPERATOR_FAN_2_COMPLETE:PASS",
+      "case_id": "G-OPL-STRUCT-006.CHARACTERIZATION_PROCESS_OPERATOR_FAN_2_COMPLETE.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-006",
+      "variant_key": "CHARACTERIZATION_PROCESS_OPERATOR_FAN_2_COMPLETE",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "PROCESS",
+        "feature_kind": "OPERATOR",
+        "fan_size": 2,
+        "completeness": "COMPLETE"
+      },
+      "required_template_ids": [
+        "opl.structural.characterization.complete.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-006:-:CHARACTERIZATION_PROCESS_OPERATOR_FAN_2_INCOMPLETE:PASS",
+      "case_id": "G-OPL-STRUCT-006.CHARACTERIZATION_PROCESS_OPERATOR_FAN_2_INCOMPLETE.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-006",
+      "variant_key": "CHARACTERIZATION_PROCESS_OPERATOR_FAN_2_INCOMPLETE",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "PROCESS",
+        "feature_kind": "OPERATOR",
+        "fan_size": 2,
+        "completeness": "INCOMPLETE"
+      },
+      "required_template_ids": [
+        "opl.structural.characterization.incomplete.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-006:-:CHARACTERIZATION_PROCESS_OPERATOR_FAN_3_COMPLETE:PASS",
+      "case_id": "G-OPL-STRUCT-006.CHARACTERIZATION_PROCESS_OPERATOR_FAN_3_COMPLETE.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-006",
+      "variant_key": "CHARACTERIZATION_PROCESS_OPERATOR_FAN_3_COMPLETE",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "PROCESS",
+        "feature_kind": "OPERATOR",
+        "fan_size": 3,
+        "completeness": "COMPLETE"
+      },
+      "required_template_ids": [
+        "opl.structural.characterization.complete.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-006:-:CHARACTERIZATION_PROCESS_OPERATOR_FAN_3_INCOMPLETE:PASS",
+      "case_id": "G-OPL-STRUCT-006.CHARACTERIZATION_PROCESS_OPERATOR_FAN_3_INCOMPLETE.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-006",
+      "variant_key": "CHARACTERIZATION_PROCESS_OPERATOR_FAN_3_INCOMPLETE",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "PROCESS",
+        "feature_kind": "OPERATOR",
+        "fan_size": 3,
+        "completeness": "INCOMPLETE"
+      },
+      "required_template_ids": [
+        "opl.structural.characterization.incomplete.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-006:-:CHARACTERIZATION_OBJECT_MIXED_A1_O1_COMPLETE:PASS",
+      "case_id": "G-OPL-STRUCT-006.CHARACTERIZATION_OBJECT_MIXED_A1_O1_COMPLETE.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-006",
+      "variant_key": "CHARACTERIZATION_OBJECT_MIXED_A1_O1_COMPLETE",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "OBJECT",
+        "feature_kind": "MIXED",
+        "mixed_group_shape": "A1_O1",
+        "completeness": "COMPLETE"
+      },
+      "required_template_ids": [
+        "opl.structural.characterization.mixed.complete.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-006:-:CHARACTERIZATION_OBJECT_MIXED_A1_O1_INCOMPLETE:PASS",
+      "case_id": "G-OPL-STRUCT-006.CHARACTERIZATION_OBJECT_MIXED_A1_O1_INCOMPLETE.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-006",
+      "variant_key": "CHARACTERIZATION_OBJECT_MIXED_A1_O1_INCOMPLETE",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "OBJECT",
+        "feature_kind": "MIXED",
+        "mixed_group_shape": "A1_O1",
+        "completeness": "INCOMPLETE"
+      },
+      "required_template_ids": [
+        "opl.structural.characterization.mixed.incomplete.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-006:-:CHARACTERIZATION_OBJECT_MIXED_A1_O2_COMPLETE:PASS",
+      "case_id": "G-OPL-STRUCT-006.CHARACTERIZATION_OBJECT_MIXED_A1_O2_COMPLETE.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-006",
+      "variant_key": "CHARACTERIZATION_OBJECT_MIXED_A1_O2_COMPLETE",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "OBJECT",
+        "feature_kind": "MIXED",
+        "mixed_group_shape": "A1_O2",
+        "completeness": "COMPLETE"
+      },
+      "required_template_ids": [
+        "opl.structural.characterization.mixed.complete.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-006:-:CHARACTERIZATION_OBJECT_MIXED_A1_O2_INCOMPLETE:PASS",
+      "case_id": "G-OPL-STRUCT-006.CHARACTERIZATION_OBJECT_MIXED_A1_O2_INCOMPLETE.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-006",
+      "variant_key": "CHARACTERIZATION_OBJECT_MIXED_A1_O2_INCOMPLETE",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "OBJECT",
+        "feature_kind": "MIXED",
+        "mixed_group_shape": "A1_O2",
+        "completeness": "INCOMPLETE"
+      },
+      "required_template_ids": [
+        "opl.structural.characterization.mixed.incomplete.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-006:-:CHARACTERIZATION_OBJECT_MIXED_A2_O1_COMPLETE:PASS",
+      "case_id": "G-OPL-STRUCT-006.CHARACTERIZATION_OBJECT_MIXED_A2_O1_COMPLETE.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-006",
+      "variant_key": "CHARACTERIZATION_OBJECT_MIXED_A2_O1_COMPLETE",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "OBJECT",
+        "feature_kind": "MIXED",
+        "mixed_group_shape": "A2_O1",
+        "completeness": "COMPLETE"
+      },
+      "required_template_ids": [
+        "opl.structural.characterization.mixed.complete.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-006:-:CHARACTERIZATION_OBJECT_MIXED_A2_O1_INCOMPLETE:PASS",
+      "case_id": "G-OPL-STRUCT-006.CHARACTERIZATION_OBJECT_MIXED_A2_O1_INCOMPLETE.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-006",
+      "variant_key": "CHARACTERIZATION_OBJECT_MIXED_A2_O1_INCOMPLETE",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "OBJECT",
+        "feature_kind": "MIXED",
+        "mixed_group_shape": "A2_O1",
+        "completeness": "INCOMPLETE"
+      },
+      "required_template_ids": [
+        "opl.structural.characterization.mixed.incomplete.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-006:-:CHARACTERIZATION_PROCESS_MIXED_A1_O1_COMPLETE:PASS",
+      "case_id": "G-OPL-STRUCT-006.CHARACTERIZATION_PROCESS_MIXED_A1_O1_COMPLETE.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-006",
+      "variant_key": "CHARACTERIZATION_PROCESS_MIXED_A1_O1_COMPLETE",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "PROCESS",
+        "feature_kind": "MIXED",
+        "mixed_group_shape": "A1_O1",
+        "completeness": "COMPLETE"
+      },
+      "required_template_ids": [
+        "opl.structural.characterization.mixed.complete.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-006:-:CHARACTERIZATION_PROCESS_MIXED_A1_O1_INCOMPLETE:PASS",
+      "case_id": "G-OPL-STRUCT-006.CHARACTERIZATION_PROCESS_MIXED_A1_O1_INCOMPLETE.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-006",
+      "variant_key": "CHARACTERIZATION_PROCESS_MIXED_A1_O1_INCOMPLETE",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "PROCESS",
+        "feature_kind": "MIXED",
+        "mixed_group_shape": "A1_O1",
+        "completeness": "INCOMPLETE"
+      },
+      "required_template_ids": [
+        "opl.structural.characterization.mixed.incomplete.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-006:-:CHARACTERIZATION_PROCESS_MIXED_A1_O2_COMPLETE:PASS",
+      "case_id": "G-OPL-STRUCT-006.CHARACTERIZATION_PROCESS_MIXED_A1_O2_COMPLETE.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-006",
+      "variant_key": "CHARACTERIZATION_PROCESS_MIXED_A1_O2_COMPLETE",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "PROCESS",
+        "feature_kind": "MIXED",
+        "mixed_group_shape": "A1_O2",
+        "completeness": "COMPLETE"
+      },
+      "required_template_ids": [
+        "opl.structural.characterization.mixed.complete.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-006:-:CHARACTERIZATION_PROCESS_MIXED_A1_O2_INCOMPLETE:PASS",
+      "case_id": "G-OPL-STRUCT-006.CHARACTERIZATION_PROCESS_MIXED_A1_O2_INCOMPLETE.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-006",
+      "variant_key": "CHARACTERIZATION_PROCESS_MIXED_A1_O2_INCOMPLETE",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "PROCESS",
+        "feature_kind": "MIXED",
+        "mixed_group_shape": "A1_O2",
+        "completeness": "INCOMPLETE"
+      },
+      "required_template_ids": [
+        "opl.structural.characterization.mixed.incomplete.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-006:-:CHARACTERIZATION_PROCESS_MIXED_A2_O1_COMPLETE:PASS",
+      "case_id": "G-OPL-STRUCT-006.CHARACTERIZATION_PROCESS_MIXED_A2_O1_COMPLETE.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-006",
+      "variant_key": "CHARACTERIZATION_PROCESS_MIXED_A2_O1_COMPLETE",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "PROCESS",
+        "feature_kind": "MIXED",
+        "mixed_group_shape": "A2_O1",
+        "completeness": "COMPLETE"
+      },
+      "required_template_ids": [
+        "opl.structural.characterization.mixed.complete.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-006:-:CHARACTERIZATION_PROCESS_MIXED_A2_O1_INCOMPLETE:PASS",
+      "case_id": "G-OPL-STRUCT-006.CHARACTERIZATION_PROCESS_MIXED_A2_O1_INCOMPLETE.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-006",
+      "variant_key": "CHARACTERIZATION_PROCESS_MIXED_A2_O1_INCOMPLETE",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "PROCESS",
+        "feature_kind": "MIXED",
+        "mixed_group_shape": "A2_O1",
+        "completeness": "INCOMPLETE"
+      },
+      "required_template_ids": [
+        "opl.structural.characterization.mixed.incomplete.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-006:-:EXHIBITION_OBJECT_ATTRIBUTE_IMPORT:PASS",
+      "case_id": "G-OPL-STRUCT-006.EXHIBITION_OBJECT_ATTRIBUTE_IMPORT.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-006",
+      "variant_key": "EXHIBITION_OBJECT_ATTRIBUTE_IMPORT",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "OBJECT",
+        "feature_kind": "ATTRIBUTE",
+        "completeness": "COMPLETE"
+      },
+      "required_template_ids": [
+        "opl.structural.exhibition.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-006:-:EXHIBITION_PROCESS_OPERATOR_IMPORT:PASS",
+      "case_id": "G-OPL-STRUCT-006.EXHIBITION_PROCESS_OPERATOR_IMPORT.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-006",
+      "variant_key": "EXHIBITION_PROCESS_OPERATOR_IMPORT",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "PROCESS",
+        "feature_kind": "OPERATOR",
+        "completeness": "COMPLETE"
+      },
+      "required_template_ids": [
+        "opl.structural.exhibition.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-007:-:GENERALIZATION_OBJECT_FAN_1_COMPLETE:PASS",
+      "case_id": "G-OPL-STRUCT-007.GENERALIZATION_OBJECT_FAN_1_COMPLETE.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-007",
+      "variant_key": "GENERALIZATION_OBJECT_FAN_1_COMPLETE",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "OBJECT",
+        "fan_size": 1,
+        "completeness": "COMPLETE"
+      },
+      "required_template_ids": [
+        "opl.structural.generalization.object.single.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-007:-:GENERALIZATION_OBJECT_FAN_1_INCOMPLETE:PASS",
+      "case_id": "G-OPL-STRUCT-007.GENERALIZATION_OBJECT_FAN_1_INCOMPLETE.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-007",
+      "variant_key": "GENERALIZATION_OBJECT_FAN_1_INCOMPLETE",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "OBJECT",
+        "fan_size": 1,
+        "completeness": "INCOMPLETE"
+      },
+      "required_template_ids": [
+        "opl.structural.generalization.incomplete.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-007:-:GENERALIZATION_OBJECT_FAN_2_COMPLETE:PASS",
+      "case_id": "G-OPL-STRUCT-007.GENERALIZATION_OBJECT_FAN_2_COMPLETE.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-007",
+      "variant_key": "GENERALIZATION_OBJECT_FAN_2_COMPLETE",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "OBJECT",
+        "fan_size": 2,
+        "completeness": "COMPLETE"
+      },
+      "required_template_ids": [
+        "opl.structural.generalization.multiple.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-007:-:GENERALIZATION_OBJECT_FAN_2_INCOMPLETE:PASS",
+      "case_id": "G-OPL-STRUCT-007.GENERALIZATION_OBJECT_FAN_2_INCOMPLETE.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-007",
+      "variant_key": "GENERALIZATION_OBJECT_FAN_2_INCOMPLETE",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "OBJECT",
+        "fan_size": 2,
+        "completeness": "INCOMPLETE"
+      },
+      "required_template_ids": [
+        "opl.structural.generalization.incomplete.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-007:-:GENERALIZATION_OBJECT_FAN_3_COMPLETE:PASS",
+      "case_id": "G-OPL-STRUCT-007.GENERALIZATION_OBJECT_FAN_3_COMPLETE.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-007",
+      "variant_key": "GENERALIZATION_OBJECT_FAN_3_COMPLETE",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "OBJECT",
+        "fan_size": 3,
+        "completeness": "COMPLETE"
+      },
+      "required_template_ids": [
+        "opl.structural.generalization.multiple.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-007:-:GENERALIZATION_OBJECT_FAN_3_INCOMPLETE:PASS",
+      "case_id": "G-OPL-STRUCT-007.GENERALIZATION_OBJECT_FAN_3_INCOMPLETE.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-007",
+      "variant_key": "GENERALIZATION_OBJECT_FAN_3_INCOMPLETE",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "OBJECT",
+        "fan_size": 3,
+        "completeness": "INCOMPLETE"
+      },
+      "required_template_ids": [
+        "opl.structural.generalization.incomplete.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-007:-:GENERALIZATION_PROCESS_FAN_1_COMPLETE:PASS",
+      "case_id": "G-OPL-STRUCT-007.GENERALIZATION_PROCESS_FAN_1_COMPLETE.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-007",
+      "variant_key": "GENERALIZATION_PROCESS_FAN_1_COMPLETE",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "PROCESS",
+        "fan_size": 1,
+        "completeness": "COMPLETE"
+      },
+      "required_template_ids": [
+        "opl.structural.generalization.process.single.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-007:-:GENERALIZATION_PROCESS_FAN_1_INCOMPLETE:PASS",
+      "case_id": "G-OPL-STRUCT-007.GENERALIZATION_PROCESS_FAN_1_INCOMPLETE.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-007",
+      "variant_key": "GENERALIZATION_PROCESS_FAN_1_INCOMPLETE",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "PROCESS",
+        "fan_size": 1,
+        "completeness": "INCOMPLETE"
+      },
+      "required_template_ids": [
+        "opl.structural.generalization.incomplete.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-007:-:GENERALIZATION_PROCESS_FAN_2_COMPLETE:PASS",
+      "case_id": "G-OPL-STRUCT-007.GENERALIZATION_PROCESS_FAN_2_COMPLETE.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-007",
+      "variant_key": "GENERALIZATION_PROCESS_FAN_2_COMPLETE",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "PROCESS",
+        "fan_size": 2,
+        "completeness": "COMPLETE"
+      },
+      "required_template_ids": [
+        "opl.structural.generalization.multiple.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-007:-:GENERALIZATION_PROCESS_FAN_2_INCOMPLETE:PASS",
+      "case_id": "G-OPL-STRUCT-007.GENERALIZATION_PROCESS_FAN_2_INCOMPLETE.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-007",
+      "variant_key": "GENERALIZATION_PROCESS_FAN_2_INCOMPLETE",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "PROCESS",
+        "fan_size": 2,
+        "completeness": "INCOMPLETE"
+      },
+      "required_template_ids": [
+        "opl.structural.generalization.incomplete.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-007:-:GENERALIZATION_PROCESS_FAN_3_COMPLETE:PASS",
+      "case_id": "G-OPL-STRUCT-007.GENERALIZATION_PROCESS_FAN_3_COMPLETE.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-007",
+      "variant_key": "GENERALIZATION_PROCESS_FAN_3_COMPLETE",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "PROCESS",
+        "fan_size": 3,
+        "completeness": "COMPLETE"
+      },
+      "required_template_ids": [
+        "opl.structural.generalization.multiple.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-007:-:GENERALIZATION_PROCESS_FAN_3_INCOMPLETE:PASS",
+      "case_id": "G-OPL-STRUCT-007.GENERALIZATION_PROCESS_FAN_3_INCOMPLETE.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-007",
+      "variant_key": "GENERALIZATION_PROCESS_FAN_3_INCOMPLETE",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "PROCESS",
+        "fan_size": 3,
+        "completeness": "INCOMPLETE"
+      },
+      "required_template_ids": [
+        "opl.structural.generalization.incomplete.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-008:-:CLASSIFICATION_OBJECT_FAN_1:PASS",
+      "case_id": "G-OPL-STRUCT-008.CLASSIFICATION_OBJECT_FAN_1.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-008",
+      "variant_key": "CLASSIFICATION_OBJECT_FAN_1",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "OBJECT",
+        "fan_size": 1,
+        "completeness": "NOT_APPLICABLE"
+      },
+      "required_template_ids": [
+        "opl.structural.classification.single.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-008:-:CLASSIFICATION_OBJECT_FAN_2:PASS",
+      "case_id": "G-OPL-STRUCT-008.CLASSIFICATION_OBJECT_FAN_2.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-008",
+      "variant_key": "CLASSIFICATION_OBJECT_FAN_2",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "OBJECT",
+        "fan_size": 2,
+        "completeness": "NOT_APPLICABLE"
+      },
+      "required_template_ids": [
+        "opl.structural.classification.multiple.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-008:-:CLASSIFICATION_OBJECT_FAN_3:PASS",
+      "case_id": "G-OPL-STRUCT-008.CLASSIFICATION_OBJECT_FAN_3.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-008",
+      "variant_key": "CLASSIFICATION_OBJECT_FAN_3",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "OBJECT",
+        "fan_size": 3,
+        "completeness": "NOT_APPLICABLE"
+      },
+      "required_template_ids": [
+        "opl.structural.classification.multiple.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-008:-:CLASSIFICATION_PROCESS_FAN_1:PASS",
+      "case_id": "G-OPL-STRUCT-008.CLASSIFICATION_PROCESS_FAN_1.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-008",
+      "variant_key": "CLASSIFICATION_PROCESS_FAN_1",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "PROCESS",
+        "fan_size": 1,
+        "completeness": "NOT_APPLICABLE"
+      },
+      "required_template_ids": [
+        "opl.structural.classification.single.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-008:-:CLASSIFICATION_PROCESS_FAN_2:PASS",
+      "case_id": "G-OPL-STRUCT-008.CLASSIFICATION_PROCESS_FAN_2.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-008",
+      "variant_key": "CLASSIFICATION_PROCESS_FAN_2",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "PROCESS",
+        "fan_size": 2,
+        "completeness": "NOT_APPLICABLE"
+      },
+      "required_template_ids": [
+        "opl.structural.classification.multiple.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-008:-:CLASSIFICATION_PROCESS_FAN_3:PASS",
+      "case_id": "G-OPL-STRUCT-008.CLASSIFICATION_PROCESS_FAN_3.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-008",
+      "variant_key": "CLASSIFICATION_PROCESS_FAN_3",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "PROCESS",
+        "fan_size": 3,
+        "completeness": "NOT_APPLICABLE"
+      },
+      "required_template_ids": [
+        "opl.structural.classification.multiple.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-009:-:CHARACTERIZATION_OBJECT_VALUE_STATE:PASS",
+      "case_id": "G-OPL-STRUCT-009.CHARACTERIZATION_OBJECT_VALUE_STATE.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-009",
+      "variant_key": "CHARACTERIZATION_OBJECT_VALUE_STATE",
+      "expectation": "PASS",
+      "dimensions": {
+        "endpoint_domain": "OBJECT",
+        "feature_kind": "ATTRIBUTE",
+        "completeness": "NOT_APPLICABLE"
+      },
+      "required_template_ids": [
+        "opl.structural.characterization.state.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-010:-:UNIDIRECTIONAL_SOURCE_STATE_TAGGED:PASS",
+      "case_id": "G-OPL-STRUCT-010.UNIDIRECTIONAL_SOURCE_STATE_TAGGED.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-010",
+      "variant_key": "UNIDIRECTIONAL_SOURCE_STATE_TAGGED",
+      "expectation": "PASS",
+      "dimensions": {
+        "direction": "UNIDIRECTIONAL",
+        "state_position": "SOURCE",
+        "tag_mode": "TAGGED"
+      },
+      "required_template_ids": [
+        "opl.structural.tagged.state.unidirectional.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-010:-:UNIDIRECTIONAL_SOURCE_STATE_NULL_TAG:PASS",
+      "case_id": "G-OPL-STRUCT-010.UNIDIRECTIONAL_SOURCE_STATE_NULL_TAG.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-010",
+      "variant_key": "UNIDIRECTIONAL_SOURCE_STATE_NULL_TAG",
+      "expectation": "PASS",
+      "dimensions": {
+        "direction": "UNIDIRECTIONAL",
+        "state_position": "SOURCE",
+        "tag_mode": "NULL_TAG"
+      },
+      "required_template_ids": [
+        "opl.structural.tagged.state.unidirectional.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-010:-:UNIDIRECTIONAL_DESTINATION_STATE_TAGGED:PASS",
+      "case_id": "G-OPL-STRUCT-010.UNIDIRECTIONAL_DESTINATION_STATE_TAGGED.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-010",
+      "variant_key": "UNIDIRECTIONAL_DESTINATION_STATE_TAGGED",
+      "expectation": "PASS",
+      "dimensions": {
+        "direction": "UNIDIRECTIONAL",
+        "state_position": "DESTINATION",
+        "tag_mode": "TAGGED"
+      },
+      "required_template_ids": [
+        "opl.structural.tagged.state.unidirectional.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-010:-:UNIDIRECTIONAL_DESTINATION_STATE_NULL_TAG:PASS",
+      "case_id": "G-OPL-STRUCT-010.UNIDIRECTIONAL_DESTINATION_STATE_NULL_TAG.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-010",
+      "variant_key": "UNIDIRECTIONAL_DESTINATION_STATE_NULL_TAG",
+      "expectation": "PASS",
+      "dimensions": {
+        "direction": "UNIDIRECTIONAL",
+        "state_position": "DESTINATION",
+        "tag_mode": "NULL_TAG"
+      },
+      "required_template_ids": [
+        "opl.structural.tagged.state.unidirectional.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-010:-:UNIDIRECTIONAL_BOTH_STATE_TAGGED:PASS",
+      "case_id": "G-OPL-STRUCT-010.UNIDIRECTIONAL_BOTH_STATE_TAGGED.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-010",
+      "variant_key": "UNIDIRECTIONAL_BOTH_STATE_TAGGED",
+      "expectation": "PASS",
+      "dimensions": {
+        "direction": "UNIDIRECTIONAL",
+        "state_position": "BOTH",
+        "tag_mode": "TAGGED"
+      },
+      "required_template_ids": [
+        "opl.structural.tagged.state.unidirectional.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-010:-:UNIDIRECTIONAL_BOTH_STATE_NULL_TAG:PASS",
+      "case_id": "G-OPL-STRUCT-010.UNIDIRECTIONAL_BOTH_STATE_NULL_TAG.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-010",
+      "variant_key": "UNIDIRECTIONAL_BOTH_STATE_NULL_TAG",
+      "expectation": "PASS",
+      "dimensions": {
+        "direction": "UNIDIRECTIONAL",
+        "state_position": "BOTH",
+        "tag_mode": "NULL_TAG"
+      },
+      "required_template_ids": [
+        "opl.structural.tagged.state.unidirectional.v1"
+      ],
+      "expected_sentence_slots": [
+        "SINGLE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-010:-:BIDIRECTIONAL_SOURCE_STATE_TAGGED:PASS",
+      "case_id": "G-OPL-STRUCT-010.BIDIRECTIONAL_SOURCE_STATE_TAGGED.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-010",
+      "variant_key": "BIDIRECTIONAL_SOURCE_STATE_TAGGED",
+      "expectation": "PASS",
+      "dimensions": {
+        "direction": "BIDIRECTIONAL",
+        "state_position": "SOURCE",
+        "tag_mode": "TAGGED"
+      },
+      "required_template_ids": [
+        "opl.structural.tagged.state.bidirectional.forward.v1",
+        "opl.structural.tagged.state.bidirectional.reverse.v1"
+      ],
+      "expected_sentence_slots": [
+        "FORWARD",
+        "REVERSE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-010:-:BIDIRECTIONAL_DESTINATION_STATE_TAGGED:PASS",
+      "case_id": "G-OPL-STRUCT-010.BIDIRECTIONAL_DESTINATION_STATE_TAGGED.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-010",
+      "variant_key": "BIDIRECTIONAL_DESTINATION_STATE_TAGGED",
+      "expectation": "PASS",
+      "dimensions": {
+        "direction": "BIDIRECTIONAL",
+        "state_position": "DESTINATION",
+        "tag_mode": "TAGGED"
+      },
+      "required_template_ids": [
+        "opl.structural.tagged.state.bidirectional.forward.v1",
+        "opl.structural.tagged.state.bidirectional.reverse.v1"
+      ],
+      "expected_sentence_slots": [
+        "FORWARD",
+        "REVERSE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-010:-:BIDIRECTIONAL_BOTH_STATE_TAGGED:PASS",
+      "case_id": "G-OPL-STRUCT-010.BIDIRECTIONAL_BOTH_STATE_TAGGED.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-010",
+      "variant_key": "BIDIRECTIONAL_BOTH_STATE_TAGGED",
+      "expectation": "PASS",
+      "dimensions": {
+        "direction": "BIDIRECTIONAL",
+        "state_position": "BOTH",
+        "tag_mode": "TAGGED"
+      },
+      "required_template_ids": [
+        "opl.structural.tagged.state.bidirectional.forward.v1",
+        "opl.structural.tagged.state.bidirectional.reverse.v1"
+      ],
+      "expected_sentence_slots": [
+        "FORWARD",
+        "REVERSE"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-010:-:RECIPROCAL_SOURCE_STATE_TAGGED:PASS",
+      "case_id": "G-OPL-STRUCT-010.RECIPROCAL_SOURCE_STATE_TAGGED.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-010",
+      "variant_key": "RECIPROCAL_SOURCE_STATE_TAGGED",
+      "expectation": "PASS",
+      "dimensions": {
+        "direction": "RECIPROCAL",
+        "state_position": "SOURCE",
+        "tag_mode": "TAGGED"
+      },
+      "required_template_ids": [
+        "opl.structural.tagged.state.reciprocal.v1"
+      ],
+      "expected_sentence_slots": [
+        "RECIPROCAL"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-010:-:RECIPROCAL_SOURCE_STATE_NULL_TAG:PASS",
+      "case_id": "G-OPL-STRUCT-010.RECIPROCAL_SOURCE_STATE_NULL_TAG.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-010",
+      "variant_key": "RECIPROCAL_SOURCE_STATE_NULL_TAG",
+      "expectation": "PASS",
+      "dimensions": {
+        "direction": "RECIPROCAL",
+        "state_position": "SOURCE",
+        "tag_mode": "NULL_TAG"
+      },
+      "required_template_ids": [
+        "opl.structural.tagged.state.reciprocal.v1"
+      ],
+      "expected_sentence_slots": [
+        "RECIPROCAL"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-010:-:RECIPROCAL_DESTINATION_STATE_TAGGED:PASS",
+      "case_id": "G-OPL-STRUCT-010.RECIPROCAL_DESTINATION_STATE_TAGGED.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-010",
+      "variant_key": "RECIPROCAL_DESTINATION_STATE_TAGGED",
+      "expectation": "PASS",
+      "dimensions": {
+        "direction": "RECIPROCAL",
+        "state_position": "DESTINATION",
+        "tag_mode": "TAGGED"
+      },
+      "required_template_ids": [
+        "opl.structural.tagged.state.reciprocal.v1"
+      ],
+      "expected_sentence_slots": [
+        "RECIPROCAL"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-010:-:RECIPROCAL_DESTINATION_STATE_NULL_TAG:PASS",
+      "case_id": "G-OPL-STRUCT-010.RECIPROCAL_DESTINATION_STATE_NULL_TAG.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-010",
+      "variant_key": "RECIPROCAL_DESTINATION_STATE_NULL_TAG",
+      "expectation": "PASS",
+      "dimensions": {
+        "direction": "RECIPROCAL",
+        "state_position": "DESTINATION",
+        "tag_mode": "NULL_TAG"
+      },
+      "required_template_ids": [
+        "opl.structural.tagged.state.reciprocal.v1"
+      ],
+      "expected_sentence_slots": [
+        "RECIPROCAL"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-010:-:RECIPROCAL_BOTH_STATE_TAGGED:PASS",
+      "case_id": "G-OPL-STRUCT-010.RECIPROCAL_BOTH_STATE_TAGGED.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-010",
+      "variant_key": "RECIPROCAL_BOTH_STATE_TAGGED",
+      "expectation": "PASS",
+      "dimensions": {
+        "direction": "RECIPROCAL",
+        "state_position": "BOTH",
+        "tag_mode": "TAGGED"
+      },
+      "required_template_ids": [
+        "opl.structural.tagged.state.reciprocal.v1"
+      ],
+      "expected_sentence_slots": [
+        "RECIPROCAL"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-010:-:RECIPROCAL_BOTH_STATE_NULL_TAG:PASS",
+      "case_id": "G-OPL-STRUCT-010.RECIPROCAL_BOTH_STATE_NULL_TAG.PASS",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-010",
+      "variant_key": "RECIPROCAL_BOTH_STATE_NULL_TAG",
+      "expectation": "PASS",
+      "dimensions": {
+        "direction": "RECIPROCAL",
+        "state_position": "BOTH",
+        "tag_mode": "NULL_TAG"
+      },
+      "required_template_ids": [
+        "opl.structural.tagged.state.reciprocal.v1"
+      ],
+      "expected_sentence_slots": [
+        "RECIPROCAL"
+      ]
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-001:-:CROSS_KIND_TAGGED:BLOCKED",
+      "case_id": "G-OPL-STRUCT-001.CROSS_KIND_TAGGED.BLOCKED",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-001",
+      "variant_key": "CROSS_KIND_TAGGED",
+      "expectation": "BLOCKED",
+      "dimensions": {},
+      "expected_error_code": "ENDPOINT_KIND_MISMATCH"
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-001:-:FORWARD_TAG_MISSING:BLOCKED",
+      "case_id": "G-OPL-STRUCT-001.FORWARD_TAG_MISSING.BLOCKED",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-001",
+      "variant_key": "FORWARD_TAG_MISSING",
+      "expectation": "BLOCKED",
+      "dimensions": {},
+      "expected_error_code": "MODIFIER_COMBINATION_INVALID"
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-003:-:REVERSE_TAG_MISSING:BLOCKED",
+      "case_id": "G-OPL-STRUCT-003.REVERSE_TAG_MISSING.BLOCKED",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-003",
+      "variant_key": "REVERSE_TAG_MISSING",
+      "expectation": "BLOCKED",
+      "dimensions": {},
+      "expected_error_code": "MODIFIER_COMBINATION_INVALID"
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-005:-:FAN_EMPTY:BLOCKED",
+      "case_id": "G-OPL-STRUCT-005.FAN_EMPTY.BLOCKED",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-005",
+      "variant_key": "FAN_EMPTY",
+      "expectation": "BLOCKED",
+      "dimensions": {},
+      "expected_error_code": "ENDPOINT_KIND_MISMATCH"
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-005:-:FAN_ORDINAL_DUPLICATE:BLOCKED",
+      "case_id": "G-OPL-STRUCT-005.FAN_ORDINAL_DUPLICATE.BLOCKED",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-005",
+      "variant_key": "FAN_ORDINAL_DUPLICATE",
+      "expectation": "BLOCKED",
+      "dimensions": {},
+      "expected_error_code": "ENDPOINT_KIND_MISMATCH"
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-006:-:FAN_ORDINAL_GAP:BLOCKED",
+      "case_id": "G-OPL-STRUCT-006.FAN_ORDINAL_GAP.BLOCKED",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-006",
+      "variant_key": "FAN_ORDINAL_GAP",
+      "expectation": "BLOCKED",
+      "dimensions": {},
+      "expected_error_code": "ENDPOINT_KIND_MISMATCH"
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-007:-:MULTIPLE_REFINEABLE:BLOCKED",
+      "case_id": "G-OPL-STRUCT-007.MULTIPLE_REFINEABLE.BLOCKED",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-007",
+      "variant_key": "MULTIPLE_REFINEABLE",
+      "expectation": "BLOCKED",
+      "dimensions": {},
+      "expected_error_code": "ENDPOINT_KIND_MISMATCH"
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-004:-:CROSS_KIND_RECIPROCAL:BLOCKED",
+      "case_id": "G-OPL-STRUCT-004.CROSS_KIND_RECIPROCAL.BLOCKED",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-004",
+      "variant_key": "CROSS_KIND_RECIPROCAL",
+      "expectation": "BLOCKED",
+      "dimensions": {},
+      "expected_error_code": "ENDPOINT_KIND_MISMATCH"
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-005:-:FAN_CROSS_KIND:BLOCKED",
+      "case_id": "G-OPL-STRUCT-005.FAN_CROSS_KIND.BLOCKED",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-005",
+      "variant_key": "FAN_CROSS_KIND",
+      "expectation": "BLOCKED",
+      "dimensions": {},
+      "expected_error_code": "ENDPOINT_KIND_MISMATCH"
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-006:-:FEATURE_KIND_INVALID:BLOCKED",
+      "case_id": "G-OPL-STRUCT-006.FEATURE_KIND_INVALID.BLOCKED",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-006",
+      "variant_key": "FEATURE_KIND_INVALID",
+      "expectation": "BLOCKED",
+      "dimensions": {},
+      "expected_error_code": "ENDPOINT_KIND_MISMATCH"
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-008:-:COMPLETENESS_INVALID:BLOCKED",
+      "case_id": "G-OPL-STRUCT-008.COMPLETENESS_INVALID.BLOCKED",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-008",
+      "variant_key": "COMPLETENESS_INVALID",
+      "expectation": "BLOCKED",
+      "dimensions": {},
+      "expected_error_code": "MODIFIER_COMBINATION_INVALID"
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-009:-:SOURCE_STATE_INVALID:BLOCKED",
+      "case_id": "G-OPL-STRUCT-009.SOURCE_STATE_INVALID.BLOCKED",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-009",
+      "variant_key": "SOURCE_STATE_INVALID",
+      "expectation": "BLOCKED",
+      "dimensions": {},
+      "expected_error_code": "ENDPOINT_KIND_MISMATCH"
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-009:-:SOURCE_FEATURE_STATE_INVALID:BLOCKED",
+      "case_id": "G-OPL-STRUCT-009.SOURCE_FEATURE_STATE_INVALID.BLOCKED",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-009",
+      "variant_key": "SOURCE_FEATURE_STATE_INVALID",
+      "expectation": "BLOCKED",
+      "dimensions": {},
+      "expected_error_code": "ENDPOINT_KIND_MISMATCH"
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-009:-:STATE_OWNER_MISMATCH:BLOCKED",
+      "case_id": "G-OPL-STRUCT-009.STATE_OWNER_MISMATCH.BLOCKED",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-009",
+      "variant_key": "STATE_OWNER_MISMATCH",
+      "expectation": "BLOCKED",
+      "dimensions": {},
+      "expected_error_code": "STATE_OWNER_MISMATCH"
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-010:-:PROCESS_ENDPOINT_INVALID:BLOCKED",
+      "case_id": "G-OPL-STRUCT-010.PROCESS_ENDPOINT_INVALID.BLOCKED",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-010",
+      "variant_key": "PROCESS_ENDPOINT_INVALID",
+      "expectation": "BLOCKED",
+      "dimensions": {},
+      "expected_error_code": "ENDPOINT_KIND_MISMATCH"
+    },
+    {
+      "coverage_key": "STRUCT:CAP-ISO-STRUCT-010:-:BIDIRECTIONAL_NULL_TAG:BLOCKED",
+      "case_id": "G-OPL-STRUCT-010.BIDIRECTIONAL_NULL_TAG.BLOCKED",
+      "family": "STRUCT",
+      "capability_id": "CAP-ISO-STRUCT-010",
+      "variant_key": "BIDIRECTIONAL_NULL_TAG",
+      "expectation": "BLOCKED",
+      "dimensions": {},
+      "expected_error_code": "MODIFIER_COMBINATION_INVALID"
+    }
+  ]
+}

@@ -1,6 +1,7 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
 test("真实 P01 到 P03 主路径提交并在三个视口重开", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1200 });
   const projectName = `E2E P0 ${Date.now()}`;
   const modelName = `模型 ${Date.now()}`;
 
@@ -34,6 +35,13 @@ test("真实 P01 到 P03 主路径提交并在三个视口重开", async ({ page
   await page.getByTestId("p03-state-name").fill("Ready");
   const stateRevision = await commitAndRead(page, page.getByTestId("p03-state-candidate").getByRole("button", { name: "创建", exact: true }));
   await expect(page.locator(".x6-node")).toHaveCount(3);
+  await page.locator(".x6-node").first().click({ position: { x: 10, y: 10 } });
+  await page.getByTestId("p03-tool-state").click();
+  await page.locator(".x6-node").first().click({ position: { x: 10, y: 10 } });
+  await expect(page.getByTestId("p03-state-candidate")).toBeVisible();
+  await page.getByTestId("p03-state-name").fill("Finished");
+  await commitAndRead(page, page.getByTestId("p03-state-candidate").getByRole("button", { name: "创建", exact: true }));
+  await expect(page.locator(".x6-node")).toHaveCount(4);
   await page.locator(".x6-node").nth(2).click();
   const committedRevision = await commitAndRead(page, page.getByTestId("p03-tool-consumption"));
   await expect(page.locator(".x6-edge")).toHaveCount(1);
@@ -57,33 +65,17 @@ test("真实 P01 到 P03 主路径提交并在三个视口重开", async ({ page
   const canvasFrame = page.locator(".canvas-frame");
   const frameBox = await canvasFrame.boundingBox();
   if (!frameBox) throw new Error("未找到画布编辑区域");
-  await page.getByTestId("p03-canvas").hover({ position: { x: frameBox.width - 24, y: 36 } });
-  await page.mouse.wheel(0, 260);
-  await expect.poll(async () => (await objectTwo.boundingBox())?.y ?? Number.POSITIVE_INFINITY).toBeLessThan(frameBox.y + frameBox.height - 32);
-  await objectTwo.click({ position: { x: 10, y: 10 } });
-  await expect(page.getByTestId("p03-tool-state")).toBeEnabled();
-  await page.getByTestId("p03-tool-state").click();
-  await objectTwo.click({ position: { x: 10, y: 10 } });
-  await expect(page.getByTestId("p03-state-candidate")).toBeVisible();
-  await page.getByTestId("p03-state-name").fill("Finished");
-  await commitAndRead(page, page.getByTestId("p03-state-candidate").getByRole("button", { name: "创建", exact: true }));
-
-  await page.getByTestId("p03-canvas").hover({ position: { x: frameBox.width - 24, y: 36 } });
-  await page.mouse.wheel(0, -260);
   const toolbarBottom = await page.locator(".editor-toolbar").evaluate((element) => element.getBoundingClientRect().bottom);
   await expect.poll(async () => (await canvasNode(page, "Ready").boundingBox())?.y ?? Number.NEGATIVE_INFINITY).toBeGreaterThan(toolbarBottom + 4);
   await canvasNode(page, "Ready").click();
   await page.getByTestId("p03-tool-procedural-relation").click();
   await canvasNode(page, "Process 1").click();
-  await page.getByTestId("p03-canvas").hover({ position: { x: frameBox.width - 24, y: 36 } });
-  await page.mouse.wheel(0, 260);
-  await expect.poll(async () => (await canvasNode(page, "Finished").boundingBox())?.y ?? Number.POSITIVE_INFINITY).toBeLessThan(frameBox.y + frameBox.height - 32);
   await canvasNode(page, "Finished").click();
   await page.getByTestId("p03-relation-resolve").click();
   await expect(page.getByTestId("p03-relation-option-CAP-ISO-PROC-008")).toBeVisible();
   await commitAndRead(page, page.getByTestId("p03-relation-option-CAP-ISO-PROC-008"));
   await expect(page.locator(".x6-edge")).toHaveCount(4);
-  await expect(page.getByText("Process 1 changes Ready Object 1 to Finished Object 2.", { exact: true })).toBeVisible();
+  await expect(page.getByText("Process 1 changes Object 1 from Ready to Finished.", { exact: true })).toBeVisible();
 
   await commitAndRead(page, page.getByTestId("p03-tool-process"));
   const processOne = canvasNode(page, "Process 1");
@@ -131,9 +123,12 @@ test("真实 P01 到 P03 主路径提交并在三个视口重开", async ({ page
   await expect(page.locator(".x6-edge")).toHaveCount(6);
   await expect(page.getByTestId("p03-opl-sentence")).toHaveCount(5);
   await expect(page.getByText("Process 1 yields Object 1.", { exact: true })).toBeVisible();
-  await expect(page.getByText("Process 1 changes Ready Object 1 to Finished Object 2.", { exact: true })).toBeVisible();
+  await expect(page.getByText("Process 1 changes Object 1 from Ready to Finished.", { exact: true })).toBeVisible();
   await expect(page.getByText("Process 1 invokes Process 2.", { exact: true })).toBeVisible();
   await expect(page.getByText("When Process 1 exceeds PT5M, Process 2 handles the exception.", { exact: true })).toBeVisible();
+  await page.getByTestId("p03-opl-sentence").filter({ hasText: "Process 1 invokes Process 2." }).click();
+  await expect(page.locator(".inspector-panel .panel-heading strong")).toHaveText("关系");
+  await expect(page.locator(".inspector-panel")).toContainText("CAP-ISO-PROC-013");
 
   const viewportRevision = await revisionTag(page);
   for (const viewport of [{ width: 1440, height: 900 }, { width: 1280, height: 800 }]) {
@@ -203,7 +198,7 @@ test("使能关系与 State 指定变体从 Runtime 候选提交并重开", asyn
   await expect(process).toBeVisible();
 
   await createState(page, objectOne, "Ready");
-  await createState(page, objectTwo, "Finished");
+  await createState(page, objectOne, "Finished");
   const ready = canvasNode(page, "Ready");
   await expect(ready).toBeVisible();
 
@@ -240,7 +235,7 @@ test("Effect 与剩余 State 指定变体从 Runtime 候选提交并重开", asy
   await expect(process).toBeVisible();
 
   await createState(page, objectOne, "Ready");
-  await createState(page, objectTwo, "Finished");
+  await createState(page, objectOne, "Finished");
   const ready = canvasNode(page, "Ready");
   const finished = canvasNode(page, "Finished");
   await expect(ready).toBeVisible();
@@ -249,24 +244,24 @@ test("Effect 与剩余 State 指定变体从 Runtime 候选提交并重开", asy
   await createProceduralRelation(page, ready, [process], "CAP-ISO-PROC-006");
   await createProceduralRelation(page, process, [finished], "CAP-ISO-PROC-007");
   await createProceduralRelation(page, objectOne, [process, objectTwo], "CAP-ISO-PROC-003");
-  await createProceduralRelation(page, ready, [process, objectTwo], "CAP-ISO-PROC-009");
+  await createProceduralRelation(page, ready, [process, objectOne], "CAP-ISO-PROC-009");
   const revision = await createProceduralRelation(page, objectOne, [process, finished], "CAP-ISO-PROC-010");
   await expect(page.locator(".x6-edge")).toHaveCount(8);
   await expect(page.getByText("Process 1 consumes Ready Object 1.", { exact: true })).toBeVisible();
-  await expect(page.getByText("Process 1 yields Finished Object 2.", { exact: true })).toBeVisible();
+  await expect(page.getByText("Process 1 yields Finished Object 1.", { exact: true })).toBeVisible();
   await expect(page.getByText("Process 1 affects Object 2.", { exact: true })).toBeVisible();
-  await expect(page.getByText("Process 1 changes Ready Object 1 to Object 2.", { exact: true })).toBeVisible();
-  await expect(page.getByText("Process 1 changes Object 1 to Finished Object 2.", { exact: true })).toBeVisible();
+  await expect(page.getByText("Process 1 changes Object 1 from Ready.", { exact: true })).toBeVisible();
+  await expect(page.getByText("Process 1 changes Object 1 to Finished.", { exact: true })).toBeVisible();
 
   await page.reload();
   await expectWorkbenchReady(page);
   await expect(page.locator(".revision-tag")).toHaveText(revision);
   await expect(page.locator(".x6-edge")).toHaveCount(8);
   await expect(page.getByText("Process 1 consumes Ready Object 1.", { exact: true })).toBeVisible();
-  await expect(page.getByText("Process 1 yields Finished Object 2.", { exact: true })).toBeVisible();
+  await expect(page.getByText("Process 1 yields Finished Object 1.", { exact: true })).toBeVisible();
   await expect(page.getByText("Process 1 affects Object 2.", { exact: true })).toBeVisible();
-  await expect(page.getByText("Process 1 changes Ready Object 1 to Object 2.", { exact: true })).toBeVisible();
-  await expect(page.getByText("Process 1 changes Object 1 to Finished Object 2.", { exact: true })).toBeVisible();
+  await expect(page.getByText("Process 1 changes Object 1 from Ready.", { exact: true })).toBeVisible();
+  await expect(page.getByText("Process 1 changes Object 1 to Finished.", { exact: true })).toBeVisible();
 });
 
 test("16 类 Procedural Link 以冻结的 SVG marker、路径和时间注记呈现", async ({ page }) => {
@@ -349,17 +344,43 @@ test("八类 Control 从基础 Procedural Fact 的 Runtime 候选提交并重开
   await applyControl(page, 3, "CAP-ISO-CTRL-004");
   await expect(page.locator(".x6-edge-label").filter({ hasText: "e" })).toHaveCount(4);
 
-  await applyControl(page, 0, "CAP-ISO-CTRL-005");
-  await applyControl(page, 1, "CAP-ISO-CTRL-006");
-  await applyControl(page, 2, "CAP-ISO-CTRL-007");
-  const revision = await applyControl(page, 3, "CAP-ISO-CTRL-008");
+  await createProceduralRelation(page, objectOne, [process, objectTwo], "CAP-ISO-PROC-003");
+  await applyControlForText(page, "Process 1 affects Object 2.", "CAP-ISO-CTRL-005");
+  await createProceduralRelation(page, objectOne, [process], "CAP-ISO-PROC-005");
+  await applyControlForText(page, "Process 1 requires Object 1.", "CAP-ISO-CTRL-006");
+  await createProceduralRelation(page, ready, [process, objectOne], "CAP-ISO-PROC-009");
+  await applyControlForText(page, "Process 1 changes Object 1 from Ready.", "CAP-ISO-CTRL-007");
+  await createProceduralRelation(page, ready, [process], "CAP-ISO-PROC-012");
+  const revision = await applyControlForText(page, "Process 1 requires Ready Object 1.", "CAP-ISO-CTRL-008");
   await expect(page.locator(".x6-edge-label").filter({ hasText: "c" })).toHaveCount(4);
+  await expect(page.getByText("Object 1 initiates Process 1, which consumes Object 1.", { exact: true })).toBeVisible();
+  await expect(page.getByText("Object 2 initiates and handles Process 1.", { exact: true })).toBeVisible();
+  await expect(page.getByText("Ready Object 1 initiates Process 1, which consumes Object 1.", { exact: true })).toBeVisible();
+  await expect(page.getByText("Available Object 2 initiates and handles Process 1.", { exact: true })).toBeVisible();
+  await expect(page.getByText("Process 1 occurs if Object 1 exists, in which case Process 1 affects Object 2, otherwise Process 1 is skipped.", { exact: true })).toBeVisible();
+  await expect(page.getByText("Process 1 occurs if Object 1 exists, else Process 1 is skipped.", { exact: true })).toBeVisible();
+  await expect(page.getByText("Process 1 occurs if there is Ready Object 1 in which case Process 1 changes Object 1 from Ready, else Process 1 is skipped.", { exact: true })).toBeVisible();
+  await expect(page.getByText("Process 1 occurs if Ready Object 1 exists, else Process 1 is skipped.", { exact: true })).toBeVisible();
 
   await page.reload();
   await expectWorkbenchReady(page);
   await expect(page.locator(".revision-tag")).toHaveText(revision);
-  await expect(page.locator(".x6-edge")).toHaveCount(4);
+  await expect(page.locator(".x6-edge")).toHaveCount(10);
   await expect(page.locator(".x6-edge-label").filter({ hasText: "c" })).toHaveCount(4);
+  const traceCases = [
+    ["Object 1 initiates Process 1, which consumes Object 1.", "CAP-ISO-CTRL-001"],
+    ["Object 2 initiates and handles Process 1.", "CAP-ISO-CTRL-002"],
+    ["Ready Object 1 initiates Process 1, which consumes Object 1.", "CAP-ISO-CTRL-003"],
+    ["Available Object 2 initiates and handles Process 1.", "CAP-ISO-CTRL-004"],
+    ["Process 1 occurs if Object 1 exists, in which case Process 1 affects Object 2, otherwise Process 1 is skipped.", "CAP-ISO-CTRL-005"],
+    ["Process 1 occurs if Object 1 exists, else Process 1 is skipped.", "CAP-ISO-CTRL-006"],
+    ["Process 1 occurs if there is Ready Object 1 in which case Process 1 changes Object 1 from Ready, else Process 1 is skipped.", "CAP-ISO-CTRL-007"],
+    ["Process 1 occurs if Ready Object 1 exists, else Process 1 is skipped.", "CAP-ISO-CTRL-008"],
+  ] as const;
+  for (const [sentence, capabilityId] of traceCases) {
+    await page.getByText(sentence, { exact: true }).click();
+    await expect(page.locator(".inspector-panel")).toContainText(capabilityId);
+  }
 });
 
 test("Feature Value State 支持 Exhibition 与 State-specified Characterization 并重开", async ({ page }) => {
@@ -435,6 +456,64 @@ test("Structural tagged 与 Aggregation fan 以稳定 Fact ID 更新完整性并
   await expect(page.locator(".revision-tag")).toHaveText(completeRevision);
   await expect(page.locator(`[data-cell-id="${fanFactId}.root"]`)).toHaveCount(1);
   await expect(page.getByText("...", { exact: true })).toHaveCount(0);
+});
+
+test("十类 Structural Link 均通过 Runtime 候选生成 OPL、Trace 并在重开后保持", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1400 });
+  await openNewWorkbench(page, "All structural E2E");
+
+  await commitAndRead(page, page.getByTestId("p03-tool-object"));
+  await commitAndRead(page, page.getByTestId("p03-tool-object"));
+  await commitAndRead(page, page.getByTestId("p03-tool-object"));
+  const objectOne = canvasNode(page, "Object 1");
+  const objectTwo = canvasNode(page, "Object 2");
+  const objectThree = canvasNode(page, "Object 3");
+  await expect(objectOne).toBeVisible();
+  await expect(objectTwo).toBeVisible();
+  await expect(objectThree).toBeVisible();
+
+  await objectOne.click({ position: { x: 20, y: 20 } });
+  await commitAndRead(page, page.getByTestId("p03-tool-attribute"));
+  const attribute = canvasNode(page, "Attribute 1");
+  await createState(page, objectOne, "Ready");
+  await createState(page, objectTwo, "Finished");
+  await createState(page, attribute, "High");
+  const ready = canvasNode(page, "Ready");
+  const finished = canvasNode(page, "Finished");
+  const high = canvasNode(page, "High");
+
+  await createStructuralRelation(page, objectOne, objectTwo, "CAP-ISO-STRUCT-001", undefined, { forward_tag: "owns" });
+  await createStructuralRelation(page, objectOne, objectTwo, "CAP-ISO-STRUCT-002");
+  await createStructuralRelation(page, objectOne, objectTwo, "CAP-ISO-STRUCT-003", undefined, { forward_tag: "includes", reverse_tag: "belongs to" });
+  await createStructuralRelation(page, objectOne, objectTwo, "CAP-ISO-STRUCT-004");
+  await createStructuralRelation(page, objectOne, [objectTwo, objectThree], "CAP-ISO-STRUCT-005", "COMPLETE");
+  await createStructuralRelation(page, objectOne, attribute, "CAP-ISO-STRUCT-006", "COMPLETE");
+  await createStructuralRelation(page, objectOne, [objectTwo, objectThree], "CAP-ISO-STRUCT-007", "COMPLETE");
+  await createStructuralRelation(page, objectOne, objectTwo, "CAP-ISO-STRUCT-008");
+  await createStructuralRelation(page, objectOne, high, "CAP-ISO-STRUCT-009");
+  const revision = await createStructuralRelation(page, ready, finished, "CAP-ISO-STRUCT-010", undefined, { forward_tag: "transfers" });
+
+  await page.reload();
+  await expectWorkbenchReady(page);
+  await expect(page.locator(".revision-tag")).toHaveText(revision);
+  await expect(page.getByTestId("p03-opl-sentence")).toHaveCount(11);
+
+  const traceCases = [
+    ["Object 1 owns Object 2.", "CAP-ISO-STRUCT-001"],
+    ["Object 1 relates to Object 2.", "CAP-ISO-STRUCT-002"],
+    ["Object 1 includes Object 2.", "CAP-ISO-STRUCT-003"],
+    ["Object 1 and Object 2 are related.", "CAP-ISO-STRUCT-004"],
+    ["Object 1 consists of Object 2 and Object 3.", "CAP-ISO-STRUCT-005"],
+    ["Object 1 exhibits Attribute 1.", "CAP-ISO-STRUCT-006"],
+    ["Object 2 and Object 3 are Object 1.", "CAP-ISO-STRUCT-007"],
+    ["Object 2 is an instance of Object 1.", "CAP-ISO-STRUCT-008"],
+    ["Object 1 exhibits High Attribute 1.", "CAP-ISO-STRUCT-009"],
+    ["Ready Object 1 transfers Finished Object 2.", "CAP-ISO-STRUCT-010"],
+  ] as const;
+  for (const [sentence, capabilityId] of traceCases) {
+    await page.getByTestId("p03-opl-sentence").filter({ hasText: sentence }).click();
+    await expect(page.locator(".inspector-panel")).toContainText(capabilityId);
+  }
 });
 
 async function openNewWorkbench(page: Page, prefix: string) {
@@ -544,6 +623,15 @@ async function selectIncompleteFan(page: Page): Promise<string> {
 
 async function applyControl(page: Page, relationIndex: number, capabilityId: string): Promise<string> {
   await page.locator(".x6-edge").nth(relationIndex).click();
+  return applySelectedControl(page, capabilityId);
+}
+
+async function applyControlForText(page: Page, relationText: string, capabilityId: string): Promise<string> {
+  await page.getByTestId("p03-opl-sentence").filter({ hasText: relationText }).click();
+  return applySelectedControl(page, capabilityId);
+}
+
+async function applySelectedControl(page: Page, capabilityId: string): Promise<string> {
   await expect(page.getByTestId("p03-control-open")).toBeVisible();
   await page.getByTestId("p03-control-open").click();
   await expect(page.getByTestId("p03-control-catalog")).toBeVisible();

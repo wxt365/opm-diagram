@@ -1,8 +1,10 @@
 # OPM Profile Package 字段级 Schema
 
-文档版本：`v0.3-draft`
+文档版本：`v1.0`
 
-文档状态：逻辑字段级 schema 与完整关系 Symbol Descriptor 冻结；机器资产和离线加载证据待实现
+文档状态：`FROZEN_INCLUDED`；Profile 字段与完整关系 Symbol Descriptor 冻结
+
+全局设计状态、延期边界和开发准入以 `opm-design-freeze-baseline.md` 为唯一事实源。
 
 更新时间：2026-07-28
 
@@ -432,9 +434,9 @@ logical_path 不允许绝对路径、`..`、符号链接或重复规范化路径
 4. 当前已有代表性 Profile Package JSON Schema/样例，但只引用 Symbol/Grammar 外部资产；完整 Relation Symbol/Marker 机器资产、可执行 Grammar 和加载测试尚未形成；
 5. 本任务没有数据库、DDL、Flyway 或 SQL 变更。
 
-### 11.2 设计建议/待确认
+### 11.2 冻结实现与延期边界
 
-1. `PS-*` 应作为首批 JSON Schema/Protobuf Profile 资产的逻辑输入；
-2. 首个可执行包应至少提供两个 Profile、96 项能力闭包、破损依赖包和跨版本迁移样例；
-3. Clause 4 符号目录及 Clause 7-10 对应图形语义的完整资产、Annex A 完整 EBNF 形成后，应只补资产内容，不改变 Package 所有权边界；
-4. Package 物理容器、签名和可信发布机制仍需独立技术设计。
+1. `PS-*` 是 Profile 机器资产的逻辑输入；当前实现使用 JSON Schema 2020-12，不在开发阶段切换为 Protobuf；
+2. 当前开发包必须按能力范围提供 exact Profile、Rule、Grammar、Symbol、Normalization 依赖闭包、破损依赖包和跨版本样例；中文专属完整包按 `DFD-002` 延期；
+3. Clause 4 完整符号目录和 Annex A 完整 EBNF 按 `DFD-005/006` 延期；重启后只补版本化资产内容，不改变 Package 所有权边界；
+4. Package 物理形态固定为受控目录、manifest、相对路径、byte length、SHA-256 和 exact ID/version/digest；数字签名和可信第三方发布按 `DFD-009` 延期。

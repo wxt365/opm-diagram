@@ -1,8 +1,10 @@
 # OPM 单机建模工具前端交付标注
 
-文档版本：`v0.4-draft`
+文档版本：`v1.0`
 
-文档状态：P0 前端输入与完整画布增量 handoff 冻结；完整画布机器契约已有部分草案但未达到联调门槛
+文档状态：`FROZEN_INCLUDED`；P0 与完整画布前端 handoff 冻结，联调仍受机器契约 Gate 约束
+
+全局设计状态、延期边界和开发准入以 `opm-design-freeze-baseline.md` 为唯一事实源。
 
 更新时间：2026-07-28
 
@@ -87,6 +89,7 @@ apps/web/src/
 5. Pinia 只保存 route/query/local view/resource/editor/projection/task 状态，服务器 Revision 是正式状态；
 6. 原型不进入生产构建。
 7. 通用工具图标采用 Lucide，OPM 领域图标必须来自 Symbol Catalog；当前前端未直接依赖 Lucide，后续前端任务规格必须显式允许并冻结准确依赖版本，或通过现有图标库 ADR 给出等价替代。
+8. 应用 bootstrap 在任何项目查询或编辑器写命令前执行冻结浏览器矩阵和必需 Web API 检查；不支持时只渲染兼容性阻断页。
 
 ## 6. 全局实现口径
 
@@ -253,7 +256,7 @@ apps/web/src/
 3. State 工具、检查器和命令闭环；
 4. Procedural -> Control -> Structural 分包接入；
 5. OPL/Trace/Rule 阻断闭合后逐 Capability 启用；
-6. 桌面/移动视觉、E2E 和性能证据通过后完成发布门槛。
+6. 桌面/窄视口视觉、跨浏览器 E2E 和 Chromium 性能证据通过后完成发布门槛；窄视口不代表移动端产品支持。
 
 ## 12. 联调前检查清单
 
@@ -279,7 +282,7 @@ apps/web/src/
 1. P01-P06 原型已通过桌面/移动浏览器验收；
 2. 当前仓库已有 DEV-00 Vue/Vite/TypeScript 工程壳，但不等于 P01-P03 或完整画布业务实现；
 3. P0 OpenAPI 覆盖 16 个 operationId；
-4. 当前工作区 OpenAPI 草案已有 `CREATE_STATE/UPDATE_STATE/UPDATE_FACT` 和结构化候选，但 `base_fact_capability_ref`、Control Modifier 原子组、Revision Fact `modifiers` 与相应生成/契约测试仍未闭环；
+4. 当前工作区 OpenAPI 已有 `CREATE_STATE/UPDATE_STATE/UPDATE_FACT`、`base_fact_capability_ref`、`AllowedModifier` 和结构化候选，Revision 0.1 Schema 已有 Fact `modifiers[]`；0.2 机器发布、generated client/handler、兼容 reader 和正反 contract test 仍由 DEV-CANVAS-00/03 闭合；
 5. 原型不是生产组件实现。
 
 ### 13.2 建议/待实现

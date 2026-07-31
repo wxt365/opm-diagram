@@ -80,8 +80,10 @@ class CandidateRevisionCommitterTest {
                         base.profileBinding().normalizationAdapter(), base.profileBinding().bindingDigest()),
                 base.rootContextId(), base.elements(), base.states(), base.facts(), base.contexts(), base.occurrences(), base.layouts());
         RecordingRepository ruleRepository = new RecordingRepository(base);
-        assertRejected(new CandidateRevisionCommitter(ruleRepository)
-                .commit(command(base, ruleMismatch, "command.rule", "digest-rule")), CommitFailureCode.RULE_VERSION_CONFLICT);
+        CommitResult ruleResult = new CandidateRevisionCommitter(ruleRepository)
+                .commit(command(base, ruleMismatch, "command.rule", "digest-rule"));
+        assertRejected(ruleResult, CommitFailureCode.RULE_VERSION_CONFLICT);
+        assertEquals("PROFILE_MIGRATION_REQUIRED", ((CommitResult.Rejected) ruleResult).message());
         assertEquals(0, ruleRepository.commitCount);
     }
 

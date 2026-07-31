@@ -1,10 +1,12 @@
 # OPM 配置档能力矩阵
 
-文档版本：`v0.4-draft`
+文档版本：`v1.0`
 
-文档状态：配置档需求基线草案，条款规则组已建立，待原子规则和执行证据
+文档状态：`FROZEN_INCLUDED`；96 项配置档能力设计冻结，完整资产和执行证据分阶段形成
 
-更新时间：2026-07-29
+全局设计状态、延期边界和开发准入以 `docs/design/opm-design-freeze-baseline.md` 为唯一事实源。
+
+更新时间：2026-07-30
 
 ## Task Type
 
@@ -221,10 +223,12 @@ ISO Structural Link 默认不得连接 Object 与 Process，Exhibition-character
 6. 配置档能力报告必须列出未实现的 `SHOULD`、规则版本和测试证据版本。
 7. 未被本矩阵列出的能力必须被阻止，或先通过需求变更流程纳入矩阵。
 
-## 11. 已知缺口
+## 11. 冻结延期与证据边界
 
-- 已建立 ISO 19450:2024 子条款规则组，尚未把每个 `shall/shall not` 拆成原子规则和自动化参数集；
-- 尚未把 Annex A EBNF 拆分为逐句式生成规则；
-- Object、Process、State、Consumption 的 P0 符号尺寸、锚点、连接线和组合绘制规范已经冻结；覆盖全部 96 项能力的完整符号目录和视觉证据仍未形成；
-- 中文资料仍为草案，关系名称、符号或语义发生变化时必须升级配置档版本；
-- 外部 OPM 工具交换格式尚未确定，因此本矩阵只约束内部语义，不宣称工具互操作。
+- ISO 19450:2024 的 103 个规则组已冻结；原子 `shall/shall not` 目录和自动化参数集属于 `DFD-004`；
+- 当前 34 Capability 的 concrete OPL subset 已冻结；Annex A 完整可执行 Grammar 属于 `DFD-005`；
+- 当前开发范围的 Symbol descriptor、marker、label 和 fan 规则已冻结；完整 Clause 4 Symbol Catalog 与全标准视觉证据属于 `DFD-006`；
+- 中文配置档 exact source 固定为 `自动化系统与集成 对象过程语言-20250914`，专属能力和正式 OPT 资产属于 `DFD-002`；来源内容变化必须升级 Profile version；
+- 外部 OPM 工具交换格式与互操作属于 `DFD-008`；本矩阵只约束内部语义，不宣称工具互操作。
+
+上述项目均为 `FROZEN_DEFERRED`，不是开发人员可以自行补全的开放问题；owner、重启条件和禁止实现边界以 `docs/design/opm-design-freeze-baseline.md` 第 5 章为准。

@@ -1,8 +1,10 @@
 # OPM 单机建模工具开发执行包
 
-文档版本：`v0.5`
+文档版本：`v1.0`
 
-文档状态：P0 与完整画布增量范围冻结，可按开发包进入代码开发
+文档状态：`FROZEN_INCLUDED`；全局开发门已打开，仍须按单包依赖与 Gate 开发
+
+全局设计状态、延期边界和开发准入以 `opm-design-freeze-baseline.md` 为唯一事实源。
 
 更新时间：2026-07-29
 
@@ -386,42 +388,37 @@ DEV-00~09 和 DEV-CANVAS-00~06 每包必须在自己的 task spec 中写更具�
 
 ## 11. 开发就绪矩阵
 
-| 门槛 | 状态 | 证据 |
-| --- | --- | --- |
-| 需求范围/非目标 | READY | 主需求、Task 18 |
-| 页面/状态/字段/组件 | READY | 四份 workbench 设计 |
-| 原型验收 | READY | `opm-prototype-acceptance-report.md` |
-| 技术栈/运行拓扑 | READY | ARC-007/008/009 ACCEPTED |
-| 模块/数据所有权 | READY | M01-M12 模块设计 |
-| P0 核心机器字段契约 | READY | MS/PS/RS schema 文档与代表性 JSON Schema |
-| 完整关系逻辑字段契约 | READY | PS-SYM-003/004/005 Relation/Marker/Label Slot Descriptor；机器资产待 DEV-CANVAS-00/05 |
-| HTTP 契约 | READY | OpenAPI 3.1，16 operationId 已验证 |
-| SQLite 初始 schema | READY | V1/verify SQL 已执行验证 |
-| 符号/OPL P0 | READY | 实现契约 + G-OPL-001/002 |
-| 完整画布专题设计 | READY | 工具链设计 + v0.2 符号契约 + handoff |
-| Control/Structural concrete OPL 输入 | READY | 符号与文本契约 7.3.2~7.3.4；Control 20 变体、Structural 全合法变体 |
-| precedence、Token/Trace、golden manifest | READY | 符号与文本契约 7.4、7.5、9.2；Clause 15 错误已纠正 |
-| DEV-CANVAS-05/06 任务规格 | READY | 两份独立 spec/checklist、范围/非目标/DoD/回滚/性能门槛 |
-| 完整画布机器契约 | NEXT | DEV-CANVAS-00；当前 OpenAPI 仅有部分草案，Control/Revision 契约与验收未闭环 |
-| 完整画布生产证据 | DEFERRED | DEV-CANVAS-01~06 尚未执行 |
-| 测试策略 | READY | `opm-test-strategy.md` |
-| 开发拆包/DoD/回滚 | READY | 本文 DEV-00~09、DEV-CANVAS-00~06 |
-| 完整 ISO 符合性 | DEFERRED | 阻断声明，不阻断 P0 框架开发 |
-| P04-P06 生产实现 | DEFERRED | 原型/handoff 完成，后续开发包 |
+| 门槛 | 设计状态 | 实施/证据状态 | 证据 |
+| --- | --- | --- | --- |
+| 全量设计冻结与开发门 | `FROZEN_INCLUDED` | `READY_FOR_DEVELOPMENT` | `opm-design-freeze-baseline.md` |
+| 需求范围/非目标 | `FROZEN_INCLUDED` | 不适用 | 主需求、冻结基线 DFR/DFD |
+| 页面/状态/字段/组件 | `FROZEN_INCLUDED` | 按开发包验证 | 四份 workbench 设计 |
+| 原型验收 | `FROZEN_INCLUDED` | 设计原型 PASS | `opm-prototype-acceptance-report.md` |
+| 技术栈/运行拓扑/浏览器 | `FROZEN_INCLUDED` | 真实发布环境待验证 | ARC-007/008/009、冻结基线第 3 章 |
+| 模块/数据所有权 | `FROZEN_INCLUDED` | 按模块测试 | M01-M12 模块设计 |
+| 核心/完整关系逻辑字段 | `FROZEN_INCLUDED` | 机器资产按 DEV-CANVAS-00/05 | MS/PS/RS、Relation/Marker/Label Slot |
+| P0 HTTP 与完整画布 0.2 目标 | `FROZEN_INCLUDED` | 0.2 发布/生成/contract test 待 DEV-CANVAS-00 | OpenAPI + API 契约 + 冻结基线第 6 章 |
+| Revision 0.2 目标与 SQLite V1 | `FROZEN_INCLUDED` | 0.2 reader/writer/roundtrip 待 DEV-CANVAS-00/03 | 持久化、物理设计、V1 |
+| 完整画布专题与 16/8/10 | `FROZEN_INCLUDED` | 按 DEV-CANVAS-01~04 | 工具链设计 + handoff |
+| concrete OPL/precedence/Token/Trace/golden | `FROZEN_INCLUDED` | 按 GATE-05-01~06 报告 | 符号文本契约 + DEV-CANVAS-05 |
+| 视觉/E2E/性能/恢复/release | `FROZEN_INCLUDED` | 未执行项保持 `NOT_RUN` | 测试策略 + DEV-CANVAS-06 |
+| 开发拆包/DoD/回滚 | `FROZEN_INCLUDED` | 每包重新核验依赖 | 本文 DEV-00~09、DEV-CANVAS-00~06 |
+| P04-P06 生产实现 | `FROZEN_DEFERRED` | `NOT_RUN` | DFD-001 |
+| 中文专属能力、完整 ISO 资产/符合性及其他延期 | `FROZEN_DEFERRED` | `EVIDENCE_MISSING` | DFD-002~010 |
 
-结论：P0 设计与契约具备按既有开发包继续开发的条件；完整画布设计具备从 `DEV-CANVAS-00` 直接进入开发的条件，后续包按依赖门槛推进。该结论不表示完整画布、ISO 资产、安装包或端到端证据已经存在。
+结论：`20` 项当前设计责任和 `10` 项延期边界已全部冻结，`blocked_count=0`，全局开发门为 `READY_FOR_DEVELOPMENT`。开发人员可以选择一个依赖满足的 DEV 包进入实现；该结论不表示完整画布、ISO 资产、安装包或端到端证据已经存在。
 
 ## 12. 风险与遗留项
 
 1. `.harness/repo-profile.md` 仍把仓库描述为 `harness-engineering` 文档模板仓库；本轮禁止修改 `.harness/**`。首个代码任务必须在 task spec 中显式允许 `apps/services/packages/migrations/tests`，并单独安排治理修正；
 2. Flyway SQLite 支持模块和 JDBC 准确版本尚未用工程 PoC 验证；DEV-00/02 必须形成证据，失败时走 ADR；
-3. 代表性 Profile/Rule 不能覆盖完整 ISO 行为，UI 必须持续显示草案/证据未就绪；
+3. 代表性 Profile/Rule 不能覆盖完整 ISO 行为，UI 必须持续显示“证据缺失/无法判断”；
 4. OpenAPI 只覆盖首批 16 operationId，后续能力必须从 application API 契约版本化扩展；
 5. 原型固定数据不能证明性能、事务和恢复；DEV-09 承接真实证据。
-6. 完整画布当前最大的确定阻断是 OpenAPI 草案缺少 `base_fact_capability_ref`、Modifier 基数/原子组，且 Revision Schema Fact 缺少 `modifiers`；DEV-CANVAS-00/03 必须先闭合，前端不得绕过；
+6. OpenAPI 和 Revision 0.1 已出现完整画布关键字段，但 0.2 发布、generated client/handler、兼容 reader 和 roundtrip 仍是 DEV-CANVAS-00/03 的实施 Gate；前端不得绕过；
 7. Control/Structural concrete OPL、Trace 和 golden 已冻结为设计输入，但完整 16/8/10 Grammar、Rule、Symbol 和 manifest 仍不是已验收机器资产；DEV-CANVAS-05/06 通过前不得批量启用；
 8. Lucide 当前不是前端直接依赖，完整工具链前端任务需显式允许新增依赖并冻结版本，或通过 ADR 采用现有图标库等价方案。
-9. 当前 Revision JSON Schema 的 Fact 尚未承载 modifiers；不改 SQLite DDL 不代表机器契约已闭合，DEV-CANVAS-00/03 必须先完成版本化 Schema 与 roundtrip。
+9. 当前 Revision JSON Schema 仍为 0.1 身份；其中出现 `modifiers[]` 不等于独立 0.2 已发布，不改 SQLite DDL也不等于机器契约已验收。
 
 ## 13. 事实与假设
 

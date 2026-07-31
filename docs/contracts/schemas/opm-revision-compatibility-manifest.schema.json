@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:opm:contract:revision-compatibility-manifest:0.1",
+  "title": "OPM Revision Compatibility Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["manifest_id", "manifest_version", "cases"],
+  "properties": {
+    "manifest_id": {"const": "compatibility.revision.0.1-to-0.2"},
+    "manifest_version": {"const": "0.1.0"},
+    "cases": {"type": "array", "minItems": 13, "maxItems": 13, "items": {"$ref": "#/$defs/case"}}
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "relativePath": {"type": "string", "minLength": 1, "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$"},
+    "assetRef": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "version", "sha256"],
+      "properties": {"id": {"type": "string", "minLength": 1}, "version": {"type": "string", "minLength": 1}, "sha256": {"$ref": "#/$defs/digest"}}
+    },
+    "schemaRef": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schema_id", "schema_version", "sha256"],
+      "properties": {"schema_id": {"const": "MS-REV-001"}, "schema_version": {"enum": ["0.1", "0.2"]}, "sha256": {"$ref": "#/$defs/digest"}}
+    },
+    "binding": {
+      "type": "object", "additionalProperties": false,
+      "required": ["profile", "rule_set", "text_grammar", "symbol_catalog", "normalization_adapter", "binding_digest"],
+      "properties": {
+        "profile": {"$ref": "#/$defs/assetRef"}, "rule_set": {"$ref": "#/$defs/assetRef"}, "text_grammar": {"$ref": "#/$defs/assetRef"},
+        "symbol_catalog": {"$ref": "#/$defs/assetRef"}, "normalization_adapter": {"$ref": "#/$defs/assetRef"}, "binding_digest": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "transaction": {
+      "type": "object", "additionalProperties": false,
+      "required": ["revision_delta", "revision_parent_delta", "text_artifact_delta", "text_trace_delta", "finding_delta", "operation_delta", "receipt_delta", "draft_head_changed"],
+      "properties": {
+        "revision_delta": {"type": "integer", "minimum": 0}, "revision_parent_delta": {"type": "integer", "minimum": 0},
+        "text_artifact_delta": {"type": "integer", "minimum": 0}, "text_trace_delta": {"type": "integer", "minimum": 0},
+        "finding_delta": {"type": "integer", "minimum": 0}, "operation_delta": {"type": "integer", "minimum": 0},
+        "receipt_delta": {"type": "integer", "minimum": 0}, "draft_head_changed": {"type": "boolean"}
+      }
+    },
+    "case": {
+      "type": "object", "additionalProperties": false,
+      "required": ["case_id", "mode", "expectation", "input_ref", "input_sha256", "source_schema_ref", "source_binding"],
+      "properties": {
+        "case_id": {"pattern": "^COMPAT-0(?:0[1-9]|1[0-3])\\.[A-Z0-9_]+\\.(PASS|BLOCKED)$"},
+        "mode": {"enum": ["READ", "HISTORICAL_REPLAY", "SQLITE_REOPEN", "V01_TO_V02", "V02_ROUNDTRIP", "ACTIVE_WRITE"]},
+        "expectation": {"enum": ["PASS", "BLOCKED"]}, "input_ref": {"$ref": "#/$defs/relativePath"}, "input_sha256": {"$ref": "#/$defs/digest"},
+        "source_schema_ref": {"$ref": "#/$defs/schemaRef"}, "target_schema_ref": {"$ref": "#/$defs/schemaRef"}, "source_binding": {"$ref": "#/$defs/binding"},
+        "target_binding": {"$ref": "#/$defs/binding"}, "expected_availability": {"enum": ["NOT_RECORDED", "STORED_TEXT_ONLY", "LEGACY_REPLAYED_TEXT", "FULL"]},
+        "expected_error_code": {"type": "string", "minLength": 1}, "expected_detail_code": {"type": "string", "minLength": 1}, "expected_transaction": {"$ref": "#/$defs/transaction"}
+      },
+      "allOf": [
+        {"if": {"properties": {"expectation": {"const": "PASS"}}}, "then": {"required": ["expected_availability", "expected_transaction"], "not": {"anyOf": [{"required": ["expected_error_code"]}, {"required": ["expected_detail_code"]}]}}},
+        {"if": {"properties": {"expectation": {"const": "BLOCKED"}}}, "then": {"required": ["expected_error_code", "expected_detail_code", "expected_transaction"], "not": {"required": ["expected_availability"]}}}
+      ]
+    }
+  }
+}

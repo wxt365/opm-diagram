@@ -8,6 +8,7 @@
 
 - `backend-springboot (primary)`
 - `testing`
+- `design-module-docs`
 
 ## 1. 背景
 

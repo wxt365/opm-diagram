@@ -1,10 +1,12 @@
 # OPM 单机建模工具测试策略
 
-文档版本：`v0.4-draft`
+文档版本：`v1.0`
 
-文档状态：P0 与完整画布分阶段测试基线冻结；生产与 ISO 符合性证据待实现
+文档状态：`FROZEN_INCLUDED`；P0 与完整画布测试设计冻结，生产和 ISO 证据分开记录
 
-更新时间：2026-07-29
+全局设计状态、延期边界和开发准入以 `opm-design-freeze-baseline.md` 为唯一事实源。
+
+更新时间：2026-07-30
 
 ## Task Type
 
@@ -52,9 +54,11 @@
 | SQLite 集成 | 方言、迁移、事务 | 临时独立 `.db` | 临时资产目录 |
 | Spring 集成 | 模块化单体用例 | 临时 SQLite | loopback 或进程内 |
 | E2E | 真实浏览器主路径 | 每场景新项目 | loopback，仅测试目录 |
-| 安装 smoke | 发布形态 | 空目录 + 示例包 | loopback，无外网依赖 |
+| 安装 smoke | 发布形态 | 空 install/storage/browser roots + 固定 P0 smoke fixture | loopback、单 origin、无外网依赖 |
 
 每个测试必须使用独立项目库和资产目录。禁止复用开发者真实项目库、`~/OPM Studio` 或生产备份目录。
+
+浏览器矩阵固定为 Playwright `1.57.0` 对应 Chromium `143.0.7499.4`、Firefox `144.0.2`、WebKit `26.0`。Chromium 运行全部发布 Gate；Firefox/WebKit 运行 P01-P03、Object/Process/State、16/8/10 候选与提交、OPL/Trace 和重开。默认浏览器不受支持时，launcher smoke 必须证明兼容性页阻断编辑、零写命令、loopback 地址可复制并可在支持浏览器重开。
 
 ## 5. 标准夹具
 
@@ -67,7 +71,9 @@
 | `G-OPL-PROC-001~016` | 符号/文本契约，由 DEV-CANVAS-05 形成机器 fixture | 16 类 Procedural 及全部受控变体 |
 | `G-OPL-CTRL-001~008` | 符号/文本契约，由 DEV-CANVAS-05 形成机器 fixture | 8 类 Control 及允许的基础关系变体 |
 | `G-OPL-STRUCT-001~010` | 符号/文本契约，由 DEV-CANVAS-05 形成机器 fixture | 10 类 Structural、fan、标签和完整性 |
+| `complete-canvas-perf-small` | DEV-CANVAS-06 性能 factory | 工具切换、选择、检查器反馈和四类增量 OPL mutation |
 | `complete-canvas-large-opd` | DEV-CANVAS-06 测试 factory | 300/600 需求基线与 1000/2000 设计压力集 |
+| `complete-canvas-large-model` | DEV-CANVAS-06 性能 factory | 10 个 OPD、10,000 semantic construct、20,000 Fact 的保存/快照/全量校验 |
 | `empty-project` | 测试 factory | P01/P02 空状态 |
 | `baseline-project` | 测试 factory | 不可变基线与建草稿 |
 | `conflict-project` | 测试 factory | revision/idempotency 冲突 |
@@ -197,7 +203,16 @@ Control pair 至少覆盖以下正反例：
 | E2E-CANVAS-006 | 删除影响 | State/Fact 影响摘要可定位，过期或不匹配 impact token 被阻断 |
 | E2E-CANVAS-007 | 故障与只读 | asset-missing、text-blocked、conflict、persistence-failed、readonly 均保留最近 committed Projection |
 
-桌面最小矩阵：`1440x900`、`1280x800`。窄视口设计回归：`390x844`，保证页面无全局横向溢出；P0 生产定位仍为桌面优先。完整画布还必须在 `25%/100%/400%` 对 State、全部 marker、长标签、fan、候选层和检查器执行 visual golden 与 canvas pixel 非空/遮挡检查。
+桌面最小矩阵：`1440x900`、`1280x800`。窄视口设计回归：`390x844`，保证页面无全局横向溢出；它不构成移动端产品支持。完整画布还必须在 `25%/100%/400%` 对 State、全部 marker、长标签、fan、候选层和检查器执行 visual golden 与 canvas pixel 非空/遮挡检查。
+
+### 9.3 DEV-CANVAS-06 Visual/E2E 机器闭包
+
+1. Visual release catalog 固定 `378` 个 case：Capability `34×3×3=306`，公共主题 `8×3×3=72`；每项两次隔离执行，共 `756` 条 attempt evidence。
+2. Capability visual case 内按 exact Symbol Descriptor 展开全部 visual variant capture；每个 capture 比较版本化 golden、空白对照、像素非空、关键区域、几何/遮挡、文本裁剪和页面溢出。
+3. E2E release catalog 固定 `194` 个 case：按 Handoff coverage keys 派生家族 `178=130 PASS+48 BLOCKED`，公共 `16`；每项两次隔离执行，共 `388` 条 attempt evidence。
+4. 家族 suite 映射固定为 Procedural -> `E2E-CANVAS-002`、Control -> `003`、Structural -> `004`；公共 suite 固定为 State `001`、候选归一化 `005`、删除影响 `006`、故障/只读 `007`。
+5. release visual/E2E 使用 production build、独立 browser context/project、固定时钟/locale/timezone/font/Chromium、`workers=1/retries=0`；dev server、人工观察、组件 mock 或重试后的绿色结果不能作为 Gate 证据。
+6. 唯一字段、case ID、像素容差、失败码、Report READY 算法和 golden 更新边界由 `docs/checklists/opm-dev-canvas-06-toolchain-release-checklist.md` 的 `GATE-06-03` 执行契约承接，测试策略不维护第二套数值。
 
 ## 10. 非功能验证
 
@@ -219,11 +234,38 @@ Control pair 至少覆盖以下正反例：
 
 性能使用 production/release build、Java 21、Node 22、lockfile 对应 Chromium、至少 8 逻辑 CPU/16 GB RAM/SSD，关闭 HMR、DevTools、CPU/network throttling 和节能模式。结果必须报告 exact 版本、数据规模、fixture/asset digests、机器、OS、冷/热启动、P50/P95/Max、失败率和原始样本。不同机器或版本不得混算同一 P95；原型或 dev build 响应时间不作为生产性能证据。
 
+#### 10.1.1 DEV-CANVAS-06 Performance 机器闭包
+
+1. Performance release catalog 固定 `4` 个 fixture、`7` 个 scenario、按 `(scenario_id, metric_id)` 计数的 `11` 个 metric instance 和 `7` 份 raw sample set；Manifest/Raw Samples/Report 使用独立机器 Schema。
+2. UI/OPL/selection 使用浏览器 monotonic clock，frame 使用连续 `requestAnimationFrame` delta，保存/快照/校验使用 Node monotonic clock；单个 series 禁止混用计时域。
+3. duration 统一保存为整数微秒；P50/P95 使用 nearest-rank，不插值、不删除 outlier、timeout、OOM 或失败样本。失败样本进入失败率并阻断 Gate。
+4. 两档 OPD 的 frame 分别至少保留 `900/600` 个 30 秒 measured sample；非 frame measured sample 总计 `615`，三类大模型任务各 5 次零失败且结果完整。
+5. 性能只能在继承 Intake upstream artifacts 的同一 clean DEV-CANVAS-06 target build、固定机器/浏览器/JVM/fixture/environment fingerprint 上汇总；不同指纹不得混算。
+6. 唯一场景 ID、计时起止点、sample series 字段、P95 公式、环境守卫、失败码和 Report READY 算法由 DEV-CANVAS-06 checklist 的 `GATE-06-04` 执行契约承接。
+
 ### 10.2 可靠性与恢复
 
 在 Candidate、Rule、Symbol/Grammar 解析、OPL、Trace、SQLite commit、Head update、Projection 回读和资产写入阶段注入失败；验证无部分 Revision、无错误 Head、候选可恢复且不会显示为 committed。对 option/impact token 过期、digest mismatch、State owner mismatch、fan 成员冲突和 Control 非法 segment 使用稳定错误断言。强制终止运行时后重启，检查任务终态、临时文件清理和最近耐久 Revision 重开。
 
-### 10.3 安全
+#### 10.2.1 DEV-CANVAS-06 Recovery/Rollback 机器闭包
+
+1. Recovery release catalog 固定 `28=8+7+4+3+6` 个 case，每项两个隔离 attempt，共 `56`；Manifest、test-only Gate Fixture 和 Report 使用独立机器 Schema，两次规范化 outcome digest 必须一致。
+2. 前置资产/语义和 SQLite 七写阶段失败必须复用 DEV-CANVAS-05 的 Revision/Parent/Text/Trace/Finding/Operation/Receipt 七项零增量与 Head ID/sequence 口径；pre-repository case 还必须证明 repository 未调用。
+3. 强停必须以 exact release JAR 启动独立 Local Runtime 子进程并由新 JVM/连接/context 重开；commit 前强停保持零增量，commit 后断连或 Projection 回读失败必须证明恰好一次提交和同 command_id 幂等回放。Report 固定记录 OS/filesystem、SQLite/JVM/runtime args 和 source artifact 的环境指纹。
+4. 发布前 gate 演练只使用 production loader 明确拒绝的 test-only fixture，通过测试组合根调用与生产相同的 rollback evaluator；真实 production gate 在全部 attempt 前后保持 `DISABLED + []`。
+5. 部分回退按前序 enabled 集合减 requested 与 Control 反向依赖闭包生成 `ROLLED_BACK_PARTIAL`；全量回退生成 `ROLLED_BACK`。历史含 disabled Capability 的 Revision 仍按 exact binding 只读渲染，新写入稳定阻断且零增量。
+6. 唯一 case ID、故障到达点、attempt 字段、事务/重开快照、失败码和 Report READY 算法由 DEV-CANVAS-06 checklist 的 `GATE-06-05` 执行契约承接。
+
+### 10.3 DEV-CANVAS-06 Release Candidate Smoke
+
+1. 发布候选固定使用 Manifest、Report 和平台定向 ZIP；Web production dist 内嵌 Spring Boot JAR，由单一 loopback origin 提供，smoke 不得使用 Vite、源码目录、npm/Maven 或开发者数据。
+2. case catalog 固定为 clean install/start/health/open/reopen/exit `6` 项；`LANE-01/LANE-02` 各在独立 install/storage/browser/process/port 中执行一遍，共 `12` 条 attempt evidence，无 retry、skip 或现有进程复用。
+3. OPEN 使用真实 UI 创建 P0 Object/Process/Consumption 并记录 Revision、Projection、OPL、Trace digest；REOPEN 以新 Runtime 进程和浏览器上下文验证身份/digest 不变；EXIT 验证正常退出、无残留进程和 SQLite 完整性。
+4. Manifest/Report 必须锁定 source build、`package-lock.json`、Maven inputs、Web dist tree、JAR、ZIP、target environment 以及 Intake/Visual/E2E/Performance/Recovery/Candidate 的 exact ref/SHA。
+5. Candidate 必须为 `READY_FOR_ACTIVATION`，但 smoke 前中后 production gate 均为 `DISABLED + []`；Release Report READY 后才允许独立 Activation 命令消费 exact Candidate 和 Report。
+6. 唯一 case ID、阈值、字段、20 个失败码和 READY 算法由 DEV-CANVAS-06 checklist 的 `GATE-06-06` 执行契约承接。产品发布证据不等于 ISO 19450:2024 符合性证据。
+
+### 10.4 安全
 
 1. 非 loopback 绑定失败；
 2. 缺/错 `X-OPM-Session` 拒绝；
@@ -246,6 +288,14 @@ npm run test:e2e
 ./mvnw verify
 ```
 
+DEV-CANVAS-06 `GATE-06-06` 还冻结以下未来稳定入口；当前仓库尚未实现，不得列为已执行：
+
+```text
+npm run release:canvas06:assemble
+npm run release:canvas06:smoke
+npm run release:canvas06:verify -- --require-ready
+```
+
 CI 顺序：静态契约 -> 前后端单元/组件 -> SQLite/API/模块集成 -> OPL golden/视觉 -> 浏览器 E2E -> 性能门槛 -> 打包 smoke。P0 只执行已进入 P0 的门槛；完整画布按 DEV-CANVAS 依赖逐步加入，任何 enabled Capability 的必需阶段失败即阻断合并或发布。Conformance Suite 独立报告，不得被普通测试绿色替代。
 
 ## 12. 完成定义
@@ -266,18 +316,19 @@ CI 顺序：静态契约 -> 前后端单元/组件 -> SQLite/API/模块集成 ->
 1. DEV-CANVAS-00 的 OpenAPI、generated DTO、兼容性和正反 contract test 通过后，才允许 State/Fact 联调；
 2. State 与 16/8/10 每个 enabled Capability 都具有 descriptor、端点正反例、领域命令、Rule、Projection 和组件测试；
 3. 三个完整 golden 主集合及所有 Profile 允许变体通过，且 Symbol/OPL/Token/Trace/digest 同 Revision 可重复；
-4. E2E-CANVAS-001~007、三视口、三缩放比例 visual golden 和 canvas pixel 检查通过；
-5. NFR-PERF-001~004 达到第 10.1 节全部延迟、frame、任务时限、样本量和零失败门槛；
-6. 失败注入证明任一阶段失败无 partial Revision，feature gate 回滚后已有数据保持只读可渲染；
-7. 只有对应 Capability 的 Symbol/Rule/Grammar/golden 依赖闭包均通过时才可生产启用；
-8. 完整工具菜单不等于 ISO 19450:2024 符合性，界面和报告继续按证据状态显示。
+4. E2E-CANVAS-001~007 的 `194/194` case 与 `388/388` attempt，以及三视口/三缩放 visual 的 `378/378` case 与 `756/756` attempt 全部通过；
+5. NFR-PERF-001~004 的 `7/7` scenario、`11/11` metric instance、7 份 raw sample set 达到第 10.1 节全部延迟、frame、任务时限、样本量、完整性和零失败门槛；
+6. Recovery/Rollback 的 `28/28` case 与 `56/56` attempt 证明失败无 partial Revision、强停可重开、幂等不重复提交，部分/全量 gate 回退后已有数据保持只读可渲染；
+7. Release Candidate Manifest/Report Schema 合法，exact ZIP 的 `6/6` smoke case 与 `12/12` attempt 通过，Candidate 和 production gate 在 Activation 前保持 `READY_FOR_ACTIVATION + DISABLED + []`；
+8. 只有对应 Capability 的 Symbol/Rule/Grammar/golden 依赖闭包均通过，且 Activation 引用 exact READY Release Report 时才可生产启用；
+9. 完整工具菜单和产品发布报告不等于 ISO 19450:2024 符合性，界面和报告继续按证据状态显示。
 
 ## 13. 事实与假设
 
 ### 13.1 事实
 
-1. 当前已有 JSON Schema 样例、P0 OpenAPI、SQLite V1、无构建浏览器原型、DEV-00 前后端工程壳，以及尚未完成验收的完整画布 OpenAPI 部分草案；
-2. 当前已有前端 lint/typecheck/unit/build/E2E 与 Maven test/verify 命令入口，但没有 P0 业务闭环、闭合的完整画布机器契约、CI 发布流水线或安装包；
+1. 当前已有 JSON Schema 样例、P0/完整画布 OpenAPI 设计输入、SQLite V1、无构建浏览器原型和前后端工程；OpenAPI 0.2 发布、generated client/handler 与 Revision 0.2 roundtrip 仍按 DEV-CANVAS-00/03 验收；
+2. 当前已有前端 lint/typecheck/unit/build/E2E 与 Maven test/verify 命令入口，DEV-CANVAS-06 `GATE-06-01~06` 设计契约已冻结；对应机器 Schema、release runner、golden/sample/recovery/release report、production Web 静态打包、P0 业务闭环、CI 发布流水线和安装包尚未形成；
 3. SQLite 与发布数据库相同，持久层测试不采用 H2 替代。
 
 ### 13.2 假设/待实现

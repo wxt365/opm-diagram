@@ -1,10 +1,12 @@
 # OPM 单机建模工具需求验收追踪矩阵
 
-文档版本：`v0.8-draft`
+文档版本：`v1.0`
 
-文档状态：验收设计基线；设计资产已有验证，生产实现证据尚无
+文档状态：`FROZEN_INCLUDED`；验收设计冻结，执行证据按开发包记录
 
-更新时间：2026-07-29
+全局设计状态、延期边界和开发准入以 `docs/design/opm-design-freeze-baseline.md` 为唯一事实源。
+
+更新时间：2026-07-30
 
 ## Task Type
 
@@ -14,33 +16,34 @@
 
 本文档将产品需求、非功能需求和配置档能力逐项映射到可执行的验收设计，作为后续测试方案、自动化用例、原型验收和发布证据的统一追踪入口。
 
-本文档中的“预期结果”是未来实现必须满足的判定口径，不表示当前产品已经实现或测试通过。当前仓库尚无应用代码、自动化测试结果、代表性模型执行记录或外部工具互操作证据，因此不得据此宣称产品符合 ISO 19450:2024。
+本文档中的“预期结果”是实现必须满足的判定口径，不表示当前产品已经实现或测试通过。本次设计冻结不复核当前应用代码、自动化测试结果、代表性模型执行记录或外部工具互操作证据，因此不得据此宣称产品符合 ISO 19450:2024。
 
 ## 2. 输入与边界
 
 ### 2.1 输入基线
 
-1. `docs/requirements/opm-online-modeling-tool-requirements.md` `v0.13-draft`
-2. `docs/requirements/opm-profile-capability-matrix.md` `v0.3-draft`
-3. `docs/requirements/iso-19450-2024-conformance-matrix.md` `v0.1-draft`
-4. `docs/requirements/opm-common-semantic-core.md` `v0.4-draft`
-5. `docs/design/opm-modeling-workbench-page-design.md` `v0.3-draft`
-6. `docs/design/opm-modeling-workbench-state-model.md` `v0.3-draft`
-7. `docs/design/opm-modeling-workbench-field-region-detail.md` `v0.3-draft`
-8. `docs/design/opm-modeling-workbench-component-interaction.md` `v0.3-draft`
-9. `docs/design/opm-modeling-tool-application-api-contract.md` `v0.3-draft`
-10. `docs/design/opm-modeling-tool-persistence-contract.md` `v0.3-draft`
-11. `docs/design/opm-native-exchange-package-contract.md` `v0.3-draft`
-12. `docs/design/opm-core-metamodel-field-schema.md` `v0.1-draft`
-13. `docs/design/opm-profile-package-field-schema.md` `v0.1-draft`
-14. `docs/design/opm-rule-definition-field-schema.md` `v0.1-draft`
-15. `docs/design/opm-development-execution-pack.md` `v0.1`
-16. `docs/design/opm-test-strategy.md` `v0.1-draft`
+1. `docs/design/opm-design-freeze-baseline.md` `1.0`
+2. `docs/requirements/opm-online-modeling-tool-requirements.md` `v1.0`
+3. `docs/requirements/opm-profile-capability-matrix.md` `v1.0`
+4. `docs/requirements/iso-19450-2024-conformance-matrix.md` `v1.0`
+5. `docs/requirements/opm-common-semantic-core.md` `v1.0`
+6. `docs/design/opm-modeling-workbench-page-design.md` `v1.0`
+7. `docs/design/opm-modeling-workbench-state-model.md` `v1.0`
+8. `docs/design/opm-modeling-workbench-field-region-detail.md` `v1.0`
+9. `docs/design/opm-modeling-workbench-component-interaction.md` `v1.0`
+10. `docs/design/opm-modeling-tool-application-api-contract.md` `v1.0`
+11. `docs/design/opm-modeling-tool-persistence-contract.md` `v1.0`
+12. `docs/design/opm-native-exchange-package-contract.md` `v1.0`
+13. `docs/design/opm-core-metamodel-field-schema.md` `v1.0`
+14. `docs/design/opm-profile-package-field-schema.md` `v1.0`
+15. `docs/design/opm-rule-definition-field-schema.md` `v1.0`
+16. `docs/design/opm-development-execution-pack.md` `v1.0`
+17. `docs/design/opm-test-strategy.md` `v1.0`
 
 JSON Schema 样例、OpenAPI、SQLite V1 和原型浏览器验收属于“设计资产验证”，不替代未来生产代码、迁移、安装包和 E2E 的验收证据。各 AT-* 只有在对应生产实现上执行并保存环境/输入/结果后才能标记 PASS。
-15. `reference/ISO+19450-2024.pdf`
-16. `reference/自动化系统与集成 对象过程语言-20250914.pdf`
-17. `reference/基于OPL的架构建模方法20260425.pdf`
+18. `reference/ISO+19450-2024.pdf`
+19. `reference/自动化系统与集成 对象过程语言-20250914.pdf`
+20. `reference/基于OPL的架构建模方法20260425.pdf`
 
 ### 2.2 本轮覆盖
 
@@ -83,7 +86,7 @@ JSON Schema 样例、OpenAPI、SQLite V1 和原型浏览器验收属于“设计
 ### 3.3 发布门槛
 
 1. 所有 `MUST` 功能需求和配置档能力必须为 `PASS`。
-2. 所有阻断性 `NFR-*` 必须为 `PASS`；尚未冻结阈值的指标只能标记 `BLOCKED`，不能静默通过。
+2. 所有阻断性 `NFR-*` 必须按冻结阈值为 `PASS`；输入、环境或执行证据缺失时只能标记 `BLOCKED`，不能静默通过。
 3. `SHOULD` 未实现项必须列入能力报告或发布偏差清单，并由产品评审接受。
 4. `COULD` 不阻断首期发布，但不得显示为已支持。
 5. 任一 `FORBIDDEN` 能力被静默接受，或任一图文等价、原子保存、基线只读测试失败，均阻断发布。
@@ -294,7 +297,7 @@ JSON Schema 样例、OpenAPI、SQLite V1 和原型浏览器验收属于“设计
 | NFR-UX-002 | AT-NFR-UX-002 非纯颜色表达 | TD-INVALID + TD-CN-BASE | 状态、错误等级和可见性同时具备文字、形状、图标或线型线索 | MANUAL + 视觉回归 | 主需求 13.4 |
 | NFR-UX-003 | AT-NFR-UX-003 图标可理解 | 全部工具栏和上下文菜单 | 陌生图标均有可访问名称或悬停工具提示，键盘聚焦可读取 | E2E + MANUAL | 主需求 13.4 |
 | NFR-UX-004 | AT-NFR-UX-004 错误可读性 | TD-INVALID | 错误含业务说明和修复建议，不仅显示规则代码 | MANUAL + E2E | 主需求 13.4 |
-| NFR-UX-005 | AT-NFR-UX-005 浏览器矩阵 | 待冻结浏览器版本 | 冻结后的每个桌面浏览器通过核心主路径；冻结前标记 BLOCKED | 跨浏览器 E2E | 主需求 13.4 |
+| NFR-UX-005 | AT-NFR-UX-005 浏览器矩阵 | Playwright 1.57.0：Chromium `143.0.7499.4`、Firefox `144.0.2`、WebKit `26.0` | Chromium 通过全部发布 Gate；Firefox/WebKit 通过核心主路径；不受支持的默认浏览器进入阻断页且无写命令 | 跨浏览器 E2E + launcher smoke | 主需求 13.4；冻结基线第 3 章 |
 | NFR-UX-006 | AT-NFR-UX-006 界面与模型语言 | 中英文及其他 Unicode 名称样例 | 界面至少为简体中文，模型名称可保存、显示、搜索和导出其他语言 | E2E + DATA | 主需求 13.4 |
 | NFR-MAINT-001 | AT-NFR-MAINT-001 规则资产版本化 | TD-VERSION | 元模型、配置档、生成和校验规则均有不可歧义版本标识 | DATA | 主需求 13.5 |
 | NFR-MAINT-002 | AT-NFR-MAINT-002 文本规则追溯 | TD-CAP-ISO + TD-CAP-CN | 任一正式语句可定位元素、Model Fact 和生成规则版本 | INT + DATA | ISO Annex C；主需求 13.5 |
@@ -448,11 +451,10 @@ JSON Schema 样例、OpenAPI、SQLite V1 和原型浏览器验收属于“设计
 4. 本矩阵的“标准来源”逐步链接到 `ISOR-*` 内部规则组；原子规则形成后继续链接到条款测试，不复制第二套标准规则内容。
 5. 用例实际执行后，在独立测试报告记录证据，不把动态执行结果回写为需求事实。
 
-## 10. 当前缺口与下一步
+## 10. 冻结延期与执行边界
 
-- `NFR-UX-005` 的浏览器矩阵尚待冻结；NFR-PERF-001~004 的阈值已冻结，执行证据仍由 DEV-CANVAS-06 形成；
-- `FR-IO-007` 的外部交换格式和代表性工具尚未确定；
-- `FR-ASSET-006` 的本体映射样例和发布契约尚未设计；
-- 96 项能力和 103 个 ISO 子条款规则组已有字段级表达入口，但仍需把每个 `shall/shall not` 拆为原子规则、符号断言、OPL 句式和自动化参数集；
-- 三份逻辑字段级 schema 已形成，仍需转换为机器可读 schema，并用两个 Profile Package、代表性模型和破损包验证引用、兼容与回滚；
-- 下一步应评审字段级 schema，完成可交互原型验收；原子规则与机器可读规则包可按代表组先行验证表达力。
+- 浏览器矩阵和 NFR-PERF-001~004 的阈值已冻结；执行证据由对应跨浏览器、DEV-CANVAS-06 和 release 报告形成；
+- `FR-IO-007` 外部工具交换、`FR-ASSET-006` 本体映射与发布为 `FROZEN_DEFERRED`，不得在当前发布中伪装支持；
+- 96 项能力和 103 个 ISO 规则组的设计入口已冻结；原子规则、完整 Annex A Grammar、完整 Clause 4 Symbol Catalog 和符合性声明为 `FROZEN_DEFERRED`；
+- 三份逻辑字段设计和当前机器 Schema 是开发输入；Revision 0.2、完整 Profile/Rule/Grammar/Symbol 包、代表模型和破损包属于待实现/待执行证据；
+- P01-P06 原型验收已完成，当前全局设计门为 `READY_FOR_DEVELOPMENT`；单个用例仍保持 `NOT_RUN`，直到在 exact build、fixture 和环境上保存证据。

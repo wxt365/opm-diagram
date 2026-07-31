@@ -1,8 +1,10 @@
 # OPM 单机建模工具页面专题设计包
 
-文档版本：`v0.3-draft`
+文档版本：`v1.0`
 
-文档状态：P01-P06 信息架构经原型验证，P0 handoff 已冻结
+文档状态：`FROZEN_INCLUDED`；P01-P06 信息架构与 handoff 冻结
+
+全局设计状态、延期边界和开发准入以 `opm-design-freeze-baseline.md` 为唯一事实源。
 
 更新时间：2026-07-27
 

@@ -1,11 +1,15 @@
 package org.opm.localruntime.command;
 
+import org.opm.localruntime.assets.ProfilePackageAssembler;
+import org.opm.localruntime.assets.ProfilePackageAssemblyException;
 import org.opm.localruntime.semantic.SemanticRevision;
 import org.opm.localruntime.semantic.SemanticRevisionValidator;
 import org.opm.localruntime.semantic.SemanticValidationProblem;
 import org.opm.localruntime.text.OplGenerationException;
 import org.opm.localruntime.text.OplGenerationResult;
+import org.opm.localruntime.text.OplGrammar;
 import org.opm.localruntime.text.OplTextGenerationService;
+import org.opm.localruntime.text.TextGenerationAssets;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -20,18 +24,25 @@ public final class CandidateRevisionCommitter {
     private final RevisionCommitRepository repository;
     private final SemanticRevisionValidator semanticValidator;
     private final OplTextGenerationService textGenerationService;
+    private final ProfilePackageAssembler profilePackageAssembler;
 
     public CandidateRevisionCommitter(RevisionCommitRepository repository) {
-        this(repository, new SemanticRevisionValidator(), new OplTextGenerationService());
+        this(repository, new SemanticRevisionValidator(), new OplTextGenerationService(), null);
+    }
+
+    public CandidateRevisionCommitter(RevisionCommitRepository repository, ProfilePackageAssembler profilePackageAssembler) {
+        this(repository, new SemanticRevisionValidator(), new OplTextGenerationService(), profilePackageAssembler);
     }
 
     CandidateRevisionCommitter(
             RevisionCommitRepository repository,
             SemanticRevisionValidator semanticValidator,
-            OplTextGenerationService textGenerationService) {
+            OplTextGenerationService textGenerationService,
+            ProfilePackageAssembler profilePackageAssembler) {
         this.repository = Objects.requireNonNull(repository, "repository must not be null");
         this.semanticValidator = Objects.requireNonNull(semanticValidator, "semanticValidator must not be null");
         this.textGenerationService = Objects.requireNonNull(textGenerationService, "textGenerationService must not be null");
+        this.profilePackageAssembler = profilePackageAssembler;
     }
 
     public CommitResult commit(CandidateRevisionCommand command) {
@@ -51,6 +62,15 @@ public final class CandidateRevisionCommitter {
         CommitResult.Rejected guardFailure = guards(command);
         if (guardFailure != null) return guardFailure;
 
+        final TextGenerationAssets assets;
+        final OplGrammar grammar;
+        try {
+            assets = profilePackageAssembler == null ? null : profilePackageAssembler.assemble(command.candidateRevision().profileBinding());
+            grammar = assets == null ? command.grammar() : assets.grammar();
+        } catch (ProfilePackageAssemblyException exception) {
+            return rejected(CommitFailureCode.TEXT_GENERATION_BLOCKED, List.of(), exception.code().name());
+        }
+
         List<CommitFinding> findings = semanticValidator.validate(command.candidateRevision()).stream()
                 .map(problem -> finding(command.candidateRevision(), problem))
                 .toList();
@@ -61,8 +81,16 @@ public final class CandidateRevisionCommitter {
 
         final OplGenerationResult text;
         try {
-            text = textGenerationService.generate(command.candidateRevision(), command.candidateRevision().rootContextId(), command.grammar());
+            text = assets == null
+                    ? textGenerationService.generate(command.candidateRevision(), command.candidateRevision().rootContextId(), grammar)
+                    : textGenerationService.generate(command.candidateRevision(), command.candidateRevision().rootContextId(), assets);
+            if (assets != null) {
+                textGenerationService.validateActiveWriteEvidence(command.candidateRevision(), assets, text);
+            }
         } catch (OplGenerationException exception) {
+            if (exception.code() == org.opm.localruntime.text.OplGenerationCode.MODIFIER_COMBINATION_INVALID) {
+                return rejected(CommitFailureCode.MODIFIER_COMBINATION_INVALID, List.of(), exception.code().name());
+            }
             return rejected(CommitFailureCode.TEXT_GENERATION_BLOCKED, List.of(), exception.code().name());
         }
         return repository.commit(new RevisionCommitBundle(command, command.candidateRevision(), text, validation));
@@ -93,7 +121,7 @@ public final class CandidateRevisionCommitter {
         }
         if (!command.expectedBinding().matches(command.baseRevision()) || !command.expectedBinding().matches(command.candidateRevision())
                 || !sameBinding(command.baseRevision(), command.candidateRevision())) {
-            return rejected(CommitFailureCode.RULE_VERSION_CONFLICT, List.of(), "Profile or rule binding differs from the base revision");
+            return rejected(CommitFailureCode.RULE_VERSION_CONFLICT, List.of(), "PROFILE_MIGRATION_REQUIRED");
         }
         return null;
     }

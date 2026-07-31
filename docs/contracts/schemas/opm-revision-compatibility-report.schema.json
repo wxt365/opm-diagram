@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:opm:contract:revision-compatibility-report:0.1",
+  "title": "OPM Revision Compatibility Report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "manifest", "runner_version", "schema_refs", "historical_binding", "active_binding", "case_count", "pass_count", "blocked_count", "failed_count", "cases"],
+  "properties": {
+    "schema_id": {"const": "OPM-REVISION-COMPATIBILITY-REPORT-001"}, "schema_version": {"const": "0.1"},
+    "manifest": {"$ref": "#/$defs/manifest"}, "runner_version": {"type": "string", "minLength": 1},
+    "schema_refs": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"$ref": "#/$defs/schemaRef"}},
+    "historical_binding": {"$ref": "#/$defs/binding"}, "active_binding": {"$ref": "#/$defs/binding"},
+    "case_count": {"const": 13}, "pass_count": {"type": "integer", "minimum": 0}, "blocked_count": {"type": "integer", "minimum": 0}, "failed_count": {"type": "integer", "minimum": 0},
+    "cases": {"type": "array", "minItems": 13, "maxItems": 13, "items": {"$ref": "#/$defs/case"}}
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "assetRef": {"type": "object", "additionalProperties": false, "required": ["id", "version", "sha256"], "properties": {"id": {"type": "string", "minLength": 1}, "version": {"type": "string", "minLength": 1}, "sha256": {"$ref": "#/$defs/digest"}}},
+    "binding": {"type": "object", "additionalProperties": false, "required": ["profile", "rule_set", "text_grammar", "symbol_catalog", "normalization_adapter", "binding_digest"], "properties": {"profile": {"$ref": "#/$defs/assetRef"}, "rule_set": {"$ref": "#/$defs/assetRef"}, "text_grammar": {"$ref": "#/$defs/assetRef"}, "symbol_catalog": {"$ref": "#/$defs/assetRef"}, "normalization_adapter": {"$ref": "#/$defs/assetRef"}, "binding_digest": {"$ref": "#/$defs/digest"}}},
+    "schemaRef": {"type": "object", "additionalProperties": false, "required": ["schema_id", "schema_version", "sha256"], "properties": {"schema_id": {"const": "MS-REV-001"}, "schema_version": {"enum": ["0.1", "0.2"]}, "sha256": {"$ref": "#/$defs/digest"}}},
+    "manifest": {"type": "object", "additionalProperties": false, "required": ["manifest_id", "manifest_version", "sha256"], "properties": {"manifest_id": {"const": "compatibility.revision.0.1-to-0.2"}, "manifest_version": {"const": "0.1.0"}, "sha256": {"$ref": "#/$defs/digest"}}},
+    "transaction": {"type": "object", "additionalProperties": false, "required": ["revision_delta", "revision_parent_delta", "text_artifact_delta", "text_trace_delta", "finding_delta", "operation_delta", "receipt_delta", "draft_head_changed"], "properties": {"revision_delta": {"type": "integer", "minimum": 0}, "revision_parent_delta": {"type": "integer", "minimum": 0}, "text_artifact_delta": {"type": "integer", "minimum": 0}, "text_trace_delta": {"type": "integer", "minimum": 0}, "finding_delta": {"type": "integer", "minimum": 0}, "operation_delta": {"type": "integer", "minimum": 0}, "receipt_delta": {"type": "integer", "minimum": 0}, "draft_head_changed": {"type": "boolean"}}},
+    "attempt": {"type": "object", "additionalProperties": false, "required": ["attempt", "observed_status", "input_sha256", "output_sha256", "availability", "error_code", "detail_code", "transaction", "head_before", "head_after"], "properties": {"attempt": {"enum": [1, 2]}, "observed_status": {"enum": ["PASS_MATCHED", "BLOCKED_MATCHED", "FAILED"]}, "input_sha256": {"$ref": "#/$defs/digest"}, "output_sha256": {"type": ["string", "null"], "pattern": "^[a-f0-9]{64}$"}, "availability": {"type": ["string", "null"], "enum": ["NOT_RECORDED", "STORED_TEXT_ONLY", "LEGACY_REPLAYED_TEXT", "FULL", null]}, "error_code": {"type": ["string", "null"]}, "detail_code": {"type": ["string", "null"]}, "transaction": {"$ref": "#/$defs/transaction"}, "head_before": {"type": ["string", "null"]}, "head_after": {"type": ["string", "null"]}}},
+    "case": {"type": "object", "additionalProperties": false, "required": ["case_id", "expectation", "observed_status", "attempts"], "properties": {"case_id": {"pattern": "^COMPAT-0(?:0[1-9]|1[0-3])\\.[A-Z0-9_]+\\.(PASS|BLOCKED)$"}, "expectation": {"enum": ["PASS", "BLOCKED"]}, "observed_status": {"enum": ["PASS_MATCHED", "BLOCKED_MATCHED", "FAILED"]}, "attempts": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"$ref": "#/$defs/attempt"}}}}
+  }
+}

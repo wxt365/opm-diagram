@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:opm:contract:opl-coverage-catalog:0.1",
+  "title": "OPL Golden Coverage Catalog",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "catalog_id", "catalog_version", "summary", "requirements"],
+  "properties": {
+    "schema_id": {"const": "OPL-GOLDEN-COVERAGE-CATALOG-001"},
+    "schema_version": {"const": "0.1"},
+    "catalog_id": {"const": "coverage.opl.iso19450.2024.draft"},
+    "catalog_version": {"const": "0.1.0"},
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["total", "pass", "blocked"],
+      "properties": {
+        "total": {"type": "integer", "minimum": 0},
+        "pass": {"type": "integer", "minimum": 0},
+        "blocked": {"type": "integer", "minimum": 0}
+      }
+    },
+    "requirements": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/requirement"}}
+  },
+  "$defs": {
+    "capabilityId": {"type": "string", "pattern": "^CAP-ISO-(PROC|CTRL|STRUCT)-[0-9]{3}$"},
+    "variant": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]*$"},
+    "templateId": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9._:-]{2,127}$"},
+    "dimensions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "endpoint_domain": {"enum": ["OBJECT", "PROCESS"]},
+        "direction": {"enum": ["UNIDIRECTIONAL", "BIDIRECTIONAL", "RECIPROCAL"]},
+        "tag_mode": {"enum": ["TAGGED", "NULL_TAG"]},
+        "state_position": {"enum": ["SOURCE", "DESTINATION", "BOTH"]},
+        "fan_size": {"enum": [1, 2, 3]},
+        "completeness": {"enum": ["COMPLETE", "INCOMPLETE", "NOT_APPLICABLE"]},
+        "feature_kind": {"enum": ["ATTRIBUTE", "OPERATOR", "MIXED"]},
+        "mixed_group_shape": {"enum": ["A1_O1", "A1_O2", "A2_O1"]}
+      }
+    },
+    "transition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "base_fan_size", "candidate_fan_size", "preserve_fact_id"],
+      "properties": {
+        "kind": {"enum": ["ADD", "DELETE", "REORDER", "COMPLETENESS_SWITCH"]},
+        "base_fan_size": {"enum": [1, 2, 3]},
+        "candidate_fan_size": {"enum": [1, 2, 3]},
+        "preserve_fact_id": {"const": true}
+      }
+    },
+    "requirement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["coverage_key", "case_id", "family", "capability_id", "variant_key", "expectation", "dimensions"],
+      "properties": {
+        "coverage_key": {"type": "string", "minLength": 1},
+        "case_id": {"type": "string", "pattern": "^G-OPL-(PROC|CTRL|STRUCT)-[0-9]{3}\\.[A-Z][A-Z0-9_]*\\.(PASS|BLOCKED)$"},
+        "family": {"enum": ["PROC", "CTRL", "STRUCT"]},
+        "capability_id": {"$ref": "#/$defs/capabilityId"},
+        "base_fact_capability_id": {"$ref": "#/$defs/capabilityId"},
+        "variant_key": {"$ref": "#/$defs/variant"},
+        "expectation": {"enum": ["PASS", "BLOCKED"]},
+        "required_template_ids": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/templateId"}},
+        "expected_sentence_slots": {"type": "array", "minItems": 1, "items": {"enum": ["SINGLE", "FORWARD", "REVERSE", "RECIPROCAL"]}},
+        "expected_error_code": {"type": "string", "minLength": 1},
+        "dimensions": {"$ref": "#/$defs/dimensions"},
+        "transition": {"$ref": "#/$defs/transition"}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"expectation": {"const": "PASS"}}},
+          "then": {"required": ["required_template_ids", "expected_sentence_slots"], "not": {"required": ["expected_error_code"]}}
+        },
+        {
+          "if": {"properties": {"expectation": {"const": "BLOCKED"}}},
+          "then": {"required": ["expected_error_code"], "not": {"anyOf": [{"required": ["required_template_ids"]}, {"required": ["expected_sentence_slots"]}]}}
+        }
+      ]
+    }
+  }
+}

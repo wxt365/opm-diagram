@@ -9,11 +9,18 @@ describe("ProjectDetailView", () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     window.__OPM_LOCAL_SESSION__ = "test-session";
+    window.__OPM_ACTIVE_PROFILE_BINDING__ = {
+      profile_id: "profile.iso19450.2024.draft",
+      profile_version: "0.2.0",
+      rule_set_id: "rules.iso19450.2024.draft",
+      rule_version: "0.1.0",
+    };
   });
 
   afterEach(() => {
     vi.unstubAllGlobals();
     delete window.__OPM_LOCAL_SESSION__;
+    delete window.__OPM_ACTIVE_PROFILE_BINDING__;
   });
 
   it("OV02 使用对话框语义并在取消后回到触发控件", async () => {

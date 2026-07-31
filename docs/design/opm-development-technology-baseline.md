@@ -1,8 +1,10 @@
 # OPM 单机建模工具开发技术基线
 
-文档版本：`v0.1-draft`
+文档版本：`v1.0`
 
-文档状态：首批开发冻结基线
+文档状态：`FROZEN_INCLUDED`；当前开发技术基线冻结
+
+全局设计状态、延期边界和开发准入以 `opm-design-freeze-baseline.md` 为唯一事实源。
 
 更新时间：2026-07-27
 
@@ -90,6 +92,14 @@ flowchart LR
 3. 普通 viewport、hover、selection 和临时 route 不发送语义命令；
 4. X6 History 只用于临时交互，不替代 M03 Undo/Redo；
 5. 自定义 shape 和 connector 只读取 Symbol Catalog，不硬编码配置档能力。
+
+### 5.2 浏览器基线
+
+1. 根 lockfile 固定 `@playwright/test=1.57.0`，对应 Chromium `143.0.7499.4`、Firefox `144.0.2`、WebKit `26.0`；
+2. Chromium 承担全部 P01-P03、完整画布、visual、E2E、性能、恢复和 release smoke；Firefox/WebKit 承担核心主路径并阻断不兼容发布；
+3. Launcher 打开默认浏览器，但应用必须在进入项目或工作台前校验版本和必需 Web API；
+4. 不受支持的默认浏览器只显示兼容性阻断页，允许复制 loopback 地址并重新检测，不允许忽略继续或发出写命令；
+5. 版本、视口、跨浏览器验收和变更入口以 `opm-design-freeze-baseline.md` 第 3 章为准。
 
 ## 6. 本地运行时基线
 

@@ -31,7 +31,7 @@ public final class SemanticRevisionJsonWriter {
     private ObjectNode tree(SemanticRevision revision) {
         ObjectNode root = objectMapper.createObjectNode();
         root.put("schema_id", "MS-REV-001");
-        root.put("schema_version", "0.1");
+        root.put("schema_version", "0.2");
         root.put("revision_id", revision.revisionId());
         root.put("model_id", revision.modelId());
         root.put("revision_sequence", revision.revisionSequence());

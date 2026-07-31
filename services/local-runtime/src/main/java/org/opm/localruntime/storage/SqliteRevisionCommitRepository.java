@@ -14,6 +14,7 @@ import org.opm.localruntime.semantic.SemanticRevisionJsonWriter;
 import org.opm.localruntime.text.OplParagraph;
 import org.opm.localruntime.text.OplSentence;
 import org.opm.localruntime.text.OplTextTrace;
+import org.opm.localruntime.text.OplToken;
 
 import javax.sql.DataSource;
 import java.nio.charset.StandardCharsets;
@@ -112,13 +113,20 @@ public final class SqliteRevisionCommitRepository implements RevisionCommitRepos
                             "baseRevisionId is not the current draft head", null);
                 }
                 writeRevision(connection, bundle);
+                writeHook.afterRevisionInsert();
                 writeParent(connection, bundle);
+                writeHook.afterParentInsert();
                 writeTraces(connection, bundle);
+                writeHook.afterTraceInsert();
                 writeFindings(connection, bundle);
+                writeHook.afterFindingInsert();
                 writeHook.beforeHeadUpdate();
                 updateHead(connection, bundle);
+                writeHook.afterHeadUpdate();
                 writeOperation(connection, bundle);
+                writeHook.afterOperationInsert();
                 writeReceipt(connection, bundle);
+                writeHook.afterReceiptInsert();
                 connection.commit();
                 return new CommitResult.Committed(bundle.revision().revisionId(), traceIds(bundle), bundle.validation());
             } catch (CommitPersistenceException exception) {
@@ -166,7 +174,7 @@ public final class SqliteRevisionCommitRepository implements RevisionCommitRepos
                     revision_id, model_id, revision_sequence, schema_version, profile_id, profile_version,
                     rule_set_id, rule_set_version, schema_set_json, profile_binding_json, document_json,
                     document_digest, commit_reason, created_at)
-                VALUES (?, ?, ?, '0.1', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, '0.2', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """)) {
             statement.setString(1, revision.revisionId());
             statement.setString(2, revision.modelId());
@@ -287,16 +295,43 @@ public final class SqliteRevisionCommitRepository implements RevisionCommitRepos
 
     private String document(RevisionCommitBundle bundle) throws Exception {
         ObjectNode root = (ObjectNode) objectMapper.readTree(revisionWriter.write(bundle.revision()));
+        root.put("schema_version", "0.2");
+        root.put("parent_revision_id", bundle.command().baseRevisionId());
+        ObjectNode schemaSet = root.putObject("schema_set_ref");
+        schemaSet.put("core_metamodel_version", "0.2");
+        schemaSet.put("profile_schema_version", "0.2");
+        schemaSet.put("rule_schema_version", "0.1");
+        schemaSet.put("storage_schema_version", "1.0");
+        root.withObject("model_header").put("name", bundle.revision().modelId());
         ObjectNode text = root.putObject("text_artifact");
         text.put("artifact_id", bundle.text().artifact().artifactId());
+        text.put("modality", "OPL");
         text.put("context_id", bundle.text().artifact().contextId());
-        text.put("artifact_digest", bundle.text().artifact().artifactDigest());
+        ObjectNode grammar = text.putObject("grammar_ref");
+        grammar.put("id", bundle.text().artifact().grammarBinding().id());
+        grammar.put("version", bundle.text().artifact().grammarBinding().version());
+        digest(grammar.putObject("digest"), bundle.text().artifact().grammarBinding().digest());
+        digest(text.putObject("artifact_digest"), bundle.text().artifact().artifactDigest());
         ArrayNode sentences = text.putArray("sentences");
         for (OplParagraph paragraph : bundle.text().artifact().paragraphs()) for (OplSentence sentence : paragraph.sentences()) {
             ObjectNode item = sentences.addObject();
             item.put("sentence_id", sentence.sentenceId());
             item.put("text", sentence.text());
             item.put("ordinal", sentence.ordinal());
+            array(item.putArray("generation_rule_ids"), sentence.generationRuleIds());
+            array(item.putArray("input_fact_ids"), sentence.inputFactIds());
+            ArrayNode tokens = item.putArray("tokens");
+            for (var token : sentence.tokens()) {
+                ObjectNode tokenNode = tokens.addObject();
+                tokenNode.put("token_id", token.tokenId());
+                tokenNode.put("sentence_id", token.sentenceId());
+                tokenNode.put("ordinal", token.ordinal());
+                tokenNode.put("kind", token.kind().name());
+                tokenNode.put("text", token.text());
+                tokenNode.put("start_utf8_byte", token.startUtf8Byte());
+                tokenNode.put("end_utf8_byte", token.endUtf8Byte());
+                sourceRefs(tokenNode.putArray("source_refs"), token.sourceRefs());
+            }
         }
         ArrayNode traces = root.putArray("text_traces");
         for (OplTextTrace trace : bundle.text().traces()) {
@@ -304,14 +339,48 @@ public final class SqliteRevisionCommitRepository implements RevisionCommitRepos
             item.put("trace_id", trace.traceId());
             item.put("context_id", trace.contextId());
             array(item.putArray("fact_ids"), trace.factIds());
+            array(item.putArray("input_element_ids"), trace.inputElementIds());
+            array(item.putArray("occurrence_ids"), trace.occurrenceIds());
             array(item.putArray("sentence_ids"), trace.sentenceIds());
+            array(item.putArray("rule_ids"), trace.ruleIds());
+            digest(item.putObject("binding_digest"), trace.bindingDigest());
+            ArrayNode ranges = item.putArray("token_ranges");
+            for (OplTextTrace.TokenRange range : trace.tokenRanges()) {
+                ranges.addObject()
+                        .put("input_id", range.inputId())
+                        .put("start_utf8_byte", range.startUtf8Byte())
+                        .put("end_utf8_byte", range.endUtf8Byte());
+            }
+            sourceRefs(item.putArray("source_refs"), trace.sourceRefs());
         }
-        ObjectNode validation = root.putObject("commit_validation_summary");
+        ObjectNode validation = root.putObject("validation_summary");
+        validation.put("scope", "POST_COMMIT");
         validation.put("blocking", bundle.validation().findings().stream().filter(f -> f.severity().name().equals("BLOCKING")).count());
+        validation.put("warning", bundle.validation().findings().stream().filter(f -> f.severity().name().equals("WARNING")).count());
+        validation.put("suggestion", bundle.validation().findings().stream().filter(f -> f.severity().name().equals("SUGGESTION")).count());
+        validation.put("coverage_state", "COMPLETE");
+        digest(validation.putObject("report_digest"), digest("validation:" + bundle.revision().revisionId()));
+        digest(root.putObject("revision_digest"), digest("revision:" + bundle.revision().revisionId()));
         return objectMapper.writeValueAsString(root);
     }
 
     private void array(ArrayNode target, List<String> values) { values.forEach(target::add); }
+
+    private void sourceRefs(ArrayNode target, List<OplToken.SourceRef> refs) {
+        for (OplToken.SourceRef ref : refs) {
+            ObjectNode item = target.addObject();
+            item.put("source_kind", ref.sourceKind().name());
+            item.put("stable_id", ref.stableId());
+            if (ref.fieldPath() != null) item.put("field_path", ref.fieldPath());
+            if (ref.endpointOrdinal() != null) item.put("endpoint_ordinal", ref.endpointOrdinal());
+            if (ref.sentenceSlot() != null) item.put("sentence_slot", ref.sentenceSlot());
+        }
+    }
+
+    private void digest(ObjectNode target, String value) {
+        target.put("algorithm", "sha256");
+        target.put("digest", value);
+    }
 
     private List<String> traceIds(RevisionCommitBundle bundle) {
         return bundle.text().traces().stream().map(OplTextTrace::traceId).toList();
@@ -337,5 +406,15 @@ public final class SqliteRevisionCommitRepository implements RevisionCommitRepos
     }
 
     @FunctionalInterface
-    interface CommitWriteHook { void beforeHeadUpdate() throws Exception; }
+    interface CommitWriteHook {
+        void beforeHeadUpdate() throws Exception;
+
+        default void afterRevisionInsert() throws Exception { }
+        default void afterParentInsert() throws Exception { }
+        default void afterTraceInsert() throws Exception { }
+        default void afterFindingInsert() throws Exception { }
+        default void afterHeadUpdate() throws Exception { }
+        default void afterOperationInsert() throws Exception { }
+        default void afterReceiptInsert() throws Exception { }
+    }
 }
