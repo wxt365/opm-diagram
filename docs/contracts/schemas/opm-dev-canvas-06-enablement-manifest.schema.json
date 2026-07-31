@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:opm:contract:dev-canvas-06-enablement-manifest:0.1",
+  "title": "OPM DEV-CANVAS-06 Enablement Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "manifest_id", "manifest_kind", "manifest_status", "generated_at", "generator_identity", "source_build", "handoff_ref", "intake_report_ref", "release_evidence", "batches", "capability_decisions", "proposed_enabled_capability_ids", "production_gate", "limitations", "blockers"],
+  "properties": {
+    "schema_id": {"const": "OPM-DEV-CANVAS-06-ENABLEMENT-001"},
+    "schema_version": {"const": "0.1"},
+    "manifest_id": {"pattern": "^dev-canvas-06\\.(candidate|activation|rollback)\\.[a-f0-9]{12}\\.[a-f0-9]{12}$"},
+    "manifest_kind": {"enum": ["CANDIDATE", "ACTIVATION", "ROLLBACK"]},
+    "manifest_status": {"enum": ["BLOCKED", "READY_FOR_ACTIVATION", "ACTIVE_PARTIAL", "ACTIVE_COMPLETE", "ROLLED_BACK_PARTIAL", "ROLLED_BACK"]},
+    "generated_at": {"type": "string", "format": "date-time"},
+    "generator_identity": {"$ref": "#/$defs/runnerIdentity"},
+    "source_build": {"type": "object", "minProperties": 1},
+    "supersedes_ref": {"$ref": "#/$defs/fileRef"},
+    "handoff_ref": {"$ref": "#/$defs/fileRef"},
+    "intake_report_ref": {"$ref": "#/$defs/fileRef"},
+    "release_evidence": {"$ref": "#/$defs/releaseEvidence"},
+    "candidate_manifest_ref": {"$ref": "#/$defs/fileRef"},
+    "release_candidate_report_ref": {"$ref": "#/$defs/fileRef"},
+    "rollback_of_ref": {"$ref": "#/$defs/fileRef"},
+    "rollback_trigger": {"$ref": "#/$defs/rollbackTrigger"},
+    "rollback_scope": {"$ref": "#/$defs/rollbackScope"},
+    "batches": {"type": "array", "minItems": 3, "maxItems": 3, "items": {"$ref": "#/$defs/batch"}},
+    "capability_decisions": {"type": "array", "minItems": 34, "maxItems": 34, "items": {"$ref": "#/$defs/decision"}},
+    "proposed_enabled_capability_ids": {"type": "array", "maxItems": 34, "items": {"$ref": "#/$defs/capabilityId"}},
+    "production_gate": {"$ref": "#/$defs/productionGate"},
+    "limitations": {"type": "array", "minItems": 2, "items": {"type": "string", "minLength": 1}},
+    "blockers": {"type": "array", "items": {"$ref": "#/$defs/blocker"}}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"manifest_kind": {"const": "CANDIDATE"}}},
+      "then": {
+        "properties": {
+          "manifest_status": {"enum": ["BLOCKED", "READY_FOR_ACTIVATION"]},
+          "production_gate": {"type": "object", "properties": {"state": {"const": "DISABLED"}, "enabled_capability_ids": {"maxItems": 0}}}
+        },
+        "not": {"anyOf": [{"required": ["candidate_manifest_ref"]}, {"required": ["release_candidate_report_ref"]}, {"required": ["rollback_of_ref"]}, {"required": ["rollback_trigger"]}, {"required": ["rollback_scope"]}]}
+      }
+    },
+    {
+      "if": {"properties": {"manifest_kind": {"const": "ACTIVATION"}}},
+      "then": {
+        "required": ["supersedes_ref", "candidate_manifest_ref", "release_candidate_report_ref"],
+        "properties": {
+          "manifest_status": {"enum": ["ACTIVE_PARTIAL", "ACTIVE_COMPLETE"]},
+          "production_gate": {"type": "object", "properties": {"state": {"const": "ENABLED"}, "enabled_capability_ids": {"minItems": 1}}}
+        },
+        "not": {"anyOf": [{"required": ["rollback_of_ref"]}, {"required": ["rollback_trigger"]}, {"required": ["rollback_scope"]}]}
+      }
+    },
+    {
+      "if": {"properties": {"manifest_kind": {"const": "ROLLBACK"}}},
+      "then": {
+        "required": ["supersedes_ref", "rollback_of_ref", "rollback_trigger", "rollback_scope"],
+        "properties": {"manifest_status": {"enum": ["ROLLED_BACK_PARTIAL", "ROLLED_BACK"]}},
+        "not": {"anyOf": [{"required": ["candidate_manifest_ref"]}, {"required": ["release_candidate_report_ref"]}]}
+      }
+    }
+  ],
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "capabilityId": {"type": "string", "pattern": "^CAP-ISO-(PROC|CTRL|STRUCT)-\\d{3}$"},
+    "path": {"type": "string", "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$"},
+    "fileRef": {"type": "object", "additionalProperties": false, "required": ["kind", "path", "byte_length", "sha256"], "properties": {"kind": {"type": "string", "minLength": 1}, "path": {"$ref": "#/$defs/path"}, "byte_length": {"type": "integer", "minimum": 0}, "sha256": {"$ref": "#/$defs/digest"}}},
+    "runnerIdentity": {"type": "object", "additionalProperties": false, "required": ["runner_version", "source_commit", "node_version", "os", "command", "runner_source_sha256"], "properties": {"runner_version": {"const": "0.1.0"}, "source_commit": {"pattern": "^[a-f0-9]{40}$"}, "node_version": {"type": "string", "minLength": 1}, "os": {"type": "string", "minLength": 1}, "command": {"type": "string", "minLength": 1}, "runner_source_sha256": {"$ref": "#/$defs/digest"}}},
+    "releaseEvidence": {"type": "object", "additionalProperties": false, "required": ["visual_report_ref", "e2e_report_ref", "performance_report_ref", "recovery_report_ref"], "properties": {"visual_report_ref": {"$ref": "#/$defs/fileRef"}, "e2e_report_ref": {"$ref": "#/$defs/fileRef"}, "performance_report_ref": {"$ref": "#/$defs/fileRef"}, "recovery_report_ref": {"$ref": "#/$defs/fileRef"}}},
+    "batch": {"type": "object", "additionalProperties": false, "required": ["batch_id", "ordinal", "capability_ids", "dependency_batch_ids", "release_validation_status", "activation_state", "blocker_codes"], "properties": {"batch_id": {"enum": ["BATCH-PROCEDURAL", "BATCH-CONTROL", "BATCH-STRUCTURAL"]}, "ordinal": {"enum": [1, 2, 3]}, "capability_ids": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/capabilityId"}}, "dependency_batch_ids": {"type": "array", "items": {"type": "string"}}, "release_validation_status": {"enum": ["PENDING", "PASSED", "BLOCKED"]}, "activation_state": {"enum": ["DISABLED", "ENABLED"]}, "blocker_codes": {"type": "array", "items": {"type": "string", "pattern": "^CANVAS06_[A-Z0-9_]+$"}}}},
+    "decision": {"type": "object", "additionalProperties": false, "required": ["capability_id", "family", "batch_id", "upstream_evidence_fingerprint", "dependency_closure", "release_evidence_coverage", "release_validation_status", "activation_state", "blocker_codes"], "properties": {"capability_id": {"$ref": "#/$defs/capabilityId"}, "family": {"enum": ["PROCEDURAL", "CONTROL", "STRUCTURAL"]}, "batch_id": {"enum": ["BATCH-PROCEDURAL", "BATCH-CONTROL", "BATCH-STRUCTURAL"]}, "upstream_evidence_fingerprint": {"$ref": "#/$defs/digest"}, "dependency_closure": {"type": "object", "additionalProperties": false, "required": ["coverage_keys", "template_refs", "rule_refs", "symbol_refs", "grammar_refs", "binding_digest"], "properties": {"coverage_keys": {"type": "array", "minItems": 1, "items": {"type": "string"}}, "template_refs": {"type": "array", "minItems": 1, "items": {"type": "string"}}, "rule_refs": {"type": "array", "minItems": 1, "items": {"type": "string"}}, "symbol_refs": {"type": "array", "minItems": 1, "items": {"type": "string"}}, "grammar_refs": {"type": "array", "minItems": 1, "items": {"type": "object"}}, "binding_digest": {"$ref": "#/$defs/digest"}}}, "release_evidence_coverage": {"type": "object", "additionalProperties": false, "required": ["visual_case_ids", "family_e2e_result_ref", "common_e2e_ids", "performance_scenario_ids", "recovery_case_ids"], "properties": {"visual_case_ids": {"type": "array", "minItems": 9, "maxItems": 9, "items": {"type": "string"}}, "family_e2e_result_ref": {"type": "string", "minLength": 1}, "common_e2e_ids": {"type": "array", "minItems": 4, "maxItems": 4, "items": {"type": "string"}}, "performance_scenario_ids": {"type": "array", "minItems": 7, "maxItems": 7, "items": {"type": "string"}}, "recovery_case_ids": {"type": "array", "minItems": 1, "items": {"type": "string"}}}}, "release_validation_status": {"enum": ["PENDING", "PASSED", "BLOCKED"]}, "activation_state": {"enum": ["DISABLED", "ENABLED"]}, "blocker_codes": {"type": "array", "items": {"type": "string", "pattern": "^CANVAS06_[A-Z0-9_]+$"}}}},
+    "productionGate": {"type": "object", "additionalProperties": false, "required": ["state", "enabled_capability_ids"], "properties": {"state": {"enum": ["DISABLED", "ENABLED"]}, "enabled_capability_ids": {"type": "array", "maxItems": 34, "items": {"$ref": "#/$defs/capabilityId"}}}},
+    "rollbackTrigger": {"type": "object", "additionalProperties": false, "required": ["trigger_code", "evidence_refs", "message_key"], "properties": {"trigger_code": {"enum": ["MANUAL_RELEASE_ROLLBACK", "EVIDENCE_INVALIDATED", "RUNTIME_HEALTH_FAILED", "ASSET_INTEGRITY_FAILED"]}, "evidence_refs": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/fileRef"}}, "message_key": {"type": "string", "minLength": 1}}},
+    "rollbackScope": {"type": "object", "additionalProperties": false, "required": ["mode", "requested_disabled_capability_ids", "effective_disabled_capability_ids", "remaining_enabled_capability_ids", "dependency_cascade"], "properties": {"mode": {"enum": ["ALL", "CAPABILITY_SET"]}, "requested_disabled_capability_ids": {"type": "array", "items": {"$ref": "#/$defs/capabilityId"}}, "effective_disabled_capability_ids": {"type": "array", "items": {"$ref": "#/$defs/capabilityId"}}, "remaining_enabled_capability_ids": {"type": "array", "items": {"$ref": "#/$defs/capabilityId"}}, "dependency_cascade": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["source_capability_id", "dependent_capability_id"], "properties": {"source_capability_id": {"$ref": "#/$defs/capabilityId"}, "dependent_capability_id": {"$ref": "#/$defs/capabilityId"}}}}}},
+    "blocker": {"type": "object", "additionalProperties": false, "required": ["code", "evidence_refs", "message_key"], "properties": {"code": {"type": "string", "pattern": "^CANVAS06_[A-Z0-9_]+$"}, "capability_id": {"$ref": "#/$defs/capabilityId"}, "evidence_refs": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/fileRef"}}, "message_key": {"type": "string", "minLength": 1}}}
+  }
+}

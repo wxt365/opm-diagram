@@ -1,8 +1,10 @@
 # OPM 单机建模工具全量设计冻结基线
 
-文档版本：`1.0`
+文档版本：`1.1`
 
-冻结日期：`2026-07-30`
+初始冻结日期：`2026-07-30`
+
+最近复核日期：`2026-07-31`
 
 设计冻结状态：`FROZEN`
 
@@ -32,7 +34,7 @@
 4. 图标化工具链、关系分组搜索、服务端候选、检查器、撤销/重做、视口缩放和语义 in/out-zoom；
 5. Semantic Model 单一事实源、OPD/OPL/Trace/Finding 投影、不可变 Revision、Draft Head 和 Baseline；
 6. ISO 配置档下的只读实时 OPL、Token/Trace、golden 和原子提交；
-7. P0 应用 API、完整画布目标 API、SQLite V1、版本化 Revision 文档和 `.opmp` 原生交换边界；
+7. P0 应用 API、完整画布目标 API、SQLite V1、版本化 Revision 文档，以及 `.opmp` ZIP、Canonical JSON、SHA-256、`exchange_format_version=1.0/minimum_reader_version=1.0` 原生交换边界；
 8. 分层测试、视觉/E2E/性能/恢复和发布 Gate 设计。
 
 P04-P06 的页面、状态、字段和组件设计已经冻结，但生产实现不属于当前开发包。开发必须按 `DEV-00~09`、`DEV-CANVAS-00~06` 的依赖和单包 Gate 逐步进行。
@@ -109,7 +111,7 @@ Launcher 仍只启动 loopback 服务并打开系统默认浏览器。前端在�
 | `DFR-014` | 完整画布 OpenAPI 目标契约 | `opm-local-api-v1.yaml` 目标 `0.2.0` + API 第 7.2 节 | M06 + API owner | option/base Fact/allowed modifier、State/Fact union、正反 contract test | DEV-CANVAS-00 只能实现冻结目标，不得改语义 |
 | `DFR-015` | Revision 0.2 目标机器表示和 0.1 兼容读取 | 核心字段 + 持久化 +物理设计 | M09/M12 | Fact `modifiers[]`、旧 reader、roundtrip、immutable | 发布独立 `/0.2` Schema；不得改写 0.1 历史 Revision |
 | `DFR-016` | SQLite V1、不可变 Revision、Draft Head、原子提交和恢复 | 持久化 +物理设计 + V1 DDL | M09/M12 | migration、FK、immutable trigger、故障注入 | 当前语义扩展不修改 SQLite V1 |
-| `DFR-017` | `.opmp` 原生交换、版本兼容和资产 exact binding | 原生交换契约 | M02/M10/M12 | staging、digest、未知版本阻断、回滚 | 不得宣称为 ISO 或第三方标准交换格式 |
+| `DFR-017` | `.opmp` 1.0 原生交换、版本兼容和资产 exact binding | 原生交换契约 | M02/M10/M12 | ZIP/Canonical JSON/SHA-256、1.0 reader/writer、staging、digest、未知版本阻断、回滚 | 不得宣称为 ISO 或第三方标准交换格式 |
 | `DFR-018` | 分层测试、fixture、visual/E2E/性能/恢复证据边界 | 测试策略 `v1.0` | QA +各模块 | 需求矩阵与 GATE-05/06 | 设计状态与执行状态分栏 |
 | `DFR-019` | 工具链 release、enablement、rollback 和 6/12 smoke | DEV-CANVAS-06 规格/checklist | Release + QA | GATE-06-01~06 READY 算法 | Candidate 不等于 Activation；production gate 默认关闭 |
 | `DFR-020` | 正式索引、handoff、开发门和冻结后变更 | 本文 + `docs/README.md` | Architecture | blocked/conflict/status 计数为 0 | 任一冻结输入变化先关闭开发门再评审 |
@@ -197,6 +199,8 @@ cross_document_conflict_count=0
 development_gate=READY_FOR_DEVELOPMENT
 ```
 
+2026-07-31 复核记录：原生交换契约第 1 章曾保留“物理格式未冻结”的早期表述，与架构 ARC-008、物理数据设计第 10 章及该契约第 16.2 节冲突；冲突存续期间不得引用上述 `cross_document_conflict_count=0`。本次按 `specs/opm-design-conflict-remediation-and-conformance-refresh-task-spec.md` 删除开放选型表述、冻结首发 1.0/reader 1.0，并重新核对 30 项责任后恢复为 `0`。
+
 `READY_FOR_DEVELOPMENT` 只授权开发人员创建并执行一个满足依赖的任务规格。它不授权跳过 `DEV-*`/`DEV-CANVAS-*` 输入 Gate，不授权启用未通过 release evidence 的 Capability，也不授权 ISO 声明。
 
 ## 9. 实现与证据状态
@@ -210,6 +214,7 @@ development_gate=READY_FOR_DEVELOPMENT
 | Revision 0.2 reader/writer/roundtrip | 待 DEV-CANVAS-00/03 验收 |
 | DEV-CANVAS-05 golden/Trace 机器证据 | 以对应 checklist 当前执行记录为准，本任务不重跑 |
 | DEV-CANVAS-06 visual/E2E/performance/recovery/release | `NOT_RUN` 或以未来报告为准 |
+| `.opmp` 1.0 Schema/reader/writer/golden roundtrip | `NOT_IMPLEMENTED/NOT_RUN`；物理格式已冻结不等于实现完成 |
 | production enablement | 默认 `DISABLED` |
 | ISO 19450:2024 conformance | `EVIDENCE_MISSING/无法判断` |
 
@@ -230,7 +235,8 @@ development_gate=READY_FOR_DEVELOPMENT
 2. Control/Structural concrete OPL、Token/Trace、golden 和 DEV-CANVAS-05/06 Gate 设计已冻结；
 3. 当前 OpenAPI 已出现 `base_fact_capability_ref`、`AllowedModifier` 和 State/Fact command union；Revision 0.1 Schema 已出现 Fact `modifiers[]`；
 4. 当前机器文件的存在不等于 generated client、handler、roundtrip、release 或 ISO 证据通过；
-5. `.harness/repo-profile.md` 与当前应用仓库事实不一致，本任务按边界不修改 `.harness/**`。该治理偏差不改变产品设计语义，但后续 Harness 治理任务必须修正。
+5. `.opmp` 首发物理格式和版本已经冻结，机器 Schema、reader/writer、golden package 与 roundtrip 仍待实现；
+6. `.harness/repo-profile.md` 与当前应用仓库事实不一致，本任务按边界不修改 `.harness/**`。该治理偏差不改变产品设计语义，但后续 Harness 治理任务必须修正。
 
 ### 11.2 假设/解释
 

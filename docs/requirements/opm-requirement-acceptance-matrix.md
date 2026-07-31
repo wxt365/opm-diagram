@@ -1,12 +1,12 @@
 # OPM 单机建模工具需求验收追踪矩阵
 
-文档版本：`v1.0`
+文档版本：`v1.1`
 
 文档状态：`FROZEN_INCLUDED`；验收设计冻结，执行证据按开发包记录
 
 全局设计状态、延期边界和开发准入以 `docs/design/opm-design-freeze-baseline.md` 为唯一事实源。
 
-更新时间：2026-07-30
+更新时间：2026-07-31
 
 ## Task Type
 
@@ -22,7 +22,7 @@
 
 ### 2.1 输入基线
 
-1. `docs/design/opm-design-freeze-baseline.md` `1.0`
+1. `docs/design/opm-design-freeze-baseline.md` `1.1`
 2. `docs/requirements/opm-online-modeling-tool-requirements.md` `v1.0`
 3. `docs/requirements/opm-profile-capability-matrix.md` `v1.0`
 4. `docs/requirements/iso-19450-2024-conformance-matrix.md` `v1.0`
@@ -33,7 +33,7 @@
 9. `docs/design/opm-modeling-workbench-component-interaction.md` `v1.0`
 10. `docs/design/opm-modeling-tool-application-api-contract.md` `v1.0`
 11. `docs/design/opm-modeling-tool-persistence-contract.md` `v1.0`
-12. `docs/design/opm-native-exchange-package-contract.md` `v1.0`
+12. `docs/design/opm-native-exchange-package-contract.md` `v1.1`
 13. `docs/design/opm-core-metamodel-field-schema.md` `v1.0`
 14. `docs/design/opm-profile-package-field-schema.md` `v1.0`
 15. `docs/design/opm-rule-definition-field-schema.md` `v1.0`

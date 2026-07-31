@@ -88,6 +88,11 @@ Gate 编号表示职责，不表示一次性线性执行顺序。执行依赖固
 3. Visual `378` 和 E2E `194` 每项都执行两次独立 attempt，分别形成 `756` 和 `388` 条 attempt evidence；禁止 retry、skip、only、失败后更新 golden 或只保留最终绿色结果。
 4. Gate 必须继承 Intake 的 exact upstream build/artifacts、Profile binding 和 Revision/fixture digest，并在同一个 clean DEV-CANVAS-06 target release build 与 Chromium patch 上生成 Visual/E2E 报告；upstream build 与 target build 不得混为同一身份。现有 dev server E2E、组件截图或人工浏览不计为 Gate PASS。
 5. Visual 使用固定 PNG 像素算法、非空对照、关键几何/遮挡/溢出断言；E2E 同时断言 Revision、Projection、OPL/Trace、事务增量和重开结果。具体字段、case ID、阈值和失败码以 checklist `GATE-06-03` 契约为准。
+6. 当前 exact Symbol Catalog 只提供 34 个 Capability 的主 symbol 条目，不提供受控 visual variant 列表；GATE-06-03 不修改 Profile binding，而是以 READY Intake/Handoff 为根，对 exact Coverage Catalog、Golden Manifest 和 Golden Replay Report 做一对一 join，派生 family variant、fixture、expected projection 和 transaction。任一原始 ref/SHA、join key、expectation 或两次 replay 不一致即 BLOCKED。
+7. family visual variant 固定取 130 个 PASS coverage key，按 Capability 与 coverage key 排序；`visual_variant_key` 使用完整 coverage key。Visual case 保持 `378`，但 fixture/revision/focus/cell/golden/critical region 必须位于每个 variant capture 内，不能放在包含多个 variant 的 case 层。
+8. 当前基线的 family capture 为 `130×3×3=1170`，加 8 个公共 subject 的 `72` 个 capture，固定 `capture_count=1242`、`attempt_capture_count=2484`。这些数量不改变 `378/756` case/attempt 口径。
+9. 上游 family fixture 必须从 Handoff exact evidence bundle 安全物化，并同时绑定 bundle raw SHA、archive entry path 和物化文件 SHA；普通 file ref 不得冒充 archive entry ref。8 个公共 Visual 与 16 个公共 E2E 必须来自独立版本化 common fixture/factory catalog，expected action/transaction 不得由 observed 结果反填。
+10. golden 必须由版本化 `golden-environment.json` 索引 exact PNG、9 个 blank baseline 和环境指纹；Manifest 不能通过目录扫描猜测 golden。common fixture catalog、golden index、六个输入/输出 Schema 和 runner 均未实现前，`GATE-06-03` 保持 BLOCKED。
 
 ### 4.5 Performance Closure 边界
 
@@ -145,7 +150,7 @@ Gate 编号表示职责，不表示一次性线性执行顺序。执行依赖固
 | Handoff Intake | exact `handoff_ref.sha256`、8 项检查和 34 项 intake 均 matched，Intake Report Schema 合法 |
 | 完整工具链 | 组件测试和 P03 浏览器主路径，图标/tooltip/搜索/候选/检查器完整 |
 | Capability gate | 每个 ID 的上游 evidence 指纹、五项依赖、coverage keys、视觉/家族 E2E/公共 Gate 闭包与稳定 reason；Candidate 与 Activation manifest 均可复核 |
-| 视觉 | `378/378` case、`756/756` attempt；三视口/三缩放、全部 descriptor variant、8 个公共主题、golden/canvas pixel/几何/遮挡/溢出均 matched |
+| 视觉 | `378/378` case、`756/756` attempt、`1242` capture、`2484` attempt capture；三视口/三缩放、130 个 exact PASS family variant、8 个公共主题、golden/canvas pixel/几何/遮挡/溢出均 matched |
 | E2E | `194/194` case、`388/388` attempt；`178=130+48` coverage keys 和 16 个公共 case 全 matched，Revision/Projection/OPL/Trace/事务/重开闭合 |
 | 性能 | `7/7` scenario、`11/11` metric instance、7 份 raw sample set；nearest-rank P50/P95/Max 可复算，阈值/功能/完整性/零 OOM/零失败全部 matched |
 | 恢复/回退 | `28/28` case、`56/56` attempt；七项事务/Head、强停重开、幂等回放、`ROLLED_BACK_PARTIAL/ROLLED_BACK` 和历史只读均 matched |
@@ -176,7 +181,7 @@ Gate 编号表示职责，不表示一次性线性执行顺序。执行依赖固
 1. 性能阈值和采样方法已由本规格冻结；
 2. 通过本包只能证明指定版本、fixture 和环境的发布验收，不自动证明其他硬件或 ISO 符合性；
 3. 本包不能修改上游语义输入来换取 UI 或性能通过；
-4. `GATE-06-01~06` 的 Schema 身份、Gate 顺序、三批次、Visual/E2E/Performance/Recovery/Release 数量、状态、失败分类和 READY 边界均已冻结。
+4. `GATE-06-01~06` 的 Schema 身份、Gate 顺序、三批次、Visual/E2E/Performance/Recovery/Release 数量、状态、失败分类和 READY 边界均已冻结；GATE-06-03 的可执行输入还要求 exact 三表 join、bundle 物化、common fixture catalog 和 golden index，不能把高层数量冻结解释为机器资产已存在。
 
 ### 10.2 待实现验证
 

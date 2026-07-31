@@ -1,12 +1,12 @@
 # OPM 原生模型交换包契约
 
-文档版本：`v1.0`
+文档版本：`v1.1`
 
 文档状态：`FROZEN_INCLUDED`；原生交换逻辑与物理容器冻结，机器资产按开发包实现
 
 全局设计状态、延期边界和开发准入以 `opm-design-freeze-baseline.md` 为唯一事实源。
 
-更新时间：2026-07-27
+更新时间：2026-07-31
 
 ## Task Type
 
@@ -18,14 +18,19 @@
 
 “原生”表示本产品定义的结构化交换格式，不表示 ISO 19450:2024 已定义或认可该格式。ISO 工具互操作必须另行调研标准或供应商格式、建立映射和代表性证据。
 
-本文档不冻结：
+本文档冻结首发原生交换包的物理格式：
 
-1. ZIP/TAR/目录包等物理容器、文件扩展名和 MIME type；
-2. JSON/CBOR/Protobuf 等序列化编码及原生交换包物理字段级 schema；
-3. 数字签名、加密、第三方信任链和远程传输协议；
-4. 外部 OPM 工具导入导出格式；
-5. PDF、SVG、PNG 的渲染规范；
-6. 完整项目备份的物理格式和默认保留策略。
+1. 文件扩展名固定为 `.opmp`，物理容器固定为 ZIP，容器 MIME type 固定为 `application/zip`；不得以 TAR、目录包或其他容器写出 `exchange_format_version=1.0`；
+2. `manifest.json` 及其他 JSON entry 固定使用 UTF-8 Canonical JSON；规范化规则与 `opm-physical-data-and-migration-design.md` 第 10.1 节一致，即对象键字典序、Decimal 规范化并禁止 NaN/Infinity；
+3. entry 和 package 完整性摘要固定使用 SHA-256，摘要值使用 64 位小写十六进制；所有 `logical_path` 使用 ZIP 内相对路径；
+4. 首个机器 Schema 必须实现本节物理格式，不得在实现阶段重新选择容器、扩展名、编码或摘要算法。
+
+本文档仍不冻结：
+
+1. 数字签名、加密、第三方信任链和远程传输协议；
+2. 外部 OPM 工具导入导出格式；
+3. PDF、SVG、PNG 的渲染规范；
+4. 完整项目备份的物理格式和默认保留策略。
 
 ## 2. 关联文档
 
@@ -69,8 +74,9 @@ SVG/PNG/PDF/纯 OPL/OPT 是 `ExportArtifact` 的呈现产物，不是可无损�
 1. major 变化表示现有读取器不能保证正确解释；
 2. minor 变化只允许兼容性新增，旧读取器可以在未触及未知 required 能力时读取；
 3. Manifest 必须声明 `minimum_reader_version`；
-4. 当前文档是 `v0.3-draft` 设计，不代表已经发布 `1.0` 格式；首个可执行交换 schema 评审通过后再分配正式版本；
-5. 格式版本与 storage_schema_version、model_revision、Profile/规则版本完全独立。
+4. 首发机器格式固定 `exchange_format_version=1.0`、`minimum_reader_version=1.0`；机器 Schema、writer、reader 和 golden package 尚未通过实现验收时，只能标记为 `NOT_IMPLEMENTED/NOT_RUN`，不得更改已冻结版本值；
+5. `1.x` reader 可以读取 `minimum_reader_version<=自身版本` 且不包含未知 required 能力的包；major 不同、最低读取器版本过高或出现未知 required 能力时必须阻断；
+6. 格式版本与 storage_schema_version、model_revision、Profile/规则版本完全独立。
 
 ### 5.2 扩展兼容
 
@@ -89,8 +95,8 @@ SVG/PNG/PDF/纯 OPL/OPT 是 `ExportArtifact` 的呈现产物，不是可无损�
 | --- | --- | --- |
 | `package_id` | 是 | 本次导出的唯一包标识 |
 | `package_kind` | 是 | 第 4 章枚举 |
-| `exchange_format_version` | 是 | 原生格式版本 |
-| `minimum_reader_version` | 是 | 最低读取器版本 |
+| `exchange_format_version` | 是 | 首发固定为 `1.0` |
+| `minimum_reader_version` | 是 | 首发固定为 `1.0`；不得高于 `exchange_format_version` |
 | `created_at` | 是 | 导出完成时间 |
 | `producer_application/version` | 是 | 产生工具及版本，不作为符合性证据 |
 | `source_project_id` | PROJECT_FULL 时是 | 源项目稳定 ID |
@@ -129,7 +135,7 @@ SVG/PNG/PDF/纯 OPL/OPT 是 `ExportArtifact` 的呈现产物，不是可无损�
 | `digest_algorithm/digest` | 完整性摘要 |
 | `depends_on` | 其他 entry_id 的显式依赖 |
 
-Manifest 自身也必须有整体 package digest 的规范化计算规则；物理容器选型后冻结其覆盖范围和计算顺序。
+Manifest 自身也必须有整体 package digest 的规范化计算规则；首个机器 Schema 必须冻结 SHA-256 覆盖范围和计算顺序，不得依赖 ZIP entry 的物理排列顺序。
 
 ## 7. 逻辑内容分区
 
@@ -338,6 +344,6 @@ sequenceDiagram
 ### 16.2 冻结实现与延期边界
 
 1. 三种 package kind、Manifest、逻辑分区和三份字段设计共同作为首个交换 machine schema 的输入；
-2. 物理容器固定为 `.opmp` ZIP、Canonical JSON entries、相对路径和 SHA-256；流式解析、原子写和路径安全属于实现验收，不再重新选型；
-3. 正式 `1.0` 发布必须形成 machine schema、迁移规则、golden package、破损包和版本兼容测试集；这些是待实现证据，不是开放设计；
+2. 物理容器固定为 `.opmp` ZIP、`application/zip`、UTF-8 Canonical JSON entries、相对路径和 SHA-256；流式解析、原子写和路径安全属于实现验收，不再重新选型；
+3. 首发固定 `exchange_format_version=1.0`、`minimum_reader_version=1.0`；正式发布必须形成 machine schema、迁移规则、golden package、破损包和版本兼容测试集；这些是待实现证据，不是开放设计；
 4. 数字签名和静态加密按 `DFD-009` 延期，外部 OPM 工具适配和本体发布按 `DFD-008` 延期。

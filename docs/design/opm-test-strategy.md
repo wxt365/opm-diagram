@@ -208,11 +208,17 @@ Control pair 至少覆盖以下正反例：
 ### 9.3 DEV-CANVAS-06 Visual/E2E 机器闭包
 
 1. Visual release catalog 固定 `378` 个 case：Capability `34×3×3=306`，公共主题 `8×3×3=72`；每项两次隔离执行，共 `756` 条 attempt evidence。
-2. Capability visual case 内按 exact Symbol Descriptor 展开全部 visual variant capture；每个 capture 比较版本化 golden、空白对照、像素非空、关键区域、几何/遮挡、文本裁剪和页面溢出。
+2. Capability visual case 以 exact Symbol 主 descriptor 为基线，并按 READY Intake/Handoff 引用的 Coverage Catalog、Golden Manifest、Golden Replay 三表一对一 join 展开 130 个 PASS family variant；`visual_variant_key` 使用完整 coverage key。每个 capture 独立绑定 fixture/revision/focus/cell/golden/critical region，不能把不同 fixture 提升到 case 层。
 3. E2E release catalog 固定 `194` 个 case：按 Handoff coverage keys 派生家族 `178=130 PASS+48 BLOCKED`，公共 `16`；每项两次隔离执行，共 `388` 条 attempt evidence。
 4. 家族 suite 映射固定为 Procedural -> `E2E-CANVAS-002`、Control -> `003`、Structural -> `004`；公共 suite 固定为 State `001`、候选归一化 `005`、删除影响 `006`、故障/只读 `007`。
 5. release visual/E2E 使用 production build、独立 browser context/project、固定时钟/locale/timezone/font/Chromium、`workers=1/retries=0`；dev server、人工观察、组件 mock 或重试后的绿色结果不能作为 Gate 证据。
 6. 唯一字段、case ID、像素容差、失败码、Report READY 算法和 golden 更新边界由 `docs/checklists/opm-dev-canvas-06-toolchain-release-checklist.md` 的 `GATE-06-03` 执行契约承接，测试策略不维护第二套数值。
+7. Visual case 仍为 `378`、attempt 为 `756`；130 个 family variant 在三视口/三缩放下形成 `1170` capture，8 个公共 subject 形成 `72` capture，因此固定 `capture_count=1242`、`attempt_capture_count=2484`。
+8. 178 个 family E2E 的 base/input fixture 来自 Handoff exact evidence bundle；expected transaction 取 Golden Replay 两次一致的 transaction，BLOCKED 还必须与 Golden Manifest 深度一致。普通 file ref 不得冒充 archive entry ref。
+9. evidence bundle 必须先验证 raw SHA，再由 fixed Java 21 安全物化到 evidence output root；绝对路径、`..`、重复 entry、symlink 或超限 archive 立即阻断，source/handoff root 保持只读。
+10. 8 个公共 Visual 与 16 个公共 E2E 必须来自版本化 Common Fixture Catalog；每个公共 action 的 expected status/error/transaction/reopen checkpoint 在执行前冻结，禁止从 observed 结果反填。
+11. Visual golden 只由版本化 Golden Environment Index 解析 `1242` 个 PNG 和 9 个 blank baseline；目录扫描、环境指纹不一致、缺项、额外项或 SHA 不一致均不能生成 READY Manifest。
+12. Common Fixture Catalog、Golden Environment Index、六个 Schema、release runner 和真实 Report 未实现前，本节只构成设计输入，不构成 `GATE-06-03` PASS。
 
 ## 10. 非功能验证
 

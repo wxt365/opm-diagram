@@ -13,7 +13,7 @@
 - 验证：组件、E2E、visual/canvas pixel、性能、故障恢复、clean install smoke、diff check。
 - 回滚：整体或按 Capability 关闭 gate，历史模型和 Revision 不回退。
 
-### GATE-06-01~06 设计冻结边界
+### GATE-06-01~06 原设计冻结任务边界（历史）
 
 - Task Type：`feature`。
 - Active Playbooks：`design-module-docs (primary)`、`testing`。
@@ -23,13 +23,15 @@
 - 验证：Markdown 结构与表格、ID/集合/计数、跨文档口径、限定文件 `git diff --check`；纯文档任务无需执行代码测试。
 - 回滚：只回退本轮两份文档的增量，不改变工作树中的并行实现和任何运行时数据。
 
+上述边界只记录最初冻结执行契约时的文档任务，不表示当前机器实现状态。后续 task 已实现 `GATE-06-01` Intake；当前实现与执行状态以各 Gate 的退出证据及本 checklist 的“当前实现与执行结论”为准。
+
 ## 输入门槛
 
 - [x] 性能阈值、样本量、固定环境和报告字段已冻结
-- [ ] `handoff_ref={path,sha256}` 已冻结，Handoff Schema 合法且 `handoff_status=READY_FOR_DEV_CANVAS_06`
-- [ ] `GATE-05-01~06` 的 report ref/length/SHA 全部匹配，Compatibility `13/13`、semantic `178/130/48`、Atomic `19/19`、Structural `24/24`、Control `20/20`
-- [ ] clean release build、`LOCAL_RUNTIME_JAR/EVIDENCE_BUNDLE`、Revision `0.1/0.2` Schema 和历史/ACTIVE exact binding 已冻结
-- [ ] `34/34` Capability 为 `ELIGIBLE_FOR_RELEASE_VALIDATION`，上游 production gate=`DISABLED`、enabled ID 为空
+- [x] `handoff_ref={path,sha256}` 已冻结，Handoff Schema 合法且 `handoff_status=READY_FOR_DEV_CANVAS_06`
+- [x] `GATE-05-01~06` 的 report ref/length/SHA 全部匹配，Compatibility `13/13`、semantic `178/130/48`、Atomic `19/19`、Structural `24/24`、Control `20/20`
+- [x] clean release build、`LOCAL_RUNTIME_JAR/EVIDENCE_BUNDLE`、Revision `0.1/0.2` Schema 和历史/ACTIVE exact binding 已冻结
+- [x] `34/34` Capability 为 `ELIGIBLE_FOR_RELEASE_VALIDATION`，上游 production gate=`DISABLED`、enabled ID 为空
 - [ ] 性能/视觉 fixture 的生成器与摘要已版本化
 
 ## Build
@@ -53,7 +55,7 @@
 - [ ] 交互预热/样本、30 s frame 采样、机器/版本/digest 元数据完整
 - [ ] 强停、服务失败、asset mismatch 和 gate 回滚无 partial Revision/错误 Head
 - [ ] enablement manifest 只包含 Handoff eligible 且本包证据通过的 Capability，并保持原 `handoff_ref.sha256`
-- [ ] Intake Report 的 8 项检查和 `34/34` capability intake 均为 matched，原 Handoff bytes 未被复制改写
+- [x] Intake Report 的 8 项检查和 `34/34` capability intake 均为 matched，原 Handoff bytes 未被复制改写
 - [ ] Candidate/Activation/Rollback manifest 的状态、集合基数、前序 SHA 和 Report refs 通过 Schema 与 verifier
 - [ ] clean install/start/health/open/reopen/exit 的 `6/6` case、`12/12` attempt 通过
 - [ ] 限定文件 `git diff --check` 通过
@@ -84,7 +86,7 @@
 
 ### GATE-06-01 Handoff Intake 冻结执行契约
 
-本节只消费 `GATE-05-06` Handoff，不重算 OPL/Trace、Compatibility、coverage 或 eligibility。设计冻结状态为 `FROZEN`，实现与执行状态仍为 `BLOCKED`。
+本节只消费 `GATE-05-06` Handoff，不重算 OPL/Trace、Compatibility、coverage 或 eligibility。设计状态为 `FROZEN`；Intake Schema、runner 和反例测试已实现，exact Handoff 的执行状态为 `READY_FOR_RELEASE_VALIDATION`。该状态只关闭 `GATE-06-01`，不启用任何 Capability。
 
 #### 1. 机器资产与命令
 
@@ -175,8 +177,8 @@ AND blockers.length == 0
 ```
 
 - [x] Intake Schema identity、路径、命令、8 项检查、34 项结构、JCS 指纹、READY 算法和退出码已冻结。
-- [ ] Intake Schema 与 runner 已实现并由非法 SHA、非法 Schema、证据缺失、错误计数、非禁用 gate 反例验证。
-- [ ] exact Handoff 达到 `READY_FOR_RELEASE_VALIDATION`，报告原始 bytes SHA 已冻结。
+- [x] Intake Schema 与 runner 已实现并由非法 SHA、非法 Schema、证据缺失、错误计数、非禁用 gate 反例验证。
+- [x] exact Handoff 达到 `READY_FOR_RELEASE_VALIDATION`，报告原始 bytes SHA 已冻结：`handoff=38accdf1e54c8b95214c217ff09a3f349b3f715defc4b7eade20fdfc8bc674da`，`intake=823369ff830ed2f8c4fcb3156829dee641eece923f1cc6b6ddd34bdd933196fa`。
 
 ### GATE-06-02 Enablement Manifest 冻结执行契约
 
@@ -326,15 +328,16 @@ ROLLED_BACK_PARTIAL --恢复证据后新 Candidate/READY--> ACTIVE_PARTIAL | ACT
 #### 7. Gate 退出证据
 
 - [x] Enablement Schema identity、路径、命令、三批次、34 项闭包、稳定 blocker code 和不可变状态机已冻结。
-- [ ] Schema、builder、verifier、activate、rollback runner 已实现，正反例和集合边界测试通过。
+- [x] Schema、builder、verifier、activate、rollback runner 已实现；`4/4` 隔离测试覆盖合法 `BLOCKED/READY` Candidate、派生字段篡改阻断、不可变写入和缺少 GATE-06-06 exact Schema/READY Report 时 Activation 零输出。
 - [ ] `GATE-06-03~05` 机器报告已生成且 Candidate 可复算为 `READY_FOR_ACTIVATION`；当前不得勾选。
 - [ ] `GATE-06-06` READY 后 Activation manifest 已生成并复验；本项关闭前 production gate 必须保持 `DISABLED`。
 
-## GATE-06-01/02 设计冻结结论
+## GATE-06-01~06 当前实现与执行结论
 
-1. `GATE-06-01/02` 的设计输入已达到 `FROZEN`，实现和执行仍为 `BLOCKED`。
-2. 本轮没有创建 Schema、runner、manifest 或发布报告，没有执行视觉、浏览器 E2E、性能、恢复或生产 enablement。
-3. 本结论只覆盖 `GATE-06-01/02`；`GATE-06-03` 由下节独立冻结，不能反向改变 Intake 或 Enablement 算法。
+1. `GATE-06-01`：设计为 `FROZEN`；Intake Schema、runner 和正反例测试已实现；exact Handoff 执行为 `READY_FOR_RELEASE_VALIDATION`。该 READY 只证明 8 项检查与 `34/34` intake matched。
+2. `GATE-06-02`：设计为 `FROZEN`；Enablement Schema、builder、verifier、activate/rollback runner 及失败守卫测试已实现。verifier 会从 Intake 和四类 evidence 复算 Candidate 派生字段，manifest 禁止覆盖；缺少可执行 GATE-06-06 Report Schema/READY Report 时 `activate` 必须阻断且零输出。真实 Candidate 仍等待 `GATE-06-03~05` exact Report，真实 Activation 仍等待 `GATE-06-06` READY Report；production gate 必须保持 `DISABLED + []`。
+3. `GATE-06-03~06`：设计均为 `FROZEN`；Visual/E2E、Performance、Recovery、Release Candidate 的机器资产、runner 和 READY 报告尚未完整实现或执行，具体缺口以各节退出证据为准。
+4. `GATE-06-01` READY 不构成 `GATE-06-02~06`、生产 enablement、发布或 ISO 19450:2024 符合性证明；禁止手工启用 Capability。
 
 ### GATE-06-03 Visual/E2E Closure 冻结执行契约
 
@@ -359,9 +362,16 @@ docs/contracts/schemas/opm-dev-canvas-06-visual-manifest.schema.json
 docs/contracts/schemas/opm-dev-canvas-06-visual-report.schema.json
 docs/contracts/schemas/opm-dev-canvas-06-e2e-manifest.schema.json
 docs/contracts/schemas/opm-dev-canvas-06-e2e-report.schema.json
+docs/contracts/schemas/opm-dev-canvas-06-common-fixture-catalog.schema.json
+docs/contracts/schemas/opm-dev-canvas-06-golden-environment.schema.json
 
+tests/e2e/release/dev-canvas-06/fixtures/dev-canvas-06-common-fixture-catalog.json
+tests/e2e/release/dev-canvas-06/fixtures/factories/**
 tests/e2e/release/dev-canvas-06/golden/**
+tests/e2e/release/dev-canvas-06/golden/golden-environment.json
 
+<evidence_output_root>/dev-canvas-06/inputs/upstream/**
+<evidence_output_root>/dev-canvas-06/inputs/common/**
 <evidence_output_root>/dev-canvas-06/visual/dev-canvas-06-visual-manifest.json
 <evidence_output_root>/dev-canvas-06/visual/dev-canvas-06-visual-report.json
 <evidence_output_root>/dev-canvas-06/visual/attempts/**
@@ -379,8 +389,10 @@ Schema identity 固定为：
 | Visual Report | `OPM-DEV-CANVAS-06-VISUAL-REPORT-001` | `0.1` |
 | E2E Manifest | `OPM-DEV-CANVAS-06-E2E-MANIFEST-001` | `0.1` |
 | E2E Report | `OPM-DEV-CANVAS-06-E2E-REPORT-001` | `0.1` |
+| Common Fixture Catalog | `OPM-DEV-CANVAS-06-COMMON-FIXTURE-CATALOG-001` | `0.1` |
+| Golden Environment | `OPM-DEV-CANVAS-06-GOLDEN-ENVIRONMENT-001` | `0.1` |
 
-所有对象封闭；文件 ref 均为对应 root 内相对 `path + byte_length + sha256`。Manifest/Report/golden/attempt/diff 不进入 Profile required manifest、Profile package digest、Handoff 或五 role binding digest，但其 raw SHA 必须进入后续 Enablement Candidate 和 Release Candidate Report。
+所有对象封闭；普通文件 ref 为对应 root 内相对 `path + byte_length + sha256`。从 exact evidence bundle 物化的输入使用封闭 `archiveEntryRef={path,byte_length,sha256,bundle_sha256,archive_entry_path}`，不得省略 archive identity 或退化为普通 ref。Manifest/Report/golden/attempt/diff 不进入 Profile required manifest、Profile package digest、Handoff 或五 role binding digest，但其 raw SHA 必须进入后续 Enablement Candidate 和 Release Candidate Report。
 
 #### 3. 稳定命令与退出码
 
@@ -405,7 +417,8 @@ Visual/E2E Manifest 顶层固定包含：
 schema_id, schema_version, manifest_id, manifest_version, generated_at,
 generator_identity, intake_report_ref, handoff_ref,
 upstream_source_build, source_build,
-environment_policy, cases[], summary
+upstream_input_refs[], input_materialization,
+common_fixture_catalog_ref, environment_policy, cases[], summary
 ```
 
 Visual/E2E Report 顶层固定包含：
@@ -418,6 +431,8 @@ environment, report_status, summary,
 capability_results[], case_results[], failures[], limitations[]
 ```
 
+Visual Manifest 还必须包含 `golden_environment_ref`；E2E Manifest 不包含该字段。`upstream_input_refs[]` 恰好绑定 exact Coverage Catalog、Golden Manifest、Golden Replay Report、Symbol Catalog 和 Handoff Evidence Bundle；不得用当前 source tree 中路径相同的文件替代上游 bytes。
+
 1. `manifest_version=0.1.0`；`manifest_id` 分别固定为 `dev-canvas-06.visual.<source-commit前12位>.<intake-sha前12位>` 和 `dev-canvas-06.e2e.<source-commit前12位>.<intake-sha前12位>`。
 2. Manifest/Report 的 `handoff_ref/intake_report_ref/upstream_source_build` 必须与 READY Intake 深度相等；`source_build` 是独立的 clean DEV-CANVAS-06 target build，Visual 和 E2E 必须深度相等，禁止用上游 DEV-CANVAS-05 source commit 冒充目标 build。
 3. `generator_identity/runner_identity` 至少包含工具版本、source commit、Node/Playwright/Chromium exact version、OS、命令和 runner source SHA。target build 与 runner build 分开记录，禁止混用。
@@ -429,6 +444,14 @@ capability_results[], case_results[], failures[], limitations[]
 
 `source_build` 至少包含 source commit、`dirty_before_build=false`、build command、Node exact version、lockfile SHA、`WEB_DIST` aggregate digest 和 `LOCAL_RUNTIME_JAR` ref/SHA。JAR 必须与 Intake build artifact exact 相等；Web dist 必须来自该 source commit 的 production build。Manifest 生成在 evidence output root 进行，不能使 source checkout 变脏。
 
+#### 4.1 exact input join 与 evidence bundle 物化
+
+1. Family Visual/E2E 以 READY Intake/Handoff 为根；Coverage Catalog 是 178 个 family case 的主表，按 `(capability_id, case_id, variant_key, expectation)` 与 Golden Manifest 一对一 join，再按 `case_id` 与 Golden Replay Report 一对一 join。任一缺项、重复、expectation 不一致或两次 replay status/transaction 不一致即输入 BLOCKED。
+2. builder 必须先验证 Handoff `EVIDENCE_BUNDLE` 的普通 file ref 与 raw SHA，再用 fixed Java 21 `${JAVA_HOME}/bin/jar --list --verbose` 检查并解包到 evidence-root 新临时目录。archive entry 出现绝对路径、`..`、重复 entry、symlink、UTF-8 path 超过 `512` bytes、entry 数超过 `4096`、单 entry 解压后超过 `64 MiB` 或总解压量超过 `512 MiB` 时立即 BLOCKED。
+3. 只物化被 join 引用的 Coverage/Golden/Symbol 与 base/input fixture 到 `<evidence_output_root>/dev-canvas-06/inputs/upstream/**`。物化 ref 固定包含 `path/byte_length/sha256/bundle_sha256/archive_entry_path`，排他创建；source/handoff root 均只读。
+4. `input_materialization` 固定记录 bundle ref、Java/JAR exact version、entry allowlist、materialized count、aggregate digest 和临时目录清理状态。Report/verifier 必须复核 archive 与物化 bytes，不能只信 Manifest summary。
+5. 当前 Symbol Catalog 只提供 34 个主 symbol 条目而没有受控 variant 列表。本 Gate 不修改不可变 Profile asset；Symbol entry 必须从 evidence bundle 内 active Profile `profile.json` 的 `SYMBOL_ASSET` required logical path 解析，asset id/version/digest 与 Intake active binding 完全相等且路径唯一。family visual variant 由 exact PASS Coverage requirement、Golden Manifest fixture/expected projection 和该主 symbol 条目共同派生，并保存三者原始 ref/SHA 和 expected projection canonical SHA。
+
 #### 5. Visual 固定矩阵与 case catalog
 
 Visual Manifest 额外包含 `viewport_catalog[]/zoom_catalog[]/common_subjects[]/blank_baselines[]/pixel_policy/geometry_policy/golden_policy`。
@@ -437,12 +460,10 @@ Visual Manifest 额外包含 `viewport_catalog[]/zoom_catalog[]/common_subjects[
 
 ```text
 case_id, case_kind, capability_id?, subject_id?,
-viewport_id, zoom_id, fixture_ref, expected_revision,
-focus_target_id, focus_anchor, expected_cells,
-variant_captures[]
+viewport_id, zoom_id, variant_captures[]
 ```
 
-`case_kind` 只允许 `CAPABILITY/COMMON`，Capability 与 subject 条件字段互斥。每个 `variant_captures[]` 包含 `visual_variant_key/capture_id/golden_ref/focus_target_id/focus_anchor/critical_regions[]`；公共 case 也固定一个与 subject 同名的 variant capture，避免 Report 使用另一种形状。
+`case_kind` 只允许 `CAPABILITY/COMMON`，Capability 与 subject 条件字段互斥。每个 `variant_captures[]` 独立包含 `visual_variant_key/capture_id/fixture_ref/expected_revision/focus_target_id/focus_anchor/expected_cells/golden_ref/critical_regions[]/expected_projection_sha256`；公共 case 也固定一个与 subject 同名的 variant capture。不得把多个上游 fixture 的 ref/revision/cell 计数提升到 case 层。
 
 | Viewport ID | width | height | device scale factor |
 | --- | ---: | ---: | ---: |
@@ -475,9 +496,19 @@ Visual case 固定为：
 | `FINDING_FOCUS` | Finding/图文定位高亮不遮盖基础符号，移除后样式恢复 |
 | `BLOCKED_FEEDBACK` | blocked/conflict/readonly/persistence-failed 呈现可区分且不改变固定控件尺寸 |
 
-每个 Capability case 的 `variant_captures[]` 必须从 exact Symbol Catalog 中该 Capability 的 descriptor/visual variant keys 生成，并与 Symbol digest 绑定；每个 variant 至少一个 capture。Case 仍只计一项，但只有全部 variant capture 两次 matched 才 PASS。Visual Report 必须记录 `covered_symbol_variant_keys[]`，集合与 descriptor exact 相等；禁止只截默认 marker 代表 tagged/null-tagged、direction、State-specified、Control annotation 或 fan variant。
+8 个公共 subject 的 fixture/focus/critical region 必须来自第 8.1 节 Common Fixture Catalog，不允许 manifest builder 按 subject 名称临时拼装。
 
-Visual `case_results[]` 每项固定包含 `case_id/case_kind/capability_id?/subject_id?/status/covered_symbol_variant_keys[]/attempts[]/failure_codes[]`；status 只允许 `PASS_MATCHED/FAILED`。每个 attempt 包含 `attempt_ordinal/status/revision/projection_digest/cell_geometry_hash/capture_results[]/assertion_results[]`，capture result 必须给出 actual/probe/diff ref、golden/blank ref、像素统计、关键区统计和 geometry 统计。Visual `capability_results[]` 恰有 34 项，包含 `capability_id/family/case_ids[9]/covered_symbol_variant_keys[]/pass_matched_count/failed_count/status`。
+每个 Capability case 的 `variant_captures[]` 固定从 exact Coverage Catalog 的 PASS requirement 生成，并与 Golden Manifest、Golden Replay、主 Symbol 条目及 active Symbol digest 绑定：`visual_variant_key=完整 coverage_key`，按 Capability family/ID 后再按 coverage key 字典序。当前 exact 基线为 Procedural `16`、Control `20`、Structural `94`，合计 `130` 个 family variant；同一 `(capability_id,variant_key)` 不得重复。
+
+Capability `capture_id=<case_id>.<sha256(visual_variant_key UTF-8 bytes)前12位>`；公共 `capture_id=<case_id>.<sha256(subject_id UTF-8 bytes)前12位>`。`expected_projection_sha256` 为 Golden Manifest `expected_projection` 按 RFC 8785 JCS 规范化后的 SHA-256；文件 raw SHA 与 JCS 派生 SHA 不得混用。
+
+130 个 family variant 在三视口/三缩放下形成 `1170` 个 capture；8 个公共 subject 形成 `72` 个 capture，因此 Visual Manifest 固定 `capture_count=1242`、两次独立 attempt 固定 `attempt_capture_count=2484`。Case 仍为 `378`，只有其全部 variant capture 两次 matched 才 PASS。Visual Report 必须记录 `covered_visual_variant_keys[]`，集合与 Manifest 对该 Capability 的 exact PASS coverage key 集合相等；禁止只截默认 marker 代表 tagged/null-tagged、direction、State-specified、Control annotation 或 fan variant。
+
+Family variant 的 `fixture_ref` 取 Golden Manifest `input_revision_fixture` 的 exact bundle materialization；`expected_revision` 取其 `revision_id`；`expected_cells` 取目标 Context visible occurrence 数。`focus_target_id` 必须是唯一 `target_kind=FACT && target_id=expected_normalized_fact.fact_id` 的 Occurrence ID。`focus_anchor` 优先级固定为：junction -> `JUNCTION`；annotation/completeness/label slot -> `LABEL`；仅 target marker -> `TARGET`；仅 source marker -> `SOURCE`；其余 -> `CENTER`。
+
+`critical_regions[]` 必含 `FOCUS_BBOX`，并按 expected projection 非空字段追加 `SOURCE_MARKER/TARGET_MARKER/JUNCTION_MARKER/ANNOTATION/COMPLETENESS/LABEL_SLOT:<id>`。上述字段全部由 builder 派生并由 verifier 独立重算，不允许 runner 观察截图后反填。
+
+Visual `case_results[]` 每项固定包含 `case_id/case_kind/capability_id?/subject_id?/status/covered_visual_variant_keys[]/attempts[]/failure_codes[]`；status 只允许 `PASS_MATCHED/FAILED`。每个 attempt 包含 `attempt_ordinal/status/revision/projection_digest/cell_geometry_hash/capture_results[]/assertion_results[]`，capture result 必须给出 actual/probe/diff ref、golden/blank ref、像素统计、关键区统计和 geometry 统计。Visual `capability_results[]` 恰有 34 项，包含 `capability_id/family/case_ids[9]/covered_visual_variant_keys[]/pass_matched_count/failed_count/status`。
 
 #### 6. Visual release 环境与稳定捕获
 
@@ -515,13 +546,15 @@ viewport_id, zoom_id, fixture_ref, input_ref, driver_id,
 expected_transaction, assertion_ids[]
 ```
 
-`expectation` 只允许 `PASS/BLOCKED`；家族 case 必须有 capability/coverage key，公共 case 必须省略二者并使用本节固定 case ID。`expected_transaction` 必须来自上游 coverage 或公共 case 定义，不允许 runner 从 observed 结果反填。
+`expectation` 只允许 `PASS/BLOCKED`；家族 case 必须有 capability/coverage key，公共 case 必须省略二者并使用本节固定 case ID。`expected_transaction` 必须来自 exact Golden Replay join 或公共 fixture catalog 定义，不允许 runner 从 observed 结果反填。
 
 1. family coverage 恰有 `178`：expected PASS=`130`、BLOCKED=`48`；每个 coverage key 恰映射一次；
 2. Procedural -> `E2E-CANVAS-002`，Control -> `003`，Structural -> `004`；
 3. case ID=`<suite_id>.<capability_id>.<sha256(coverage_key UTF-8 bytes)前12位>`，同时保存完整 coverage key、upstream case/fixture ref、expectation、driver ID 和 input SHA；
 4. driver 只允许 `DRIVER-PROCEDURAL/DRIVER-CONTROL/DRIVER-STRUCTURAL`，输入来自 upstream fixture。前端不能修改端点、Modifier、标签或 completeness 来迁就现有 UI；无法执行时 case FAILED 并回流相应上游/实现包；
 5. family case 在 `VP-1440X900/Z-100` 执行一次用户 mutation。PASS 必须原子提交 expected Revision 并重开；BLOCKED 必须 Head 不动且 Revision/Parent/Trace/Finding/Operation/Receipt 增量全 `0`。
+
+Family `fixture_ref/input_ref` 分别取 Golden Manifest `base_revision_fixture/input_revision_fixture` 的 exact bundle materialization；`expected_transaction` 取 Golden Replay 两次 attempt 完全相等的 `transaction`。BLOCKED case 还必须与 Golden Manifest `expected_transaction` 深度相等。PASS assertion IDs 固定为 `REVISION_COMMITTED/PROJECTION_MATCHED/TEXT_TRACE_MATCHED/TRANSACTION_MATCHED/REOPEN_MATCHED`；BLOCKED 固定为 `ERROR_CODE_MATCHED/TRANSACTION_ZERO/HEAD_UNCHANGED/PROJECTION_UNCHANGED/REOPEN_MATCHED`。
 
 公共 case 固定 `16`：
 
@@ -547,6 +580,25 @@ expected_transaction, assertion_ids[]
 公共完整 ID 为 `<suite>.<Case ID>`。E2E 总计 `178+16=194` case，每项 `2` attempt，总计 `388` attempt。排序固定为 suite `001~007`；家族 suite 内按 Capability/coverage key，公共 suite 按上表顺序。
 
 公共 case 的 `zoom_id` 全部固定为 `Z-100`。Manifest 不得把公共 case 复制到其他 zoom；三缩放交互/布局由 Visual 矩阵证明。
+
+#### 8.1 Common Fixture Catalog
+
+8 个公共 Visual subject 与 16 个公共 E2E case 必须由 `OPM-DEV-CANVAS-06-COMMON-FIXTURE-CATALOG-001/0.1` 唯一版本化 catalog 提供。顶层封闭字段固定为：
+
+```text
+schema_id, schema_version, catalog_id, catalog_version, generated_at,
+generator_ref, source_binding, visual_subjects[8], e2e_cases[16], summary
+```
+
+每个 Visual subject 固定包含 `subject_id/factory_id/factory_source_ref/fixture_ref/expected_revision/focus_target_id/focus_anchor/expected_cells/critical_regions[]`。每个 E2E common case 固定包含 `case_id/factory_id/factory_source_ref/base_fixture_ref/input_ref/actions[]/assertion_ids[]`；每个 action 固定包含 `action_id/expected_status/expected_error_code?/expected_transaction/reopen_checkpoint`。所有 factory source 和 fixture 都使用普通 exact ref/SHA，source binding 必须与 Intake active binding 相等。
+
+Catalog 按公共 subject 表和公共 case 表顺序生成，`generated_at` 固定取 target release build 的 `SOURCE_DATE_EPOCH` UTC 值，summary 必须精确为 `visual_subject_count=8/e2e_case_count=16`。expected action、error、transaction 和 reopen checkpoint 由版本化 factory catalog 预先给出，禁止 runner 根据 observed 结果写回。Catalog/Schema/fixture/factory 内容未实现或任一 ref/SHA 不匹配时，Visual/E2E Manifest 构建均 BLOCKED。
+
+#### 8.2 Golden Environment Index
+
+`<golden-root>/golden-environment.json` 必须通过 `OPM-DEV-CANVAS-06-GOLDEN-ENVIRONMENT-001/0.1` Schema，封闭记录 Chromium/Playwright/OS build、launch args、字体 ref/SHA、color profile、locale、timezone、color scheme、reduced motion、device scale factor、`png_refs[1242]` 和 `blank_baseline_refs[9]`；`generated_at` 来自获批 golden 变更的 `SOURCE_DATE_EPOCH` UTC 值。
+
+Golden 路径固定为 `<golden-root>/<capture_id>.png`，blank baseline 固定为 `<golden-root>/blank/<viewport_id>.<zoom_id>.png`。Manifest 只消费 index，不扫描目录猜测或接受额外 PNG；环境或 ref/SHA 不一致即 `VISUAL_ENVIRONMENT_MISMATCH`/`VISUAL_GOLDEN_DIGEST_MISMATCH` 并保持 BLOCKED。
 
 #### 9. E2E attempt 与报告断言
 
@@ -610,13 +662,13 @@ AND capability_case_count == 306
 AND common_case_count == 72
 AND attempt_count == 756
 AND blank_baselines.length == 9
-AND capture_count == manifest.capture_count
-AND attempt_capture_count == capture_count * 2
+AND capture_count == manifest.capture_count == 1242
+AND attempt_capture_count == capture_count * 2 == 2484
 AND pass_matched_count == 378
 AND failed_count == 0
 AND capability_results.length == 34
 AND every(case.status == PASS_MATCHED)
-AND every(capability.covered_symbol_variant_keys == exact_descriptor_variant_keys)
+AND every(capability.covered_visual_variant_keys == exact_pass_coverage_keys)
 AND failures.length == 0
 AND skipped_count == 0
 AND retry_count == 0
@@ -642,18 +694,19 @@ AND skipped_count == 0
 AND retry_count == 0
 ```
 
-`GATE-06-03` 关闭还要求两个 Manifest/Report Schema 全部通过、raw SHA 完整；两份报告的 Handoff/Intake/upstream source build refs 相同，DEV-CANVAS-06 target `source_build` 与 environment identity 相同，两个 `--require-ready` verifier 均返回 `0`。任一不满足时 Gate=`BLOCKED`，相关 Capability 保持 disabled；不得用 Visual READY 抵消 E2E BLOCKED，反之亦然。
+`GATE-06-03` 关闭还要求 Common Fixture、Golden Environment 和两个 Manifest/Report 共六个 Schema 全部通过、raw SHA 完整；两份报告的 Handoff/Intake/upstream source build refs 相同，DEV-CANVAS-06 target `source_build` 与 environment identity 相同，两个 `--require-ready` verifier 均返回 `0`。任一不满足时 Gate=`BLOCKED`，相关 Capability 保持 disabled；不得用 Visual READY 抵消 E2E BLOCKED，反之亦然。
 
-- [x] 四个 Schema identity、路径、命令、固定矩阵、case ID、attempt 数和 release 环境已冻结。
+- [x] 六个输入/输出 Schema identity、路径、命令、固定矩阵、case/capture/attempt 数和 release 环境已冻结。
 - [x] PNG comparator、非空、determinism、几何/遮挡/裁剪/溢出和 golden 更新边界已冻结。
 - [x] E2E `194=178+16` catalog、两次执行、事务/重开断言、失败码和 READY 算法已冻结。
-- [ ] 四个机器 Schema、manifest builder、runner、reporter、verifier 与 release Playwright 配置已实现并通过正反例。
+- [x] Coverage/Golden Manifest/Golden Replay exact join、variant 级 fixture、bundle 安全物化、Common Fixture Catalog 和 Golden Environment Index 契约已冻结。
+- [ ] Common Fixture/Golden Environment 与六个机器 Schema、manifest builder、runner、reporter、verifier、release Playwright 配置已实现并通过正反例。
 - [ ] `378/378` Visual、`194/194` E2E 及全部 attempts 在 exact release build 实际通过，Report SHA 已冻结。
 - [ ] `GATE-06-02` Candidate 重新消费两个 READY Report；当前不得生成 Activation 或启用 Capability。
 
 ## GATE-06-03 设计冻结结论
 
-1. `GATE-06-03` 设计输入已达到 `FROZEN`；机器资产、release runner、golden 和执行报告仍为 `BLOCKED`。
+1. `GATE-06-03` 高层矩阵之外的可执行输入已补齐冻结：exact join、variant 级 fixture、archive 物化、公共 fixture catalog 和 golden index 均有唯一实施口径；对应机器资产、release runner、golden 和执行报告仍为 `BLOCKED`。
 2. 本轮没有创建或更新 golden，没有运行 Visual/E2E release 验收，也没有把现有 dev E2E 解释为发布证据。
 3. 本结论只覆盖 `GATE-06-03`；`GATE-06-04 Performance Closure` 由下节独立冻结，不能用 Visual/E2E 结果替代性能证据。
 
