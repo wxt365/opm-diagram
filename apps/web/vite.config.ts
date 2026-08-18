@@ -29,6 +29,16 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          "opd-canvas": ["@antv/x6"],
+          "vue-runtime": ["pinia", "vue", "vue-router"],
+        },
+      },
+    },
+  },
   test: {
     environment: "jsdom",
   },

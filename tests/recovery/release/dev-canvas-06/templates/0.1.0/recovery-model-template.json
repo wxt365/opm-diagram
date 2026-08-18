@@ -1,0 +1,441 @@
+{
+  "schema_id": "OPM-DEV-CANVAS-06-RECOVERY-MODEL-TEMPLATE-001",
+  "schema_version": "0.1",
+  "template_id": "OPM-DEV-CANVAS-06-RECOVERY-MODEL-TEMPLATE-001/0.1",
+  "template_version": "0.1.0",
+  "fixture_id": "RECOVERY-FIXTURE-MODEL",
+  "source_date_epoch": 1785758631,
+  "profile_binding": {
+    "profile_id": "profile.iso19450.2024.draft",
+    "profile_version": "0.2.0",
+    "rule_set_id": "rules.iso19450.2024.draft",
+    "rule_version": "0.1.0",
+    "text_grammar_id": "grammar.opl.iso19450.2024.draft",
+    "text_grammar_version": "0.2.0",
+    "symbol_catalog_id": "symbols.iso19450.2024.draft",
+    "symbol_catalog_version": "0.1.0",
+    "normalization_adapter_id": "normalization.iso19450.2024.draft",
+    "normalization_adapter_version": "0.1.0",
+    "binding_digest": "93805d6e2fdb3ea73c4ddfc0a995d662fbf13dee2d8a6f24fc20c79ecff65d1d"
+  },
+  "source_build_binding": {
+    "source_commit": "b940ac9bb73442c3a697cce8bfa7c9df52856b3a",
+    "handoff_ref": {
+      "kind": "HANDOFF",
+      "path": "packages/profiles/profile.iso19450.2024.draft/0.2.0/handoff/dev-canvas-05-handoff.json",
+      "byte_length": 37088,
+      "sha256": "0778d77f75a68b4fb447fd26614d71885af88982dba5f2e7e1e9bd70d98b1326"
+    },
+    "intake_report_ref": {
+      "kind": "INTAKE_REPORT",
+      "path": "packages/profiles/profile.iso19450.2024.draft/0.2.0/handoff/releases/clean-b940ac9bb734/dev-canvas-06-intake-report.json",
+      "byte_length": 50823,
+      "sha256": "54d56bab7792122781bc2b8b785c3488a4bd1d4f7ecc741845ecbcccdb2d85ee"
+    },
+    "runtime_jar_ref": {
+      "kind": "LOCAL_RUNTIME_JAR",
+      "path": "packages/profiles/profile.iso19450.2024.draft/0.2.0/handoff/releases/clean-b940ac9bb734/local-runtime-0.1.0-SNAPSHOT.jar",
+      "byte_length": 39308369,
+      "sha256": "0cfe0f14f2190e64e4cbc39b8a8bfbb8c9a5b733607cb24c4801c872f87b3f49"
+    }
+  },
+  "project_identity": {
+    "scope": "SCENARIO_ISOLATED",
+    "ordered_ids": [
+      "project.recovery.state.001",
+      "project.recovery.procedural.001",
+      "project.recovery.control.001",
+      "project.recovery.structural-fan.001"
+    ]
+  },
+  "model_identity": {
+    "scope": "BASE_REVISION_BOUND",
+    "ordered_ids": [
+      "model.golden.struct.003",
+      "model.golden.proc",
+      "model.golden.proc",
+      "model.golden.struct.003"
+    ]
+  },
+  "request_digest_policy": {
+    "algorithm": "SHA-256",
+    "canonicalization": "RFC8785-JCS",
+    "preimage": "UTF8(JCS(command_request))",
+    "wire_bytes_must_equal_preimage": true,
+    "runtime_reserialized_jcs_must_equal_preimage": true
+  },
+  "result_digest_policy": {
+    "algorithm": "SHA-256",
+    "canonicalization": "RFC8785-JCS",
+    "ordered_keys": [
+      "semantic_projection_sha256",
+      "projection_sha256",
+      "opl_sha256",
+      "trace_sha256",
+      "finding_sha256",
+      "transaction_sha256",
+      "normalized_outcome_sha256"
+    ],
+    "scenario_preimages": {
+      "semantic_projection_sha256": "UTF8(JCS(expected_result.semantic_projection))",
+      "projection_sha256": "UTF8(JCS(expected_result.projection))",
+      "opl_sha256": "UTF8(JCS(expected_result.opl))",
+      "trace_sha256": "UTF8(JCS(expected_result.trace))",
+      "finding_sha256": "UTF8(JCS(expected_result.finding))",
+      "transaction_sha256": "UTF8(JCS(expected_result.transaction))",
+      "normalized_outcome_sha256": "UTF8(JCS(expected_result.normalized_outcome))"
+    },
+    "aggregate_preimage": "UTF8(JCS(command_scenarios.map(({scenario_id,expected_result_digests}) => ({scenario_id,sha256:expected_result_digests[key]}))))"
+  },
+  "deterministic_id_policy": {
+    "port_interface": "RuntimeIdProvider",
+    "production_implementation": "UuidRuntimeIdProvider",
+    "test_implementation": "RecoveryDeterministicIdProvider",
+    "availability": "TEST_ONLY_RECOVERY_COMPOSITION",
+    "allocation_rule": "consume deterministic_id_sequence in ascending ordinal and require exact prefix",
+    "production_default": "UUID_V4_PROVIDER",
+    "production_api_exposed": false,
+    "test_implementation_must_not_exist_in_runtime_jar": true,
+    "unexpected_request": "BLOCK_RECOVERY_FIXTURE_MISMATCH"
+  },
+  "command_scenarios": [
+    {
+      "scenario_id": "RECOVERY-COMMAND-STATE-001",
+      "command_family": "STATE",
+      "project_id": "project.recovery.state.001",
+      "model_id": "model.golden.struct.003",
+      "context_id": "context.sd.root",
+      "base_revision_ref": {
+        "kind": "MS_REV_001_V02",
+        "path": "packages/profiles/profile.iso19450.2024.draft/0.2.0/golden/fixtures/base-golden.struct.003.json",
+        "byte_length": 7778,
+        "sha256": "2a42ea1db241f0d0147df592f1cf159436c3a70cdde2637078e6a9a1dc684e3d"
+      },
+      "base_revision_identity": {
+        "revision_id": "revision.base.golden.struct.003",
+        "revision_sequence": 1,
+        "model_id": "model.golden.struct.003",
+        "context_id": "context.sd.root"
+      },
+      "capability_derivation_input": {
+        "selection_id": "element.raw.material",
+        "intent": "CREATE_STATE",
+        "endpoint_ids_sorted": [],
+        "capability_query_id": "capability.query.ac55d22e4fec8afc5d7a1c5a44363c83",
+        "selected_option_id": "option.state.db28f5d197f39f40514ca400"
+      },
+      "command_request": {
+        "request_id": "request.recovery.state.001",
+        "command_id": "command.recovery.state.001",
+        "base_revision": "revision.base.golden.struct.003",
+        "binding": {
+          "profile_id": "profile.iso19450.2024.draft",
+          "profile_version": "0.2.0",
+          "rule_set_id": "rules.iso19450.2024.draft",
+          "rule_version": "0.1.0"
+        },
+        "command_type": "CREATE_STATE",
+        "payload": {
+          "context_id": "context.sd.root",
+          "owner_ref": {"target_kind": "ELEMENT", "target_id": "element.raw.material"},
+          "capability_ref": {"capability_id": "CAP-STATE-001"},
+          "name_or_value": "Recovery Ready",
+          "state_roles": ["INITIAL"],
+          "occurrence": {"ownership": "OWNED", "construct_role": "STATE_NODE"},
+          "layout": {"x": 80, "y": 120, "width": 88, "height": 28},
+          "capability_query_id": "capability.query.ac55d22e4fec8afc5d7a1c5a44363c83",
+          "selected_option_id": "option.state.db28f5d197f39f40514ca400"
+        }
+      },
+      "request_digest": "57320f851a1112a7a294d34818610a6ac276ef649323e8940420f65ac0ec3bbe",
+      "deterministic_id_sequence": [
+        {"ordinal": 1, "prefix": "revision", "id": "revision.recovery.state.001"},
+        {"ordinal": 2, "prefix": "state", "id": "state.recovery.ready.001"},
+        {"ordinal": 3, "prefix": "occurrence", "id": "occurrence.recovery.state.001"},
+        {"ordinal": 4, "prefix": "layout", "id": "layout.recovery.state.001"}
+      ],
+      "expected_result": {
+        "semantic_projection": {
+          "operation": "CREATE_STATE",
+          "revision_id": "revision.recovery.state.001",
+          "revision_sequence": 2,
+          "state": {
+            "state_id": "state.recovery.ready.001",
+            "owner_target_kind": "ELEMENT",
+            "owner_id": "element.raw.material",
+            "capability_id": "CAP-STATE-001",
+            "name_or_value": "Recovery Ready",
+            "state_roles": ["INITIAL"]
+          },
+          "occurrence": {"occurrence_id": "occurrence.recovery.state.001", "context_id": "context.sd.root", "construct_role": "STATE_NODE", "layout_id": "layout.recovery.state.001"},
+          "layout": {"layout_id": "layout.recovery.state.001", "x": 80, "y": 120, "width": 88, "height": 28},
+          "state_presentation": {"explicitness": "EXPLICIT", "fold_state": "UNFOLDED"}
+        },
+        "projection": {"construct_kind": "STATE", "target_id": "state.recovery.ready.001", "symbol_id": "symbol.state.basic", "visible": true, "context_id": "context.sd.root"},
+        "opl": {"ordered_utf8_sentences": ["Raw Material feeds Refined Material.", "Refined Material depends on Raw Material."], "state_sentence_delta": 0},
+        "trace": {"fact_ids": ["fact.raw.refined.bidirectional"], "rule_ids": ["rule.iso.struct.tagged.bidirectional.v1"], "new_state_trace_reference_count": 0, "binding_digest": "93805d6e2fdb3ea73c4ddfc0a995d662fbf13dee2d8a6f24fc20c79ecff65d1d"},
+        "finding": {"blocking": 0, "warning": 0, "suggestion": 0, "finding_delta": 0},
+        "transaction": {"revision_delta": 1, "revision_parent_delta": 1, "text_artifact_delta": 1, "text_trace_delta": 2, "finding_delta": 0, "operation_delta": 1, "receipt_delta": 1, "draft_head_changed": true},
+        "normalized_outcome": {"status": "COMMITTED", "committed_revision_id": "revision.recovery.state.001", "draft_head_revision_id": "revision.recovery.state.001", "head_sequence": 2, "idempotent_replay_revision_id": "revision.recovery.state.001", "sqlite_quick_check": "OK", "foreign_key_check_count": 0}
+      },
+      "expected_result_digests": {
+        "semantic_projection_sha256": "295fb78d711c88923ed4d892810af60f8bbb9496a619c2e245806e35f03d2226",
+        "projection_sha256": "65058b061e292e0096e9d5f63070a2974ec63b159f30b03a64580136e724b336",
+        "opl_sha256": "0023e3693c17dcda1475e492ee817fd364c1bc893bd5c5501ff483a99d84e5b0",
+        "trace_sha256": "ab663a234991c45bf957cd2c409a010671418a6a30a8b4d26bd5ae4f168d6483",
+        "finding_sha256": "6e8086207860bfe4fb61bde70d96d2288a4d89c105f0960c05d38385fd1401cc",
+        "transaction_sha256": "e88a3b06437fdaf131232ff290db26748fbd826078d5fe007347513e3ba0ad6d",
+        "normalized_outcome_sha256": "8ae7651eb685adc4b772008ff187ad862ac6717923d91b8801941c40fd4eefce"
+      }
+    },
+    {
+      "scenario_id": "RECOVERY-COMMAND-PROCEDURAL-001",
+      "command_family": "PROCEDURAL",
+      "project_id": "project.recovery.procedural.001",
+      "model_id": "model.golden.proc",
+      "context_id": "context.sd.root",
+      "base_revision_ref": {
+        "kind": "MS_REV_001_V02",
+        "path": "packages/profiles/profile.iso19450.2024.draft/0.2.0/golden/fixtures/base-golden.proc.001.json",
+        "byte_length": 8623,
+        "sha256": "6cf81b7f975adde8877eca9583b93304847a4e288a788df61c2b96fff26a4036"
+      },
+      "base_revision_identity": {"revision_id": "revision.base.golden.proc.001", "revision_sequence": 1, "model_id": "model.golden.proc", "context_id": "context.sd.root"},
+      "capability_derivation_input": {
+        "selection_id": null,
+        "intent": "CREATE_FACT",
+        "endpoint_ids_sorted": ["element.processing", "element.raw.material"],
+        "capability_query_id": "capability.query.5bb4053e6f40cadd69100e612935a3ad",
+        "selected_option_id": "option.fact.4ec375dcb7eb12f849c13e93"
+      },
+      "command_request": {
+        "request_id": "request.recovery.procedural.001",
+        "command_id": "command.recovery.procedural.001",
+        "base_revision": "revision.base.golden.proc.001",
+        "binding": {"profile_id": "profile.iso19450.2024.draft", "profile_version": "0.2.0", "rule_set_id": "rules.iso19450.2024.draft", "rule_version": "0.1.0"},
+        "command_type": "CREATE_FACT",
+        "payload": {
+          "context_id": "context.sd.root",
+          "fact_id": "fact.recovery.procedural.result.001",
+          "capability_ref": {"capability_id": "CAP-ISO-PROC-002"},
+          "fact_family": "TRANSFORMATION",
+          "normalized_endpoints": [
+            {"role": "RESULT_PROCESS", "target_ref": {"target_kind": "ELEMENT", "target_id": "element.processing"}, "ordinal": 0},
+            {"role": "RESULT_OBJECT", "target_ref": {"target_kind": "ELEMENT", "target_id": "element.raw.material"}, "ordinal": 1}
+          ],
+          "direction": "DIRECTED",
+          "labels": [],
+          "modifiers": [],
+          "logical_groups": [],
+          "occurrence": {"ownership": "OWNED", "construct_role": "PROCEDURAL_LINK"},
+          "layout": {"x": 100, "y": 160},
+          "capability_query_id": "capability.query.5bb4053e6f40cadd69100e612935a3ad",
+          "selected_option_id": "option.fact.4ec375dcb7eb12f849c13e93"
+        }
+      },
+      "request_digest": "1e7f0d3bfac2bb1b0689892670d152edff553e67a44d647fc71d9d5012c3afc3",
+      "deterministic_id_sequence": [
+        {"ordinal": 1, "prefix": "revision", "id": "revision.recovery.procedural.001"},
+        {"ordinal": 2, "prefix": "endpoint", "id": "endpoint.recovery.procedural.process.001"},
+        {"ordinal": 3, "prefix": "endpoint", "id": "endpoint.recovery.procedural.result.001"},
+        {"ordinal": 4, "prefix": "occurrence", "id": "occurrence.recovery.procedural.001"},
+        {"ordinal": 5, "prefix": "layout", "id": "layout.recovery.procedural.001"}
+      ],
+      "expected_result": {
+        "semantic_projection": {
+          "operation": "CREATE_FACT",
+          "revision_id": "revision.recovery.procedural.001",
+          "revision_sequence": 2,
+          "fact_id": "fact.recovery.procedural.result.001",
+          "fact_family": "TRANSFORMATION",
+          "capability_id": "CAP-ISO-PROC-002",
+          "direction": "DIRECTED",
+          "endpoints": [
+            {"endpoint_id": "endpoint.recovery.procedural.process.001", "role": "RESULT_PROCESS", "target_kind": "ELEMENT", "target_id": "element.processing", "ordinal": 0},
+            {"endpoint_id": "endpoint.recovery.procedural.result.001", "role": "RESULT_OBJECT", "target_kind": "ELEMENT", "target_id": "element.raw.material", "ordinal": 1}
+          ],
+          "occurrence_id": "occurrence.recovery.procedural.001",
+          "layout_id": "layout.recovery.procedural.001"
+        },
+        "projection": {"fact_id": "fact.recovery.procedural.result.001", "symbol_id": "symbol.link.result", "route_family": "procedural-link", "source_target_id": "element.processing", "target_target_id": "element.raw.material"},
+        "opl": {"ordered_utf8_sentences": ["Processing consumes available Raw Material.", "Processing yields Raw Material."], "new_fact_sentence_count": 1},
+        "trace": {"fact_ids": ["fact.processing.consumes.raw", "fact.recovery.procedural.result.001"], "new_fact_rule_ids": ["rule.iso.proc.result.endpoints.v1"], "new_fact_endpoint_ids": ["endpoint.recovery.procedural.process.001", "endpoint.recovery.procedural.result.001"], "binding_digest": "93805d6e2fdb3ea73c4ddfc0a995d662fbf13dee2d8a6f24fc20c79ecff65d1d"},
+        "finding": {"blocking": 0, "warning": 0, "suggestion": 0, "finding_delta": 0},
+        "transaction": {"revision_delta": 1, "revision_parent_delta": 1, "text_artifact_delta": 1, "text_trace_delta": 2, "finding_delta": 0, "operation_delta": 1, "receipt_delta": 1, "draft_head_changed": true},
+        "normalized_outcome": {"status": "COMMITTED", "committed_revision_id": "revision.recovery.procedural.001", "draft_head_revision_id": "revision.recovery.procedural.001", "head_sequence": 2, "idempotent_replay_revision_id": "revision.recovery.procedural.001", "sqlite_quick_check": "OK", "foreign_key_check_count": 0}
+      },
+      "expected_result_digests": {
+        "semantic_projection_sha256": "e1981c9db00b00a0e554f6b7ceed0496fbbb45a772758f513bce439be9a59844",
+        "projection_sha256": "02ac7cee6f6c730080d5558dfa49d806ee9997c5464de74cca87545b4a90af51",
+        "opl_sha256": "a50bb965ea842eacb0c09cc756d27cff264ee1adce10dbcd7ffd2cfd48622a59",
+        "trace_sha256": "eb8eedff34451d1d24eee0b196018825162b883f23c97bbb33d922fc6c71d999",
+        "finding_sha256": "6e8086207860bfe4fb61bde70d96d2288a4d89c105f0960c05d38385fd1401cc",
+        "transaction_sha256": "e88a3b06437fdaf131232ff290db26748fbd826078d5fe007347513e3ba0ad6d",
+        "normalized_outcome_sha256": "a73944f6f0a48d4759e05e09145cac6654f54ad87ff9da82aaf8ae9bcc745ce8"
+      }
+    },
+    {
+      "scenario_id": "RECOVERY-COMMAND-CONTROL-001",
+      "command_family": "CONTROL",
+      "project_id": "project.recovery.control.001",
+      "model_id": "model.golden.proc",
+      "context_id": "context.sd.root",
+      "base_revision_ref": {
+        "kind": "MS_REV_001_V02",
+        "path": "packages/profiles/profile.iso19450.2024.draft/0.2.0/golden/fixtures/g-opl-proc-001-consumption-object-pass.json",
+        "byte_length": 7761,
+        "sha256": "c94e620bfe7d12f619eb21b8020b1a57b7defa4c4f7d6170ee67657cf8d2b505"
+      },
+      "base_revision_identity": {"revision_id": "revision.g-opl-proc-001-consumption-object-pass", "revision_sequence": 2, "model_id": "model.golden.proc", "context_id": "context.sd.root"},
+      "capability_derivation_input": {
+        "selection_id": "fact.g-opl-proc-001-consumption-object-pass",
+        "intent": "UPDATE_FACT",
+        "endpoint_ids_sorted": ["element.processing", "element.raw.material"],
+        "capability_query_id": "capability.query.2219c8057486e97af909b7883822e70f",
+        "selected_option_id": "option.control.9fcdf95b789b9f6f9f057b86"
+      },
+      "command_request": {
+        "request_id": "request.recovery.control.001",
+        "command_id": "command.recovery.control.001",
+        "base_revision": "revision.g-opl-proc-001-consumption-object-pass",
+        "binding": {"profile_id": "profile.iso19450.2024.draft", "profile_version": "0.2.0", "rule_set_id": "rules.iso19450.2024.draft", "rule_version": "0.1.0"},
+        "command_type": "UPDATE_FACT",
+        "payload": {
+          "fact_id": "fact.g-opl-proc-001-consumption-object-pass",
+          "expected_capability_ref": {"capability_id": "CAP-ISO-PROC-001"},
+          "replacement": {
+            "modifiers": [
+              {"modifier_id": "control.capability", "value": "CAP-ISO-CTRL-001"},
+              {"modifier_id": "control.segment", "value": "PROCESS_INPUT"}
+            ]
+          },
+          "capability_query_id": "capability.query.2219c8057486e97af909b7883822e70f",
+          "selected_option_id": "option.control.9fcdf95b789b9f6f9f057b86"
+        }
+      },
+      "request_digest": "b00e7b18b07f459e87a826d1f7558128f52f9ea66243fd7ea4f0a51bbeabd3ba",
+      "deterministic_id_sequence": [
+        {"ordinal": 1, "prefix": "revision", "id": "revision.recovery.control.001"}
+      ],
+      "expected_result": {
+        "semantic_projection": {
+          "operation": "UPDATE_FACT",
+          "revision_id": "revision.recovery.control.001",
+          "revision_sequence": 3,
+          "fact_id": "fact.g-opl-proc-001-consumption-object-pass",
+          "base_capability_id": "CAP-ISO-PROC-001",
+          "endpoints_unchanged": true,
+          "modifiers": [
+            {"modifier_id": "control.capability", "value": "CAP-ISO-CTRL-001"},
+            {"modifier_id": "control.segment", "value": "PROCESS_INPUT"}
+          ]
+        },
+        "projection": {"fact_id": "fact.g-opl-proc-001-consumption-object-pass", "symbol_id": "symbol.link.consumption", "control_annotation": "event-e", "control_segment": "PROCESS_INPUT", "duplicate_edge_count": 0},
+        "opl": {"ordered_utf8_sentences": ["Raw Material initiates Processing, which consumes Raw Material."], "template_id": "opl.control.event.transforming.consumption.v1"},
+        "trace": {"fact_ids": ["fact.g-opl-proc-001-consumption-object-pass"], "modifier_ids": ["control.capability", "control.segment"], "rule_ids": ["rule.iso.proc.consumption.endpoints.v1", "rule.iso.control.event.001.v1"], "binding_digest": "93805d6e2fdb3ea73c4ddfc0a995d662fbf13dee2d8a6f24fc20c79ecff65d1d"},
+        "finding": {"blocking": 0, "warning": 0, "suggestion": 0, "finding_delta": 0},
+        "transaction": {"revision_delta": 1, "revision_parent_delta": 1, "text_artifact_delta": 1, "text_trace_delta": 1, "finding_delta": 0, "operation_delta": 1, "receipt_delta": 1, "draft_head_changed": true},
+        "normalized_outcome": {"status": "COMMITTED", "committed_revision_id": "revision.recovery.control.001", "draft_head_revision_id": "revision.recovery.control.001", "head_sequence": 3, "idempotent_replay_revision_id": "revision.recovery.control.001", "sqlite_quick_check": "OK", "foreign_key_check_count": 0}
+      },
+      "expected_result_digests": {
+        "semantic_projection_sha256": "b13d25010e369e921053013db28f8d418a0214dec8e0b396c4c8373445dc01f5",
+        "projection_sha256": "e13da9402576a01d3cf1c04771564bbabd431856644ce601a3f2a0e7f73a78b6",
+        "opl_sha256": "9700767dd4e0f1895121857e81d4512be67ac6f1974fbe73c74dce86050c550d",
+        "trace_sha256": "125e69fbc10361e35e237cbf153393634a0c4c91e50e030b9cb78ec06841243a",
+        "finding_sha256": "6e8086207860bfe4fb61bde70d96d2288a4d89c105f0960c05d38385fd1401cc",
+        "transaction_sha256": "7c261f2f7f5e306b1eaeed11c8785795c16d8e2f2048ae6c194b81159914a135",
+        "normalized_outcome_sha256": "d50305bb083a3cfa45f681cecc05dc53dac39a227afbe2d59ec941ed88cb7390"
+      }
+    },
+    {
+      "scenario_id": "RECOVERY-COMMAND-STRUCTURAL-FAN-001",
+      "command_family": "STRUCTURAL_FAN",
+      "project_id": "project.recovery.structural-fan.001",
+      "model_id": "model.golden.struct.003",
+      "context_id": "context.sd.root",
+      "base_revision_ref": {
+        "kind": "MS_REV_001_V02",
+        "path": "packages/profiles/profile.iso19450.2024.draft/0.2.0/golden/fixtures/g-opl-struct-005-aggregation-object-fan-3-complete-pass.json",
+        "byte_length": 10073,
+        "sha256": "267af063f7f27e2c0bc78ecd95ed26eabf6afc4973ded78c99e803df2252c4e5"
+      },
+      "base_revision_identity": {"revision_id": "revision.g-opl-struct-005-aggregation-object-fan-3-complete-pass", "revision_sequence": 2, "model_id": "model.golden.struct.003", "context_id": "context.sd.root"},
+      "capability_derivation_input": {
+        "selection_id": "fact.g-opl-struct-005-aggregation-object-fan-3-complete-pass",
+        "intent": "UPDATE_FACT",
+        "endpoint_ids_sorted": ["element.object.part-1", "element.object.part-2", "element.object.part-3", "element.object.root"],
+        "capability_query_id": "capability.query.b36c76c7c6fd991cf852abe77fd79bda",
+        "selected_option_id": "option.structural.ce5a927dcb03aaeca2623f21"
+      },
+      "command_request": {
+        "request_id": "request.recovery.structural-fan.001",
+        "command_id": "command.recovery.structural-fan.001",
+        "base_revision": "revision.g-opl-struct-005-aggregation-object-fan-3-complete-pass",
+        "binding": {"profile_id": "profile.iso19450.2024.draft", "profile_version": "0.2.0", "rule_set_id": "rules.iso19450.2024.draft", "rule_version": "0.1.0"},
+        "command_type": "UPDATE_FACT",
+        "payload": {
+          "fact_id": "fact.g-opl-struct-005-aggregation-object-fan-3-complete-pass",
+          "expected_capability_ref": {"capability_id": "CAP-ISO-STRUCT-005"},
+          "replacement": {"collection_completeness": "INCOMPLETE"},
+          "capability_query_id": "capability.query.b36c76c7c6fd991cf852abe77fd79bda",
+          "selected_option_id": "option.structural.ce5a927dcb03aaeca2623f21"
+        }
+      },
+      "request_digest": "20de78334643a2f42856577872a618178df8d27ffb31754eff4568e0ec5d646f",
+      "deterministic_id_sequence": [
+        {"ordinal": 1, "prefix": "revision", "id": "revision.recovery.structural-fan.001"},
+        {"ordinal": 2, "prefix": "endpoint", "id": "endpoint.recovery.structural-fan.whole.001"},
+        {"ordinal": 3, "prefix": "endpoint", "id": "endpoint.recovery.structural-fan.part-1.001"},
+        {"ordinal": 4, "prefix": "endpoint", "id": "endpoint.recovery.structural-fan.part-2.001"},
+        {"ordinal": 5, "prefix": "endpoint", "id": "endpoint.recovery.structural-fan.part-3.001"}
+      ],
+      "expected_result": {
+        "semantic_projection": {
+          "operation": "UPDATE_FACT",
+          "revision_id": "revision.recovery.structural-fan.001",
+          "revision_sequence": 3,
+          "fact_id": "fact.g-opl-struct-005-aggregation-object-fan-3-complete-pass",
+          "fact_family": "STRUCTURAL",
+          "capability_id": "CAP-ISO-STRUCT-005",
+          "direction": "DIRECTED",
+          "collection_completeness": "INCOMPLETE",
+          "endpoints": [
+            {"endpoint_id": "endpoint.recovery.structural-fan.whole.001", "role": "WHOLE_THING", "target_kind": "ELEMENT", "target_id": "element.object.root", "ordinal": 0},
+            {"endpoint_id": "endpoint.recovery.structural-fan.part-1.001", "role": "PART_THING", "target_kind": "ELEMENT", "target_id": "element.object.part-1", "ordinal": 1},
+            {"endpoint_id": "endpoint.recovery.structural-fan.part-2.001", "role": "PART_THING", "target_kind": "ELEMENT", "target_id": "element.object.part-2", "ordinal": 2},
+            {"endpoint_id": "endpoint.recovery.structural-fan.part-3.001", "role": "PART_THING", "target_kind": "ELEMENT", "target_id": "element.object.part-3", "ordinal": 3}
+          ]
+        },
+        "projection": {"fact_id": "fact.g-opl-struct-005-aggregation-object-fan-3-complete-pass", "symbol_id": "symbol.link.structural.aggregation", "route_family": "fundamental-fan", "junction_marker": "filled-triangle", "completeness_annotation": "annotation.incomplete-set", "branch_count": 3},
+        "opl": {"ordered_utf8_sentences": ["Object Root consists of Object Part 1, Object Part 2 and Object Part 3 and at least one other part."], "template_id": "opl.structural.aggregation.incomplete.v1"},
+        "trace": {"fact_ids": ["fact.g-opl-struct-005-aggregation-object-fan-3-complete-pass"], "endpoint_ids": ["endpoint.recovery.structural-fan.whole.001", "endpoint.recovery.structural-fan.part-1.001", "endpoint.recovery.structural-fan.part-2.001", "endpoint.recovery.structural-fan.part-3.001"], "rule_ids": ["rule.iso.struct.aggregation.v1"], "binding_digest": "93805d6e2fdb3ea73c4ddfc0a995d662fbf13dee2d8a6f24fc20c79ecff65d1d"},
+        "finding": {"blocking": 0, "warning": 0, "suggestion": 0, "finding_delta": 0},
+        "transaction": {"revision_delta": 1, "revision_parent_delta": 1, "text_artifact_delta": 1, "text_trace_delta": 1, "finding_delta": 0, "operation_delta": 1, "receipt_delta": 1, "draft_head_changed": true},
+        "normalized_outcome": {"status": "COMMITTED", "committed_revision_id": "revision.recovery.structural-fan.001", "draft_head_revision_id": "revision.recovery.structural-fan.001", "head_sequence": 3, "idempotent_replay_revision_id": "revision.recovery.structural-fan.001", "sqlite_quick_check": "OK", "foreign_key_check_count": 0}
+      },
+      "expected_result_digests": {
+        "semantic_projection_sha256": "cd135b02097267ca6a9d4f5bfb8dba55995023a3abc9db2f2ea0c7efc02632cf",
+        "projection_sha256": "96e0f3cc370bb1b07bcc2452e6915b6b4f9bc6d738cd3e49f462fffd4ab05274",
+        "opl_sha256": "baa9462c301fa25786102bf06bac31dfa5ea66c5f0e0ae73eb0f691ea4226ff1",
+        "trace_sha256": "31f8fa5573defcdf213c4bfcc97e8c43ce4ba10a6b3147b7da3638d1876f6091",
+        "finding_sha256": "6e8086207860bfe4fb61bde70d96d2288a4d89c105f0960c05d38385fd1401cc",
+        "transaction_sha256": "7c261f2f7f5e306b1eaeed11c8785795c16d8e2f2048ae6c194b81159914a135",
+        "normalized_outcome_sha256": "75e65c986d845683f7abb4bda73f8409a4628a9c0e74c5205ec17c8375f0d3b9"
+      }
+    }
+  ],
+  "expected_commits": {
+    "KILL_AFTER_COMMIT": "RECOVERY-COMMAND-PROCEDURAL-001",
+    "PROJECTION_READBACK": "RECOVERY-COMMAND-STRUCTURAL-FAN-001"
+  },
+  "expected_result_digests": {
+    "semantic_projection_sha256": "a9009ca2e82be78efd2cafeac4fbb07ef1a91f6bf2eb782e01382e4dd3985165",
+    "projection_sha256": "a5778cea40cace1779a3a05df684e46f7045236caec41d02f18fc652b660d6c9",
+    "opl_sha256": "dee13e5f5a0d652eac5baed69729a582ac98c1c5ff7bcdf68151646179945fe5",
+    "trace_sha256": "12f6a9dfa1b664d18597d4c93cf206724158df44bc95d4334db881be5633dfbf",
+    "finding_sha256": "31851c499b3d1db0acb38790a3c05cada82d0fa433905b17c712f79d92baebe4",
+    "transaction_sha256": "e8b7a01ddcb7e0888a6c6af05a532aaacee8ee2b8308397c4fb788a7b8cf05b1",
+    "normalized_outcome_sha256": "cbbaa8422abc8e7f61123ca715ed311f34e295496fc3c6f74339e4fd63487aae"
+  },
+  "template_payload_sha256": "cafdb6a845be9e6cd53b327c447aae2f3a81aa9c8a97527e9c18c341c829c234"
+}

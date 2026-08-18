@@ -1,0 +1,1306 @@
+{
+  "schema_id": "OPM-DEV-CANVAS-06-INTAKE-REPORT-001",
+  "schema_version": "0.1",
+  "report_id": "dev-canvas-06.intake.dev-canvas-05.profile.iso19450.2024.draft.0.2.0.b940ac9bb734.0778d77f75a6",
+  "generated_at": "2026-08-03T12:04:21.119Z",
+  "runner_identity": {
+    "runner_version": "0.1.0",
+    "source_commit": "b940ac9bb73442c3a697cce8bfa7c9df52856b3a",
+    "node_version": "v22.22.0",
+    "os": "darwin-arm64",
+    "command": "npm run release:canvas06:intake -- --handoff-root <handoff-bundle-root> --handoff <relative-handoff-path> --handoff-sha256 <sha256> --out <report-path>",
+    "runner_source_sha256": "7c836c56ee1111ed5b120ae094af9cb86d76c3d3c3810b3f60783712993c976c"
+  },
+  "handoff_ref": {
+    "kind": "HANDOFF",
+    "path": "dev-canvas-05-handoff.json",
+    "byte_length": 37088,
+    "sha256": "0778d77f75a68b4fb447fd26614d71885af88982dba5f2e7e1e9bd70d98b1326"
+  },
+  "intake_status": "READY_FOR_RELEASE_VALIDATION",
+  "checks": [
+    {
+      "check_id": "INTAKE-06-001.HANDOFF_BYTES",
+      "status": "MATCHED",
+      "evidence_refs": [
+        {
+          "kind": "HANDOFF",
+          "path": "dev-canvas-05-handoff.json",
+          "byte_length": 37088,
+          "sha256": "0778d77f75a68b4fb447fd26614d71885af88982dba5f2e7e1e9bd70d98b1326"
+        }
+      ],
+      "observed_summary": "sha256=0778d77f75a68b4fb447fd26614d71885af88982dba5f2e7e1e9bd70d98b1326",
+      "blocker_codes": []
+    },
+    {
+      "check_id": "INTAKE-06-002.HANDOFF_SCHEMA_STATUS",
+      "status": "MATCHED",
+      "evidence_refs": [
+        {
+          "kind": "HANDOFF",
+          "path": "dev-canvas-05-handoff.json",
+          "byte_length": 37088,
+          "sha256": "0778d77f75a68b4fb447fd26614d71885af88982dba5f2e7e1e9bd70d98b1326"
+        }
+      ],
+      "observed_summary": "schema=valid, status=READY_FOR_DEV_CANVAS_06",
+      "blocker_codes": []
+    },
+    {
+      "check_id": "INTAKE-06-003.SOURCE_BUILD_ARTIFACTS",
+      "status": "MATCHED",
+      "evidence_refs": [
+        {
+          "kind": "LOCAL_RUNTIME_JAR",
+          "path": "releases/clean-b940ac9bb734/local-runtime-0.1.0-SNAPSHOT.jar",
+          "byte_length": 39308369,
+          "sha256": "0cfe0f14f2190e64e4cbc39b8a8bfbb8c9a5b733607cb24c4801c872f87b3f49"
+        },
+        {
+          "kind": "EVIDENCE_BUNDLE",
+          "path": "releases/clean-b940ac9bb734/dev-canvas-05-evidence-bundle.jar",
+          "byte_length": 956815,
+          "sha256": "84e41e5e4c9edab98aa72cd209da49726df96436c9d0ae8a50fc2895f375cabe"
+        }
+      ],
+      "observed_summary": "artifacts=2, dirty_before_build=false",
+      "blocker_codes": []
+    },
+    {
+      "check_id": "INTAKE-06-004.REVISION_BINDINGS",
+      "status": "MATCHED",
+      "evidence_refs": [
+        {
+          "kind": "SCHEMA",
+          "path": "reports/revision-v01.schema.json",
+          "byte_length": 17828,
+          "sha256": "437e63bfae925f44e2a0bbed3b52c7f45957ff91fb6d71e989c72f95ad3396c8"
+        },
+        {
+          "kind": "SCHEMA",
+          "path": "reports/revision-v02.schema.json",
+          "byte_length": 18074,
+          "sha256": "36cede0a2d7fbcf67e80415d3a7e9713e25cb6734032feb72cbf88d0f95f4fdc"
+        }
+      ],
+      "observed_summary": "reader_versions=[\"0.1\",\"0.2\"]",
+      "blocker_codes": []
+    },
+    {
+      "check_id": "INTAKE-06-005.GATE_EVIDENCE",
+      "status": "MATCHED",
+      "evidence_refs": [
+        {
+          "kind": "REPORT",
+          "path": "reports/golden-contract.json",
+          "byte_length": 1130,
+          "sha256": "e7180b90780a9dbef3bd97fa3346870ec9f1c47e976377bd43d2e1ca874865a5"
+        },
+        {
+          "kind": "REPORT",
+          "path": "reports/golden-replay.json",
+          "byte_length": 215314,
+          "sha256": "3e3c9d9e6e444e30ed86fbca9cf10e2923f236e7acd84630bdd68ee9efe5b3da"
+        },
+        {
+          "kind": "REPORT",
+          "path": "reports/golden-coverage.json",
+          "byte_length": 1567,
+          "sha256": "bff75db7ef94ec2de7056fa5db410641e6605f52a466f8c771c5f8cbac504565"
+        },
+        {
+          "kind": "REPORT",
+          "path": "reports/trace-closure.json",
+          "byte_length": 1199,
+          "sha256": "f7bd1dd3b5ce4b2a692f5d123a7b272f61638f35cc26713b883aa4f713312ebc"
+        },
+        {
+          "kind": "REPORT",
+          "path": "reports/golden-replay.json",
+          "byte_length": 215314,
+          "sha256": "3e3c9d9e6e444e30ed86fbca9cf10e2923f236e7acd84630bdd68ee9efe5b3da"
+        },
+        {
+          "kind": "REPORT",
+          "path": "reports/revision-compatibility.json",
+          "byte_length": 16936,
+          "sha256": "dbfd01966203ddb7b40b6b2e0552b41ef2fe2aae43dd3f7d69943e72e2758f08"
+        }
+      ],
+      "observed_summary": "gate_count=6",
+      "blocker_codes": []
+    },
+    {
+      "check_id": "INTAKE-06-006.COVERAGE_COMPATIBILITY",
+      "status": "MATCHED",
+      "evidence_refs": [
+        {
+          "kind": "ASSET",
+          "path": "reports/golden-coverage-catalog.json",
+          "byte_length": 99105,
+          "sha256": "dfde1f5b9ae003b8455712378b2a06439a0212682d79253739443e2734fe7466"
+        },
+        {
+          "kind": "ASSET",
+          "path": "reports/golden-manifest.json",
+          "byte_length": 3766673,
+          "sha256": "8aaca22c69402e08ff58a4a3e19eb38b260511dc7649c1deae8ac4fffce280a7"
+        },
+        {
+          "kind": "ASSET",
+          "path": "reports/active-grammar.json",
+          "byte_length": 15930,
+          "sha256": "c88e672bd9db7f0405a7ef3fc464043f15cae844931192e3412c94ce05339e7d"
+        },
+        {
+          "kind": "REPORT",
+          "path": "reports/golden-coverage.json",
+          "byte_length": 1567,
+          "sha256": "bff75db7ef94ec2de7056fa5db410641e6605f52a466f8c771c5f8cbac504565"
+        },
+        {
+          "kind": "REPORT",
+          "path": "reports/golden-replay.json",
+          "byte_length": 215314,
+          "sha256": "3e3c9d9e6e444e30ed86fbca9cf10e2923f236e7acd84630bdd68ee9efe5b3da"
+        },
+        {
+          "kind": "REPORT",
+          "path": "reports/revision-compatibility.json",
+          "byte_length": 16936,
+          "sha256": "dbfd01966203ddb7b40b6b2e0552b41ef2fe2aae43dd3f7d69943e72e2758f08"
+        }
+      ],
+      "observed_summary": "semantic={\"expected\":178,\"pass\":130,\"blocked\":48}",
+      "blocker_codes": []
+    },
+    {
+      "check_id": "INTAKE-06-007.CAPABILITY_ELIGIBILITY",
+      "status": "MATCHED",
+      "evidence_refs": [
+        {
+          "kind": "HANDOFF",
+          "path": "dev-canvas-05-handoff.json",
+          "byte_length": 37088,
+          "sha256": "0778d77f75a68b4fb447fd26614d71885af88982dba5f2e7e1e9bd70d98b1326"
+        }
+      ],
+      "observed_summary": "capability_count=34",
+      "blocker_codes": []
+    },
+    {
+      "check_id": "INTAKE-06-008.PRODUCTION_GATE_DISABLED",
+      "status": "MATCHED",
+      "evidence_refs": [
+        {
+          "kind": "HANDOFF",
+          "path": "dev-canvas-05-handoff.json",
+          "byte_length": 37088,
+          "sha256": "0778d77f75a68b4fb447fd26614d71885af88982dba5f2e7e1e9bd70d98b1326"
+        }
+      ],
+      "observed_summary": "state=DISABLED",
+      "blocker_codes": []
+    }
+  ],
+  "capability_intake": [
+    {
+      "capability_id": "CAP-ISO-PROC-001",
+      "family": "PROCEDURAL",
+      "upstream_eligibility": "ELIGIBLE_FOR_RELEASE_VALIDATION",
+      "coverage_keys": [
+        "PROC:CAP-ISO-PROC-001:-:CONSUMPTION_OBJECT:PASS",
+        "PROC:CAP-ISO-PROC-001:-:ENDPOINTS_REVERSED:BLOCKED"
+      ],
+      "template_refs": [
+        "opl.consumption.v1"
+      ],
+      "rule_refs": [
+        "rule.iso.proc.consumption.endpoints.v1"
+      ],
+      "symbol_refs": [
+        "symbol.link.consumption"
+      ],
+      "grammar_refs": [
+        {
+          "id": "grammar.opl.iso19450.2024.draft",
+          "version": "0.2.0",
+          "sha256": "c88e672bd9db7f0405a7ef3fc464043f15cae844931192e3412c94ce05339e7d"
+        }
+      ],
+      "binding_digest": "93805d6e2fdb3ea73c4ddfc0a995d662fbf13dee2d8a6f24fc20c79ecff65d1d",
+      "upstream_evidence_fingerprint": "bdb9a4580e1349846d87a765254f96f2fb850e74a8bfd9829693b50b65a693f0",
+      "intake_status": "MATCHED",
+      "blocker_codes": []
+    },
+    {
+      "capability_id": "CAP-ISO-PROC-002",
+      "family": "PROCEDURAL",
+      "upstream_eligibility": "ELIGIBLE_FOR_RELEASE_VALIDATION",
+      "coverage_keys": [
+        "PROC:CAP-ISO-PROC-002:-:RESULT_OBJECT:PASS",
+        "PROC:CAP-ISO-PROC-002:-:ENDPOINTS_REVERSED:BLOCKED"
+      ],
+      "template_refs": [
+        "opl.result.v1"
+      ],
+      "rule_refs": [
+        "rule.iso.proc.result.endpoints.v1"
+      ],
+      "symbol_refs": [
+        "symbol.link.result"
+      ],
+      "grammar_refs": [
+        {
+          "id": "grammar.opl.iso19450.2024.draft",
+          "version": "0.2.0",
+          "sha256": "c88e672bd9db7f0405a7ef3fc464043f15cae844931192e3412c94ce05339e7d"
+        }
+      ],
+      "binding_digest": "93805d6e2fdb3ea73c4ddfc0a995d662fbf13dee2d8a6f24fc20c79ecff65d1d",
+      "upstream_evidence_fingerprint": "1e3082143d966300e8cef99655a0d2545bc4306d17850f1b340c41495508f31f",
+      "intake_status": "MATCHED",
+      "blocker_codes": []
+    },
+    {
+      "capability_id": "CAP-ISO-PROC-003",
+      "family": "PROCEDURAL",
+      "upstream_eligibility": "ELIGIBLE_FOR_RELEASE_VALIDATION",
+      "coverage_keys": [
+        "PROC:CAP-ISO-PROC-003:-:EFFECT_OBJECT:PASS",
+        "PROC:CAP-ISO-PROC-003:-:ENDPOINTS_REVERSED:BLOCKED"
+      ],
+      "template_refs": [
+        "opl.effect.v1"
+      ],
+      "rule_refs": [
+        "rule.iso.proc.effect.endpoints.v1"
+      ],
+      "symbol_refs": [
+        "symbol.link.effect"
+      ],
+      "grammar_refs": [
+        {
+          "id": "grammar.opl.iso19450.2024.draft",
+          "version": "0.2.0",
+          "sha256": "c88e672bd9db7f0405a7ef3fc464043f15cae844931192e3412c94ce05339e7d"
+        }
+      ],
+      "binding_digest": "93805d6e2fdb3ea73c4ddfc0a995d662fbf13dee2d8a6f24fc20c79ecff65d1d",
+      "upstream_evidence_fingerprint": "b09ef7bed89732a6e9f1dfc34ff82a241864b6ba2f76ea9212e35a6e30aace86",
+      "intake_status": "MATCHED",
+      "blocker_codes": []
+    },
+    {
+      "capability_id": "CAP-ISO-PROC-004",
+      "family": "PROCEDURAL",
+      "upstream_eligibility": "ELIGIBLE_FOR_RELEASE_VALIDATION",
+      "coverage_keys": [
+        "PROC:CAP-ISO-PROC-004:-:AGENT_OBJECT:PASS",
+        "PROC:CAP-ISO-PROC-004:-:ENDPOINTS_REVERSED:BLOCKED"
+      ],
+      "template_refs": [
+        "opl.agent.v1"
+      ],
+      "rule_refs": [
+        "rule.iso.proc.agent.endpoints.v1"
+      ],
+      "symbol_refs": [
+        "symbol.link.agent"
+      ],
+      "grammar_refs": [
+        {
+          "id": "grammar.opl.iso19450.2024.draft",
+          "version": "0.2.0",
+          "sha256": "c88e672bd9db7f0405a7ef3fc464043f15cae844931192e3412c94ce05339e7d"
+        }
+      ],
+      "binding_digest": "93805d6e2fdb3ea73c4ddfc0a995d662fbf13dee2d8a6f24fc20c79ecff65d1d",
+      "upstream_evidence_fingerprint": "27cb3ce127d7d4caf1820c84627d1409ab96e17af5c9f63bbd5564b66924cf2d",
+      "intake_status": "MATCHED",
+      "blocker_codes": []
+    },
+    {
+      "capability_id": "CAP-ISO-PROC-005",
+      "family": "PROCEDURAL",
+      "upstream_eligibility": "ELIGIBLE_FOR_RELEASE_VALIDATION",
+      "coverage_keys": [
+        "PROC:CAP-ISO-PROC-005:-:INSTRUMENT_OBJECT:PASS",
+        "PROC:CAP-ISO-PROC-005:-:ENDPOINTS_REVERSED:BLOCKED"
+      ],
+      "template_refs": [
+        "opl.instrument.v1"
+      ],
+      "rule_refs": [
+        "rule.iso.proc.instrument.endpoints.v1"
+      ],
+      "symbol_refs": [
+        "symbol.link.instrument"
+      ],
+      "grammar_refs": [
+        {
+          "id": "grammar.opl.iso19450.2024.draft",
+          "version": "0.2.0",
+          "sha256": "c88e672bd9db7f0405a7ef3fc464043f15cae844931192e3412c94ce05339e7d"
+        }
+      ],
+      "binding_digest": "93805d6e2fdb3ea73c4ddfc0a995d662fbf13dee2d8a6f24fc20c79ecff65d1d",
+      "upstream_evidence_fingerprint": "7e9fd561dda564fe0adfb1ace5a781bf5c71ac35866280224e2dcebf27a72f94",
+      "intake_status": "MATCHED",
+      "blocker_codes": []
+    },
+    {
+      "capability_id": "CAP-ISO-PROC-006",
+      "family": "PROCEDURAL",
+      "upstream_eligibility": "ELIGIBLE_FOR_RELEASE_VALIDATION",
+      "coverage_keys": [
+        "PROC:CAP-ISO-PROC-006:-:CONSUMPTION_STATE:PASS",
+        "PROC:CAP-ISO-PROC-006:-:STATE_OWNER_MISMATCH:BLOCKED"
+      ],
+      "template_refs": [
+        "opl.consumption.state.v1"
+      ],
+      "rule_refs": [
+        "rule.iso.proc.state-consumption.endpoints.v1"
+      ],
+      "symbol_refs": [
+        "symbol.link.consumption.state"
+      ],
+      "grammar_refs": [
+        {
+          "id": "grammar.opl.iso19450.2024.draft",
+          "version": "0.2.0",
+          "sha256": "c88e672bd9db7f0405a7ef3fc464043f15cae844931192e3412c94ce05339e7d"
+        }
+      ],
+      "binding_digest": "93805d6e2fdb3ea73c4ddfc0a995d662fbf13dee2d8a6f24fc20c79ecff65d1d",
+      "upstream_evidence_fingerprint": "0f29c08727ea6de8ccdb167ebfc0c95392d1e825f978186d4e70616e157f20be",
+      "intake_status": "MATCHED",
+      "blocker_codes": []
+    },
+    {
+      "capability_id": "CAP-ISO-PROC-007",
+      "family": "PROCEDURAL",
+      "upstream_eligibility": "ELIGIBLE_FOR_RELEASE_VALIDATION",
+      "coverage_keys": [
+        "PROC:CAP-ISO-PROC-007:-:RESULT_STATE:PASS",
+        "PROC:CAP-ISO-PROC-007:-:STATE_OWNER_MISMATCH:BLOCKED"
+      ],
+      "template_refs": [
+        "opl.result.state.v1"
+      ],
+      "rule_refs": [
+        "rule.iso.proc.state-result.endpoints.v1"
+      ],
+      "symbol_refs": [
+        "symbol.link.result.state"
+      ],
+      "grammar_refs": [
+        {
+          "id": "grammar.opl.iso19450.2024.draft",
+          "version": "0.2.0",
+          "sha256": "c88e672bd9db7f0405a7ef3fc464043f15cae844931192e3412c94ce05339e7d"
+        }
+      ],
+      "binding_digest": "93805d6e2fdb3ea73c4ddfc0a995d662fbf13dee2d8a6f24fc20c79ecff65d1d",
+      "upstream_evidence_fingerprint": "ae5d9fffca972a442f046ffc457efe115eeb9df34406056a1723efe02bb6ade9",
+      "intake_status": "MATCHED",
+      "blocker_codes": []
+    },
+    {
+      "capability_id": "CAP-ISO-PROC-008",
+      "family": "PROCEDURAL",
+      "upstream_eligibility": "ELIGIBLE_FOR_RELEASE_VALIDATION",
+      "coverage_keys": [
+        "PROC:CAP-ISO-PROC-008:-:EFFECT_INPUT_OUTPUT_STATE:PASS",
+        "PROC:CAP-ISO-PROC-008:-:INPUT_STATE_OWNER_MISMATCH:BLOCKED",
+        "PROC:CAP-ISO-PROC-008:-:OUTPUT_STATE_OWNER_MISMATCH:BLOCKED"
+      ],
+      "template_refs": [
+        "opl.effect.state.input-output.v1"
+      ],
+      "rule_refs": [
+        "rule.iso.proc.state-effect.input-output.endpoints.v1"
+      ],
+      "symbol_refs": [
+        "symbol.link.effect.state.input-output"
+      ],
+      "grammar_refs": [
+        {
+          "id": "grammar.opl.iso19450.2024.draft",
+          "version": "0.2.0",
+          "sha256": "c88e672bd9db7f0405a7ef3fc464043f15cae844931192e3412c94ce05339e7d"
+        }
+      ],
+      "binding_digest": "93805d6e2fdb3ea73c4ddfc0a995d662fbf13dee2d8a6f24fc20c79ecff65d1d",
+      "upstream_evidence_fingerprint": "80d0a1993b96dfb69982c4700cbb52232c8a5156f9ec20e4e7f9edc63fd9f9fd",
+      "intake_status": "MATCHED",
+      "blocker_codes": []
+    },
+    {
+      "capability_id": "CAP-ISO-PROC-009",
+      "family": "PROCEDURAL",
+      "upstream_eligibility": "ELIGIBLE_FOR_RELEASE_VALIDATION",
+      "coverage_keys": [
+        "PROC:CAP-ISO-PROC-009:-:EFFECT_INPUT_STATE:PASS",
+        "PROC:CAP-ISO-PROC-009:-:INPUT_STATE_OWNER_MISMATCH:BLOCKED"
+      ],
+      "template_refs": [
+        "opl.effect.state.input.v1"
+      ],
+      "rule_refs": [
+        "rule.iso.proc.state-effect.input.endpoints.v1"
+      ],
+      "symbol_refs": [
+        "symbol.link.effect.state.input"
+      ],
+      "grammar_refs": [
+        {
+          "id": "grammar.opl.iso19450.2024.draft",
+          "version": "0.2.0",
+          "sha256": "c88e672bd9db7f0405a7ef3fc464043f15cae844931192e3412c94ce05339e7d"
+        }
+      ],
+      "binding_digest": "93805d6e2fdb3ea73c4ddfc0a995d662fbf13dee2d8a6f24fc20c79ecff65d1d",
+      "upstream_evidence_fingerprint": "2f98d68695a31897f03251ce9ccd9999734d462ee00418b72cdc4c08d83b7664",
+      "intake_status": "MATCHED",
+      "blocker_codes": []
+    },
+    {
+      "capability_id": "CAP-ISO-PROC-010",
+      "family": "PROCEDURAL",
+      "upstream_eligibility": "ELIGIBLE_FOR_RELEASE_VALIDATION",
+      "coverage_keys": [
+        "PROC:CAP-ISO-PROC-010:-:EFFECT_OUTPUT_STATE:PASS",
+        "PROC:CAP-ISO-PROC-010:-:OUTPUT_STATE_OWNER_MISMATCH:BLOCKED"
+      ],
+      "template_refs": [
+        "opl.effect.state.output.v1"
+      ],
+      "rule_refs": [
+        "rule.iso.proc.state-effect.output.endpoints.v1"
+      ],
+      "symbol_refs": [
+        "symbol.link.effect.state.output"
+      ],
+      "grammar_refs": [
+        {
+          "id": "grammar.opl.iso19450.2024.draft",
+          "version": "0.2.0",
+          "sha256": "c88e672bd9db7f0405a7ef3fc464043f15cae844931192e3412c94ce05339e7d"
+        }
+      ],
+      "binding_digest": "93805d6e2fdb3ea73c4ddfc0a995d662fbf13dee2d8a6f24fc20c79ecff65d1d",
+      "upstream_evidence_fingerprint": "2950eb2f6007501c5281ec423120c9f6f57395245c112e22efd781b67aa3f5df",
+      "intake_status": "MATCHED",
+      "blocker_codes": []
+    },
+    {
+      "capability_id": "CAP-ISO-PROC-011",
+      "family": "PROCEDURAL",
+      "upstream_eligibility": "ELIGIBLE_FOR_RELEASE_VALIDATION",
+      "coverage_keys": [
+        "PROC:CAP-ISO-PROC-011:-:AGENT_STATE:PASS",
+        "PROC:CAP-ISO-PROC-011:-:STATE_OWNER_MISMATCH:BLOCKED"
+      ],
+      "template_refs": [
+        "opl.agent.state.v1"
+      ],
+      "rule_refs": [
+        "rule.iso.proc.state-agent.endpoints.v1"
+      ],
+      "symbol_refs": [
+        "symbol.link.agent.state"
+      ],
+      "grammar_refs": [
+        {
+          "id": "grammar.opl.iso19450.2024.draft",
+          "version": "0.2.0",
+          "sha256": "c88e672bd9db7f0405a7ef3fc464043f15cae844931192e3412c94ce05339e7d"
+        }
+      ],
+      "binding_digest": "93805d6e2fdb3ea73c4ddfc0a995d662fbf13dee2d8a6f24fc20c79ecff65d1d",
+      "upstream_evidence_fingerprint": "f7e447afd5245a1d5b6d13c1b2ba5c5fe0b8a642c79200f2a09a2da559bd3340",
+      "intake_status": "MATCHED",
+      "blocker_codes": []
+    },
+    {
+      "capability_id": "CAP-ISO-PROC-012",
+      "family": "PROCEDURAL",
+      "upstream_eligibility": "ELIGIBLE_FOR_RELEASE_VALIDATION",
+      "coverage_keys": [
+        "PROC:CAP-ISO-PROC-012:-:INSTRUMENT_STATE:PASS",
+        "PROC:CAP-ISO-PROC-012:-:STATE_OWNER_MISMATCH:BLOCKED"
+      ],
+      "template_refs": [
+        "opl.instrument.state.v1"
+      ],
+      "rule_refs": [
+        "rule.iso.proc.state-instrument.endpoints.v1"
+      ],
+      "symbol_refs": [
+        "symbol.link.instrument.state"
+      ],
+      "grammar_refs": [
+        {
+          "id": "grammar.opl.iso19450.2024.draft",
+          "version": "0.2.0",
+          "sha256": "c88e672bd9db7f0405a7ef3fc464043f15cae844931192e3412c94ce05339e7d"
+        }
+      ],
+      "binding_digest": "93805d6e2fdb3ea73c4ddfc0a995d662fbf13dee2d8a6f24fc20c79ecff65d1d",
+      "upstream_evidence_fingerprint": "6f05e0398e47a64abeaefbc14e1c9e669099fc5a5a9fcf9d1e3b9b24f9a4e560",
+      "intake_status": "MATCHED",
+      "blocker_codes": []
+    },
+    {
+      "capability_id": "CAP-ISO-PROC-013",
+      "family": "PROCEDURAL",
+      "upstream_eligibility": "ELIGIBLE_FOR_RELEASE_VALIDATION",
+      "coverage_keys": [
+        "PROC:CAP-ISO-PROC-013:-:INVOCATION_PROCESS:PASS",
+        "PROC:CAP-ISO-PROC-013:-:TARGET_KIND_INVALID:BLOCKED"
+      ],
+      "template_refs": [
+        "opl.invocation.v1"
+      ],
+      "rule_refs": [
+        "rule.iso.proc.invocation.endpoints.v1"
+      ],
+      "symbol_refs": [
+        "symbol.link.invocation"
+      ],
+      "grammar_refs": [
+        {
+          "id": "grammar.opl.iso19450.2024.draft",
+          "version": "0.2.0",
+          "sha256": "c88e672bd9db7f0405a7ef3fc464043f15cae844931192e3412c94ce05339e7d"
+        }
+      ],
+      "binding_digest": "93805d6e2fdb3ea73c4ddfc0a995d662fbf13dee2d8a6f24fc20c79ecff65d1d",
+      "upstream_evidence_fingerprint": "1defbfabea42a7e219316d5815636476df0394a7770af8121a7d53b38178d176",
+      "intake_status": "MATCHED",
+      "blocker_codes": []
+    },
+    {
+      "capability_id": "CAP-ISO-PROC-014",
+      "family": "PROCEDURAL",
+      "upstream_eligibility": "ELIGIBLE_FOR_RELEASE_VALIDATION",
+      "coverage_keys": [
+        "PROC:CAP-ISO-PROC-014:-:SELF_INVOCATION_SAME_PROCESS:PASS",
+        "PROC:CAP-ISO-PROC-014:-:SELF_IDENTITY_MISMATCH:BLOCKED"
+      ],
+      "template_refs": [
+        "opl.invocation.self.v1"
+      ],
+      "rule_refs": [
+        "rule.iso.proc.self-invocation.identity.v1"
+      ],
+      "symbol_refs": [
+        "symbol.link.invocation.self"
+      ],
+      "grammar_refs": [
+        {
+          "id": "grammar.opl.iso19450.2024.draft",
+          "version": "0.2.0",
+          "sha256": "c88e672bd9db7f0405a7ef3fc464043f15cae844931192e3412c94ce05339e7d"
+        }
+      ],
+      "binding_digest": "93805d6e2fdb3ea73c4ddfc0a995d662fbf13dee2d8a6f24fc20c79ecff65d1d",
+      "upstream_evidence_fingerprint": "6b847a9603e9c1391da7e4175d6585aff38875800d53c4aee68618e99c4403a5",
+      "intake_status": "MATCHED",
+      "blocker_codes": []
+    },
+    {
+      "capability_id": "CAP-ISO-PROC-015",
+      "family": "PROCEDURAL",
+      "upstream_eligibility": "ELIGIBLE_FOR_RELEASE_VALIDATION",
+      "coverage_keys": [
+        "PROC:CAP-ISO-PROC-015:-:OVERTIME_DURATION:PASS",
+        "PROC:CAP-ISO-PROC-015:-:DURATION_MISSING:BLOCKED"
+      ],
+      "template_refs": [
+        "opl.exception.overtime.v1"
+      ],
+      "rule_refs": [
+        "rule.iso.proc.overtime-exception.duration.v1"
+      ],
+      "symbol_refs": [
+        "symbol.link.exception.overtime"
+      ],
+      "grammar_refs": [
+        {
+          "id": "grammar.opl.iso19450.2024.draft",
+          "version": "0.2.0",
+          "sha256": "c88e672bd9db7f0405a7ef3fc464043f15cae844931192e3412c94ce05339e7d"
+        }
+      ],
+      "binding_digest": "93805d6e2fdb3ea73c4ddfc0a995d662fbf13dee2d8a6f24fc20c79ecff65d1d",
+      "upstream_evidence_fingerprint": "8a4b5bc7fea49653d0b86926573909f66c45838f81c9413c0f52dd801313edcb",
+      "intake_status": "MATCHED",
+      "blocker_codes": []
+    },
+    {
+      "capability_id": "CAP-ISO-PROC-016",
+      "family": "PROCEDURAL",
+      "upstream_eligibility": "ELIGIBLE_FOR_RELEASE_VALIDATION",
+      "coverage_keys": [
+        "PROC:CAP-ISO-PROC-016:-:UNDERTIME_DURATION:PASS",
+        "PROC:CAP-ISO-PROC-016:-:DURATION_MISSING:BLOCKED"
+      ],
+      "template_refs": [
+        "opl.exception.undertime.v1"
+      ],
+      "rule_refs": [
+        "rule.iso.proc.undertime-exception.duration.v1"
+      ],
+      "symbol_refs": [
+        "symbol.link.exception.undertime"
+      ],
+      "grammar_refs": [
+        {
+          "id": "grammar.opl.iso19450.2024.draft",
+          "version": "0.2.0",
+          "sha256": "c88e672bd9db7f0405a7ef3fc464043f15cae844931192e3412c94ce05339e7d"
+        }
+      ],
+      "binding_digest": "93805d6e2fdb3ea73c4ddfc0a995d662fbf13dee2d8a6f24fc20c79ecff65d1d",
+      "upstream_evidence_fingerprint": "d7382709e60daf8c726fa0c7320bd2b5a47c602adacaec5d63b4b16a638d5dea",
+      "intake_status": "MATCHED",
+      "blocker_codes": []
+    },
+    {
+      "capability_id": "CAP-ISO-CTRL-001",
+      "family": "CONTROL",
+      "upstream_eligibility": "ELIGIBLE_FOR_RELEASE_VALIDATION",
+      "coverage_keys": [
+        "CTRL:CAP-ISO-CTRL-001:CAP-ISO-PROC-001:CONSUMPTION:PASS",
+        "CTRL:CAP-ISO-CTRL-001:CAP-ISO-PROC-003:EFFECT:PASS",
+        "CTRL:CAP-ISO-CTRL-001:CAP-ISO-PROC-002:RESULT:BLOCKED",
+        "CTRL:CAP-ISO-CTRL-001:-:STATE_RESULT:BLOCKED",
+        "CTRL:CAP-ISO-CTRL-001:-:EFFECT_OUTPUT_SEGMENT:BLOCKED",
+        "CTRL:CAP-ISO-CTRL-001:-:NON_INPUT_SEGMENT:BLOCKED",
+        "CTRL:CAP-ISO-CTRL-001:-:BASE_CAPABILITY_MISMATCH:BLOCKED",
+        "CTRL:CAP-ISO-CTRL-001:-:MISSING_CONTROL_CAPABILITY:BLOCKED",
+        "CTRL:CAP-ISO-CTRL-001:-:MISSING_CONTROL_SEGMENT:BLOCKED",
+        "CTRL:CAP-ISO-CTRL-001:-:DUPLICATE_CONTROL_CAPABILITY:BLOCKED",
+        "CTRL:CAP-ISO-CTRL-001:-:DUPLICATE_CONTROL_SEGMENT:BLOCKED",
+        "CTRL:CAP-ISO-CTRL-001:-:EVENT_CONDITION_COMBINATION:BLOCKED",
+        "CTRL:CAP-ISO-CTRL-001:-:UNKNOWN_CONTROL_CAPABILITY:BLOCKED",
+        "CTRL:CAP-ISO-CTRL-001:-:MODIFIER_CAPABILITY_REF_MISMATCH:BLOCKED",
+        "CTRL:CAP-ISO-CTRL-001:-:MODIFIER_VALUE_REF_MISMATCH:BLOCKED",
+        "CTRL:CAP-ISO-CTRL-001:-:OPTION_PAYLOAD_MISMATCH:BLOCKED",
+        "CTRL:CAP-ISO-CTRL-001:-:INDEPENDENT_CONTROL_FACT:BLOCKED"
+      ],
+      "template_refs": [
+        "opl.control.event.transforming.v1"
+      ],
+      "rule_refs": [
+        "rule.iso.control.event.001.v1"
+      ],
+      "symbol_refs": [
+        "symbol.control.event.transforming"
+      ],
+      "grammar_refs": [
+        {
+          "id": "grammar.opl.iso19450.2024.draft",
+          "version": "0.2.0",
+          "sha256": "c88e672bd9db7f0405a7ef3fc464043f15cae844931192e3412c94ce05339e7d"
+        }
+      ],
+      "binding_digest": "93805d6e2fdb3ea73c4ddfc0a995d662fbf13dee2d8a6f24fc20c79ecff65d1d",
+      "upstream_evidence_fingerprint": "884cf14b887c862f10bdba39c6bd3bb607ab45782f3660ae24eb3c9044dab88a",
+      "intake_status": "MATCHED",
+      "blocker_codes": []
+    },
+    {
+      "capability_id": "CAP-ISO-CTRL-002",
+      "family": "CONTROL",
+      "upstream_eligibility": "ELIGIBLE_FOR_RELEASE_VALIDATION",
+      "coverage_keys": [
+        "CTRL:CAP-ISO-CTRL-002:CAP-ISO-PROC-004:AGENT:PASS",
+        "CTRL:CAP-ISO-CTRL-002:CAP-ISO-PROC-005:INSTRUMENT:PASS"
+      ],
+      "template_refs": [
+        "opl.control.event.enabling.v1"
+      ],
+      "rule_refs": [
+        "rule.iso.control.event.002.v1"
+      ],
+      "symbol_refs": [
+        "symbol.control.event.enabling"
+      ],
+      "grammar_refs": [
+        {
+          "id": "grammar.opl.iso19450.2024.draft",
+          "version": "0.2.0",
+          "sha256": "c88e672bd9db7f0405a7ef3fc464043f15cae844931192e3412c94ce05339e7d"
+        }
+      ],
+      "binding_digest": "93805d6e2fdb3ea73c4ddfc0a995d662fbf13dee2d8a6f24fc20c79ecff65d1d",
+      "upstream_evidence_fingerprint": "5efadd1ee2a87e0f584333913e53df349725fa56f546d0dcd7a8032fa407c7fd",
+      "intake_status": "MATCHED",
+      "blocker_codes": []
+    },
+    {
+      "capability_id": "CAP-ISO-CTRL-003",
+      "family": "CONTROL",
+      "upstream_eligibility": "ELIGIBLE_FOR_RELEASE_VALIDATION",
+      "coverage_keys": [
+        "CTRL:CAP-ISO-CTRL-003:CAP-ISO-PROC-006:CONSUMPTION_STATE:PASS",
+        "CTRL:CAP-ISO-CTRL-003:CAP-ISO-PROC-008:EFFECT_INPUT_OUTPUT:PASS",
+        "CTRL:CAP-ISO-CTRL-003:CAP-ISO-PROC-009:EFFECT_INPUT:PASS",
+        "CTRL:CAP-ISO-CTRL-003:CAP-ISO-PROC-010:EFFECT_OUTPUT:PASS"
+      ],
+      "template_refs": [
+        "opl.control.event.transforming.state.v1"
+      ],
+      "rule_refs": [
+        "rule.iso.control.event.003.v1"
+      ],
+      "symbol_refs": [
+        "symbol.control.event.transforming.state"
+      ],
+      "grammar_refs": [
+        {
+          "id": "grammar.opl.iso19450.2024.draft",
+          "version": "0.2.0",
+          "sha256": "c88e672bd9db7f0405a7ef3fc464043f15cae844931192e3412c94ce05339e7d"
+        }
+      ],
+      "binding_digest": "93805d6e2fdb3ea73c4ddfc0a995d662fbf13dee2d8a6f24fc20c79ecff65d1d",
+      "upstream_evidence_fingerprint": "6bbbff3fb0d41394758e4c353f3b46031d0e5158ebe85d35ed794acfaad970e0",
+      "intake_status": "MATCHED",
+      "blocker_codes": []
+    },
+    {
+      "capability_id": "CAP-ISO-CTRL-004",
+      "family": "CONTROL",
+      "upstream_eligibility": "ELIGIBLE_FOR_RELEASE_VALIDATION",
+      "coverage_keys": [
+        "CTRL:CAP-ISO-CTRL-004:CAP-ISO-PROC-011:AGENT_STATE:PASS",
+        "CTRL:CAP-ISO-CTRL-004:CAP-ISO-PROC-012:INSTRUMENT_STATE:PASS"
+      ],
+      "template_refs": [
+        "opl.control.event.enabling.state.v1"
+      ],
+      "rule_refs": [
+        "rule.iso.control.event.004.v1"
+      ],
+      "symbol_refs": [
+        "symbol.control.event.enabling.state"
+      ],
+      "grammar_refs": [
+        {
+          "id": "grammar.opl.iso19450.2024.draft",
+          "version": "0.2.0",
+          "sha256": "c88e672bd9db7f0405a7ef3fc464043f15cae844931192e3412c94ce05339e7d"
+        }
+      ],
+      "binding_digest": "93805d6e2fdb3ea73c4ddfc0a995d662fbf13dee2d8a6f24fc20c79ecff65d1d",
+      "upstream_evidence_fingerprint": "4d544a4bb7e69e97f3bdbdc080e424249ef67e6c1fd20705335846bdea39fc28",
+      "intake_status": "MATCHED",
+      "blocker_codes": []
+    },
+    {
+      "capability_id": "CAP-ISO-CTRL-005",
+      "family": "CONTROL",
+      "upstream_eligibility": "ELIGIBLE_FOR_RELEASE_VALIDATION",
+      "coverage_keys": [
+        "CTRL:CAP-ISO-CTRL-005:CAP-ISO-PROC-001:CONSUMPTION:PASS",
+        "CTRL:CAP-ISO-CTRL-005:CAP-ISO-PROC-003:EFFECT:PASS"
+      ],
+      "template_refs": [
+        "opl.control.condition.transforming.v1"
+      ],
+      "rule_refs": [
+        "rule.iso.control.condition.005.v1"
+      ],
+      "symbol_refs": [
+        "symbol.control.condition.transforming"
+      ],
+      "grammar_refs": [
+        {
+          "id": "grammar.opl.iso19450.2024.draft",
+          "version": "0.2.0",
+          "sha256": "c88e672bd9db7f0405a7ef3fc464043f15cae844931192e3412c94ce05339e7d"
+        }
+      ],
+      "binding_digest": "93805d6e2fdb3ea73c4ddfc0a995d662fbf13dee2d8a6f24fc20c79ecff65d1d",
+      "upstream_evidence_fingerprint": "0ff8c7f49d36a14ea4eadf19a136b939341c02049fcecfdcb52d71771a51cc3e",
+      "intake_status": "MATCHED",
+      "blocker_codes": []
+    },
+    {
+      "capability_id": "CAP-ISO-CTRL-006",
+      "family": "CONTROL",
+      "upstream_eligibility": "ELIGIBLE_FOR_RELEASE_VALIDATION",
+      "coverage_keys": [
+        "CTRL:CAP-ISO-CTRL-006:CAP-ISO-PROC-004:AGENT:PASS",
+        "CTRL:CAP-ISO-CTRL-006:CAP-ISO-PROC-005:INSTRUMENT:PASS"
+      ],
+      "template_refs": [
+        "opl.control.condition.enabling.v1"
+      ],
+      "rule_refs": [
+        "rule.iso.control.condition.006.v1"
+      ],
+      "symbol_refs": [
+        "symbol.control.condition.enabling"
+      ],
+      "grammar_refs": [
+        {
+          "id": "grammar.opl.iso19450.2024.draft",
+          "version": "0.2.0",
+          "sha256": "c88e672bd9db7f0405a7ef3fc464043f15cae844931192e3412c94ce05339e7d"
+        }
+      ],
+      "binding_digest": "93805d6e2fdb3ea73c4ddfc0a995d662fbf13dee2d8a6f24fc20c79ecff65d1d",
+      "upstream_evidence_fingerprint": "16a93e44348570a180464c65e84b99cb58b5a602deac7569d557904286b66345",
+      "intake_status": "MATCHED",
+      "blocker_codes": []
+    },
+    {
+      "capability_id": "CAP-ISO-CTRL-007",
+      "family": "CONTROL",
+      "upstream_eligibility": "ELIGIBLE_FOR_RELEASE_VALIDATION",
+      "coverage_keys": [
+        "CTRL:CAP-ISO-CTRL-007:CAP-ISO-PROC-006:CONSUMPTION_STATE:PASS",
+        "CTRL:CAP-ISO-CTRL-007:CAP-ISO-PROC-008:EFFECT_INPUT_OUTPUT:PASS",
+        "CTRL:CAP-ISO-CTRL-007:CAP-ISO-PROC-009:EFFECT_INPUT:PASS",
+        "CTRL:CAP-ISO-CTRL-007:CAP-ISO-PROC-010:EFFECT_OUTPUT:PASS"
+      ],
+      "template_refs": [
+        "opl.control.condition.transforming.state.v1"
+      ],
+      "rule_refs": [
+        "rule.iso.control.condition.007.v1"
+      ],
+      "symbol_refs": [
+        "symbol.control.condition.transforming.state"
+      ],
+      "grammar_refs": [
+        {
+          "id": "grammar.opl.iso19450.2024.draft",
+          "version": "0.2.0",
+          "sha256": "c88e672bd9db7f0405a7ef3fc464043f15cae844931192e3412c94ce05339e7d"
+        }
+      ],
+      "binding_digest": "93805d6e2fdb3ea73c4ddfc0a995d662fbf13dee2d8a6f24fc20c79ecff65d1d",
+      "upstream_evidence_fingerprint": "cda494ef3f995a0f53e5afa72e80cda13d8b35105caa4434cc9c14d4234edcb2",
+      "intake_status": "MATCHED",
+      "blocker_codes": []
+    },
+    {
+      "capability_id": "CAP-ISO-CTRL-008",
+      "family": "CONTROL",
+      "upstream_eligibility": "ELIGIBLE_FOR_RELEASE_VALIDATION",
+      "coverage_keys": [
+        "CTRL:CAP-ISO-CTRL-008:CAP-ISO-PROC-011:AGENT_STATE:PASS",
+        "CTRL:CAP-ISO-CTRL-008:CAP-ISO-PROC-012:INSTRUMENT_STATE:PASS"
+      ],
+      "template_refs": [
+        "opl.control.condition.enabling.state.v1"
+      ],
+      "rule_refs": [
+        "rule.iso.control.condition.008.v1"
+      ],
+      "symbol_refs": [
+        "symbol.control.condition.enabling.state"
+      ],
+      "grammar_refs": [
+        {
+          "id": "grammar.opl.iso19450.2024.draft",
+          "version": "0.2.0",
+          "sha256": "c88e672bd9db7f0405a7ef3fc464043f15cae844931192e3412c94ce05339e7d"
+        }
+      ],
+      "binding_digest": "93805d6e2fdb3ea73c4ddfc0a995d662fbf13dee2d8a6f24fc20c79ecff65d1d",
+      "upstream_evidence_fingerprint": "68a787c1ee9270f9c28c59b0a5ddae35dfdfd9553e0bbee15b95e75d5ad64dc9",
+      "intake_status": "MATCHED",
+      "blocker_codes": []
+    },
+    {
+      "capability_id": "CAP-ISO-STRUCT-001",
+      "family": "STRUCTURAL",
+      "upstream_eligibility": "ELIGIBLE_FOR_RELEASE_VALIDATION",
+      "coverage_keys": [
+        "STRUCT:CAP-ISO-STRUCT-001:-:UNIDIRECTIONAL_OBJECT_TAGGED:PASS",
+        "STRUCT:CAP-ISO-STRUCT-001:-:UNIDIRECTIONAL_PROCESS_TAGGED:PASS",
+        "STRUCT:CAP-ISO-STRUCT-001:-:CROSS_KIND_TAGGED:BLOCKED",
+        "STRUCT:CAP-ISO-STRUCT-001:-:FORWARD_TAG_MISSING:BLOCKED"
+      ],
+      "template_refs": [
+        "opl.structural.tagged.unidirectional.v1"
+      ],
+      "rule_refs": [
+        "rule.iso.struct.tagged.unidirectional.v1"
+      ],
+      "symbol_refs": [
+        "symbol.link.structural.tagged.unidirectional"
+      ],
+      "grammar_refs": [
+        {
+          "id": "grammar.opl.iso19450.2024.draft",
+          "version": "0.2.0",
+          "sha256": "c88e672bd9db7f0405a7ef3fc464043f15cae844931192e3412c94ce05339e7d"
+        }
+      ],
+      "binding_digest": "93805d6e2fdb3ea73c4ddfc0a995d662fbf13dee2d8a6f24fc20c79ecff65d1d",
+      "upstream_evidence_fingerprint": "4af82d3d23dab817bf0242df6235402afab5cb6054ad490fd4862182eb60b5dc",
+      "intake_status": "MATCHED",
+      "blocker_codes": []
+    },
+    {
+      "capability_id": "CAP-ISO-STRUCT-002",
+      "family": "STRUCTURAL",
+      "upstream_eligibility": "ELIGIBLE_FOR_RELEASE_VALIDATION",
+      "coverage_keys": [
+        "STRUCT:CAP-ISO-STRUCT-002:-:UNIDIRECTIONAL_OBJECT_NULL_TAG:PASS",
+        "STRUCT:CAP-ISO-STRUCT-002:-:UNIDIRECTIONAL_PROCESS_NULL_TAG:PASS"
+      ],
+      "template_refs": [
+        "opl.structural.null-tagged.unidirectional.v1"
+      ],
+      "rule_refs": [
+        "rule.iso.struct.null-tagged.unidirectional.v1"
+      ],
+      "symbol_refs": [
+        "symbol.link.structural.null-tagged.unidirectional"
+      ],
+      "grammar_refs": [
+        {
+          "id": "grammar.opl.iso19450.2024.draft",
+          "version": "0.2.0",
+          "sha256": "c88e672bd9db7f0405a7ef3fc464043f15cae844931192e3412c94ce05339e7d"
+        }
+      ],
+      "binding_digest": "93805d6e2fdb3ea73c4ddfc0a995d662fbf13dee2d8a6f24fc20c79ecff65d1d",
+      "upstream_evidence_fingerprint": "db1d368170e9a8c2e573693999dc5c6ae72d6f81462bf93769a5eb855f5a8bf4",
+      "intake_status": "MATCHED",
+      "blocker_codes": []
+    },
+    {
+      "capability_id": "CAP-ISO-STRUCT-003",
+      "family": "STRUCTURAL",
+      "upstream_eligibility": "ELIGIBLE_FOR_RELEASE_VALIDATION",
+      "coverage_keys": [
+        "STRUCT:CAP-ISO-STRUCT-003:-:BIDIRECTIONAL_OBJECT_TAGGED:PASS",
+        "STRUCT:CAP-ISO-STRUCT-003:-:BIDIRECTIONAL_PROCESS_TAGGED:PASS",
+        "STRUCT:CAP-ISO-STRUCT-003:-:REVERSE_TAG_MISSING:BLOCKED"
+      ],
+      "template_refs": [
+        "opl.structural.tagged.bidirectional.v1"
+      ],
+      "rule_refs": [
+        "rule.iso.struct.tagged.bidirectional.v1"
+      ],
+      "symbol_refs": [
+        "symbol.link.structural.tagged.bidirectional"
+      ],
+      "grammar_refs": [
+        {
+          "id": "grammar.opl.iso19450.2024.draft",
+          "version": "0.2.0",
+          "sha256": "c88e672bd9db7f0405a7ef3fc464043f15cae844931192e3412c94ce05339e7d"
+        }
+      ],
+      "binding_digest": "93805d6e2fdb3ea73c4ddfc0a995d662fbf13dee2d8a6f24fc20c79ecff65d1d",
+      "upstream_evidence_fingerprint": "7933efd64434ef9af5b2d5b834ab8d175f415835c9d10caa21cb80689ce45558",
+      "intake_status": "MATCHED",
+      "blocker_codes": []
+    },
+    {
+      "capability_id": "CAP-ISO-STRUCT-004",
+      "family": "STRUCTURAL",
+      "upstream_eligibility": "ELIGIBLE_FOR_RELEASE_VALIDATION",
+      "coverage_keys": [
+        "STRUCT:CAP-ISO-STRUCT-004:-:RECIPROCAL_OBJECT_TAGGED:PASS",
+        "STRUCT:CAP-ISO-STRUCT-004:-:RECIPROCAL_OBJECT_NULL_TAG:PASS",
+        "STRUCT:CAP-ISO-STRUCT-004:-:RECIPROCAL_PROCESS_TAGGED:PASS",
+        "STRUCT:CAP-ISO-STRUCT-004:-:RECIPROCAL_PROCESS_NULL_TAG:PASS",
+        "STRUCT:CAP-ISO-STRUCT-004:-:CROSS_KIND_RECIPROCAL:BLOCKED"
+      ],
+      "template_refs": [
+        "opl.structural.tagged.reciprocal.v1"
+      ],
+      "rule_refs": [
+        "rule.iso.struct.tagged.reciprocal.v1"
+      ],
+      "symbol_refs": [
+        "symbol.link.structural.tagged.reciprocal"
+      ],
+      "grammar_refs": [
+        {
+          "id": "grammar.opl.iso19450.2024.draft",
+          "version": "0.2.0",
+          "sha256": "c88e672bd9db7f0405a7ef3fc464043f15cae844931192e3412c94ce05339e7d"
+        }
+      ],
+      "binding_digest": "93805d6e2fdb3ea73c4ddfc0a995d662fbf13dee2d8a6f24fc20c79ecff65d1d",
+      "upstream_evidence_fingerprint": "3a9eca92e74060f523e3f666bae5ff0768518599e46f0cdc1265c2e707b62aa3",
+      "intake_status": "MATCHED",
+      "blocker_codes": []
+    },
+    {
+      "capability_id": "CAP-ISO-STRUCT-005",
+      "family": "STRUCTURAL",
+      "upstream_eligibility": "ELIGIBLE_FOR_RELEASE_VALIDATION",
+      "coverage_keys": [
+        "STRUCT:CAP-ISO-STRUCT-005:-:AGGREGATION_OBJECT_FAN_1_COMPLETE:PASS",
+        "STRUCT:CAP-ISO-STRUCT-005:-:AGGREGATION_OBJECT_FAN_1_INCOMPLETE:PASS",
+        "STRUCT:CAP-ISO-STRUCT-005:-:AGGREGATION_OBJECT_FAN_2_COMPLETE:PASS",
+        "STRUCT:CAP-ISO-STRUCT-005:-:AGGREGATION_OBJECT_FAN_2_INCOMPLETE:PASS",
+        "STRUCT:CAP-ISO-STRUCT-005:-:AGGREGATION_OBJECT_FAN_3_COMPLETE:PASS",
+        "STRUCT:CAP-ISO-STRUCT-005:-:AGGREGATION_OBJECT_FAN_3_INCOMPLETE:PASS",
+        "STRUCT:CAP-ISO-STRUCT-005:-:AGGREGATION_PROCESS_FAN_1_COMPLETE:PASS",
+        "STRUCT:CAP-ISO-STRUCT-005:-:AGGREGATION_PROCESS_FAN_1_INCOMPLETE:PASS",
+        "STRUCT:CAP-ISO-STRUCT-005:-:AGGREGATION_PROCESS_FAN_2_COMPLETE:PASS",
+        "STRUCT:CAP-ISO-STRUCT-005:-:AGGREGATION_PROCESS_FAN_2_INCOMPLETE:PASS",
+        "STRUCT:CAP-ISO-STRUCT-005:-:AGGREGATION_PROCESS_FAN_3_COMPLETE:PASS",
+        "STRUCT:CAP-ISO-STRUCT-005:-:AGGREGATION_PROCESS_FAN_3_INCOMPLETE:PASS",
+        "STRUCT:CAP-ISO-STRUCT-005:-:FAN_EMPTY:BLOCKED",
+        "STRUCT:CAP-ISO-STRUCT-005:-:FAN_ORDINAL_DUPLICATE:BLOCKED",
+        "STRUCT:CAP-ISO-STRUCT-005:-:FAN_CROSS_KIND:BLOCKED"
+      ],
+      "template_refs": [
+        "opl.structural.aggregation.v1"
+      ],
+      "rule_refs": [
+        "rule.iso.struct.aggregation.v1"
+      ],
+      "symbol_refs": [
+        "symbol.link.structural.aggregation"
+      ],
+      "grammar_refs": [
+        {
+          "id": "grammar.opl.iso19450.2024.draft",
+          "version": "0.2.0",
+          "sha256": "c88e672bd9db7f0405a7ef3fc464043f15cae844931192e3412c94ce05339e7d"
+        }
+      ],
+      "binding_digest": "93805d6e2fdb3ea73c4ddfc0a995d662fbf13dee2d8a6f24fc20c79ecff65d1d",
+      "upstream_evidence_fingerprint": "e106d40e98a9e4aa6e9a68d59f7591118b1ffc69df6a92f8dfa2b50c1eee3c69",
+      "intake_status": "MATCHED",
+      "blocker_codes": []
+    },
+    {
+      "capability_id": "CAP-ISO-STRUCT-006",
+      "family": "STRUCTURAL",
+      "upstream_eligibility": "ELIGIBLE_FOR_RELEASE_VALIDATION",
+      "coverage_keys": [
+        "STRUCT:CAP-ISO-STRUCT-006:-:CHARACTERIZATION_OBJECT_ATTRIBUTE_FAN_1_COMPLETE:PASS",
+        "STRUCT:CAP-ISO-STRUCT-006:-:CHARACTERIZATION_OBJECT_ATTRIBUTE_FAN_1_INCOMPLETE:PASS",
+        "STRUCT:CAP-ISO-STRUCT-006:-:CHARACTERIZATION_OBJECT_ATTRIBUTE_FAN_2_COMPLETE:PASS",
+        "STRUCT:CAP-ISO-STRUCT-006:-:CHARACTERIZATION_OBJECT_ATTRIBUTE_FAN_2_INCOMPLETE:PASS",
+        "STRUCT:CAP-ISO-STRUCT-006:-:CHARACTERIZATION_OBJECT_ATTRIBUTE_FAN_3_COMPLETE:PASS",
+        "STRUCT:CAP-ISO-STRUCT-006:-:CHARACTERIZATION_OBJECT_ATTRIBUTE_FAN_3_INCOMPLETE:PASS",
+        "STRUCT:CAP-ISO-STRUCT-006:-:CHARACTERIZATION_OBJECT_OPERATOR_FAN_1_COMPLETE:PASS",
+        "STRUCT:CAP-ISO-STRUCT-006:-:CHARACTERIZATION_OBJECT_OPERATOR_FAN_1_INCOMPLETE:PASS",
+        "STRUCT:CAP-ISO-STRUCT-006:-:CHARACTERIZATION_OBJECT_OPERATOR_FAN_2_COMPLETE:PASS",
+        "STRUCT:CAP-ISO-STRUCT-006:-:CHARACTERIZATION_OBJECT_OPERATOR_FAN_2_INCOMPLETE:PASS",
+        "STRUCT:CAP-ISO-STRUCT-006:-:CHARACTERIZATION_OBJECT_OPERATOR_FAN_3_COMPLETE:PASS",
+        "STRUCT:CAP-ISO-STRUCT-006:-:CHARACTERIZATION_OBJECT_OPERATOR_FAN_3_INCOMPLETE:PASS",
+        "STRUCT:CAP-ISO-STRUCT-006:-:CHARACTERIZATION_PROCESS_ATTRIBUTE_FAN_1_COMPLETE:PASS",
+        "STRUCT:CAP-ISO-STRUCT-006:-:CHARACTERIZATION_PROCESS_ATTRIBUTE_FAN_1_INCOMPLETE:PASS",
+        "STRUCT:CAP-ISO-STRUCT-006:-:CHARACTERIZATION_PROCESS_ATTRIBUTE_FAN_2_COMPLETE:PASS",
+        "STRUCT:CAP-ISO-STRUCT-006:-:CHARACTERIZATION_PROCESS_ATTRIBUTE_FAN_2_INCOMPLETE:PASS",
+        "STRUCT:CAP-ISO-STRUCT-006:-:CHARACTERIZATION_PROCESS_ATTRIBUTE_FAN_3_COMPLETE:PASS",
+        "STRUCT:CAP-ISO-STRUCT-006:-:CHARACTERIZATION_PROCESS_ATTRIBUTE_FAN_3_INCOMPLETE:PASS",
+        "STRUCT:CAP-ISO-STRUCT-006:-:CHARACTERIZATION_PROCESS_OPERATOR_FAN_1_COMPLETE:PASS",
+        "STRUCT:CAP-ISO-STRUCT-006:-:CHARACTERIZATION_PROCESS_OPERATOR_FAN_1_INCOMPLETE:PASS",
+        "STRUCT:CAP-ISO-STRUCT-006:-:CHARACTERIZATION_PROCESS_OPERATOR_FAN_2_COMPLETE:PASS",
+        "STRUCT:CAP-ISO-STRUCT-006:-:CHARACTERIZATION_PROCESS_OPERATOR_FAN_2_INCOMPLETE:PASS",
+        "STRUCT:CAP-ISO-STRUCT-006:-:CHARACTERIZATION_PROCESS_OPERATOR_FAN_3_COMPLETE:PASS",
+        "STRUCT:CAP-ISO-STRUCT-006:-:CHARACTERIZATION_PROCESS_OPERATOR_FAN_3_INCOMPLETE:PASS",
+        "STRUCT:CAP-ISO-STRUCT-006:-:CHARACTERIZATION_OBJECT_MIXED_A1_O1_COMPLETE:PASS",
+        "STRUCT:CAP-ISO-STRUCT-006:-:CHARACTERIZATION_OBJECT_MIXED_A1_O1_INCOMPLETE:PASS",
+        "STRUCT:CAP-ISO-STRUCT-006:-:CHARACTERIZATION_OBJECT_MIXED_A1_O2_COMPLETE:PASS",
+        "STRUCT:CAP-ISO-STRUCT-006:-:CHARACTERIZATION_OBJECT_MIXED_A1_O2_INCOMPLETE:PASS",
+        "STRUCT:CAP-ISO-STRUCT-006:-:CHARACTERIZATION_OBJECT_MIXED_A2_O1_COMPLETE:PASS",
+        "STRUCT:CAP-ISO-STRUCT-006:-:CHARACTERIZATION_OBJECT_MIXED_A2_O1_INCOMPLETE:PASS",
+        "STRUCT:CAP-ISO-STRUCT-006:-:CHARACTERIZATION_PROCESS_MIXED_A1_O1_COMPLETE:PASS",
+        "STRUCT:CAP-ISO-STRUCT-006:-:CHARACTERIZATION_PROCESS_MIXED_A1_O1_INCOMPLETE:PASS",
+        "STRUCT:CAP-ISO-STRUCT-006:-:CHARACTERIZATION_PROCESS_MIXED_A1_O2_COMPLETE:PASS",
+        "STRUCT:CAP-ISO-STRUCT-006:-:CHARACTERIZATION_PROCESS_MIXED_A1_O2_INCOMPLETE:PASS",
+        "STRUCT:CAP-ISO-STRUCT-006:-:CHARACTERIZATION_PROCESS_MIXED_A2_O1_COMPLETE:PASS",
+        "STRUCT:CAP-ISO-STRUCT-006:-:CHARACTERIZATION_PROCESS_MIXED_A2_O1_INCOMPLETE:PASS",
+        "STRUCT:CAP-ISO-STRUCT-006:-:EXHIBITION_OBJECT_ATTRIBUTE_IMPORT:PASS",
+        "STRUCT:CAP-ISO-STRUCT-006:-:EXHIBITION_PROCESS_OPERATOR_IMPORT:PASS",
+        "STRUCT:CAP-ISO-STRUCT-006:-:FAN_ORDINAL_GAP:BLOCKED",
+        "STRUCT:CAP-ISO-STRUCT-006:-:FEATURE_KIND_INVALID:BLOCKED"
+      ],
+      "template_refs": [
+        "opl.structural.exhibition.v1"
+      ],
+      "rule_refs": [
+        "rule.iso.struct.exhibition.v1"
+      ],
+      "symbol_refs": [
+        "symbol.link.structural.exhibition"
+      ],
+      "grammar_refs": [
+        {
+          "id": "grammar.opl.iso19450.2024.draft",
+          "version": "0.2.0",
+          "sha256": "c88e672bd9db7f0405a7ef3fc464043f15cae844931192e3412c94ce05339e7d"
+        }
+      ],
+      "binding_digest": "93805d6e2fdb3ea73c4ddfc0a995d662fbf13dee2d8a6f24fc20c79ecff65d1d",
+      "upstream_evidence_fingerprint": "2fb11b79bb5327459da1414eac4db5e65f9bc709a3f7a65f23abb16c66bfb68b",
+      "intake_status": "MATCHED",
+      "blocker_codes": []
+    },
+    {
+      "capability_id": "CAP-ISO-STRUCT-007",
+      "family": "STRUCTURAL",
+      "upstream_eligibility": "ELIGIBLE_FOR_RELEASE_VALIDATION",
+      "coverage_keys": [
+        "STRUCT:CAP-ISO-STRUCT-007:-:GENERALIZATION_OBJECT_FAN_1_COMPLETE:PASS",
+        "STRUCT:CAP-ISO-STRUCT-007:-:GENERALIZATION_OBJECT_FAN_1_INCOMPLETE:PASS",
+        "STRUCT:CAP-ISO-STRUCT-007:-:GENERALIZATION_OBJECT_FAN_2_COMPLETE:PASS",
+        "STRUCT:CAP-ISO-STRUCT-007:-:GENERALIZATION_OBJECT_FAN_2_INCOMPLETE:PASS",
+        "STRUCT:CAP-ISO-STRUCT-007:-:GENERALIZATION_OBJECT_FAN_3_COMPLETE:PASS",
+        "STRUCT:CAP-ISO-STRUCT-007:-:GENERALIZATION_OBJECT_FAN_3_INCOMPLETE:PASS",
+        "STRUCT:CAP-ISO-STRUCT-007:-:GENERALIZATION_PROCESS_FAN_1_COMPLETE:PASS",
+        "STRUCT:CAP-ISO-STRUCT-007:-:GENERALIZATION_PROCESS_FAN_1_INCOMPLETE:PASS",
+        "STRUCT:CAP-ISO-STRUCT-007:-:GENERALIZATION_PROCESS_FAN_2_COMPLETE:PASS",
+        "STRUCT:CAP-ISO-STRUCT-007:-:GENERALIZATION_PROCESS_FAN_2_INCOMPLETE:PASS",
+        "STRUCT:CAP-ISO-STRUCT-007:-:GENERALIZATION_PROCESS_FAN_3_COMPLETE:PASS",
+        "STRUCT:CAP-ISO-STRUCT-007:-:GENERALIZATION_PROCESS_FAN_3_INCOMPLETE:PASS",
+        "STRUCT:CAP-ISO-STRUCT-007:-:MULTIPLE_REFINEABLE:BLOCKED"
+      ],
+      "template_refs": [
+        "opl.structural.generalization.v1"
+      ],
+      "rule_refs": [
+        "rule.iso.struct.generalization.v1"
+      ],
+      "symbol_refs": [
+        "symbol.link.structural.generalization"
+      ],
+      "grammar_refs": [
+        {
+          "id": "grammar.opl.iso19450.2024.draft",
+          "version": "0.2.0",
+          "sha256": "c88e672bd9db7f0405a7ef3fc464043f15cae844931192e3412c94ce05339e7d"
+        }
+      ],
+      "binding_digest": "93805d6e2fdb3ea73c4ddfc0a995d662fbf13dee2d8a6f24fc20c79ecff65d1d",
+      "upstream_evidence_fingerprint": "072c016b8a7fb5e63f1f1b8384308c0fe51c6514cad509f123e27e153a477339",
+      "intake_status": "MATCHED",
+      "blocker_codes": []
+    },
+    {
+      "capability_id": "CAP-ISO-STRUCT-008",
+      "family": "STRUCTURAL",
+      "upstream_eligibility": "ELIGIBLE_FOR_RELEASE_VALIDATION",
+      "coverage_keys": [
+        "STRUCT:CAP-ISO-STRUCT-008:-:CLASSIFICATION_OBJECT_FAN_1:PASS",
+        "STRUCT:CAP-ISO-STRUCT-008:-:CLASSIFICATION_OBJECT_FAN_2:PASS",
+        "STRUCT:CAP-ISO-STRUCT-008:-:CLASSIFICATION_OBJECT_FAN_3:PASS",
+        "STRUCT:CAP-ISO-STRUCT-008:-:CLASSIFICATION_PROCESS_FAN_1:PASS",
+        "STRUCT:CAP-ISO-STRUCT-008:-:CLASSIFICATION_PROCESS_FAN_2:PASS",
+        "STRUCT:CAP-ISO-STRUCT-008:-:CLASSIFICATION_PROCESS_FAN_3:PASS",
+        "STRUCT:CAP-ISO-STRUCT-008:-:COMPLETENESS_INVALID:BLOCKED"
+      ],
+      "template_refs": [
+        "opl.structural.classification.v1"
+      ],
+      "rule_refs": [
+        "rule.iso.struct.classification.v1"
+      ],
+      "symbol_refs": [
+        "symbol.link.structural.classification"
+      ],
+      "grammar_refs": [
+        {
+          "id": "grammar.opl.iso19450.2024.draft",
+          "version": "0.2.0",
+          "sha256": "c88e672bd9db7f0405a7ef3fc464043f15cae844931192e3412c94ce05339e7d"
+        }
+      ],
+      "binding_digest": "93805d6e2fdb3ea73c4ddfc0a995d662fbf13dee2d8a6f24fc20c79ecff65d1d",
+      "upstream_evidence_fingerprint": "6b1d7ca5a98c7c265b595b6773e9de3ec9faf146e30c4452b0792db826ec547c",
+      "intake_status": "MATCHED",
+      "blocker_codes": []
+    },
+    {
+      "capability_id": "CAP-ISO-STRUCT-009",
+      "family": "STRUCTURAL",
+      "upstream_eligibility": "ELIGIBLE_FOR_RELEASE_VALIDATION",
+      "coverage_keys": [
+        "STRUCT:CAP-ISO-STRUCT-009:-:CHARACTERIZATION_OBJECT_VALUE_STATE:PASS",
+        "STRUCT:CAP-ISO-STRUCT-009:-:SOURCE_STATE_INVALID:BLOCKED",
+        "STRUCT:CAP-ISO-STRUCT-009:-:SOURCE_FEATURE_STATE_INVALID:BLOCKED",
+        "STRUCT:CAP-ISO-STRUCT-009:-:STATE_OWNER_MISMATCH:BLOCKED"
+      ],
+      "template_refs": [
+        "opl.structural.exhibition.state.v1"
+      ],
+      "rule_refs": [
+        "rule.iso.struct.exhibition.state.v1"
+      ],
+      "symbol_refs": [
+        "symbol.link.structural.exhibition.state"
+      ],
+      "grammar_refs": [
+        {
+          "id": "grammar.opl.iso19450.2024.draft",
+          "version": "0.2.0",
+          "sha256": "c88e672bd9db7f0405a7ef3fc464043f15cae844931192e3412c94ce05339e7d"
+        }
+      ],
+      "binding_digest": "93805d6e2fdb3ea73c4ddfc0a995d662fbf13dee2d8a6f24fc20c79ecff65d1d",
+      "upstream_evidence_fingerprint": "bd09e579ea944653c3aec940b97de1915fb8526f723f7df4f5f6a353e4b29dce",
+      "intake_status": "MATCHED",
+      "blocker_codes": []
+    },
+    {
+      "capability_id": "CAP-ISO-STRUCT-010",
+      "family": "STRUCTURAL",
+      "upstream_eligibility": "ELIGIBLE_FOR_RELEASE_VALIDATION",
+      "coverage_keys": [
+        "STRUCT:CAP-ISO-STRUCT-010:-:UNIDIRECTIONAL_SOURCE_STATE_TAGGED:PASS",
+        "STRUCT:CAP-ISO-STRUCT-010:-:UNIDIRECTIONAL_SOURCE_STATE_NULL_TAG:PASS",
+        "STRUCT:CAP-ISO-STRUCT-010:-:UNIDIRECTIONAL_DESTINATION_STATE_TAGGED:PASS",
+        "STRUCT:CAP-ISO-STRUCT-010:-:UNIDIRECTIONAL_DESTINATION_STATE_NULL_TAG:PASS",
+        "STRUCT:CAP-ISO-STRUCT-010:-:UNIDIRECTIONAL_BOTH_STATE_TAGGED:PASS",
+        "STRUCT:CAP-ISO-STRUCT-010:-:UNIDIRECTIONAL_BOTH_STATE_NULL_TAG:PASS",
+        "STRUCT:CAP-ISO-STRUCT-010:-:BIDIRECTIONAL_SOURCE_STATE_TAGGED:PASS",
+        "STRUCT:CAP-ISO-STRUCT-010:-:BIDIRECTIONAL_DESTINATION_STATE_TAGGED:PASS",
+        "STRUCT:CAP-ISO-STRUCT-010:-:BIDIRECTIONAL_BOTH_STATE_TAGGED:PASS",
+        "STRUCT:CAP-ISO-STRUCT-010:-:RECIPROCAL_SOURCE_STATE_TAGGED:PASS",
+        "STRUCT:CAP-ISO-STRUCT-010:-:RECIPROCAL_SOURCE_STATE_NULL_TAG:PASS",
+        "STRUCT:CAP-ISO-STRUCT-010:-:RECIPROCAL_DESTINATION_STATE_TAGGED:PASS",
+        "STRUCT:CAP-ISO-STRUCT-010:-:RECIPROCAL_DESTINATION_STATE_NULL_TAG:PASS",
+        "STRUCT:CAP-ISO-STRUCT-010:-:RECIPROCAL_BOTH_STATE_TAGGED:PASS",
+        "STRUCT:CAP-ISO-STRUCT-010:-:RECIPROCAL_BOTH_STATE_NULL_TAG:PASS",
+        "STRUCT:CAP-ISO-STRUCT-010:-:PROCESS_ENDPOINT_INVALID:BLOCKED",
+        "STRUCT:CAP-ISO-STRUCT-010:-:BIDIRECTIONAL_NULL_TAG:BLOCKED"
+      ],
+      "template_refs": [
+        "opl.structural.tagged.state.v1"
+      ],
+      "rule_refs": [
+        "rule.iso.struct.tagged.state.v1"
+      ],
+      "symbol_refs": [
+        "symbol.link.structural.tagged.state"
+      ],
+      "grammar_refs": [
+        {
+          "id": "grammar.opl.iso19450.2024.draft",
+          "version": "0.2.0",
+          "sha256": "c88e672bd9db7f0405a7ef3fc464043f15cae844931192e3412c94ce05339e7d"
+        }
+      ],
+      "binding_digest": "93805d6e2fdb3ea73c4ddfc0a995d662fbf13dee2d8a6f24fc20c79ecff65d1d",
+      "upstream_evidence_fingerprint": "744cca2fe2d3832543c396e030f9e623e1966284f95cc013b0a7213a31c526d5",
+      "intake_status": "MATCHED",
+      "blocker_codes": []
+    }
+  ],
+  "blockers": []
+}

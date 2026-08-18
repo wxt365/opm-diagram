@@ -1,0 +1,167 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:opm:contract:dev-canvas-06-golden-authoring-report:0.2",
+  "title": "OPM DEV-CANVAS-06 Golden Authoring Report v0.2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_id", "schema_version", "report_id", "report_version", "report_status", "change_id",
+    "generated_at", "source_date_epoch", "generator_identity", "capture_plan_ref", "handoff_ref",
+    "intake_report_ref", "source_build", "source_build_digest", "runtime_jar_ref", "web_dist_tree_sha256",
+    "input_materialization", "environment", "capture_summary", "approved_assets", "old_golden_set_version",
+    "old_golden_set_sha256", "new_golden_set_sha256", "golden_set_version", "command", "failures",
+    "materialization_verifier_identity", "fixture_materialization_report_refs", "fixture_materialization_set_sha256",
+    "fixture_database_refs", "fixture_database_set_sha256", "capture_attempt_results", "blank_attempt_results",
+    "candidate_attempt_set_sha256", "report_payload_sha256"
+  ],
+  "properties": {
+    "schema_id": {"const": "OPM-DEV-CANVAS-06-GOLDEN-AUTHORING-REPORT-001"},
+    "schema_version": {"const": "0.2"},
+    "report_id": {"type": "string", "minLength": 1},
+    "report_version": {"const": "0.2.0"},
+    "report_status": {"enum": ["READY_FOR_APPROVAL", "APPROVED_PUBLISHED", "BLOCKED"]},
+    "change_id": {"pattern": "^GOLDEN-CANVAS06-[0-9]{8}-[0-9]{3}$"},
+    "generated_at": {"type": "string", "format": "date-time"},
+    "source_date_epoch": {"type": "integer", "minimum": 0},
+    "generator_identity": {"$ref": "#/$defs/identity"},
+    "capture_plan_ref": {"$ref": "#/$defs/fileRef"},
+    "approval_record_ref": {"$ref": "#/$defs/fileRef"},
+    "handoff_ref": {"$ref": "#/$defs/fileRef"},
+    "intake_report_ref": {"$ref": "#/$defs/fileRef"},
+    "source_build": {"$ref": "#/$defs/sourceBuild"},
+    "source_build_digest": {"$ref": "#/$defs/digest"},
+    "runtime_jar_ref": {"$ref": "#/$defs/fileRef"},
+    "web_dist_tree_sha256": {"$ref": "#/$defs/digest"},
+    "input_materialization": {"$ref": "#/$defs/materialization"},
+    "environment": {"$ref": "#/$defs/environment"},
+    "golden_environment_ref": {"$ref": "#/$defs/fileRef"},
+    "authored_golden_environment_ref": {"$ref": "#/$defs/fileRef"},
+    "candidate_authoring_report_ref": {"$ref": "#/$defs/fileRef"},
+    "capture_summary": {"$ref": "#/$defs/captureSummary"},
+    "approved_assets": {"$ref": "#/$defs/approvedAssets"},
+    "old_golden_set_version": {"anyOf": [{"$ref": "#/$defs/semver"}, {"type": "null"}]},
+    "old_golden_set_sha256": {"anyOf": [{"$ref": "#/$defs/digest"}, {"type": "null"}]},
+    "new_golden_set_sha256": {"$ref": "#/$defs/digest"},
+    "golden_set_version": {"$ref": "#/$defs/semver"},
+    "command": {"type": "string", "minLength": 1},
+    "failures": {"type": "array", "items": {"$ref": "#/$defs/failure"}},
+    "materialization_verifier_identity": {"$ref": "#/$defs/identity"},
+    "fixture_materialization_report_refs": {"type": "array", "minItems": 130, "maxItems": 130, "items": {"$ref": "#/$defs/materializationReportRef"}},
+    "fixture_materialization_set_sha256": {"$ref": "#/$defs/digest"},
+    "fixture_database_refs": {"type": "array", "minItems": 130, "maxItems": 130, "items": {"$ref": "#/$defs/databaseRef"}},
+    "fixture_database_set_sha256": {"$ref": "#/$defs/digest"},
+    "capture_attempt_results": {"type": "array", "minItems": 2484, "maxItems": 2484, "items": {"$ref": "#/$defs/captureAttempt"}},
+    "blank_attempt_results": {"type": "array", "minItems": 18, "maxItems": 18, "items": {"$ref": "#/$defs/blankAttempt"}},
+    "candidate_attempt_set_sha256": {"$ref": "#/$defs/digest"},
+    "report_payload_sha256": {"$ref": "#/$defs/digest"}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"report_status": {"const": "READY_FOR_APPROVAL"}}},
+      "then": {
+        "required": ["authored_golden_environment_ref"],
+        "properties": {
+          "report_id": {"pattern": "^dev-canvas-06\\.golden-authoring-report\\.GOLDEN-CANVAS06-[0-9]{8}-[0-9]{3}\\.candidate$"},
+          "failures": {"maxItems": 0},
+          "capture_summary": {"$ref": "#/$defs/completeCaptureSummary"},
+          "approved_assets": {"$ref": "#/$defs/completeApprovedAssets"}
+        },
+        "not": {"anyOf": [{"required": ["approval_record_ref"]}, {"required": ["golden_environment_ref"]}, {"required": ["candidate_authoring_report_ref"]}]}
+      }
+    },
+    {
+      "if": {"properties": {"report_status": {"const": "APPROVED_PUBLISHED"}}},
+      "then": {
+        "required": ["approval_record_ref", "golden_environment_ref", "authored_golden_environment_ref", "candidate_authoring_report_ref"],
+        "properties": {
+          "report_id": {"pattern": "^dev-canvas-06\\.golden-authoring-report\\.GOLDEN-CANVAS06-[0-9]{8}-[0-9]{3}\\.approved\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"},
+          "failures": {"maxItems": 0},
+          "capture_summary": {"$ref": "#/$defs/completeCaptureSummary"},
+          "approved_assets": {"$ref": "#/$defs/completeApprovedAssets"}
+        }
+      }
+    },
+    {
+      "if": {"properties": {"report_status": {"const": "BLOCKED"}}},
+      "then": {
+        "properties": {
+          "report_id": {"pattern": "^dev-canvas-06\\.golden-authoring-report\\.GOLDEN-CANVAS06-[0-9]{8}-[0-9]{3}\\.blocked$"},
+          "failures": {"minItems": 1}
+        },
+        "not": {"anyOf": [{"required": ["approval_record_ref"]}, {"required": ["golden_environment_ref"]}, {"required": ["candidate_authoring_report_ref"]}]}
+      }
+    }
+  ],
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "path": {"type": "string", "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*//).+$"},
+    "semver": {"type": "string", "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"},
+    "fileRef": {
+      "type": "object", "additionalProperties": false,
+      "required": ["kind", "path", "byte_length", "sha256"],
+      "properties": {"kind": {"type": "string", "minLength": 1}, "path": {"$ref": "#/$defs/path"}, "byte_length": {"type": "integer", "minimum": 0}, "sha256": {"$ref": "#/$defs/digest"}}
+    },
+    "identity": {
+      "type": "object", "additionalProperties": false,
+      "required": ["runner_version", "source_commit", "node_version", "command", "runner_source_sha256"],
+      "properties": {"runner_version": {"const": "0.2.0"}, "source_commit": {"pattern": "^[a-f0-9]{40}$"}, "node_version": {"type": "string", "minLength": 1}, "command": {"type": "string", "minLength": 1}, "runner_source_sha256": {"$ref": "#/$defs/digest"}}
+    },
+    "sourceBuild": {
+      "type": "object", "additionalProperties": false,
+      "required": ["source_commit", "dirty_before_build", "node_full_version", "node_executable_sha256", "npm_version", "lockfile_sha256", "build_command", "web_dist_tree_sha256", "runtime_jar_sha256"],
+      "properties": {"source_commit": {"pattern": "^[a-f0-9]{40}$"}, "dirty_before_build": {"const": false}, "node_full_version": {"type": "string", "minLength": 1}, "node_executable_sha256": {"$ref": "#/$defs/digest"}, "npm_version": {"const": "10.9.4"}, "lockfile_sha256": {"$ref": "#/$defs/digest"}, "build_command": {"const": "npm ci --ignore-scripts && npm run build"}, "web_dist_tree_sha256": {"$ref": "#/$defs/digest"}, "runtime_jar_sha256": {"$ref": "#/$defs/digest"}}
+    },
+    "materialization": {
+      "type": "object", "additionalProperties": false,
+      "required": ["bundle_ref", "java_version", "entry_allowlist", "materialized_count", "aggregate_sha256", "temporary_directory_cleaned"],
+      "properties": {"bundle_ref": {"$ref": "#/$defs/fileRef"}, "java_version": {"type": "string", "minLength": 1}, "entry_allowlist": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/path"}}, "materialized_count": {"const": 130}, "aggregate_sha256": {"$ref": "#/$defs/digest"}, "temporary_directory_cleaned": {"const": true}}
+    },
+    "environment": {
+      "type": "object", "additionalProperties": false,
+      "required": ["environment_fingerprint", "locale", "timezone", "color_scheme", "reduced_motion", "device_scale_factor"],
+      "properties": {"environment_fingerprint": {"$ref": "#/$defs/digest"}, "locale": {"const": "zh-CN"}, "timezone": {"const": "Asia/Shanghai"}, "color_scheme": {"const": "light"}, "reduced_motion": {"const": "reduce"}, "device_scale_factor": {"const": 1}}
+    },
+    "captureSummary": {
+      "type": "object", "additionalProperties": false,
+      "required": ["capture_count", "blank_baseline_count", "capture_attempt_count", "blank_attempt_count", "deterministic"],
+      "properties": {"capture_count": {"type": "integer", "minimum": 0, "maximum": 1242}, "blank_baseline_count": {"type": "integer", "minimum": 0, "maximum": 9}, "capture_attempt_count": {"type": "integer", "minimum": 0, "maximum": 2484}, "blank_attempt_count": {"type": "integer", "minimum": 0, "maximum": 18}, "deterministic": {"type": "boolean"}}
+    },
+    "completeCaptureSummary": {"allOf": [{"$ref": "#/$defs/captureSummary"}, {"properties": {"capture_count": {"const": 1242}, "blank_baseline_count": {"const": 9}, "capture_attempt_count": {"const": 2484}, "blank_attempt_count": {"const": 18}, "deterministic": {"const": true}}}]},
+    "assetRef": {
+      "type": "object", "additionalProperties": false,
+      "required": ["logical_id", "path", "byte_length", "sha256"],
+      "properties": {"logical_id": {"type": "string", "minLength": 1}, "path": {"$ref": "#/$defs/path"}, "byte_length": {"type": "integer", "minimum": 0}, "sha256": {"$ref": "#/$defs/digest"}}
+    },
+    "approvedAssets": {
+      "type": "object", "additionalProperties": false,
+      "required": ["png_refs", "blank_baseline_refs", "font_refs"],
+      "properties": {"png_refs": {"type": "array", "minItems": 0, "maxItems": 1242, "items": {"$ref": "#/$defs/assetRef"}}, "blank_baseline_refs": {"type": "array", "minItems": 0, "maxItems": 9, "items": {"$ref": "#/$defs/assetRef"}}, "font_refs": {"type": "array", "minItems": 0, "items": {"$ref": "#/$defs/assetRef"}}}
+    },
+    "completeApprovedAssets": {"allOf": [{"$ref": "#/$defs/approvedAssets"}, {"properties": {"png_refs": {"minItems": 1242}, "blank_baseline_refs": {"minItems": 9}, "font_refs": {"minItems": 1}}}]},
+    "materializationReportRef": {
+      "type": "object", "additionalProperties": false,
+      "required": ["fixture_ref_key", "report_ref"],
+      "properties": {"fixture_ref_key": {"$ref": "#/$defs/digest"}, "report_ref": {"allOf": [{"$ref": "#/$defs/fileRef"}, {"properties": {"kind": {"const": "MATERIALIZATION_REPORT"}}}]}}
+    },
+    "databaseRef": {
+      "type": "object", "additionalProperties": false,
+      "required": ["fixture_ref_key", "database_ref", "semantic_state_sha256"],
+      "properties": {"fixture_ref_key": {"$ref": "#/$defs/digest"}, "database_ref": {"allOf": [{"$ref": "#/$defs/fileRef"}, {"properties": {"kind": {"const": "DATABASE"}}}]}, "semantic_state_sha256": {"$ref": "#/$defs/digest"}}
+    },
+    "captureAttempt": {
+      "type": "object", "additionalProperties": false,
+      "required": ["capture_id", "attempt_ordinal", "png_byte_length", "png_sha256", "width", "height", "cell_geometry_sha256", "projection_sha256"],
+      "properties": {"capture_id": {"type": "string", "minLength": 1}, "attempt_ordinal": {"enum": [1, 2]}, "png_byte_length": {"type": "integer", "minimum": 1}, "png_sha256": {"$ref": "#/$defs/digest"}, "width": {"type": "integer", "minimum": 1}, "height": {"type": "integer", "minimum": 1}, "cell_geometry_sha256": {"$ref": "#/$defs/digest"}, "projection_sha256": {"$ref": "#/$defs/digest"}}
+    },
+    "blankAttempt": {
+      "type": "object", "additionalProperties": false,
+      "required": ["baseline_id", "attempt_ordinal", "png_byte_length", "png_sha256", "width", "height"],
+      "properties": {"baseline_id": {"type": "string", "minLength": 1}, "attempt_ordinal": {"enum": [1, 2]}, "png_byte_length": {"type": "integer", "minimum": 1}, "png_sha256": {"$ref": "#/$defs/digest"}, "width": {"type": "integer", "minimum": 1}, "height": {"type": "integer", "minimum": 1}}
+    },
+    "failure": {
+      "type": "object", "additionalProperties": false,
+      "required": ["code", "message_key"],
+      "properties": {"code": {"type": "string", "minLength": 1}, "message_key": {"type": "string", "minLength": 1}, "evidence_refs": {"type": "array", "items": {"$ref": "#/$defs/fileRef"}}}
+    }
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "schema_id": "OPM-DEV-CANVAS-06-E2E-FAMILY-FIXTURE-IDENTITY-CATALOG-001",
+  "schema_version": "0.1",
+  "catalog_id": "dev-canvas-06.e2e-family-fixture-identity.iso19450.2024.draft",
+  "catalog_version": "0.1.0",
+  "source_profile": {
+    "id": "profile.iso19450.2024.draft",
+    "version": "0.2.0"
+  },
+  "source_golden_manifest_sha256": "8aaca22c69402e08ff58a4a3e19eb38b260511dc7649c1deae8ac4fffce280a7",
+  "entries": [
+    {
+      "fixture_sha256": "2a42ea1db241f0d0147df592f1cf159436c3a70cdde2637078e6a9a1dc684e3d",
+      "project_id": "project.e2e.family.struct.003",
+      "model_id": "model.golden.struct.003",
+      "context_id": "context.sd.root",
+      "base_revision": "revision.base.golden.struct.003",
+      "revision_sequence": 1,
+      "parent_revision_id": null
+    },
+    {
+      "fixture_sha256": "6cf81b7f975adde8877eca9583b93304847a4e288a788df61c2b96fff26a4036",
+      "project_id": "project.e2e.family.proc.001",
+      "model_id": "model.golden.proc",
+      "context_id": "context.sd.root",
+      "base_revision": "revision.base.golden.proc.001",
+      "revision_sequence": 1,
+      "parent_revision_id": null
+    }
+  ],
+  "summary": {
+    "family_case_count": 178,
+    "distinct_base_fixture_count": 2
+  },
+  "catalog_payload_sha256": "2d0c5054d58390f63deb975f8b8ea301520864bdbbabd4c84d657fda73484bb5"
+}

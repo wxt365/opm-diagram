@@ -1,0 +1,121 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:opm:contract:dev-canvas-06-recovery-reopen-expectation-catalog:0.1",
+  "title": "OPM DEV-CANVAS-06 Recovery Reopen Expectation Catalog",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "catalog_id", "catalog_version", "profiles", "cases", "catalog_payload_sha256"],
+  "properties": {
+    "schema_id": {"const": "OPM-DEV-CANVAS-06-RECOVERY-REOPEN-EXPECTATION-CATALOG-001"},
+    "schema_version": {"const": "0.1"},
+    "catalog_id": {"const": "dev-canvas-06.recovery-reopen-expectations"},
+    "catalog_version": {"const": "0.1.0"},
+    "profiles": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "prefixItems": [
+        {"allOf": [{"$ref": "#/$defs/profile"}, {"properties": {"profile_id": {"const": "REOPEN-EQUALS-BEFORE"}, "expected_reopen": {"$ref": "#/$defs/beforeExpectation"}, "expected_reopen_sha256": {"const": "b13e8bd4e1f882f33a868485ae67a5ad4f0b91c1dca69ba80e628a4bb146ab96"}}}]},
+        {"allOf": [{"$ref": "#/$defs/profile"}, {"properties": {"profile_id": {"const": "REOPEN-EQUALS-AFTER"}, "expected_reopen": {"$ref": "#/$defs/afterExpectation"}, "expected_reopen_sha256": {"const": "23e6348c4d5a4ba897bb8fc078d590b9112a502e1370a536e092a83fa3173060"}}}]},
+        {"allOf": [{"$ref": "#/$defs/profile"}, {"properties": {"profile_id": {"const": "REOPEN-RECOVERY-REQUIRED"}, "expected_reopen": {"$ref": "#/$defs/recoveryRequiredExpectation"}, "expected_reopen_sha256": {"const": "0c0b9c542d4804cdae9cf3aa3f62fe5f2001197e3fa3aa10899036349179e07c"}}}]}
+      ],
+      "items": false
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 28,
+      "maxItems": 28,
+      "prefixItems": [
+        {"$ref": "#/$defs/case001"}, {"$ref": "#/$defs/case002"}, {"$ref": "#/$defs/case003"}, {"$ref": "#/$defs/case004"},
+        {"$ref": "#/$defs/case005"}, {"$ref": "#/$defs/case006"}, {"$ref": "#/$defs/case007"}, {"$ref": "#/$defs/case008"},
+        {"$ref": "#/$defs/case009"}, {"$ref": "#/$defs/case010"}, {"$ref": "#/$defs/case011"}, {"$ref": "#/$defs/case012"},
+        {"$ref": "#/$defs/case013"}, {"$ref": "#/$defs/case014"}, {"$ref": "#/$defs/case015"}, {"$ref": "#/$defs/case016"},
+        {"$ref": "#/$defs/case017"}, {"$ref": "#/$defs/case018"}, {"$ref": "#/$defs/case019"}, {"$ref": "#/$defs/case020"},
+        {"$ref": "#/$defs/case021"}, {"$ref": "#/$defs/case022"}, {"$ref": "#/$defs/case023"}, {"$ref": "#/$defs/case024"},
+        {"$ref": "#/$defs/case025"}, {"$ref": "#/$defs/case026"}, {"$ref": "#/$defs/case027"}, {"$ref": "#/$defs/case028"}
+      ],
+      "items": false
+    },
+    "catalog_payload_sha256": {"$ref": "#/$defs/digest"}
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "snapshotSource": {"enum": ["BEFORE_SNAPSHOT", "AFTER_SNAPSHOT"]},
+    "snapshotFieldRules": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["revision_document_count", "revision_parent_count", "text_artifact_count", "text_trace_count", "finding_count", "operation_count", "receipt_count", "draft_head_revision_id", "head_sequence", "revision_digest", "projection_digest", "opl_digest", "trace_digest", "sqlite_quick_check", "foreign_key_check_count", "recovery_marker_refs", "temporary_artifact_refs"],
+      "properties": {
+        "revision_document_count": {"$ref": "#/$defs/snapshotSource"},
+        "revision_parent_count": {"$ref": "#/$defs/snapshotSource"},
+        "text_artifact_count": {"$ref": "#/$defs/snapshotSource"},
+        "text_trace_count": {"$ref": "#/$defs/snapshotSource"},
+        "finding_count": {"$ref": "#/$defs/snapshotSource"},
+        "operation_count": {"$ref": "#/$defs/snapshotSource"},
+        "receipt_count": {"$ref": "#/$defs/snapshotSource"},
+        "draft_head_revision_id": {"$ref": "#/$defs/snapshotSource"},
+        "head_sequence": {"$ref": "#/$defs/snapshotSource"},
+        "revision_digest": {"$ref": "#/$defs/snapshotSource"},
+        "projection_digest": {"$ref": "#/$defs/snapshotSource"},
+        "opl_digest": {"$ref": "#/$defs/snapshotSource"},
+        "trace_digest": {"$ref": "#/$defs/snapshotSource"},
+        "sqlite_quick_check": {"const": "CONSTANT_OK"},
+        "foreign_key_check_count": {"const": "CONSTANT_ZERO"},
+        "recovery_marker_refs": {"enum": ["EXACT_EMPTY", "EXACT_ONE_RECOVERY_REQUIRED_MARKER"]},
+        "temporary_artifact_refs": {"const": "EXACT_EMPTY"}
+      }
+    },
+    "beforeExpectation": {"$ref": "#/$defs/expectedReopen", "properties": {"snapshot_field_rules": {"properties": {"revision_document_count": {"const": "BEFORE_SNAPSHOT"}, "revision_parent_count": {"const": "BEFORE_SNAPSHOT"}, "text_artifact_count": {"const": "BEFORE_SNAPSHOT"}, "text_trace_count": {"const": "BEFORE_SNAPSHOT"}, "finding_count": {"const": "BEFORE_SNAPSHOT"}, "operation_count": {"const": "BEFORE_SNAPSHOT"}, "receipt_count": {"const": "BEFORE_SNAPSHOT"}, "draft_head_revision_id": {"const": "BEFORE_SNAPSHOT"}, "head_sequence": {"const": "BEFORE_SNAPSHOT"}, "revision_digest": {"const": "BEFORE_SNAPSHOT"}, "projection_digest": {"const": "BEFORE_SNAPSHOT"}, "opl_digest": {"const": "BEFORE_SNAPSHOT"}, "trace_digest": {"const": "BEFORE_SNAPSHOT"}, "recovery_marker_refs": {"const": "EXACT_EMPTY"}}}}},
+    "afterExpectation": {"$ref": "#/$defs/expectedReopen", "properties": {"snapshot_field_rules": {"properties": {"revision_document_count": {"const": "AFTER_SNAPSHOT"}, "revision_parent_count": {"const": "AFTER_SNAPSHOT"}, "text_artifact_count": {"const": "AFTER_SNAPSHOT"}, "text_trace_count": {"const": "AFTER_SNAPSHOT"}, "finding_count": {"const": "AFTER_SNAPSHOT"}, "operation_count": {"const": "AFTER_SNAPSHOT"}, "receipt_count": {"const": "AFTER_SNAPSHOT"}, "draft_head_revision_id": {"const": "AFTER_SNAPSHOT"}, "head_sequence": {"const": "AFTER_SNAPSHOT"}, "revision_digest": {"const": "AFTER_SNAPSHOT"}, "projection_digest": {"const": "AFTER_SNAPSHOT"}, "opl_digest": {"const": "AFTER_SNAPSHOT"}, "trace_digest": {"const": "AFTER_SNAPSHOT"}, "recovery_marker_refs": {"const": "EXACT_EMPTY"}}}}},
+    "recoveryRequiredExpectation": {"$ref": "#/$defs/expectedReopen", "properties": {"snapshot_field_rules": {"properties": {"revision_document_count": {"const": "BEFORE_SNAPSHOT"}, "revision_parent_count": {"const": "BEFORE_SNAPSHOT"}, "text_artifact_count": {"const": "BEFORE_SNAPSHOT"}, "text_trace_count": {"const": "BEFORE_SNAPSHOT"}, "finding_count": {"const": "BEFORE_SNAPSHOT"}, "operation_count": {"const": "BEFORE_SNAPSHOT"}, "receipt_count": {"const": "BEFORE_SNAPSHOT"}, "draft_head_revision_id": {"const": "BEFORE_SNAPSHOT"}, "head_sequence": {"const": "BEFORE_SNAPSHOT"}, "revision_digest": {"const": "BEFORE_SNAPSHOT"}, "projection_digest": {"const": "BEFORE_SNAPSHOT"}, "opl_digest": {"const": "BEFORE_SNAPSHOT"}, "trace_digest": {"const": "BEFORE_SNAPSHOT"}, "recovery_marker_refs": {"const": "EXACT_ONE_RECOVERY_REQUIRED_MARKER"}}}}},
+    "expectedReopen": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["comparison_mode", "snapshot_field_rules"],
+      "properties": {"comparison_mode": {"const": "FIELD_RULES_V1"}, "snapshot_field_rules": {"$ref": "#/$defs/snapshotFieldRules"}}
+    },
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profile_id", "expected_reopen", "expected_reopen_sha256"],
+      "properties": {"profile_id": {"enum": ["REOPEN-EQUALS-BEFORE", "REOPEN-EQUALS-AFTER", "REOPEN-RECOVERY-REQUIRED"]}, "expected_reopen": {"$ref": "#/$defs/expectedReopen"}, "expected_reopen_sha256": {"$ref": "#/$defs/digest"}}
+    },
+    "caseMapping": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["case_id", "expected_reopen_profile_id", "expected_reopen_sha256"],
+      "properties": {"case_id": {"pattern": "^RCV-CANVAS-(0[0-2][0-9])\\.[A-Z0-9_]+$"}, "expected_reopen_profile_id": {"enum": ["REOPEN-EQUALS-BEFORE", "REOPEN-EQUALS-AFTER", "REOPEN-RECOVERY-REQUIRED"]}, "expected_reopen_sha256": {"$ref": "#/$defs/digest"}}
+    },
+    "beforeCase": {"allOf": [{"$ref": "#/$defs/caseMapping"}, {"properties": {"expected_reopen_profile_id": {"const": "REOPEN-EQUALS-BEFORE"}, "expected_reopen_sha256": {"const": "b13e8bd4e1f882f33a868485ae67a5ad4f0b91c1dca69ba80e628a4bb146ab96"}}}]},
+    "afterCase": {"allOf": [{"$ref": "#/$defs/caseMapping"}, {"properties": {"expected_reopen_profile_id": {"const": "REOPEN-EQUALS-AFTER"}, "expected_reopen_sha256": {"const": "23e6348c4d5a4ba897bb8fc078d590b9112a502e1370a536e092a83fa3173060"}}}]},
+    "recoveryRequiredCase": {"allOf": [{"$ref": "#/$defs/caseMapping"}, {"properties": {"expected_reopen_profile_id": {"const": "REOPEN-RECOVERY-REQUIRED"}, "expected_reopen_sha256": {"const": "0c0b9c542d4804cdae9cf3aa3f62fe5f2001197e3fa3aa10899036349179e07c"}}}]},
+    "case001": {"$ref": "#/$defs/beforeCase", "properties": {"case_id": {"const": "RCV-CANVAS-001.RULE_IDENTITY"}}},
+    "case002": {"$ref": "#/$defs/beforeCase", "properties": {"case_id": {"const": "RCV-CANVAS-002.SYMBOL_MISSING"}}},
+    "case003": {"$ref": "#/$defs/beforeCase", "properties": {"case_id": {"const": "RCV-CANVAS-003.GRAMMAR_DIGEST"}}},
+    "case004": {"$ref": "#/$defs/beforeCase", "properties": {"case_id": {"const": "RCV-CANVAS-004.NORMALIZATION_IDENTITY"}}},
+    "case005": {"$ref": "#/$defs/beforeCase", "properties": {"case_id": {"const": "RCV-CANVAS-005.SEMANTIC_VALIDATION"}}},
+    "case006": {"$ref": "#/$defs/beforeCase", "properties": {"case_id": {"const": "RCV-CANVAS-006.PLAN_UNSUPPORTED"}}},
+    "case007": {"$ref": "#/$defs/beforeCase", "properties": {"case_id": {"const": "RCV-CANVAS-007.TEXT_COMPOSITION"}}},
+    "case008": {"$ref": "#/$defs/beforeCase", "properties": {"case_id": {"const": "RCV-CANVAS-008.TRACE_INCOMPLETE"}}},
+    "case009": {"$ref": "#/$defs/beforeCase", "properties": {"case_id": {"const": "RCV-CANVAS-009.SQLITE_REVISION"}}},
+    "case010": {"$ref": "#/$defs/beforeCase", "properties": {"case_id": {"const": "RCV-CANVAS-010.SQLITE_PARENT"}}},
+    "case011": {"$ref": "#/$defs/beforeCase", "properties": {"case_id": {"const": "RCV-CANVAS-011.SQLITE_TRACE"}}},
+    "case012": {"$ref": "#/$defs/beforeCase", "properties": {"case_id": {"const": "RCV-CANVAS-012.SQLITE_FINDING"}}},
+    "case013": {"$ref": "#/$defs/beforeCase", "properties": {"case_id": {"const": "RCV-CANVAS-013.SQLITE_HEAD"}}},
+    "case014": {"$ref": "#/$defs/beforeCase", "properties": {"case_id": {"const": "RCV-CANVAS-014.SQLITE_OPERATION"}}},
+    "case015": {"$ref": "#/$defs/beforeCase", "properties": {"case_id": {"const": "RCV-CANVAS-015.SQLITE_RECEIPT"}}},
+    "case016": {"$ref": "#/$defs/beforeCase", "properties": {"case_id": {"const": "RCV-CANVAS-016.KILL_AFTER_REVISION"}}},
+    "case017": {"$ref": "#/$defs/beforeCase", "properties": {"case_id": {"const": "RCV-CANVAS-017.KILL_AFTER_HEAD"}}},
+    "case018": {"$ref": "#/$defs/afterCase", "properties": {"case_id": {"const": "RCV-CANVAS-018.KILL_AFTER_COMMIT"}}},
+    "case019": {"$ref": "#/$defs/beforeCase", "properties": {"case_id": {"const": "RCV-CANVAS-019.IDLE_RESTART"}}},
+    "case020": {"$ref": "#/$defs/beforeCase", "properties": {"case_id": {"const": "RCV-CANVAS-020.SERVICE_UNAVAILABLE"}}},
+    "case021": {"$ref": "#/$defs/afterCase", "properties": {"case_id": {"const": "RCV-CANVAS-021.PROJECTION_READBACK"}}},
+    "case022": {"$ref": "#/$defs/recoveryRequiredCase", "properties": {"case_id": {"const": "RCV-CANVAS-022.RECOVERY_REQUIRED"}}},
+    "case023": {"$ref": "#/$defs/beforeCase", "properties": {"case_id": {"const": "RCV-CANVAS-023.ROLLBACK_STRUCTURAL"}}},
+    "case024": {"$ref": "#/$defs/beforeCase", "properties": {"case_id": {"const": "RCV-CANVAS-024.ROLLBACK_CONTROL"}}},
+    "case025": {"$ref": "#/$defs/beforeCase", "properties": {"case_id": {"const": "RCV-CANVAS-025.ROLLBACK_PROCEDURAL_CASCADE"}}},
+    "case026": {"$ref": "#/$defs/beforeCase", "properties": {"case_id": {"const": "RCV-CANVAS-026.ROLLBACK_ALL"}}},
+    "case027": {"$ref": "#/$defs/beforeCase", "properties": {"case_id": {"const": "RCV-CANVAS-027.ROLLBACK_UNKNOWN"}}},
+    "case028": {"$ref": "#/$defs/beforeCase", "properties": {"case_id": {"const": "RCV-CANVAS-028.ROLLBACK_TAMPERED"}}}
+  }
+}

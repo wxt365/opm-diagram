@@ -1,5 +1,7 @@
 # Task Checklist: OPM 当前实现与冻结设计符合性验收
 
+> 历史执行快照：本checklist记录2026-07-31原始验收命令与当时结果，不作为当前Handoff状态源。当前clean Handoff/Bundle与Intake以`docs/checklists/opm-dev-canvas-05-clean-handoff-rebuild-checklist.md`和符合性报告的2026-08-03输入刷新为准。
+
 ## Spec Mapping
 
 - 当前任务规格：`specs/opm-implementation-design-conformance-test-task-spec.md`

@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:opm:contract:dev-canvas-06-golden-fixture-materialization-report:0.1",
+  "title": "OPM DEV-CANVAS-06 Golden Fixture Materialization Report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "report_id", "report_version", "report_status", "change_id", "materialization_id", "generated_at", "source_date_epoch", "runner_identity", "capture_plan_ref", "evidence_bundle_ref", "source_fixture_ref", "fixture_ref_key", "runtime_binding", "fixture_identity", "checks", "failures", "report_payload_sha256"],
+  "properties": {
+    "schema_id": {"const": "OPM-DEV-CANVAS-06-GOLDEN-FIXTURE-MATERIALIZATION-REPORT-001"},
+    "schema_version": {"const": "0.1"},
+    "report_id": {"pattern": "^dev-canvas-06\\.fixture-materialization\\.GOLDEN-CANVAS06-[0-9]{8}-[0-9]{3}\\.[a-f0-9]{64}$"},
+    "report_version": {"const": "0.1.0"},
+    "report_status": {"enum": ["MATERIALIZED", "BLOCKED"]},
+    "change_id": {"pattern": "^GOLDEN-CANVAS06-[0-9]{8}-[0-9]{3}$"},
+    "materialization_id": {"pattern": "^dev-canvas-06\\.fixture-materialization\\.GOLDEN-CANVAS06-[0-9]{8}-[0-9]{3}\\.[a-f0-9]{64}$"},
+    "generated_at": {"type": "string", "format": "date-time"},
+    "source_date_epoch": {"type": "integer", "minimum": 0},
+    "runner_identity": {"$ref": "#/$defs/runnerIdentity"},
+    "capture_plan_ref": {"$ref": "#/$defs/fileRef"},
+    "evidence_bundle_ref": {"$ref": "#/$defs/fileRef"},
+    "source_fixture_ref": {"$ref": "#/$defs/archiveEntryRef"},
+    "fixture_ref_key": {"$ref": "#/$defs/digest"},
+    "runtime_binding": {"$ref": "#/$defs/binding"},
+    "fixture_identity": {"$ref": "#/$defs/fixtureIdentity"},
+    "materialized_identity": {"$ref": "#/$defs/materializedIdentity"},
+    "target_storage": {"$ref": "#/$defs/targetStorage"},
+    "persistence": {"$ref": "#/$defs/persistence"},
+    "checks": {"type": "array", "minItems": 10, "maxItems": 10, "items": {"$ref": "#/$defs/check"}},
+    "primary_failure": {"$ref": "#/$defs/failure"},
+    "failures": {"type": "array", "items": {"$ref": "#/$defs/failure"}},
+    "report_payload_sha256": {"$ref": "#/$defs/digest"}
+  },
+  "allOf": [
+    {"if": {"properties": {"report_status": {"const": "MATERIALIZED"}}}, "then": {"required": ["materialized_identity", "target_storage", "persistence"], "properties": {"checks": {"items": {"properties": {"status": {"const": "PASSED"}}, "required": ["status"]}}, "failures": {"maxItems": 0}, "persistence": {"properties": {"transaction_status": {"const": "COMMITTED"}}, "required": ["transaction_status"]}}}},
+    {"if": {"properties": {"report_status": {"const": "BLOCKED"}}}, "then": {"required": ["primary_failure"], "properties": {"failures": {"minItems": 1}}, "not": {"anyOf": [{"required": ["materialized_identity"]}, {"required": ["target_storage"]}, {"required": ["persistence"]}]}}}
+  ],
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "path": {"type": "string", "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*//).+$"},
+    "fileRef": {"type": "object", "additionalProperties": false, "required": ["kind", "path", "byte_length", "sha256"], "properties": {"kind": {"type": "string", "minLength": 1}, "path": {"$ref": "#/$defs/path"}, "byte_length": {"type": "integer", "minimum": 0}, "sha256": {"$ref": "#/$defs/digest"}}},
+    "archiveEntryRef": {"type": "object", "additionalProperties": false, "required": ["path", "byte_length", "sha256", "bundle_sha256", "archive_entry_path"], "properties": {"path": {"$ref": "#/$defs/path"}, "byte_length": {"type": "integer", "minimum": 0}, "sha256": {"$ref": "#/$defs/digest"}, "bundle_sha256": {"$ref": "#/$defs/digest"}, "archive_entry_path": {"$ref": "#/$defs/path"}}},
+    "asset": {"type": "object", "additionalProperties": false, "required": ["id", "version", "sha256"], "properties": {"id": {"type": "string", "minLength": 1}, "version": {"type": "string", "minLength": 1}, "sha256": {"$ref": "#/$defs/digest"}}},
+    "binding": {"type": "object", "additionalProperties": false, "required": ["profile", "rule_set", "text_grammar", "symbol_catalog", "normalization_adapter", "binding_digest"], "properties": {"profile": {"$ref": "#/$defs/asset"}, "rule_set": {"$ref": "#/$defs/asset"}, "text_grammar": {"$ref": "#/$defs/asset"}, "symbol_catalog": {"$ref": "#/$defs/asset"}, "normalization_adapter": {"$ref": "#/$defs/asset"}, "binding_digest": {"$ref": "#/$defs/digest"}}},
+    "runnerIdentity": {"type": "object", "additionalProperties": false, "required": ["contract_version", "runtime_jar_ref", "java_version", "java_vendor", "command"], "properties": {"contract_version": {"const": "0.1.0"}, "runtime_jar_ref": {"$ref": "#/$defs/fileRef"}, "java_version": {"type": "string", "minLength": 1}, "java_vendor": {"type": "string", "minLength": 1}, "command": {"type": "string", "minLength": 1}}},
+    "fixtureIdentity": {"type": "object", "additionalProperties": false, "required": ["schema_id", "schema_version", "model_id", "revision_id", "revision_sequence", "parent_revision_id", "fixture_sha256"], "properties": {"schema_id": {"const": "MS-REV-001"}, "schema_version": {"const": "0.2"}, "model_id": {"type": "string", "minLength": 1}, "revision_id": {"type": "string", "minLength": 1}, "revision_sequence": {"type": "integer", "minimum": 1}, "parent_revision_id": {"anyOf": [{"type": "string", "minLength": 1}, {"type": "null"}]}, "fixture_sha256": {"$ref": "#/$defs/digest"}}},
+    "materializedIdentity": {"type": "object", "additionalProperties": false, "required": ["project_id", "model_id", "revision_id", "revision_sequence", "draft_head_revision_id", "head_sequence", "history_mode"], "properties": {"project_id": {"pattern": "^project\\.golden\\.fixture\\.[a-f0-9]{64}$"}, "model_id": {"type": "string", "minLength": 1}, "revision_id": {"type": "string", "minLength": 1}, "revision_sequence": {"type": "integer", "minimum": 1}, "draft_head_revision_id": {"type": "string", "minLength": 1}, "head_sequence": {"type": "integer", "minimum": 1}, "history_mode": {"const": "SINGLE_REVISION_SNAPSHOT"}}},
+    "targetStorage": {"type": "object", "additionalProperties": false, "required": ["storage_root", "database_ref", "storage_schema_version", "database_sha256", "semantic_state_sha256"], "properties": {"storage_root": {"$ref": "#/$defs/path"}, "database_ref": {"$ref": "#/$defs/fileRef"}, "storage_schema_version": {"const": "1.0"}, "database_sha256": {"$ref": "#/$defs/digest"}, "semantic_state_sha256": {"$ref": "#/$defs/digest"}}},
+    "persistence": {"type": "object", "additionalProperties": false, "required": ["transaction_status", "table_counts", "integrity_check", "foreign_key_check", "reopen_matched", "sidecar_absent", "stage_durations_us", "peak_rss_bytes"], "properties": {"transaction_status": {"enum": ["COMMITTED", "ROLLED_BACK"]}, "table_counts": {"type": "object", "additionalProperties": false, "required": ["project_metadata", "profile_package", "rule_set_package", "grammar_package", "model_catalog", "revision_document", "model_head", "revision_parent", "operation_record", "idempotency_record", "background_task", "asset_manifest", "element_index", "fact_endpoint_index", "occurrence_index", "finding_index", "text_trace_index"], "properties": {"project_metadata": {"const": 1}, "profile_package": {"const": 1}, "rule_set_package": {"const": 1}, "grammar_package": {"const": 1}, "model_catalog": {"const": 1}, "revision_document": {"const": 1}, "model_head": {"const": 1}, "revision_parent": {"const": 0}, "operation_record": {"const": 0}, "idempotency_record": {"const": 0}, "background_task": {"const": 0}, "asset_manifest": {"const": 0}, "element_index": {"const": 0}, "fact_endpoint_index": {"const": 0}, "occurrence_index": {"const": 0}, "finding_index": {"const": 0}, "text_trace_index": {"const": 0}}}, "integrity_check": {"const": "ok"}, "foreign_key_check": {"const": 0}, "reopen_matched": {"const": true}, "sidecar_absent": {"const": true}, "stage_durations_us": {"type": "object", "additionalProperties": false, "required": ["preflight", "migration", "seed", "verify", "report"], "properties": {"preflight": {"type": "integer", "minimum": 0}, "migration": {"type": "integer", "minimum": 0}, "seed": {"type": "integer", "minimum": 0}, "verify": {"type": "integer", "minimum": 0}, "report": {"type": "integer", "minimum": 0}}}, "peak_rss_bytes": {"type": "integer", "minimum": 0}}},
+    "check": {"type": "object", "additionalProperties": false, "required": ["check_id", "status"], "properties": {"check_id": {"enum": ["GFM-CHECK-MODE", "GFM-CHECK-ARGS", "GFM-CHECK-RUNTIME-JAR", "GFM-CHECK-PLAN", "GFM-CHECK-FIXTURE-MEMBERSHIP", "GFM-CHECK-BUNDLE", "GFM-CHECK-ARCHIVE", "GFM-CHECK-FIXTURE", "GFM-CHECK-BINDING", "GFM-CHECK-STORAGE"]}, "status": {"enum": ["PASSED", "FAILED", "NOT_RUN"]}, "code": {"type": "string", "minLength": 1}}},
+    "failure": {"type": "object", "additionalProperties": false, "required": ["code", "message_key"], "properties": {"code": {"type": "string", "pattern": "^GFM_[A-Z_]+$"}, "message_key": {"type": "string", "minLength": 1}}}
+  }
+}

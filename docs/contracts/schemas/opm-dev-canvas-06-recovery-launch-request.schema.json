@@ -1,0 +1,131 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:opm:contract:dev-canvas-06-recovery-launch-request:0.1",
+  "title": "OPM DEV-CANVAS-06 Recovery Launch Request",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_id",
+    "schema_version",
+    "protocol_version",
+    "case_id",
+    "category",
+    "attempt_ordinal",
+    "source_date_epoch",
+    "runtime_jar_ref",
+    "launcher_jar_ref",
+    "attempt_materialization_ref",
+    "attempt_root",
+    "requested_loopback_port",
+    "parent_challenge_ref",
+    "parent_challenge_sha256",
+    "boot_nonce",
+    "fault",
+    "reachpoint",
+    "termination_policy",
+    "command_input",
+    "launch_request_payload_sha256"
+  ],
+  "properties": {
+    "schema_id": {"const": "OPM-DEV-CANVAS-06-RECOVERY-LAUNCH-REQUEST-001"},
+    "schema_version": {"const": "0.1"},
+    "protocol_version": {"const": "0.1"},
+    "case_id": {"$ref": "#/$defs/caseId"},
+    "category": {"$ref": "#/$defs/category"},
+    "attempt_ordinal": {"enum": [1, 2]},
+    "source_date_epoch": {"type": "integer", "minimum": 0},
+    "runtime_jar_ref": {
+      "allOf": [
+        {"$ref": "#/$defs/fileRef"},
+        {"properties": {"kind": {"const": "LOCAL_RUNTIME_JAR"}}}
+      ]
+    },
+    "launcher_jar_ref": {
+      "allOf": [
+        {"$ref": "#/$defs/fileRef"},
+        {"properties": {"kind": {"const": "RECOVERY_TEST_LAUNCHER_JAR"}}}
+      ]
+    },
+    "attempt_materialization_ref": {
+      "allOf": [
+        {"$ref": "#/$defs/fileRef"},
+        {"properties": {"kind": {"const": "RECOVERY_ATTEMPT_MATERIALIZATION"}, "path": {"const": "fixture/materialization.json"}}}
+      ]
+    },
+    "attempt_root": {"const": "."},
+    "requested_loopback_port": {"type": "integer", "minimum": 1024, "maximum": 65535},
+    "parent_challenge_ref": {
+      "allOf": [
+        {"$ref": "#/$defs/fileRef"},
+        {"properties": {"kind": {"const": "RECOVERY_PARENT_CHALLENGE"}, "path": {"const": "control/parent-challenge.bin"}, "byte_length": {"const": 32}}}
+      ]
+    },
+    "parent_challenge_sha256": {"$ref": "#/$defs/digest"},
+    "boot_nonce": {"type": "string", "pattern": "^[a-f0-9]{32}$"},
+    "fault": {"$ref": "#/$defs/fault"},
+    "reachpoint": {"$ref": "#/$defs/reachpoint"},
+    "termination_policy": {"enum": ["NORMAL", "FORCED"]},
+    "command_input": {
+      "oneOf": [
+        {"type": "null"},
+        {"$ref": "#/$defs/commandInput"}
+      ]
+    },
+    "launch_request_payload_sha256": {"$ref": "#/$defs/digest"}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"fault": {"properties": {"requires_forced_termination": {"const": true}}, "required": ["requires_forced_termination"]}}},
+      "then": {
+        "properties": {
+          "reachpoint": {"enum": ["AFTER_REVISION_INSERT_BEFORE_PARENT", "AFTER_HEAD_UPDATE_BEFORE_OPERATION", "AFTER_CONNECTION_COMMIT_BEFORE_HTTP_FIRST_BYTE", "IDLE_AFTER_CONFIRMED_RESPONSE"]},
+          "termination_policy": {"const": "FORCED"}
+        }
+      },
+      "else": {"properties": {"reachpoint": {"const": "NONE"}, "termination_policy": {"const": "NORMAL"}}}
+    }
+  ],
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "caseId": {"type": "string", "pattern": "^RCV-CANVAS-(0[0-2][0-9])\\.[A-Z0-9_]+$"},
+    "category": {"enum": ["PRE_COMMIT", "SQLITE", "FORCED_RESTART", "SERVICE_RECOVERY", "ROLLBACK"]},
+    "path": {"type": "string", "minLength": 1, "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*//)(?!.*\\\\)(?!.*\\u0000).+$"},
+    "fileRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "path", "byte_length", "sha256"],
+      "properties": {
+        "kind": {"type": "string", "minLength": 1},
+        "path": {"$ref": "#/$defs/path"},
+        "byte_length": {"type": "integer", "minimum": 0},
+        "sha256": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "fault": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stage", "variant", "requires_forced_termination"],
+      "properties": {
+        "stage": {"$ref": "#/$defs/category"},
+        "variant": {"type": "string", "minLength": 1},
+        "requires_forced_termination": {"type": "boolean"}
+      }
+    },
+    "reachpoint": {"enum": ["NONE", "AFTER_REVISION_INSERT_BEFORE_PARENT", "AFTER_HEAD_UPDATE_BEFORE_OPERATION", "AFTER_CONNECTION_COMMIT_BEFORE_HTTP_FIRST_BYTE", "IDLE_AFTER_CONFIRMED_RESPONSE"]},
+    "commandInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["command_scenario_id", "expected_request_digest", "request_body_ref"],
+      "properties": {
+        "command_scenario_id": {"type": "string", "minLength": 1},
+        "expected_request_digest": {"$ref": "#/$defs/digest"},
+        "request_body_ref": {
+          "allOf": [
+            {"$ref": "#/$defs/fileRef"},
+            {"properties": {"kind": {"const": "RECOVERY_API_REQUEST_BODY"}, "path": {"const": "observations/api-request-body.json"}}}
+          ]
+        }
+      }
+    }
+  }
+}

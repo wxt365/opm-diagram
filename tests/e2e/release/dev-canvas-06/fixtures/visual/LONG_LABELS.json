@@ -1,0 +1,18 @@
+{
+  "fixture_id": "fixture.visual.long_labels",
+  "subject_id": "LONG_LABELS",
+  "project_name": "Release visual LONG_LABELS",
+  "model_name": "Release visual LONG_LABELS",
+  "expected_revision": "revision.visual.long_labels",
+  "focus_target_id": "fact.visual.long_labels",
+  "focus_anchor": "CENTER",
+  "expected_cells": 3,
+  "critical_regions": [
+    "FOCUS_BBOX",
+    "CANVAS"
+  ],
+  "seed": {
+    "object_id": "object.visual.long_labels",
+    "process_id": "process.visual.long_labels"
+  }
+}

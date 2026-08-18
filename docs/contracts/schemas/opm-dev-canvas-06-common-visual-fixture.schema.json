@@ -1,0 +1,620 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:opm:contract:dev-canvas-06-common-visual-fixture:0.1",
+  "title": "OPM DEV-CANVAS-06 Common Visual Fixture",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_id",
+    "schema_version",
+    "fixture_version",
+    "fixture_id",
+    "subject_id",
+    "factory_id",
+    "generated_at",
+    "source_binding",
+    "project",
+    "model",
+    "revision_document",
+    "index_seed",
+    "capture_setup",
+    "expected_projection",
+    "fixture_payload_sha256"
+  ],
+  "properties": {
+    "schema_id": {"const": "OPM-DEV-CANVAS-06-COMMON-VISUAL-FIXTURE-001"},
+    "schema_version": {"const": "0.1"},
+    "fixture_version": {"const": "0.1.0"},
+    "fixture_id": {"type": "string", "pattern": "^fixture\\.visual\\.(state-roles|long-labels|fundamental-fan|candidate-layer|inspector|toolchain-catalog|finding-focus|blocked-feedback)$"},
+    "subject_id": {"$ref": "#/$defs/subjectId"},
+    "factory_id": {"type": "string", "pattern": "^factory\\.visual\\.(state-roles|long-labels|fundamental-fan|candidate-layer|inspector|toolchain-catalog|finding-focus|blocked-feedback)$"},
+    "generated_at": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.000Z$"
+    },
+    "source_binding": {"$ref": "#/$defs/sourceBinding"},
+    "project": {"$ref": "#/$defs/project"},
+    "model": {"$ref": "#/$defs/model"},
+    "revision_document": {"$ref": "https://opm.local/schemas/opm-revision/0.2"},
+    "index_seed": {"$ref": "#/$defs/indexSeed"},
+    "capture_setup": {"$ref": "#/$defs/captureSetup"},
+    "expected_projection": {"$ref": "#/$defs/expectedProjection"},
+    "fixture_payload_sha256": {"$ref": "#/$defs/sha256"}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"subject_id": {"const": "STATE_ROLES"}}, "required": ["subject_id"]},
+      "then": {
+        "properties": {
+          "index_seed": {"$ref": "#/$defs/indexCountsStateRoles"},
+          "capture_setup": {
+            "allOf": [
+              {"properties": {"steps": {"const": [{"step_type": "SELECT_OCCURRENCE", "occurrence_id": "occurrence.visual.state-roles.order"}]}}},
+              {"not": {"required": ["one_shot_fault"]}}
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {"properties": {"subject_id": {"const": "LONG_LABELS"}}, "required": ["subject_id"]},
+      "then": {
+        "properties": {
+          "index_seed": {"$ref": "#/$defs/indexCountsLongLabels"},
+          "capture_setup": {
+            "allOf": [
+              {"properties": {"steps": {"const": [{"step_type": "SELECT_OCCURRENCE", "occurrence_id": "occurrence.visual.long-labels.fact"}]}}},
+              {"not": {"required": ["one_shot_fault"]}}
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {"properties": {"subject_id": {"const": "FUNDAMENTAL_FAN"}}, "required": ["subject_id"]},
+      "then": {
+        "properties": {
+          "index_seed": {"$ref": "#/$defs/indexCountsFundamentalFan"},
+          "capture_setup": {
+            "allOf": [
+              {"properties": {"steps": {"const": [{"step_type": "SELECT_OCCURRENCE", "occurrence_id": "occurrence.visual.fundamental-fan.fact"}]}}},
+              {"not": {"required": ["one_shot_fault"]}}
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {"properties": {"subject_id": {"const": "CANDIDATE_LAYER"}}, "required": ["subject_id"]},
+      "then": {
+        "properties": {
+          "index_seed": {"$ref": "#/$defs/indexCountsCandidateLayer"},
+          "capture_setup": {
+            "allOf": [
+              {
+                "properties": {
+                  "steps": {
+                    "const": [
+                      {"step_type": "SELECT_RELATION_TOOL", "capability_id": "CAP-ISO-PROC-001"},
+                      {"step_type": "SELECT_ENDPOINT", "endpoint_role": "SOURCE", "target_kind": "ELEMENT", "target_id": "element.visual.candidate-layer.input"},
+                      {"step_type": "SELECT_ENDPOINT", "endpoint_role": "TARGET", "target_kind": "ELEMENT", "target_id": "element.visual.candidate-layer.process"},
+                      {"step_type": "WAIT_CAPABILITY_OPTIONS"},
+                      {"step_type": "SELECT_EXACT_OPTION", "capability_id": "CAP-ISO-PROC-001"}
+                    ]
+                  }
+                }
+              },
+              {"not": {"required": ["one_shot_fault"]}}
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {"properties": {"subject_id": {"const": "INSPECTOR"}}, "required": ["subject_id"]},
+      "then": {
+        "properties": {
+          "index_seed": {"$ref": "#/$defs/indexCountsInspector"},
+          "capture_setup": {
+            "allOf": [
+              {"properties": {"steps": {"const": [{"step_type": "SELECT_OCCURRENCE", "occurrence_id": "occurrence.visual.inspector.fact"}, {"step_type": "OPEN_RIGHT_PANEL"}]}}},
+              {"not": {"required": ["one_shot_fault"]}}
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {"properties": {"subject_id": {"const": "TOOLCHAIN_CATALOG"}}, "required": ["subject_id"]},
+      "then": {
+        "properties": {
+          "index_seed": {"$ref": "#/$defs/indexCountsToolchainCatalog"},
+          "capture_setup": {
+            "allOf": [
+              {
+                "properties": {
+                  "steps": {
+                    "const": [
+                      {"step_type": "OPEN_RELATION_CATALOG"},
+                      {"step_type": "CLEAR_RELATION_SEARCH"},
+                      {"step_type": "EXPAND_GROUP", "group_id": "PROCEDURAL"},
+                      {"step_type": "EXPAND_GROUP", "group_id": "CONTROL"},
+                      {"step_type": "EXPAND_GROUP", "group_id": "STRUCTURAL"}
+                    ]
+                  }
+                }
+              },
+              {"not": {"required": ["one_shot_fault"]}}
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {"properties": {"subject_id": {"const": "FINDING_FOCUS"}}, "required": ["subject_id"]},
+      "then": {
+        "properties": {
+          "index_seed": {
+            "allOf": [
+              {"$ref": "#/$defs/indexCountsFindingFocus"},
+              {
+                "properties": {
+                  "finding_index": {
+                    "const": [
+                      {
+                        "source_revision_id": "revision.visual.finding-focus",
+                        "model_id": "model.visual.finding-focus",
+                        "finding_id": "finding.visual.finding-focus.001",
+                        "rule_id": "RULE-VISUAL-COMMON-001",
+                        "severity": "WARNING",
+                        "category": "MODEL_QUALITY",
+                        "context_id": "context.visual.finding-focus.sd",
+                        "entity_id": "fact.visual.finding-focus"
+                      }
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          "capture_setup": {
+            "allOf": [
+              {
+                "properties": {
+                  "steps": {
+                    "const": [
+                      {"step_type": "OPEN_BOTTOM_PANEL", "panel_mode": "FINDINGS"},
+                      {"step_type": "SELECT_FINDING", "finding_id": "finding.visual.finding-focus.001"},
+                      {"step_type": "LOCATE_FINDING"}
+                    ]
+                  }
+                }
+              },
+              {"not": {"required": ["one_shot_fault"]}}
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {"properties": {"subject_id": {"const": "BLOCKED_FEEDBACK"}}, "required": ["subject_id"]},
+      "then": {
+        "properties": {
+          "index_seed": {
+            "allOf": [
+              {"$ref": "#/$defs/indexCountsBlockedFeedback"},
+              {
+                "properties": {
+                  "operation_record": {
+                    "prefixItems": [
+                      {
+                        "properties": {
+                          "operation_record_id": {"const": "operation-record.visual.blocked-feedback.validation-blocked"},
+                          "command_id": {"const": "command.visual.blocked-feedback.validation-blocked"},
+                          "diagnostic_id": {"const": "diagnostic.visual.blocked-feedback.validation-blocked"}
+                        }
+                      },
+                      {
+                        "properties": {
+                          "operation_record_id": {"const": "operation-record.visual.blocked-feedback.revision-conflict"},
+                          "command_id": {"const": "command.visual.blocked-feedback.revision-conflict"},
+                          "diagnostic_id": {"const": "diagnostic.visual.blocked-feedback.revision-conflict"}
+                        }
+                      },
+                      {
+                        "properties": {
+                          "operation_record_id": {"const": "operation-record.visual.blocked-feedback.readonly"},
+                          "command_id": {"const": "command.visual.blocked-feedback.readonly"},
+                          "diagnostic_id": {"const": "diagnostic.visual.blocked-feedback.readonly"}
+                        }
+                      }
+                    ],
+                    "items": false
+                  }
+                }
+              }
+            ]
+          },
+          "capture_setup": {
+            "required": ["one_shot_fault"],
+            "properties": {
+              "steps": {
+                "const": [
+                  {"step_type": "OPEN_BOTTOM_PANEL", "panel_mode": "HISTORY"},
+                  {"step_type": "SUBMIT_ONE_SHOT_FAULT_COMMAND", "command_id": "command.visual.blocked-feedback.persistence-failed"}
+                ]
+              },
+              "one_shot_fault": {
+                "const": {
+                  "hook_id": "sqlite.revision-commit.before-insert",
+                  "command_id": "command.visual.blocked-feedback.persistence-failed",
+                  "error_code": "PERSISTENCE_FAILED",
+                  "max_invocations": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "subjectId": {
+      "enum": ["STATE_ROLES", "LONG_LABELS", "FUNDAMENTAL_FAN", "CANDIDATE_LAYER", "INSPECTOR", "TOOLCHAIN_CATALOG", "FINDING_FOCUS", "BLOCKED_FEEDBACK"]
+    },
+    "stableId": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 160,
+      "pattern": "^[A-Za-z][A-Za-z0-9._:-]*$"
+    },
+    "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+(?:\\.[0-9]+)?$"},
+    "assetRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version", "sha256"],
+      "properties": {
+        "id": {"$ref": "#/$defs/stableId"},
+        "version": {"$ref": "#/$defs/version"},
+        "sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "sourceBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profile", "rule_set", "text_grammar", "symbol_catalog", "normalization_adapter", "binding_digest"],
+      "properties": {
+        "profile": {"$ref": "#/$defs/assetRef"},
+        "rule_set": {"$ref": "#/$defs/assetRef"},
+        "text_grammar": {"$ref": "#/$defs/assetRef"},
+        "symbol_catalog": {"$ref": "#/$defs/assetRef"},
+        "normalization_adapter": {"$ref": "#/$defs/assetRef"},
+        "binding_digest": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "project": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["project_id", "name", "normalized_name", "description", "status"],
+      "properties": {
+        "project_id": {"type": "string", "pattern": "^project\\.visual\\.(state-roles|long-labels|fundamental-fan|candidate-layer|inspector|toolchain-catalog|finding-focus|blocked-feedback)$"},
+        "name": {"type": "string", "minLength": 1, "maxLength": 256},
+        "normalized_name": {"type": "string", "minLength": 1, "maxLength": 256},
+        "description": {"const": "DEV-CANVAS-06 release visual common fixture."},
+        "status": {"const": "ACTIVE"}
+      }
+    },
+    "model": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["model_id", "project_id", "name", "normalized_name", "description", "status"],
+      "properties": {
+        "model_id": {"type": "string", "pattern": "^model\\.visual\\.(state-roles|long-labels|fundamental-fan|candidate-layer|inspector|toolchain-catalog|finding-focus|blocked-feedback)$"},
+        "project_id": {"$ref": "#/$defs/stableId"},
+        "name": {"type": "string", "minLength": 1, "maxLength": 256},
+        "normalized_name": {"type": "string", "minLength": 1, "maxLength": 256},
+        "description": {"const": "DEV-CANVAS-06 release visual common fixture."},
+        "status": {"const": "ACTIVE"}
+      }
+    },
+    "elementIndexEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_revision_id", "model_id", "element_id", "core_kind", "capability_id", "normalized_name"],
+      "properties": {
+        "source_revision_id": {"$ref": "#/$defs/stableId"},
+        "model_id": {"$ref": "#/$defs/stableId"},
+        "element_id": {"$ref": "#/$defs/stableId"},
+        "core_kind": {"enum": ["OBJECT", "PROCESS", "PROFILE_ELEMENT"]},
+        "capability_id": {"type": "string", "pattern": "^CAP-[A-Z0-9-]+-[0-9]{3}$"},
+        "normalized_name": {"type": "string", "minLength": 1, "maxLength": 256}
+      }
+    },
+    "factEndpointIndexEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_revision_id", "model_id", "fact_id", "endpoint_id", "endpoint_role", "target_entity_id", "ordinal"],
+      "properties": {
+        "source_revision_id": {"$ref": "#/$defs/stableId"},
+        "model_id": {"$ref": "#/$defs/stableId"},
+        "fact_id": {"$ref": "#/$defs/stableId"},
+        "endpoint_id": {"$ref": "#/$defs/stableId"},
+        "endpoint_role": {"enum": ["CONSUMED_OBJECT", "CONSUMING_PROCESS", "WHOLE_THING", "PART_THING"]},
+        "target_entity_id": {"$ref": "#/$defs/stableId"},
+        "ordinal": {"type": "integer", "minimum": 0, "maximum": 3}
+      }
+    },
+    "occurrenceIndexEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_revision_id", "model_id", "context_id", "occurrence_id", "target_entity_id", "ownership"],
+      "properties": {
+        "source_revision_id": {"$ref": "#/$defs/stableId"},
+        "model_id": {"$ref": "#/$defs/stableId"},
+        "context_id": {"$ref": "#/$defs/stableId"},
+        "occurrence_id": {"$ref": "#/$defs/stableId"},
+        "target_entity_id": {"$ref": "#/$defs/stableId"},
+        "ownership": {"enum": ["OWNED", "REFERENCED", "VIEW_DERIVED"]}
+      }
+    },
+    "findingIndexEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_revision_id", "model_id", "finding_id", "rule_id", "severity", "category", "context_id", "entity_id"],
+      "properties": {
+        "source_revision_id": {"$ref": "#/$defs/stableId"},
+        "model_id": {"$ref": "#/$defs/stableId"},
+        "finding_id": {"$ref": "#/$defs/stableId"},
+        "rule_id": {"const": "RULE-VISUAL-COMMON-001"},
+        "severity": {"const": "WARNING"},
+        "category": {"const": "MODEL_QUALITY"},
+        "context_id": {"$ref": "#/$defs/stableId"},
+        "entity_id": {"$ref": "#/$defs/stableId"}
+      }
+    },
+    "operationRecordEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operation_record_id", "project_id", "model_id", "operation_id", "aggregate_id", "command_id", "input_revision_id", "result_revision_id", "result_status", "diagnostic_id", "occurred_at"],
+      "properties": {
+        "operation_record_id": {"$ref": "#/$defs/stableId"},
+        "project_id": {"$ref": "#/$defs/stableId"},
+        "model_id": {"$ref": "#/$defs/stableId"},
+        "operation_id": {"const": "operation.visual.blocked-feedback.seed"},
+        "aggregate_id": {"$ref": "#/$defs/stableId"},
+        "command_id": {"type": "string", "pattern": "^command\\.visual\\.blocked-feedback\\.(validation-blocked|revision-conflict|readonly)$"},
+        "input_revision_id": {"$ref": "#/$defs/stableId"},
+        "result_revision_id": {"type": "null"},
+        "result_status": {"const": "BLOCKED"},
+        "diagnostic_id": {"type": "string", "pattern": "^diagnostic\\.visual\\.blocked-feedback\\.(validation-blocked|revision-conflict|readonly)$"},
+        "occurred_at": {"type": "string", "format": "date-time", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.000Z$"}
+      }
+    },
+    "indexSeed": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["element_index", "fact_endpoint_index", "occurrence_index", "finding_index", "operation_record"],
+      "properties": {
+        "element_index": {"type": "array", "minItems": 1, "maxItems": 4, "items": {"$ref": "#/$defs/elementIndexEntry"}},
+        "fact_endpoint_index": {"type": "array", "maxItems": 4, "items": {"$ref": "#/$defs/factEndpointIndexEntry"}},
+        "occurrence_index": {"type": "array", "minItems": 2, "maxItems": 5, "items": {"$ref": "#/$defs/occurrenceIndexEntry"}},
+        "finding_index": {"type": "array", "maxItems": 1, "items": {"$ref": "#/$defs/findingIndexEntry"}},
+        "operation_record": {"type": "array", "maxItems": 3, "items": {"$ref": "#/$defs/operationRecordEntry"}}
+      }
+    },
+    "indexCountsStateRoles": {"allOf": [{"$ref": "#/$defs/indexSeed"}, {"properties": {"element_index": {"minItems": 1, "maxItems": 1}, "fact_endpoint_index": {"maxItems": 0}, "occurrence_index": {"minItems": 4, "maxItems": 4}, "finding_index": {"maxItems": 0}, "operation_record": {"maxItems": 0}}}]},
+    "indexCountsLongLabels": {"allOf": [{"$ref": "#/$defs/indexSeed"}, {"properties": {"element_index": {"minItems": 2, "maxItems": 2}, "fact_endpoint_index": {"minItems": 2, "maxItems": 2}, "occurrence_index": {"minItems": 3, "maxItems": 3}, "finding_index": {"maxItems": 0}, "operation_record": {"maxItems": 0}}}]},
+    "indexCountsFundamentalFan": {"allOf": [{"$ref": "#/$defs/indexSeed"}, {"properties": {"element_index": {"minItems": 4, "maxItems": 4}, "fact_endpoint_index": {"minItems": 4, "maxItems": 4}, "occurrence_index": {"minItems": 5, "maxItems": 5}, "finding_index": {"maxItems": 0}, "operation_record": {"maxItems": 0}}}]},
+    "indexCountsCandidateLayer": {"allOf": [{"$ref": "#/$defs/indexSeed"}, {"properties": {"element_index": {"minItems": 2, "maxItems": 2}, "fact_endpoint_index": {"maxItems": 0}, "occurrence_index": {"minItems": 2, "maxItems": 2}, "finding_index": {"maxItems": 0}, "operation_record": {"maxItems": 0}}}]},
+    "indexCountsInspector": {"$ref": "#/$defs/indexCountsOrdinaryFact"},
+    "indexCountsToolchainCatalog": {"$ref": "#/$defs/indexCountsOrdinaryFact"},
+    "indexCountsFindingFocus": {"allOf": [{"$ref": "#/$defs/indexSeed"}, {"properties": {"element_index": {"minItems": 2, "maxItems": 2}, "fact_endpoint_index": {"minItems": 2, "maxItems": 2}, "occurrence_index": {"minItems": 3, "maxItems": 3}, "finding_index": {"minItems": 1, "maxItems": 1}, "operation_record": {"maxItems": 0}}}]},
+    "indexCountsBlockedFeedback": {"allOf": [{"$ref": "#/$defs/indexSeed"}, {"properties": {"element_index": {"minItems": 2, "maxItems": 2}, "fact_endpoint_index": {"minItems": 2, "maxItems": 2}, "occurrence_index": {"minItems": 3, "maxItems": 3}, "finding_index": {"maxItems": 0}, "operation_record": {"minItems": 3, "maxItems": 3}}}]},
+    "indexCountsOrdinaryFact": {"allOf": [{"$ref": "#/$defs/indexSeed"}, {"properties": {"element_index": {"minItems": 2, "maxItems": 2}, "fact_endpoint_index": {"minItems": 2, "maxItems": 2}, "occurrence_index": {"minItems": 3, "maxItems": 3}, "finding_index": {"maxItems": 0}, "operation_record": {"maxItems": 0}}}]},
+    "commandOnlyStep": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["step_type"],
+      "properties": {"step_type": {"enum": ["WAIT_CAPABILITY_OPTIONS", "OPEN_RIGHT_PANEL", "OPEN_RELATION_CATALOG", "CLEAR_RELATION_SEARCH", "LOCATE_FINDING"]}}
+    },
+    "occurrenceStep": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["step_type", "occurrence_id"],
+      "properties": {"step_type": {"const": "SELECT_OCCURRENCE"}, "occurrence_id": {"$ref": "#/$defs/stableId"}}
+    },
+    "capabilityStep": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["step_type", "capability_id"],
+      "properties": {"step_type": {"enum": ["SELECT_RELATION_TOOL", "SELECT_EXACT_OPTION"]}, "capability_id": {"const": "CAP-ISO-PROC-001"}}
+    },
+    "endpointStep": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["step_type", "endpoint_role", "target_kind", "target_id"],
+      "properties": {
+        "step_type": {"const": "SELECT_ENDPOINT"},
+        "endpoint_role": {"enum": ["SOURCE", "TARGET"]},
+        "target_kind": {"enum": ["ELEMENT", "STATE", "FEATURE", "FACT"]},
+        "target_id": {"$ref": "#/$defs/stableId"}
+      }
+    },
+    "groupStep": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["step_type", "group_id"],
+      "properties": {"step_type": {"const": "EXPAND_GROUP"}, "group_id": {"enum": ["PROCEDURAL", "CONTROL", "STRUCTURAL"]}}
+    },
+    "bottomPanelStep": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["step_type", "panel_mode"],
+      "properties": {"step_type": {"const": "OPEN_BOTTOM_PANEL"}, "panel_mode": {"enum": ["FINDINGS", "HISTORY"]}}
+    },
+    "findingStep": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["step_type", "finding_id"],
+      "properties": {"step_type": {"const": "SELECT_FINDING"}, "finding_id": {"const": "finding.visual.finding-focus.001"}}
+    },
+    "faultCommandStep": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["step_type", "command_id"],
+      "properties": {"step_type": {"const": "SUBMIT_ONE_SHOT_FAULT_COMMAND"}, "command_id": {"const": "command.visual.blocked-feedback.persistence-failed"}}
+    },
+    "uiStep": {
+      "oneOf": [
+        {"$ref": "#/$defs/commandOnlyStep"},
+        {"$ref": "#/$defs/occurrenceStep"},
+        {"$ref": "#/$defs/capabilityStep"},
+        {"$ref": "#/$defs/endpointStep"},
+        {"$ref": "#/$defs/groupStep"},
+        {"$ref": "#/$defs/bottomPanelStep"},
+        {"$ref": "#/$defs/findingStep"},
+        {"$ref": "#/$defs/faultCommandStep"}
+      ]
+    },
+    "oneShotFault": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["hook_id", "command_id", "error_code", "max_invocations"],
+      "properties": {
+        "hook_id": {"const": "sqlite.revision-commit.before-insert"},
+        "command_id": {"const": "command.visual.blocked-feedback.persistence-failed"},
+        "error_code": {"const": "PERSISTENCE_FAILED"},
+        "max_invocations": {"const": 1}
+      }
+    },
+    "captureSetup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["setup_version", "steps", "expected_read_revision", "expected_context_id", "expected_focus_target_id", "expected_focus_anchor", "expected_rendered_cell_count"],
+      "properties": {
+        "setup_version": {"const": "0.1.0"},
+        "steps": {"type": "array", "minItems": 1, "maxItems": 5, "items": {"$ref": "#/$defs/uiStep"}},
+        "expected_read_revision": {"$ref": "#/$defs/stableId"},
+        "expected_context_id": {"$ref": "#/$defs/stableId"},
+        "expected_focus_target_id": {"type": "string", "minLength": 3, "maxLength": 160},
+        "expected_focus_anchor": {"enum": ["CENTER", "SOURCE", "TARGET", "LABEL", "JUNCTION"]},
+        "expected_rendered_cell_count": {"type": "integer", "minimum": 1, "maximum": 5},
+        "one_shot_fault": {"$ref": "#/$defs/oneShotFault"}
+      }
+    },
+    "geometry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y", "width", "height", "z_order"],
+      "properties": {
+        "x": {"type": "integer"},
+        "y": {"type": "integer"},
+        "width": {"type": "integer", "minimum": 1},
+        "height": {"type": "integer", "minimum": 1},
+        "z_order": {"type": "integer", "minimum": 1, "maximum": 3}
+      }
+    },
+    "committedCell": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cell_id", "layer", "target_kind", "target_id", "construct_role", "geometry", "state_roles", "capability_id"],
+      "properties": {
+        "cell_id": {"$ref": "#/$defs/stableId"},
+        "layer": {"const": "COMMITTED"},
+        "target_kind": {"enum": ["ELEMENT", "STATE", "FACT", "FEATURE"]},
+        "target_id": {"$ref": "#/$defs/stableId"},
+        "construct_role": {"type": "string", "minLength": 1},
+        "geometry": {"$ref": "#/$defs/geometry"},
+        "state_roles": {"type": "array", "uniqueItems": true, "items": {"enum": ["INITIAL", "DEFAULT", "FINAL"]}},
+        "capability_id": {"type": "string", "pattern": "^CAP-[A-Z0-9-]+-[0-9]{3}$"}
+      }
+    },
+    "transientCell": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cell_id", "layer", "target_kind", "capability_id", "source_target_id", "target_target_id", "state"],
+      "properties": {
+        "cell_id": {"const": "candidate.visual.candidate-layer"},
+        "layer": {"const": "CANDIDATE"},
+        "target_kind": {"const": "FACT"},
+        "capability_id": {"const": "CAP-ISO-PROC-001"},
+        "source_target_id": {"const": "element.visual.candidate-layer.input"},
+        "target_target_id": {"const": "element.visual.candidate-layer.process"},
+        "state": {"const": "preview"}
+      }
+    },
+    "expectedProjection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["projection_version", "subject_id", "read_revision", "context_id", "committed_cells", "transient_cells", "selection", "panels", "relation_candidate", "catalog", "finding", "feedback", "focus_target_id"],
+      "properties": {
+        "projection_version": {"const": "0.1.0"},
+        "subject_id": {"$ref": "#/$defs/subjectId"},
+        "read_revision": {"$ref": "#/$defs/stableId"},
+        "context_id": {"$ref": "#/$defs/stableId"},
+        "committed_cells": {"type": "array", "minItems": 2, "maxItems": 5, "items": {"$ref": "#/$defs/committedCell"}},
+        "transient_cells": {"type": "array", "maxItems": 1, "items": {"$ref": "#/$defs/transientCell"}},
+        "selection": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "target_id"],
+          "properties": {"kind": {"enum": ["none", "single-element", "relation"]}, "target_id": {"anyOf": [{"type": "string", "minLength": 3}, {"type": "null"}]}}
+        },
+        "panels": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["right_open", "right_mode", "bottom_open", "bottom_mode"],
+          "properties": {
+            "right_open": {"type": "boolean"},
+            "right_mode": {"anyOf": [{"enum": ["inspector-relation-fields"]}, {"type": "null"}]},
+            "bottom_open": {"type": "boolean"},
+            "bottom_mode": {"anyOf": [{"enum": ["FINDINGS", "HISTORY"]}, {"type": "null"}]}
+          }
+        },
+        "relation_candidate": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["state", "capability_id", "candidate_id"],
+          "properties": {
+            "state": {"enum": ["none", "preview"]},
+            "capability_id": {"anyOf": [{"const": "CAP-ISO-PROC-001"}, {"type": "null"}]},
+            "candidate_id": {"anyOf": [{"const": "candidate.visual.candidate-layer"}, {"type": "null"}]}
+          }
+        },
+        "catalog": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["open", "search", "procedural_count", "control_count", "structural_count"],
+          "properties": {
+            "open": {"type": "boolean"},
+            "search": {"type": "string"},
+            "procedural_count": {"type": "integer", "minimum": 0, "maximum": 16},
+            "control_count": {"type": "integer", "minimum": 0, "maximum": 8},
+            "structural_count": {"type": "integer", "minimum": 0, "maximum": 10}
+          }
+        },
+        "finding": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["selected_finding_id", "highlighted_target_id"],
+          "properties": {
+            "selected_finding_id": {"anyOf": [{"const": "finding.visual.finding-focus.001"}, {"type": "null"}]},
+            "highlighted_target_id": {"anyOf": [{"type": "string", "minLength": 3}, {"type": "null"}]}
+          }
+        },
+        "feedback": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["current_code", "history_codes"],
+          "properties": {
+            "current_code": {"anyOf": [{"const": "PERSISTENCE_FAILED"}, {"type": "null"}]},
+            "history_codes": {"type": "array", "uniqueItems": true, "items": {"enum": ["VALIDATION_BLOCKED", "REVISION_CONFLICT", "READONLY"]}}
+          }
+        },
+        "focus_target_id": {"type": "string", "minLength": 3, "maxLength": 160}
+      }
+    }
+  }
+}

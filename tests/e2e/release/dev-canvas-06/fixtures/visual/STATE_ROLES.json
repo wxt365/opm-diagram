@@ -1,0 +1,18 @@
+{
+  "fixture_id": "fixture.visual.state_roles",
+  "subject_id": "STATE_ROLES",
+  "project_name": "Release visual STATE_ROLES",
+  "model_name": "Release visual STATE_ROLES",
+  "expected_revision": "revision.visual.state_roles",
+  "focus_target_id": "fact.visual.state_roles",
+  "focus_anchor": "CENTER",
+  "expected_cells": 3,
+  "critical_regions": [
+    "FOCUS_BBOX",
+    "CANVAS"
+  ],
+  "seed": {
+    "object_id": "object.visual.state_roles",
+    "process_id": "process.visual.state_roles"
+  }
+}

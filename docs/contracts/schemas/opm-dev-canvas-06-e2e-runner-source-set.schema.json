@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:opm:contract:dev-canvas-06-e2e-runner-source-set:0.1",
+  "title": "OPM DEV-CANVAS-06 E2E Runner Source Set",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "source_set_version", "selection_policy", "entries", "excluded_classes", "source_set_sha256"],
+  "properties": {
+    "schema_id": {"const": "OPM-DEV-CANVAS-06-E2E-RUNNER-SOURCE-SET-001"},
+    "schema_version": {"const": "0.1"},
+    "source_set_version": {"const": "0.1.0"},
+    "selection_policy": {"const": "EXACT_ALLOWLIST_ALL_OTHERS_EXCLUDED"},
+    "entries": {
+      "type": "array",
+      "minItems": 23,
+      "maxItems": 23,
+      "prefixItems": [
+        {"allOf": [{"$ref": "#/$defs/sourceEntry"}, {"properties": {"path": {"const": "scripts/release-canvas06-e2e-run.mjs"}}}]},
+        {"allOf": [{"$ref": "#/$defs/sourceEntry"}, {"properties": {"path": {"const": "scripts/verify-canvas06-e2e-report.mjs"}}}]},
+        {"allOf": [{"$ref": "#/$defs/sourceEntry"}, {"properties": {"path": {"const": "scripts/canvas06-e2e-run-input.mjs"}}}]},
+        {"allOf": [{"$ref": "#/$defs/sourceEntry"}, {"properties": {"path": {"const": "scripts/canvas06-e2e-run-preflight.mjs"}}}]},
+        {"allOf": [{"$ref": "#/$defs/sourceEntry"}, {"properties": {"path": {"const": "scripts/canvas06-e2e-run-stage.mjs"}}}]},
+        {"allOf": [{"$ref": "#/$defs/sourceEntry"}, {"properties": {"path": {"const": "scripts/canvas06-e2e-run-report.mjs"}}}]},
+        {"allOf": [{"$ref": "#/$defs/sourceEntry"}, {"properties": {"path": {"const": "scripts/canvas06-e2e-run-transaction.mjs"}}}]},
+        {"allOf": [{"$ref": "#/$defs/sourceEntry"}, {"properties": {"path": {"const": "scripts/canvas06-e2e-attempt-artifacts.mjs"}}}]},
+        {"allOf": [{"$ref": "#/$defs/sourceEntry"}, {"properties": {"path": {"const": "scripts/canvas06-e2e-production-web.mjs"}}}]},
+        {"allOf": [{"$ref": "#/$defs/sourceEntry"}, {"properties": {"path": {"const": "scripts/canvas06-projection-digest-v01.mjs"}}}]},
+        {"allOf": [{"$ref": "#/$defs/sourceEntry"}, {"properties": {"path": {"const": "scripts/canvas06-rfc8785.mjs"}}}]},
+        {"allOf": [{"$ref": "#/$defs/sourceEntry"}, {"properties": {"path": {"const": "scripts/canvas06-e2e-common-fixtures.mjs"}}}]},
+        {"allOf": [{"$ref": "#/$defs/sourceEntry"}, {"properties": {"path": {"const": "scripts/canvas06-e2e-manifest-v01-trust.mjs"}}}]},
+        {"allOf": [{"$ref": "#/$defs/sourceEntry"}, {"properties": {"path": {"const": "scripts/canvas06-e2e-manifest-v01-support.mjs"}}}]},
+        {"allOf": [{"$ref": "#/$defs/sourceEntry"}, {"properties": {"path": {"const": "scripts/canvas06-e2e-manifest-v01-input.mjs"}}}]},
+        {"allOf": [{"$ref": "#/$defs/sourceEntry"}, {"properties": {"path": {"const": "scripts/canvas06-e2e-manifest-v01-archive.mjs"}}}]},
+        {"allOf": [{"$ref": "#/$defs/sourceEntry"}, {"properties": {"path": {"const": "scripts/verify-canvas06-e2e-manifest-v01.mjs"}}}]},
+        {"allOf": [{"$ref": "#/$defs/sourceEntry"}, {"properties": {"path": {"const": "scripts/verify-canvas06-controlled-input-bundle.mjs"}}}]},
+        {"allOf": [{"$ref": "#/$defs/sourceEntry"}, {"properties": {"path": {"const": "tests/e2e/release/dev-canvas-06/playwright.release.config.ts"}}}]},
+        {"allOf": [{"$ref": "#/$defs/sourceEntry"}, {"properties": {"path": {"const": "tests/e2e/release/dev-canvas-06/drivers/procedural-driver.mjs"}}}]},
+        {"allOf": [{"$ref": "#/$defs/sourceEntry"}, {"properties": {"path": {"const": "tests/e2e/release/dev-canvas-06/drivers/control-driver.mjs"}}}]},
+        {"allOf": [{"$ref": "#/$defs/sourceEntry"}, {"properties": {"path": {"const": "tests/e2e/release/dev-canvas-06/drivers/structural-driver.mjs"}}}]},
+        {"allOf": [{"$ref": "#/$defs/sourceEntry"}, {"properties": {"path": {"const": "tests/e2e/release/dev-canvas-06/drivers/common-driver.mjs"}}}]}
+      ],
+      "items": false
+    },
+    "excluded_classes": {
+      "type": "array",
+      "minItems": 11,
+      "maxItems": 11,
+      "prefixItems": [
+        {"const": "ALL_PATHS_NOT_IN_ENTRIES"},
+        {"const": "TEST_AND_SPEC_SOURCES_NOT_IN_ENTRIES"},
+        {"const": "FIXTURE_TEMPLATE_CATALOG_AND_VECTOR_BYTES"},
+        {"const": "CONTRACT_SCHEMA_AND_REFERENCE_BYTES"},
+        {"const": "MANIFEST_BUILDER_ONLY_SOURCES"},
+        {"const": "PRODUCT_FRONTEND_AND_RUNTIME_SOURCES"},
+        {"const": "DEPENDENCY_AND_BUILD_OUTPUT_TREES"},
+        {"const": "JAVA_EXECUTABLE_AND_BROWSER_MIRRORS"},
+        {"const": "REPORT_INPUT_ATTEMPT_AND_RELEASE_ARTIFACTS"},
+        {"const": "VCS_METADATA_AND_DIRTY_PATCH_BYTES"},
+        {"const": "SYMLINK_HARDLINK_SOCKET_DEVICE_FIFO"}
+      ],
+      "items": false
+    },
+    "source_set_sha256": {"$ref": "#/$defs/digest"}
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "sourceEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "byte_length", "sha256"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1, "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*//)(?!.*\\\\)(?!.*\\u0000).+$"},
+        "byte_length": {"type": "integer", "minimum": 1},
+        "sha256": {"$ref": "#/$defs/digest"}
+      }
+    }
+  }
+}

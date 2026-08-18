@@ -1,0 +1,18 @@
+{
+  "fixture_id": "fixture.visual.fundamental_fan",
+  "subject_id": "FUNDAMENTAL_FAN",
+  "project_name": "Release visual FUNDAMENTAL_FAN",
+  "model_name": "Release visual FUNDAMENTAL_FAN",
+  "expected_revision": "revision.visual.fundamental_fan",
+  "focus_target_id": "fact.visual.fundamental_fan",
+  "focus_anchor": "CENTER",
+  "expected_cells": 3,
+  "critical_regions": [
+    "FOCUS_BBOX",
+    "CANVAS"
+  ],
+  "seed": {
+    "object_id": "object.visual.fundamental_fan",
+    "process_id": "process.visual.fundamental_fan"
+  }
+}

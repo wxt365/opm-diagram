@@ -1,0 +1,18 @@
+{
+  "fixture_id": "fixture.visual.blocked_feedback",
+  "subject_id": "BLOCKED_FEEDBACK",
+  "project_name": "Release visual BLOCKED_FEEDBACK",
+  "model_name": "Release visual BLOCKED_FEEDBACK",
+  "expected_revision": "revision.visual.blocked_feedback",
+  "focus_target_id": "fact.visual.blocked_feedback",
+  "focus_anchor": "CENTER",
+  "expected_cells": 3,
+  "critical_regions": [
+    "FOCUS_BBOX",
+    "CANVAS"
+  ],
+  "seed": {
+    "object_id": "object.visual.blocked_feedback",
+    "process_id": "process.visual.blocked_feedback"
+  }
+}

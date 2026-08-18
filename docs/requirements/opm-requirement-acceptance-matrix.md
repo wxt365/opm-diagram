@@ -250,7 +250,7 @@ JSON Schema 样例、OpenAPI、SQLite V1 和原型浏览器验收属于“设计
 | FR-IO-004 | AT-FR-IO-004 导入原子性 | TD-IO | 结构、版本或配置档校验失败时无任何部分覆盖 | INT + DATA | 主需求 10.9、13.2 |
 | FR-IO-005 | AT-FR-IO-005 PDF 报告 | TD-VERSION | 已实现时报告包含清晰 OPD、文本、校验和版本信息 | MANUAL + DATA | 主需求 10.9 |
 | FR-IO-006 | AT-FR-IO-006 转换预检 | TD-CROSS | 已实现时逐项列出无损、扩展、有损和无法映射结果，不修改源模型 | RULE + DATA | 主需求 11.5 |
-| FR-IO-007 | AT-FR-IO-007 外部互操作 | 待确定交换样例 | 完成格式调研并声明支持后，代表性模型双向交换语义不丢失；首期未声明时为 N/A | INT + MANUAL | ISO 19450:2024；待调研 |
+| FR-IO-007 | AT-FR-IO-007 外部互操作 | `FROZEN_DEFERRED/DFD-008` | 当前开发基线为 N/A；仅在指定工具/格式/版本、映射、冲突和往返验收独立冻结后重启 | INT + MANUAL | ISO 19450:2024；冻结基线 DFD-008 |
 
 ### 5.10 本地数据与操作记录
 
@@ -272,7 +272,7 @@ JSON Schema 样例、OpenAPI、SQLite V1 和原型浏览器验收属于“设计
 | FR-ASSET-003 | AT-FR-ASSET-003 基线完整性 | TD-VERSION | 基线包含全部 OPD、对应文本、配置档版本、校验和元数据 | DATA | 主需求 10.11 |
 | FR-ASSET-004 | AT-FR-ASSET-004 资产包往返 | TD-VERSION + TD-LOCAL | 在新目录恢复后 OPD 层级、身份、关系和图文映射等价 | INT + DATA | 主需求 10.11 |
 | FR-ASSET-005 | AT-FR-ASSET-005 本体边界 | TD-VERSION | 未经映射校验发布的包只标为 OPM 上游语义源，不出现“已发布本体”状态 | RULE + DATA | 主需求 9.6、10.11 |
-| FR-ASSET-006 | AT-FR-ASSET-006 本体发布包 | 待定义映射样例 | 已实现时包含源基线、配置档、稳定标识、映射、未映射项和校验结论 | INT + DATA | 主需求 10.11 |
+| FR-ASSET-006 | AT-FR-ASSET-006 本体发布包 | `FROZEN_DEFERRED/DFD-008` | 当前开发基线不实现；重启后必须包含源基线、配置档、稳定标识、映射、未映射项和校验结论 | INT + DATA | 主需求 10.11；冻结基线 DFD-008 |
 
 ## 6. 非功能需求验收矩阵
 
@@ -457,4 +457,4 @@ JSON Schema 样例、OpenAPI、SQLite V1 和原型浏览器验收属于“设计
 - `FR-IO-007` 外部工具交换、`FR-ASSET-006` 本体映射与发布为 `FROZEN_DEFERRED`，不得在当前发布中伪装支持；
 - 96 项能力和 103 个 ISO 规则组的设计入口已冻结；原子规则、完整 Annex A Grammar、完整 Clause 4 Symbol Catalog 和符合性声明为 `FROZEN_DEFERRED`；
 - 三份逻辑字段设计和当前机器 Schema 是开发输入；Revision 0.2、完整 Profile/Rule/Grammar/Symbol 包、代表模型和破损包属于待实现/待执行证据；
-- P01-P06 原型验收已完成，当前全局设计门为 `READY_FOR_DEVELOPMENT`；单个用例仍保持 `NOT_RUN`，直到在 exact build、fixture 和环境上保存证据。
+- P01-P06原型验收已完成；当前`DFR-018`的Projection Digest `v1.0/0.1`已冻结，全局设计门为`READY_FOR_DEVELOPMENT`。单个用例仍保持`NOT_RUN`，直到对应实现完成并在exact build、fixture和环境上保存证据。

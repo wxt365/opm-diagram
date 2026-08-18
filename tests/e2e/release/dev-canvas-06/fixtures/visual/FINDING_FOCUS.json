@@ -1,0 +1,18 @@
+{
+  "fixture_id": "fixture.visual.finding_focus",
+  "subject_id": "FINDING_FOCUS",
+  "project_name": "Release visual FINDING_FOCUS",
+  "model_name": "Release visual FINDING_FOCUS",
+  "expected_revision": "revision.visual.finding_focus",
+  "focus_target_id": "fact.visual.finding_focus",
+  "focus_anchor": "CENTER",
+  "expected_cells": 3,
+  "critical_regions": [
+    "FOCUS_BBOX",
+    "CANVAS"
+  ],
+  "seed": {
+    "object_id": "object.visual.finding_focus",
+    "process_id": "process.visual.finding_focus"
+  }
+}

@@ -28,7 +28,7 @@ test('BLOCKED release evidence produces a disabled Candidate manifest', async ()
   } finally { await cleanup(fixture); }
 });
 
-test('READY release evidence produces a disabled Candidate but cannot bypass GATE-06-06', async () => {
+test('schema-valid READY Release Report permits only the isolated Activation fixture', async () => {
   const fixture = await prepare(true);
   try {
     const candidateBuild = run('build', buildArguments(fixture));
@@ -42,15 +42,14 @@ test('READY release evidence produces a disabled Candidate but cannot bypass GAT
     const verify = run('verify', ['--evidence-root', fixture.evidenceRoot, '--manifest', 'candidate.json']);
     assert.equal(verify.status, 0, verify.stderr);
 
-    const release = {
-      schema_id: 'OPM-DEV-CANVAS-06-RELEASE-CANDIDATE-REPORT-001', schema_version: '0.1', report_status: 'READY',
-      candidate_manifest_ref: await ref(fixture.evidenceRoot, fixture.candidate, 'CANDIDATE_MANIFEST'), handoff_ref: candidate.handoff_ref, source_build: candidate.source_build
-    };
+    const release = releaseReport(candidate, await ref(fixture.evidenceRoot, fixture.candidate, 'ENABLEMENT_CANDIDATE'));
     await writeFile(fixture.release, JSON.stringify(release));
     const activation = run('activate', ['--evidence-root', fixture.evidenceRoot, '--candidate', 'candidate.json', '--release-report', 'release.json', '--out', 'activation.json']);
-    assert.equal(activation.status, 3, activation.stderr);
-    assert.match(activation.stderr, /GATE-06-06/);
-    assert.equal(await exists(fixture.activation), false);
+    assert.equal(activation.status, 0, activation.stderr);
+    assert.ok(await exists(fixture.activation), activation.stderr);
+    const activationManifest = await load(fixture.activation);
+    assert.equal(activationManifest.manifest_status, 'ACTIVE_COMPLETE');
+    assert.deepEqual(activationManifest.release_candidate_report_ref, await ref(fixture.evidenceRoot, fixture.release, 'RELEASE_CANDIDATE_REPORT'));
   } finally { await cleanup(fixture); }
 });
 
@@ -116,6 +115,35 @@ function buildArguments(fixture) {
 
 function visualResults(intake) { return intake.capability_intake.map(item => ({ capability_id: item.capability_id, status: 'PASS_MATCHED' })); }
 function e2eResults(intake) { return intake.capability_intake.map(item => ({ capability_id: item.capability_id, status: 'PASS_MATCHED', covered_coverage_keys: item.coverage_keys })); }
+function releaseReport(candidate, candidateRef) {
+  const evidence = refValue('EVIDENCE');
+  const open = {
+    project_id: 'project.release.001', model_id: 'model.release.001', context_id: 'context.release.001', head_revision_id: 'revision.release.001', head_sequence: 2,
+    projection_sha256: digest('1'), opl_sha256: digest('2'), trace_sha256: digest('3'), canvas_nonblank: true, console_error_count: 0, page_error_count: 0, external_request_count: 0
+  };
+  const cases = ['SMK-CANVAS-001.CLEAN_INSTALL', 'SMK-CANVAS-002.START', 'SMK-CANVAS-003.HEALTH', 'SMK-CANVAS-004.OPEN', 'SMK-CANVAS-005.REOPEN', 'SMK-CANVAS-006.EXIT'];
+  const lane = laneId => ({
+    lane_id: laneId, status: 'PASS_MATCHED', install_root_was_empty: true, storage_root_was_empty: true, browser_profile_was_empty: true,
+    process_identity_refs: [evidence], evidence_refs: [evidence],
+    case_results: cases.map((case_id, index) => ({ case_id, status: 'PASS_MATCHED', attempt_ordinal: laneId === 'LANE-01' ? 1 : 2, started_at: '2026-08-02T00:00:00.000Z', finished_at: '2026-08-02T00:00:01.000Z', duration_us: 1000, observations: case_id === cases[3] || case_id === cases[4] ? open : { observation: `PASS_${index}` }, evidence_refs: [evidence], failure_codes: [] }))
+  });
+  const gate = { state: 'DISABLED', enabled_capability_ids: [], candidate_loader_status: 'NOT_ACTIVE' };
+  return {
+    schema_id: 'OPM-DEV-CANVAS-06-RELEASE-CANDIDATE-REPORT-001', schema_version: '0.1', report_id: 'dev-canvas-06.release-report.aaaaaaaaaaaa', generated_at: '2026-08-02T00:00:00.000Z',
+    generator: { runner_version: '0.1.0', source_commit: sourceCommit, node_version: process.version, os: process.platform, command: 'release:canvas06:smoke', runner_source_sha256: digest('4') },
+    release_status: 'READY', release_manifest_ref: refValue('RELEASE_CANDIDATE_MANIFEST'), handoff_ref: candidate.handoff_ref, intake_report_ref: candidate.intake_report_ref,
+    release_evidence: Object.fromEntries(['visual_manifest_ref', 'visual_report_ref', 'e2e_manifest_ref', 'e2e_report_ref', 'performance_manifest_ref', 'performance_report_ref', 'recovery_manifest_ref', 'recovery_report_ref'].map(key => [key, evidence])),
+    enablement_candidate_ref: candidateRef, source_build: candidate.source_build,
+    artifact_observations: { release_zip_ref: evidence, installed_payload_ref: evidence, jar_web_dist_ref: evidence, profile_assets_ref: evidence },
+    environment: { target_os: 'darwin', os_build: 'test', target_arch: 'arm64', java_vendor: 'test', java_version: '21', java_executable_sha256: digest('5'), chromium_version: '143.0.7499.4', cpu: 'test', logical_cpu_count: 1, ram_bytes: 1, ssd: true, locale: 'zh-CN', timezone: 'Asia/Shanghai', viewport: { width: 1440, height: 900 }, device_scale_factor: 1, loopback_ports: [41001, 41002], network_mode: 'LOOPBACK_ONLY', hmr_enabled: false, devtools_enabled: false },
+    environment_fingerprint: digest('6'), lane_results: [lane('LANE-01'), lane('LANE-02')],
+    aggregation: { lane_count: 2, case_count: 6, expected_attempt_count: 12, observed_attempt_count: 12, pass_matched_count: 12, failed_count: 0, skipped_count: 0, retry_count: 0, external_request_count: 0, production_gate_mutation_count: 0 },
+    production_gate_observation: { before: gate, during: gate, after: gate }, failures: [], residual_risks: [],
+    conformance_boundary: { product_release_evidence: 'PRODUCT_RELEASE_EVIDENCE_ONLY', iso_19450_2024: 'ISO_19450_2024_CONFORMANCE_NOT_ESTABLISHED' }
+  };
+}
+function refValue(kind) { return { kind, path: `release/${kind.toLowerCase()}.json`, byte_length: 1, sha256: digest(kind) }; }
+function digest(value) { return createHash('sha256').update(value).digest('hex'); }
 function run(operation, arguments_) { return spawnSync(process.execPath, [enablementRunner, operation, ...arguments_], { cwd: root, encoding: 'utf8' }); }
 async function ref(base, path, kind) { const bytes = await readFile(path); const info = await stat(path); return { kind, path: path.slice(base.length + 1), byte_length: info.size, sha256: sha(bytes) }; }
 async function load(path) { return JSON.parse(await readFile(path, 'utf8')); }

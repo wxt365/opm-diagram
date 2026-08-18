@@ -133,7 +133,9 @@ golden_ref, critical_regions[]
 
 ### 6.5 公共 fixture/factory catalog
 
-后续实现必须新增唯一版本化 catalog：
+> 历史适用边界：本节记录首轮Common Catalog `0.1.0`设计输入，保留用于解释既有历史Catalog，不再是活动02B Builder目标。当前机器Schema仍为`0.1`，活动完整Catalog固定为`catalog_version=0.2.0`，并由Visual Common Materialization `v1.4`承接五类index、8类UI step和43文件self-contained root；历史`0.1.0`不得覆盖或供新semantic verifier接受。
+
+本规格冻结时的后续实现必须新增唯一版本化 catalog：
 
 ```text
 tests/e2e/release/dev-canvas-06/fixtures/dev-canvas-06-common-fixture-catalog.json
@@ -146,13 +148,22 @@ catalog_id, catalog_version, generated_at, generator_ref,
 source_binding, visual_subjects[8], e2e_cases[16], summary
 ```
 
+`catalog_id` 的唯一派生公式固定为：
+
+```text
+catalog_id = "dev-canvas-06.common-fixtures." + source_binding.binding_digest[0:12]
+catalog_version = "0.1.0"
+```
+
+`catalog_id` 标识binding域，不标识source commit，禁止使用包含Catalog自身bytes的source commit派生identity。同一`catalog_id + catalog_version`的内容必须不可变；fixture、factory、条目顺序或生成语义变化时必须发布新的`catalog_version`。
+
 每个 Visual subject 必须包含 `subject_id/factory_id/factory_source_ref/fixture_ref/expected_revision/focus_target_id/focus_anchor/expected_cells/critical_regions[]`。每个 E2E common case 必须包含 `case_id/factory_id/factory_source_ref/base_fixture_ref/input_ref/actions[]/assertion_ids[]`；每个 action 显式包含 `action_id/expected_status/expected_error_code?/expected_transaction/reopen_checkpoint`。禁止由 runner 根据 observed 结果补 expected 值。
 
 catalog 的 8/16 条目、所有 factory source SHA、生成 fixture SHA 和 action 顺序必须由 Manifest builder/verifier exact 校验。具体 fixture/factory 内容属于后续实现包，内容未落盘前 `GATE-06-03` 保持 BLOCKED。
 
 ### 6.6 Golden 路径与环境
 
-1. Golden Environment Schema 固定为 `docs/contracts/schemas/opm-dev-canvas-06-golden-environment.schema.json`；golden 路径固定为 `<golden-root>/<capture_id>.png`，blank baseline 固定为 `<golden-root>/blank/<viewport_id>.<zoom_id>.png`；
+1. Golden Environment `0.1` Schema 固定为 `docs/contracts/schemas/opm-dev-canvas-06-golden-environment.schema.json`，只保留历史输入；生产 Golden Environment 固定为后续 `docs/contracts/schemas/opm-dev-canvas-06-golden-environment-v02.schema.json`。golden 路径固定为 `<golden-root>/<capture_id>.png`，blank baseline 固定为 `<golden-root>/blank/<viewport_id>.<zoom_id>.png`；
 2. `<golden-root>/golden-environment.json` 必须封闭记录 Chromium/Playwright/OS/font/color/locale/timezone/scale 指纹及所有 PNG ref/SHA；
 3. Manifest 只读取该 index，不扫描目录猜测 golden；缺项、额外项、SHA 或环境不一致均 BLOCKED；
 4. golden index Schema、authoring 流程和变更审批属于后续独立分包，未实现前不得生成 READY Visual Manifest。

@@ -1,0 +1,18 @@
+{
+  "fixture_id": "fixture.visual.inspector",
+  "subject_id": "INSPECTOR",
+  "project_name": "Release visual INSPECTOR",
+  "model_name": "Release visual INSPECTOR",
+  "expected_revision": "revision.visual.inspector",
+  "focus_target_id": "fact.visual.inspector",
+  "focus_anchor": "CENTER",
+  "expected_cells": 3,
+  "critical_regions": [
+    "FOCUS_BBOX",
+    "CANVAS"
+  ],
+  "seed": {
+    "object_id": "object.visual.inspector",
+    "process_id": "process.visual.inspector"
+  }
+}

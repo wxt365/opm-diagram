@@ -1,0 +1,155 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:opm:contract:dev-canvas-06-projection-digest-preimage:0.1",
+  "title": "OPM DEV-CANVAS-06 Projection Digest Preimage 0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_id",
+    "schema_version",
+    "source_projection_contract",
+    "float_encoding",
+    "data"
+  ],
+  "properties": {
+    "schema_id": {
+      "const": "OPM-DEV-CANVAS-06-PROJECTION-DIGEST-PREIMAGE-001"
+    },
+    "schema_version": {
+      "const": "0.1"
+    },
+    "source_projection_contract": {
+      "const": "API-CTX-002/0.2.0-draft"
+    },
+    "float_encoding": {
+      "const": "IEEE754_BINARY64_BE_HEX"
+    },
+    "data": {
+      "$ref": "#/$defs/projectionData"
+    }
+  },
+  "$defs": {
+    "safeInteger": {
+      "type": "integer",
+      "minimum": -9007199254740991,
+      "maximum": 9007199254740991
+    },
+    "binary64": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["$binary64"],
+      "properties": {
+        "$binary64": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{16}$"
+        }
+      }
+    },
+    "layout": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y", "width", "height", "z_order"],
+      "properties": {
+        "x": {"$ref": "#/$defs/binary64"},
+        "y": {"$ref": "#/$defs/binary64"},
+        "width": {"$ref": "#/$defs/binary64"},
+        "height": {"$ref": "#/$defs/binary64"},
+        "z_order": {"$ref": "#/$defs/safeInteger"}
+      }
+    },
+    "endpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "target_kind", "target_id", "ordinal"],
+      "properties": {
+        "role": {"type": "string", "minLength": 1},
+        "target_kind": {
+          "enum": ["ELEMENT", "STATE", "FEATURE", "FACT"]
+        },
+        "target_id": {"type": "string", "minLength": 1},
+        "ordinal": {"$ref": "#/$defs/safeInteger"}
+      }
+    },
+    "modifier": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["modifier_id", "value"],
+      "properties": {
+        "modifier_id": {"type": "string", "minLength": 1},
+        "value": {"type": "string"}
+      }
+    },
+    "label": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["slot_id", "text"],
+      "properties": {
+        "slot_id": {"type": "string", "minLength": 1},
+        "text": {"type": "string"}
+      }
+    },
+    "construct": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "occurrence_id",
+        "target_id",
+        "construct_role",
+        "label",
+        "layout"
+      ],
+      "properties": {
+        "occurrence_id": {"type": "string", "minLength": 1},
+        "target_id": {"type": "string", "minLength": 1},
+        "construct_role": {"type": "string", "minLength": 1},
+        "label": {"type": "string"},
+        "layout": {"$ref": "#/$defs/layout"},
+        "source_id": {"type": "string", "minLength": 1},
+        "process_id": {"type": "string", "minLength": 1},
+        "source_occurrence_id": {"type": "string", "minLength": 1},
+        "target_occurrence_id": {"type": "string", "minLength": 1},
+        "symbol_ref": {"type": "string", "minLength": 1},
+        "layout_ref": {"type": "string", "minLength": 1},
+        "owner_id": {"type": "string", "minLength": 1},
+        "owner_target_kind": {"enum": ["ELEMENT", "FEATURE"]},
+        "state_roles": {
+          "type": "array",
+          "items": {"enum": ["INITIAL", "DEFAULT", "FINAL"]}
+        },
+        "explicitness": {"enum": ["EXPLICIT", "SUPPRESSED"]},
+        "fold_state": {"enum": ["UNFOLDED", "FOLDED"]},
+        "capability_id": {"type": "string", "minLength": 1},
+        "direction": {
+          "enum": ["DIRECTED", "BIDIRECTIONAL", "UNDIRECTED", "PROFILE_DEFINED"]
+        },
+        "endpoints": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/endpoint"}
+        },
+        "modifiers": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/modifier"}
+        },
+        "labels": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/label"}
+        },
+        "collection_completeness": {
+          "enum": ["COMPLETE", "INCOMPLETE", "NOT_APPLICABLE"]
+        }
+      }
+    },
+    "projectionData": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["context_id", "constructs"],
+      "properties": {
+        "context_id": {"type": "string", "minLength": 1},
+        "constructs": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/construct"}
+        }
+      }
+    }
+  }
+}

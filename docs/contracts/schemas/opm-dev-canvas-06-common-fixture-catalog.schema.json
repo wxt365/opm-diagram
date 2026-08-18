@@ -9,7 +9,7 @@
     "schema_id": {"const": "OPM-DEV-CANVAS-06-COMMON-FIXTURE-CATALOG-001"},
     "schema_version": {"const": "0.1"},
     "catalog_id": {"pattern": "^dev-canvas-06\\.common-fixtures\\.[a-f0-9]{12}$"},
-    "catalog_version": {"const": "0.1.0"},
+    "catalog_version": {"enum": ["0.1.0", "0.2.0"]},
     "generated_at": {"type": "string", "format": "date-time"},
     "generator_ref": {"$ref": "#/$defs/fileRef"},
     "source_binding": {"$ref": "#/$defs/binding"},

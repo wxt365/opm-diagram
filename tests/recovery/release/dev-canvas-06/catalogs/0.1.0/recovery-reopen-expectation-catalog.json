@@ -1,0 +1,117 @@
+{
+  "schema_id": "OPM-DEV-CANVAS-06-RECOVERY-REOPEN-EXPECTATION-CATALOG-001",
+  "schema_version": "0.1",
+  "catalog_id": "dev-canvas-06.recovery-reopen-expectations",
+  "catalog_version": "0.1.0",
+  "profiles": [
+    {
+      "profile_id": "REOPEN-EQUALS-BEFORE",
+      "expected_reopen": {
+        "comparison_mode": "FIELD_RULES_V1",
+        "snapshot_field_rules": {
+          "revision_document_count": "BEFORE_SNAPSHOT",
+          "revision_parent_count": "BEFORE_SNAPSHOT",
+          "text_artifact_count": "BEFORE_SNAPSHOT",
+          "text_trace_count": "BEFORE_SNAPSHOT",
+          "finding_count": "BEFORE_SNAPSHOT",
+          "operation_count": "BEFORE_SNAPSHOT",
+          "receipt_count": "BEFORE_SNAPSHOT",
+          "draft_head_revision_id": "BEFORE_SNAPSHOT",
+          "head_sequence": "BEFORE_SNAPSHOT",
+          "revision_digest": "BEFORE_SNAPSHOT",
+          "projection_digest": "BEFORE_SNAPSHOT",
+          "opl_digest": "BEFORE_SNAPSHOT",
+          "trace_digest": "BEFORE_SNAPSHOT",
+          "sqlite_quick_check": "CONSTANT_OK",
+          "foreign_key_check_count": "CONSTANT_ZERO",
+          "recovery_marker_refs": "EXACT_EMPTY",
+          "temporary_artifact_refs": "EXACT_EMPTY"
+        }
+      },
+      "expected_reopen_sha256": "b13e8bd4e1f882f33a868485ae67a5ad4f0b91c1dca69ba80e628a4bb146ab96"
+    },
+    {
+      "profile_id": "REOPEN-EQUALS-AFTER",
+      "expected_reopen": {
+        "comparison_mode": "FIELD_RULES_V1",
+        "snapshot_field_rules": {
+          "revision_document_count": "AFTER_SNAPSHOT",
+          "revision_parent_count": "AFTER_SNAPSHOT",
+          "text_artifact_count": "AFTER_SNAPSHOT",
+          "text_trace_count": "AFTER_SNAPSHOT",
+          "finding_count": "AFTER_SNAPSHOT",
+          "operation_count": "AFTER_SNAPSHOT",
+          "receipt_count": "AFTER_SNAPSHOT",
+          "draft_head_revision_id": "AFTER_SNAPSHOT",
+          "head_sequence": "AFTER_SNAPSHOT",
+          "revision_digest": "AFTER_SNAPSHOT",
+          "projection_digest": "AFTER_SNAPSHOT",
+          "opl_digest": "AFTER_SNAPSHOT",
+          "trace_digest": "AFTER_SNAPSHOT",
+          "sqlite_quick_check": "CONSTANT_OK",
+          "foreign_key_check_count": "CONSTANT_ZERO",
+          "recovery_marker_refs": "EXACT_EMPTY",
+          "temporary_artifact_refs": "EXACT_EMPTY"
+        }
+      },
+      "expected_reopen_sha256": "23e6348c4d5a4ba897bb8fc078d590b9112a502e1370a536e092a83fa3173060"
+    },
+    {
+      "profile_id": "REOPEN-RECOVERY-REQUIRED",
+      "expected_reopen": {
+        "comparison_mode": "FIELD_RULES_V1",
+        "snapshot_field_rules": {
+          "revision_document_count": "BEFORE_SNAPSHOT",
+          "revision_parent_count": "BEFORE_SNAPSHOT",
+          "text_artifact_count": "BEFORE_SNAPSHOT",
+          "text_trace_count": "BEFORE_SNAPSHOT",
+          "finding_count": "BEFORE_SNAPSHOT",
+          "operation_count": "BEFORE_SNAPSHOT",
+          "receipt_count": "BEFORE_SNAPSHOT",
+          "draft_head_revision_id": "BEFORE_SNAPSHOT",
+          "head_sequence": "BEFORE_SNAPSHOT",
+          "revision_digest": "BEFORE_SNAPSHOT",
+          "projection_digest": "BEFORE_SNAPSHOT",
+          "opl_digest": "BEFORE_SNAPSHOT",
+          "trace_digest": "BEFORE_SNAPSHOT",
+          "sqlite_quick_check": "CONSTANT_OK",
+          "foreign_key_check_count": "CONSTANT_ZERO",
+          "recovery_marker_refs": "EXACT_ONE_RECOVERY_REQUIRED_MARKER",
+          "temporary_artifact_refs": "EXACT_EMPTY"
+        }
+      },
+      "expected_reopen_sha256": "0c0b9c542d4804cdae9cf3aa3f62fe5f2001197e3fa3aa10899036349179e07c"
+    }
+  ],
+  "cases": [
+    {"case_id": "RCV-CANVAS-001.RULE_IDENTITY", "expected_reopen_profile_id": "REOPEN-EQUALS-BEFORE", "expected_reopen_sha256": "b13e8bd4e1f882f33a868485ae67a5ad4f0b91c1dca69ba80e628a4bb146ab96"},
+    {"case_id": "RCV-CANVAS-002.SYMBOL_MISSING", "expected_reopen_profile_id": "REOPEN-EQUALS-BEFORE", "expected_reopen_sha256": "b13e8bd4e1f882f33a868485ae67a5ad4f0b91c1dca69ba80e628a4bb146ab96"},
+    {"case_id": "RCV-CANVAS-003.GRAMMAR_DIGEST", "expected_reopen_profile_id": "REOPEN-EQUALS-BEFORE", "expected_reopen_sha256": "b13e8bd4e1f882f33a868485ae67a5ad4f0b91c1dca69ba80e628a4bb146ab96"},
+    {"case_id": "RCV-CANVAS-004.NORMALIZATION_IDENTITY", "expected_reopen_profile_id": "REOPEN-EQUALS-BEFORE", "expected_reopen_sha256": "b13e8bd4e1f882f33a868485ae67a5ad4f0b91c1dca69ba80e628a4bb146ab96"},
+    {"case_id": "RCV-CANVAS-005.SEMANTIC_VALIDATION", "expected_reopen_profile_id": "REOPEN-EQUALS-BEFORE", "expected_reopen_sha256": "b13e8bd4e1f882f33a868485ae67a5ad4f0b91c1dca69ba80e628a4bb146ab96"},
+    {"case_id": "RCV-CANVAS-006.PLAN_UNSUPPORTED", "expected_reopen_profile_id": "REOPEN-EQUALS-BEFORE", "expected_reopen_sha256": "b13e8bd4e1f882f33a868485ae67a5ad4f0b91c1dca69ba80e628a4bb146ab96"},
+    {"case_id": "RCV-CANVAS-007.TEXT_COMPOSITION", "expected_reopen_profile_id": "REOPEN-EQUALS-BEFORE", "expected_reopen_sha256": "b13e8bd4e1f882f33a868485ae67a5ad4f0b91c1dca69ba80e628a4bb146ab96"},
+    {"case_id": "RCV-CANVAS-008.TRACE_INCOMPLETE", "expected_reopen_profile_id": "REOPEN-EQUALS-BEFORE", "expected_reopen_sha256": "b13e8bd4e1f882f33a868485ae67a5ad4f0b91c1dca69ba80e628a4bb146ab96"},
+    {"case_id": "RCV-CANVAS-009.SQLITE_REVISION", "expected_reopen_profile_id": "REOPEN-EQUALS-BEFORE", "expected_reopen_sha256": "b13e8bd4e1f882f33a868485ae67a5ad4f0b91c1dca69ba80e628a4bb146ab96"},
+    {"case_id": "RCV-CANVAS-010.SQLITE_PARENT", "expected_reopen_profile_id": "REOPEN-EQUALS-BEFORE", "expected_reopen_sha256": "b13e8bd4e1f882f33a868485ae67a5ad4f0b91c1dca69ba80e628a4bb146ab96"},
+    {"case_id": "RCV-CANVAS-011.SQLITE_TRACE", "expected_reopen_profile_id": "REOPEN-EQUALS-BEFORE", "expected_reopen_sha256": "b13e8bd4e1f882f33a868485ae67a5ad4f0b91c1dca69ba80e628a4bb146ab96"},
+    {"case_id": "RCV-CANVAS-012.SQLITE_FINDING", "expected_reopen_profile_id": "REOPEN-EQUALS-BEFORE", "expected_reopen_sha256": "b13e8bd4e1f882f33a868485ae67a5ad4f0b91c1dca69ba80e628a4bb146ab96"},
+    {"case_id": "RCV-CANVAS-013.SQLITE_HEAD", "expected_reopen_profile_id": "REOPEN-EQUALS-BEFORE", "expected_reopen_sha256": "b13e8bd4e1f882f33a868485ae67a5ad4f0b91c1dca69ba80e628a4bb146ab96"},
+    {"case_id": "RCV-CANVAS-014.SQLITE_OPERATION", "expected_reopen_profile_id": "REOPEN-EQUALS-BEFORE", "expected_reopen_sha256": "b13e8bd4e1f882f33a868485ae67a5ad4f0b91c1dca69ba80e628a4bb146ab96"},
+    {"case_id": "RCV-CANVAS-015.SQLITE_RECEIPT", "expected_reopen_profile_id": "REOPEN-EQUALS-BEFORE", "expected_reopen_sha256": "b13e8bd4e1f882f33a868485ae67a5ad4f0b91c1dca69ba80e628a4bb146ab96"},
+    {"case_id": "RCV-CANVAS-016.KILL_AFTER_REVISION", "expected_reopen_profile_id": "REOPEN-EQUALS-BEFORE", "expected_reopen_sha256": "b13e8bd4e1f882f33a868485ae67a5ad4f0b91c1dca69ba80e628a4bb146ab96"},
+    {"case_id": "RCV-CANVAS-017.KILL_AFTER_HEAD", "expected_reopen_profile_id": "REOPEN-EQUALS-BEFORE", "expected_reopen_sha256": "b13e8bd4e1f882f33a868485ae67a5ad4f0b91c1dca69ba80e628a4bb146ab96"},
+    {"case_id": "RCV-CANVAS-018.KILL_AFTER_COMMIT", "expected_reopen_profile_id": "REOPEN-EQUALS-AFTER", "expected_reopen_sha256": "23e6348c4d5a4ba897bb8fc078d590b9112a502e1370a536e092a83fa3173060"},
+    {"case_id": "RCV-CANVAS-019.IDLE_RESTART", "expected_reopen_profile_id": "REOPEN-EQUALS-BEFORE", "expected_reopen_sha256": "b13e8bd4e1f882f33a868485ae67a5ad4f0b91c1dca69ba80e628a4bb146ab96"},
+    {"case_id": "RCV-CANVAS-020.SERVICE_UNAVAILABLE", "expected_reopen_profile_id": "REOPEN-EQUALS-BEFORE", "expected_reopen_sha256": "b13e8bd4e1f882f33a868485ae67a5ad4f0b91c1dca69ba80e628a4bb146ab96"},
+    {"case_id": "RCV-CANVAS-021.PROJECTION_READBACK", "expected_reopen_profile_id": "REOPEN-EQUALS-AFTER", "expected_reopen_sha256": "23e6348c4d5a4ba897bb8fc078d590b9112a502e1370a536e092a83fa3173060"},
+    {"case_id": "RCV-CANVAS-022.RECOVERY_REQUIRED", "expected_reopen_profile_id": "REOPEN-RECOVERY-REQUIRED", "expected_reopen_sha256": "0c0b9c542d4804cdae9cf3aa3f62fe5f2001197e3fa3aa10899036349179e07c"},
+    {"case_id": "RCV-CANVAS-023.ROLLBACK_STRUCTURAL", "expected_reopen_profile_id": "REOPEN-EQUALS-BEFORE", "expected_reopen_sha256": "b13e8bd4e1f882f33a868485ae67a5ad4f0b91c1dca69ba80e628a4bb146ab96"},
+    {"case_id": "RCV-CANVAS-024.ROLLBACK_CONTROL", "expected_reopen_profile_id": "REOPEN-EQUALS-BEFORE", "expected_reopen_sha256": "b13e8bd4e1f882f33a868485ae67a5ad4f0b91c1dca69ba80e628a4bb146ab96"},
+    {"case_id": "RCV-CANVAS-025.ROLLBACK_PROCEDURAL_CASCADE", "expected_reopen_profile_id": "REOPEN-EQUALS-BEFORE", "expected_reopen_sha256": "b13e8bd4e1f882f33a868485ae67a5ad4f0b91c1dca69ba80e628a4bb146ab96"},
+    {"case_id": "RCV-CANVAS-026.ROLLBACK_ALL", "expected_reopen_profile_id": "REOPEN-EQUALS-BEFORE", "expected_reopen_sha256": "b13e8bd4e1f882f33a868485ae67a5ad4f0b91c1dca69ba80e628a4bb146ab96"},
+    {"case_id": "RCV-CANVAS-027.ROLLBACK_UNKNOWN", "expected_reopen_profile_id": "REOPEN-EQUALS-BEFORE", "expected_reopen_sha256": "b13e8bd4e1f882f33a868485ae67a5ad4f0b91c1dca69ba80e628a4bb146ab96"},
+    {"case_id": "RCV-CANVAS-028.ROLLBACK_TAMPERED", "expected_reopen_profile_id": "REOPEN-EQUALS-BEFORE", "expected_reopen_sha256": "b13e8bd4e1f882f33a868485ae67a5ad4f0b91c1dca69ba80e628a4bb146ab96"}
+  ],
+  "catalog_payload_sha256": "f2b975996871ecb2a4f404984b9739ccecd68ecf27fc1a919b99e694f63ed26c"
+}

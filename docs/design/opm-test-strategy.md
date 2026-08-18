@@ -1,12 +1,12 @@
 # OPM 单机建模工具测试策略
 
-文档版本：`v1.0`
+文档版本：`v1.17`
 
-文档状态：`FROZEN_INCLUDED`；P0 与完整画布测试设计冻结，生产和 ISO 证据分开记录
+文档状态：`FROZEN`；全局设计门为`READY_FOR_DEVELOPMENT`；Recovery/E2E实现与`GATE-06-03/05`执行仍未完成，生产和ISO证据分开记录
 
 全局设计状态、延期边界和开发准入以 `opm-design-freeze-baseline.md` 为唯一事实源。
 
-更新时间：2026-07-30
+更新时间：2026-08-18
 
 ## Task Type
 
@@ -212,13 +212,23 @@ Control pair 至少覆盖以下正反例：
 3. E2E release catalog 固定 `194` 个 case：按 Handoff coverage keys 派生家族 `178=130 PASS+48 BLOCKED`，公共 `16`；每项两次隔离执行，共 `388` 条 attempt evidence。
 4. 家族 suite 映射固定为 Procedural -> `E2E-CANVAS-002`、Control -> `003`、Structural -> `004`；公共 suite 固定为 State `001`、候选归一化 `005`、删除影响 `006`、故障/只读 `007`。
 5. release visual/E2E 使用 production build、独立 browser context/project、固定时钟/locale/timezone/font/Chromium、`workers=1/retries=0`；dev server、人工观察、组件 mock 或重试后的绿色结果不能作为 Gate 证据。
-6. 唯一字段、case ID、像素容差、失败码、Report READY 算法和 golden 更新边界由 `docs/checklists/opm-dev-canvas-06-toolchain-release-checklist.md` 的 `GATE-06-03` 执行契约承接，测试策略不维护第二套数值。
+6. 唯一case ID、像素容差、失败码和Report READY算法由`docs/checklists/opm-dev-canvas-06-toolchain-release-checklist.md`的`GATE-06-03`承接；Visual/E2E builder owner、Manifest版本、approved exact join与bundle class/root/identity由`specs/opm-dev-canvas-06-visual-e2e-input-correction-bugfix-task-spec.md`承接，E2E `0.1`完整CLI、活动Common 43文件root、Family Identity Catalog raw ref、ref映射和零输出事务由`specs/opm-dev-canvas-06-e2e-manifest-v01-builder-implementation-task-spec.md`承接，Candidate Handoff direct raw ref的版本根identity、12个report文件、STAGING/INSTALLED解析和固定JSON原子替换由`specs/opm-dev-canvas-06-versioned-handoff-report-ref-closure-bugfix-task-spec.md`承接，E2E `194/388`执行、Fixture到SQLite、Runtime/Web/browser、活动Report `0.2`和只读verifier由`specs/opm-dev-canvas-06-e2e-runner-implementation-task-spec.md`承接；11类attempt JSON、Family identity/ordinal来源、Java executable mirror/ref、23项Runner Source Set、Report投影与verifier顺序由`docs/design/opm-dev-canvas-06-e2e-attempt-artifact-design.md v1.3`、Family Fixture Identity Catalog `0.1/0.1.0`及对应Schema承接。Golden Capture Plan、author、审批、不可变发布和变更边界由`docs/design/opm-dev-canvas-06-golden-authoring-design.md v1.4`承接，Family SQLite/Report物化由`docs/design/opm-dev-canvas-06-golden-fixture-materializer-design.md v1.5`承接，Common fixture/SQLite/Projection/Color、空Text Artifact、五类index逐列映射、8类UI step/exact subject数组、`43=1+8+32+2` self-contained root和唯一JCS owner/parity由`docs/design/opm-dev-canvas-06-visual-common-materialization-design.md v1.4`承接，Materialization verifier的原57项和6项pending case由catalog `v1.1`承接，测试策略不维护第二套数值。
 7. Visual case 仍为 `378`、attempt 为 `756`；130 个 family variant 在三视口/三缩放下形成 `1170` capture，8 个公共 subject 形成 `72` capture，因此固定 `capture_count=1242`、`attempt_capture_count=2484`。
-8. 178 个 family E2E 的 base/input fixture 来自 Handoff exact evidence bundle；expected transaction 取 Golden Replay 两次一致的 transaction，BLOCKED 还必须与 Golden Manifest 深度一致。普通 file ref 不得冒充 archive entry ref。
-9. evidence bundle 必须先验证 raw SHA，再由 fixed Java 21 安全物化到 evidence output root；绝对路径、`..`、重复 entry、symlink 或超限 archive 立即阻断，source/handoff root 保持只读。
-10. 8 个公共 Visual 与 16 个公共 E2E 必须来自版本化 Common Fixture Catalog；每个公共 action 的 expected status/error/transaction/reopen checkpoint 在执行前冻结，禁止从 observed 结果反填。
-11. Visual golden 只由版本化 Golden Environment Index 解析 `1242` 个 PNG 和 9 个 blank baseline；目录扫描、环境指纹不一致、缺项、额外项或 SHA 不一致均不能生成 READY Manifest。
-12. Common Fixture Catalog、Golden Environment Index、六个 Schema、release runner 和真实 Report 未实现前，本节只构成设计输入，不构成 `GATE-06-03` PASS。
+8. 178 个 family E2E 的 base/input fixture 来自 Handoff exact evidence bundle；178个base `fixture_ref`深度去重后当前恰为2。Family Project只来自Evidence Bundle内Family Fixture Identity Catalog，Model/Context/base Revision/sequence必须与exact fixture bytes深度一致，parent按“fixture字段存在则字符串、缺失则Catalog显式`null`”归一后相等，`base_revision=fixture.revision_id`；禁止fixture SHA、case、path、Golden或Recovery公式派生Project。expected transaction 取 Golden Replay 两次一致的 transaction，BLOCKED 还必须与 Golden Manifest 深度一致。普通 file ref 不得冒充 archive entry ref。
+9. evidence bundle 必须先验证 raw SHA，再由 fixed Java 21 安全物化；builder 强制显式 `CONTROLLED_TEST/PRODUCTION_HANDOFF`，两类 bundle 使用不同 descriptor/identity/source/output root。绝对路径、`..`、重复 entry、symlink、超限 archive、跨 class 互用或受控证据提升立即阻断，source/handoff/approved root 保持只读。
+10. 8个公共Visual与16个公共E2E必须来自版本化Common Fixture Catalog；每个公共action的expected status/error/transaction/reopen checkpoint在执行前冻结，禁止从observed结果反填。E2E Common固定把exact Factory `BASE`输出通过non-web test-only materializer写成确定性空模型，再由真实UI/API执行`INPUT`动作；Visual Common固定由02B完整fixture和03C release-only SQLite V1 materializer生成8个base/144 clone。02B活动输出固定为43文件root，包含1个Catalog、8个Visual、由同一静态factory确定性生成的32个E2E asset和两份source mirror；Catalog 24项factory ref只指同一mirror，全部ref在root内闭合，Builder/Verifier均禁止`--source-root`/外部E2E root并不得依赖checkout历史bytes。E2E Manifest必须先验证该root，再逐byte复制完整树到`inputs/common/`。两类Common不得在Runtime/API/SQLite之间临时选择或互用，Catalog`0.1`Schema不改写。
+11. Capture Plan 必须在不读取既有 PNG 的条件下由 exact join 生成 `1242` 个 capture ID；1170 个 Family capture 必须去重为 130 个 exact `MS-REV-001/0.2` archive ref，由同一 Runtime JAR 的 non-web release-only Materializer 生成 130 个隔离 SQLite/Report。72个Common capture必须从8个完整fixture的normalized Projection计算digest，并使用8个immutable base和144个fresh clone；旧subject/focus占位digest必须拒绝。
+12. Materializer 测试必须覆盖 Report/Quarantine Marker Schema、1170 -> 130 -> 9 集合算法、条件装配/零 HTTP、JAR/Bundle/entry/fixture/binding/空 storage preflight、七表事务故障注入、identity/reopen/integrity/FK/sidecar、stable projection/per-run evidence、Report content/engine/write 边界、pending-quarantine预验证、原子移动、marker、完整selected verifier的唯一四阶段cleanup/quarantine、semantic verifier `63=57+6` case catalog、并发停止、base/clone 隔离和 130 项性能门槛；Check 1~8 失败为 pre-acceptance 零 storage/report，Check 9 以后可归类失败使用真实 fixture identity 生成 Schema-valid BLOCKED Report。verifier case 必须从 controlled base clone、普通反例单变量、三种枚举顺序 top code 一致且前后 tree digest 相等；只有 full-root `--require-materialized` 通过的 130/130 Report/root 可消费。
+13. author 使用130个成功Family Report/SQLite clone、8个Common base/144 clone和fixed clean build/Runtime/Chromium/font/clock/wait协议生成candidate；Common UI终态与normalized Projection必须深度相等再比较digest。Plan raw `srgb`和exact launch arg只能映射为Environment canonical `sRGB IEC61966-2.1`，trim/case/alias/重复参数均拒绝。Authoring Report必须记录2484/18逐attempt results、集合SHA和authored Golden Environment ref，Approval必须exact引用candidate report raw/payload/attempt SHA、Environment和五类refs，经Applicant/Approver分离审批后，Publisher只能排他发布新的immutable approved version。
+14. Visual golden 只由显式 approved version 的 Golden Environment Index 解析 `1242` 个 PNG 和 9 个 blank baseline；目录扫描、mutable latest、环境指纹不一致、缺项、额外项、未审批或 SHA 不一致均不能生成 Manifest。
+15. production Golden Environment、Approval Record、Authoring Report 和 Visual Manifest 目标均为 `schema_version=0.2`；Environment 必须封闭 OS/arch/browser executable SHA/font role/screenshot options 和 fingerprint，Approval 必须覆盖 candidate report、130 份 Report/SQLite base 和 PNG/blank/font，Authoring Report 必须 exact 引用它们，Visual Manifest 必须绑定八个冻结 provenance 字段、exact `APPROVED_PUBLISHED` Authoring Report 和 Golden Environment；validation runner 对 approved root 永久只读。
+16. Visual builder只允许输出`0.2/0.2.0`，E2E builder保持`0.1/0.1.0`且拒绝Golden Authoring参数；必须分别覆盖两类bundle正例、互用反例、Visual approved transitive tamper和所有失败零输出。E2E还必须覆盖单一final transaction root各staging failure point、194-case/ref重算及controlled成功被`--require-production`拒绝。旧合并builder测试不得作为活动回归入口。
+17. E2E Runner固定使用self-contained Report transaction root；每个attempt必须有fresh SQLite/Runtime/production Web/Chromium process/context和新进程reopen。plan builder必须先原子写入并验证`fault-plan.json`，其余producer只从该文件读取`attempt_ordinal`并与Manifest schedule交叉校验，路径只做定位。11类JSON必须通过Artifact union Schema `0.1`并按固定文件名匹配root identity；命令/option/token、Projection、OPL/Token/Trace、七项事务、process/browser/network/console/reopen/API exchange以strict raw artifact写入attempt `artifact_refs[]`。Artifact Index必须各恰好包含10个核心kind且不含自身。只有388项均取得真实必填identity时才允许写Report，禁止为Schema必填字段填占位值；可归类case失败在完整执行后写BLOCKED，pre-acceptance或不完整执行final Report零输出。
+18. 当前三类Authoring`0.1`Schema、Capture Planner、Materialization Report`0.1`Schema和Materializer`v1.5`已实现；semantic verifier catalog`v1.1`63/63、受控130项串行/并发4及contract/backend已闭环。Common Visual Fixture`0.1`机器Schema已冻结，活动43文件producer/verifier与E2E Manifest Common/Family适配已完成。Family Production Input最终source `a36a7f1fd709b72e66c57e5aea634da525c9c515`保持37项delta（`4 M+33 A`），定向`34/34`、TAP `16/16 MATCHED`和完整集成`5/5`通过；Bundle、READY Handoff、READY Intake、production Common/Manifest和版本根`clean-a36a7f1fd709`已形成。固定Handoff因Candidate的10个直接Report/Schema/Asset ref仍为mutable `reports/**`而validator失败并恢复旧SHA；后继规格已修正为新source `14=12 M+2 A`，纳入production builder/verifier两个调用点，冻结production显式`INSTALLED`、controlled显式`CONTROLLED`、无默认mode和按HEAD派生的临时versioned integration fixture；12文件版本根report集合、STAGING/INSTALLED物理解析和固定JSON原子替换保持不变，执行仍未开始。E2E Attempt Artifact设计`v1.3`/union Schema`0.1`、Family Identity Catalog `0.1/0.1.0`、活动Report`0.2`和Runner Source Set`0.1`已冻结。Family Materializer、Java mirror/source producer、运行时browser/font校验、真实Golden实体、03B/04/05、Visual runner与E2E Runner仍未完成；production 130项Materialization、8个Common base/144 clone、真实approved version、release runner和真实Report未形成前，本节不构成`GATE-06-03`PASS。
+
+19. 本轮执行契约修正的统一入口为`docs/design/opm-dev-canvas-06-execution-contract-design-correction.md v1.0`；它按02B、Recovery Launch、E2E Java/Source顺序冻结机器语义，不替代各Owner文档。
+20. 02B测试必须覆盖8个完整fixture Schema/bytes、32个E2E asset factory重算、43文件inventory、Catalog/source mirror/ref/payload/binding、24项factory ref相等、subject语义/布局、五类index entry逐字段/排序/固定ID时间状态/null、8类UI step shape和每subject exact数组、`72=8*3*3`Planner join、旧占位digest拒绝、Color Profile唯一映射、原子零输出、determinism和只读tree digest；必须拒绝source/E2E root override、历史author/bytes、cwd/env/dynamic source、缺失/额外/link/escape/Git metadata。E2E Manifest回归还必须覆盖完整43文件tree copy、source/target digest、历史`0.1.0`/旧布局拒绝和新契约零输出事务。03C测试必须覆盖release-only/non-web guard、Revision JCS到SQLite逐列映射、8个SQLite V1 base、attestation、144 fresh clone、default no-op与一次性fault hook、03B adapter、rollback/隔离和`5 s/30 s/1 s/512 MiB`阈值。受控通过不等于production执行。
+21. E2E Manifest/Runner定向测试必须新增Family Identity Catalog正例，以及缺ref、额外/重复entry、payload/source Manifest SHA/fixture SHA错误、Project重复或使用`project.golden.fixture.*`/`project.recovery.*`、Model/Context/base Revision/sequence/parent归一值 drift反例；Fault Plan测试必须覆盖缺失、partial、Schema/payload错误、ordinal与case/path/schedule不一致，并证明SQLite/Runtime及后续artifact均为零输出。Catalog存在但未进入exact Handoff/Evidence Bundle不得用source checkout补齐。
 
 ## 10. 非功能验证
 
@@ -255,12 +265,19 @@ Control pair 至少覆盖以下正反例：
 
 #### 10.2.1 DEV-CANVAS-06 Recovery/Rollback 机器闭包
 
-1. Recovery release catalog 固定 `28=8+7+4+3+6` 个 case，每项两个隔离 attempt，共 `56`；Manifest、test-only Gate Fixture 和 Report 使用独立机器 Schema，两次规范化 outcome digest 必须一致。
+1. Recovery release catalog 固定 `28=8+7+4+3+6` 个 case，每项两个隔离 attempt，共 `56`；活动Manifest为`0.2/0.2.0`，历史Manifest `0.1`只读，test-only Gate Fixture和Report保持`0.1`，两次规范化outcome digest必须一致。
 2. 前置资产/语义和 SQLite 七写阶段失败必须复用 DEV-CANVAS-05 的 Revision/Parent/Text/Trace/Finding/Operation/Receipt 七项零增量与 Head ID/sequence 口径；pre-repository case 还必须证明 repository 未调用。
 3. 强停必须以 exact release JAR 启动独立 Local Runtime 子进程并由新 JVM/连接/context 重开；commit 前强停保持零增量，commit 后断连或 Projection 回读失败必须证明恰好一次提交和同 command_id 幂等回放。Report 固定记录 OS/filesystem、SQLite/JVM/runtime args 和 source artifact 的环境指纹。
 4. 发布前 gate 演练只使用 production loader 明确拒绝的 test-only fixture，通过测试组合根调用与生产相同的 rollback evaluator；真实 production gate 在全部 attempt 前后保持 `DISABLED + []`。
 5. 部分回退按前序 enabled 集合减 requested 与 Control 反向依赖闭包生成 `ROLLED_BACK_PARTIAL`；全量回退生成 `ROLLED_BACK`。历史含 disabled Capability 的 Revision 仍按 exact binding 只读渲染，新写入稳定阻断且零增量。
-6. 唯一 case ID、故障到达点、attempt 字段、事务/重开快照、失败码和 Report READY 算法由 DEV-CANVAS-06 checklist 的 `GATE-06-05` 执行契约承接。
+6. 唯一case ID、attempt字段、事务/重开快照、失败码和Report READY算法由DEV-CANVAS-06 checklist的`GATE-06-05`承接；两份immutable template及raw ref、历史五份`0.1`机器Schema、活动Manifest `0.2`、Reopen Catalog/API Request Artifact/Launch Request/Launch Proof `0.1` Schema、factory三个export、独立helper JAR、21表SQLite映射、原子事务、七个SQLite fault stage、四个forced-stop reachpoint/PropertiesLauncher协议、challenge、原子proof与artifact index由`opm-dev-canvas-06-recovery-execution-design.md v1.5`承接。
+7. forced-stop正例必须由父进程验证PID/nonce/challenge/reach proof后使用SIGKILL或TerminateProcess；018还要证明`connection.commit()`已返回且HTTP首byte尚未写。exception、正常shutdown、mock crash或child自杀均是反例。
+8. 每个attempt在cleanup前采集template/materialization、process/reach/termination、before/after/reopen/replay/gate snapshot、SQLite file-set和原始日志，并以排序raw ref和tree/payload SHA写`artifact-index.json`；失败case不得被丢弃或只保留最终绿色结果。
+9. `expected_reopen`只能从不可变Catalog `0.1.0`的三个封闭profile展开：018/021比较AFTER，022比较RECOVERY_REQUIRED，其余25项比较BEFORE；Manifest必须携带逐profile JCS SHA并与Catalog raw/payload SHA exact join。
+10. Recovery受控HTTP命令必须由test-only eager filter在Controller前校验raw bytes、严格UTF-8、BOM、重复键、单一JSON对象、JCS与template digest，再由body advice复核Spring解析对象；任一拒绝固定HTTP 422且Controller/Service/repository调用为0。该guard不得进入产品默认Spring context或release JAR/ZIP。
+11. 正式`LocalApiService.projection(...).data`摘要固定使用Projection Digest Closure `v1.0/0.1`：layout四个有限binary64编码为IEEE-754 raw bits的8-byte big-endian 16位小写hex tag，再调用现有safe-integer JCS owner；正负零不同，非有限值、非layout浮点、unsafe integer和unknown字段稳定拒绝。
+12. Node/Java实现必须读取同一`projection-digest-v01-parity-vectors.json`，通过4个正向量和9个负向量的input bits、preimage、canonical bytes、SHA、code/pointer parity；Common Visual normalized Projection继续使用独立safe-integer payload算法，禁止互用。
+13. Projection Digest设计闭合后`RECOVERY-IMPL-01=DESIGN_READY/IMPLEMENTATION_NOT_STARTED`；真实28/56、Recovery READY和`GATE-06-05`仍为`NOT_RUN/BLOCKED_BY_EVIDENCE`，不能从设计状态推导通过。
 
 ### 10.3 DEV-CANVAS-06 Release Candidate Smoke
 
@@ -334,7 +351,7 @@ CI 顺序：静态契约 -> 前后端单元/组件 -> SQLite/API/模块集成 ->
 ### 13.1 事实
 
 1. 当前已有 JSON Schema 样例、P0/完整画布 OpenAPI 设计输入、SQLite V1、无构建浏览器原型和前后端工程；OpenAPI 0.2 发布、generated client/handler 与 Revision 0.2 roundtrip 仍按 DEV-CANVAS-00/03 验收；
-2. 当前已有前端 lint/typecheck/unit/build/E2E 与 Maven test/verify 命令入口，DEV-CANVAS-06 `GATE-06-01~06` 设计契约已冻结；对应机器 Schema、release runner、golden/sample/recovery/release report、production Web 静态打包、P0 业务闭环、CI 发布流水线和安装包尚未形成；
+2. 当前已有前端lint/typecheck/unit/build/E2E与Maven test/verify命令入口，DEV-CANVAS-06现行Gate设计输入均已冻结；Common Visual Fixture机器Schema存在不等于02B/03C已实现。03B、Visual/E2E/Performance/Recovery/Release Candidate的真实release runner、production reports、production Web打包、CI发布流水线和安装包仍未形成；部分Schema、03A Materializer/verifier和E2E Manifest builder已实现，不得由此推导production Gate；
 3. SQLite 与发布数据库相同，持久层测试不采用 H2 替代。
 
 ### 13.2 假设/待实现

@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:opm:contract:dev-canvas-06-e2e-report:0.2",
+  "title": "OPM DEV-CANVAS-06 E2E Report 0.2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "report_id", "generated_at", "runner_identity", "manifest_ref", "intake_report_ref", "handoff_ref", "upstream_source_build", "source_build", "environment", "report_status", "summary", "capability_results", "case_results", "failures", "limitations"],
+  "properties": {
+    "schema_id": {"const": "OPM-DEV-CANVAS-06-E2E-REPORT-001"},
+    "schema_version": {"const": "0.2"},
+    "report_id": {"pattern": "^dev-canvas-06\\.e2e-report\\.[a-f0-9]{12}\\.[a-f0-9]{12}$"},
+    "generated_at": {"type": "string", "format": "date-time"},
+    "runner_identity": {"$ref": "#/$defs/identity"},
+    "manifest_ref": {"$ref": "#/$defs/fileRef"},
+    "intake_report_ref": {"$ref": "#/$defs/fileRef"},
+    "handoff_ref": {"$ref": "#/$defs/fileRef"},
+    "upstream_source_build": {"$ref": "urn:opm:contract:dev-canvas-06-e2e-report:0.1#/$defs/upstreamBuild"},
+    "source_build": {"$ref": "urn:opm:contract:dev-canvas-06-e2e-report:0.1#/$defs/sourceBuild"},
+    "environment": {"$ref": "urn:opm:contract:dev-canvas-06-e2e-report:0.1#/$defs/environment"},
+    "report_status": {"enum": ["BLOCKED", "READY_FOR_ENABLEMENT_EVALUATION"]},
+    "summary": {"$ref": "urn:opm:contract:dev-canvas-06-e2e-report:0.1#/$defs/summary"},
+    "capability_results": {"type": "array", "minItems": 34, "maxItems": 34, "items": {"$ref": "urn:opm:contract:dev-canvas-06-e2e-report:0.1#/$defs/capabilityResult"}},
+    "case_results": {"type": "array", "minItems": 194, "maxItems": 194, "items": {"$ref": "urn:opm:contract:dev-canvas-06-e2e-report:0.1#/$defs/caseResult"}},
+    "failures": {"type": "array", "items": {"$ref": "urn:opm:contract:dev-canvas-06-e2e-report:0.1#/$defs/failure"}},
+    "limitations": {"type": "array", "items": {"type": "string", "minLength": 1}}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"report_status": {"const": "READY_FOR_ENABLEMENT_EVALUATION"}}},
+      "then": {
+        "properties": {
+          "summary": {"properties": {"case_count": {"const": 194}, "family_case_count": {"const": 178}, "family_pass_expectation_count": {"const": 130}, "family_blocked_expectation_count": {"const": 48}, "common_case_count": {"const": 16}, "attempt_count": {"const": 388}, "pass_matched_count": {"const": 146}, "blocked_matched_count": {"const": 48}, "failed_count": {"const": 0}, "skipped_count": {"const": 0}, "retry_count": {"const": 0}}},
+          "capability_results": {"items": {"properties": {"failed_count": {"const": 0}}}},
+          "case_results": {
+            "items": {
+              "allOf": [
+                {"properties": {"status": {"enum": ["PASS_MATCHED", "BLOCKED_MATCHED"]}, "failure_codes": {"maxItems": 0}}},
+                {"if": {"properties": {"expectation": {"const": "BLOCKED"}}}, "then": {"properties": {"status": {"const": "BLOCKED_MATCHED"}}}},
+                {"if": {"properties": {"expectation": {"const": "PASS"}}}, "then": {"properties": {"status": {"const": "PASS_MATCHED"}}}}
+              ]
+            }
+          },
+          "failures": {"maxItems": 0}
+        }
+      }
+    },
+    {
+      "if": {"properties": {"report_status": {"const": "BLOCKED"}}},
+      "then": {"properties": {"failures": {"minItems": 1}}}
+    }
+  ],
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "path": {"type": "string", "minLength": 1, "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$"},
+    "fileRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "path", "byte_length", "sha256"],
+      "properties": {
+        "kind": {"type": "string", "minLength": 1},
+        "path": {"$ref": "#/$defs/path"},
+        "byte_length": {"type": "integer", "minimum": 0},
+        "sha256": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["runner_version", "source_commit", "node_version", "playwright_version", "chromium_version", "os", "command", "runner_source_sha256", "runner_source_set_ref", "java_executable"],
+      "properties": {
+        "runner_version": {"const": "0.2.0"},
+        "source_commit": {"pattern": "^[a-f0-9]{40}$"},
+        "node_version": {"type": "string", "minLength": 1},
+        "playwright_version": {"type": "string", "minLength": 1},
+        "chromium_version": {"type": "string", "minLength": 1},
+        "os": {"type": "string", "minLength": 1},
+        "command": {"type": "string", "minLength": 1},
+        "runner_source_sha256": {"$ref": "#/$defs/digest"},
+        "runner_source_set_ref": {
+          "allOf": [
+            {"$ref": "#/$defs/fileRef"},
+            {"properties": {"kind": {"const": "E2E_RUNNER_SOURCE_SET"}, "path": {"const": "inputs/runner/runner-source-set.json"}}}
+          ]
+        },
+        "java_executable": {"$ref": "#/$defs/javaExecutable"}
+      }
+    },
+    "javaExecutable": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["evidence_version", "major_version", "executable_basename", "mirror_ref", "version_output_ref", "release_metadata_ref", "os_arch", "image_payload_sha256"],
+      "properties": {
+        "evidence_version": {"const": "0.1.0"},
+        "major_version": {"const": 21},
+        "executable_basename": {"enum": ["java", "java.exe"]},
+        "mirror_ref": {
+          "allOf": [
+            {"$ref": "#/$defs/fileRef"},
+            {"properties": {"kind": {"const": "E2E_JAVA_EXECUTABLE_MIRROR"}, "path": {"pattern": "^inputs/runner/toolchain/java/[a-f0-9]{64}/java(?:\\.exe)?$"}}}
+          ]
+        },
+        "version_output_ref": {
+          "allOf": [
+            {"$ref": "#/$defs/fileRef"},
+            {"properties": {"kind": {"const": "E2E_JAVA_VERSION_OUTPUT"}, "path": {"pattern": "^inputs/runner/toolchain/java/[a-f0-9]{64}/java-version\\.txt$"}}}
+          ]
+        },
+        "release_metadata_ref": {
+          "allOf": [
+            {"$ref": "#/$defs/fileRef"},
+            {"properties": {"kind": {"const": "E2E_JAVA_RELEASE_METADATA"}, "path": {"pattern": "^inputs/runner/toolchain/java/[a-f0-9]{64}/release$"}}}
+          ]
+        },
+        "os_arch": {"type": "string", "minLength": 1},
+        "image_payload_sha256": {"$ref": "#/$defs/digest"}
+      }
+    }
+  }
+}

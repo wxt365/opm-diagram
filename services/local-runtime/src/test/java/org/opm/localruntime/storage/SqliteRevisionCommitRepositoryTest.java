@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.opm.localruntime.recovery.SingleShotRecoverySqliteFaultPort;
 import org.opm.localruntime.command.CandidateRevisionCommand;
 import org.opm.localruntime.command.CandidateRevisionCommitter;
 import org.opm.localruntime.command.CommitFailureCode;
@@ -85,7 +86,7 @@ class SqliteRevisionCommitRepositoryTest {
         Path database = initializedDatabase();
         SemanticRevision base = base();
         SqliteRevisionCommitRepository repository = new SqliteRevisionCommitRepository(
-                SqliteConnectionFactory.create(database), () -> { throw new SQLException("injected write failure"); });
+                SqliteConnectionFactory.create(database), (stage, context) -> { throw new java.io.IOException("injected write failure"); });
 
         CommitResult.Rejected result = assertInstanceOf(CommitResult.Rejected.class,
                 new CandidateRevisionCommitter(repository).commit(command(base, candidate(base), "command.sqlite.fail", "digest.sqlite.fail")));
@@ -102,16 +103,20 @@ class SqliteRevisionCommitRepositoryTest {
 
     @Test
     void rollsBackAllPersistedArtifactsForEveryCommitWriteStage() throws Exception {
-        for (CommitWriteStage stage : CommitWriteStage.values()) {
+        for (RecoverySqliteStage stage : RecoverySqliteStage.values()) {
             Path database = initializedDatabase(Files.createDirectory(temporaryDirectory.resolve(stage.name().toLowerCase())));
             SemanticRevision base = base();
+            CandidateRevisionCommand command = command(base, candidate(base), "command.sqlite.stage." + stage.name().toLowerCase(), "digest.sqlite.stage." + stage.name().toLowerCase());
+            SingleShotRecoverySqliteFaultPort faultPort = new SingleShotRecoverySqliteFaultPort(stage,
+                    new RecoveryFaultContext(command.projectId(), command.modelId(), command.candidateRevision().revisionId(), command.commandId()));
             SqliteRevisionCommitRepository repository = new SqliteRevisionCommitRepository(
-                    SqliteConnectionFactory.create(database), new StageFailureHook(stage));
+                    SqliteConnectionFactory.create(database), faultPort);
 
             CommitResult.Rejected result = assertInstanceOf(CommitResult.Rejected.class,
-                    new CandidateRevisionCommitter(repository).commit(command(base, candidate(base), "command.sqlite.stage." + stage.name().toLowerCase(), "digest.sqlite.stage." + stage.name().toLowerCase())));
+                    new CandidateRevisionCommitter(repository).commit(command));
 
             assertEquals(CommitFailureCode.PERSISTENCE_FAILED, result.code(), stage.name());
+            faultPort.assertReachedExactlyOnce();
             try (Connection connection = raw(database)) {
                 assertEquals("revision.demo.0001", text(connection, "SELECT draft_head_revision_id FROM model_head WHERE model_id = 'model.demo.processing'"), stage.name());
                 assertEquals(1, integer(connection, "SELECT COUNT(*) FROM revision_document"), stage.name());
@@ -309,52 +314,4 @@ class SqliteRevisionCommitRepositoryTest {
         try (Statement statement = connection.createStatement()) { statement.execute(sql); }
     }
 
-    private enum CommitWriteStage { REVISION, PARENT, TRACE, FINDING, HEAD, OPERATION, RECEIPT }
-
-    private static final class StageFailureHook implements SqliteRevisionCommitRepository.CommitWriteHook {
-        private final CommitWriteStage stage;
-
-        private StageFailureHook(CommitWriteStage stage) {
-            this.stage = stage;
-        }
-
-        @Override
-        public void beforeHeadUpdate() throws Exception {
-            failAt(CommitWriteStage.HEAD);
-        }
-
-        @Override
-        public void afterRevisionInsert() throws Exception {
-            failAt(CommitWriteStage.REVISION);
-        }
-
-        @Override
-        public void afterParentInsert() throws Exception {
-            failAt(CommitWriteStage.PARENT);
-        }
-
-        @Override
-        public void afterTraceInsert() throws Exception {
-            failAt(CommitWriteStage.TRACE);
-        }
-
-        @Override
-        public void afterFindingInsert() throws Exception {
-            failAt(CommitWriteStage.FINDING);
-        }
-
-        @Override
-        public void afterOperationInsert() throws Exception {
-            failAt(CommitWriteStage.OPERATION);
-        }
-
-        @Override
-        public void afterReceiptInsert() throws Exception {
-            failAt(CommitWriteStage.RECEIPT);
-        }
-
-        private void failAt(CommitWriteStage actual) throws SQLException {
-            if (stage == actual) throw new SQLException("injected write failure at " + actual);
-        }
-    }
 }

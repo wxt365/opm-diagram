@@ -17,6 +17,7 @@ import org.opm.localruntime.text.OplTextTrace;
 import org.opm.localruntime.text.OplToken;
 
 import javax.sql.DataSource;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.security.MessageDigest;
@@ -37,25 +38,25 @@ public final class SqliteRevisionCommitRepository implements RevisionCommitRepos
     private final DataSource dataSource;
     private final SemanticRevisionJsonWriter revisionWriter;
     private final ObjectMapper objectMapper;
-    private final CommitWriteHook writeHook;
+    private final RecoverySqliteFaultPort faultPort;
 
     public SqliteRevisionCommitRepository(Path databasePath) {
-        this(SqliteConnectionFactory.create(databasePath), new SemanticRevisionJsonWriter(), new ObjectMapper(), () -> { });
+        this(SqliteConnectionFactory.create(databasePath), new SemanticRevisionJsonWriter(), new ObjectMapper(), RecoverySqliteFaultPort.NOOP);
     }
 
-    SqliteRevisionCommitRepository(DataSource dataSource, CommitWriteHook writeHook) {
-        this(dataSource, new SemanticRevisionJsonWriter(), new ObjectMapper(), writeHook);
+    public SqliteRevisionCommitRepository(DataSource dataSource, RecoverySqliteFaultPort faultPort) {
+        this(dataSource, new SemanticRevisionJsonWriter(), new ObjectMapper(), faultPort);
     }
 
     private SqliteRevisionCommitRepository(
             DataSource dataSource,
             SemanticRevisionJsonWriter revisionWriter,
             ObjectMapper objectMapper,
-            CommitWriteHook writeHook) {
+            RecoverySqliteFaultPort faultPort) {
         this.dataSource = Objects.requireNonNull(dataSource, "dataSource must not be null");
         this.revisionWriter = Objects.requireNonNull(revisionWriter, "revisionWriter must not be null");
         this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper must not be null");
-        this.writeHook = Objects.requireNonNull(writeHook, "writeHook must not be null");
+        this.faultPort = Objects.requireNonNull(faultPort, "faultPort must not be null");
     }
 
     @Override
@@ -113,20 +114,19 @@ public final class SqliteRevisionCommitRepository implements RevisionCommitRepos
                             "baseRevisionId is not the current draft head", null);
                 }
                 writeRevision(connection, bundle);
-                writeHook.afterRevisionInsert();
+                reach(RecoverySqliteStage.AFTER_REVISION_INSERT, bundle);
                 writeParent(connection, bundle);
-                writeHook.afterParentInsert();
+                reach(RecoverySqliteStage.AFTER_PARENT_INSERT, bundle);
                 writeTraces(connection, bundle);
-                writeHook.afterTraceInsert();
+                reach(RecoverySqliteStage.AFTER_TRACE_INSERT, bundle);
                 writeFindings(connection, bundle);
-                writeHook.afterFindingInsert();
-                writeHook.beforeHeadUpdate();
+                reach(RecoverySqliteStage.AFTER_FINDING_INSERT, bundle);
+                reach(RecoverySqliteStage.BEFORE_HEAD_UPDATE, bundle);
                 updateHead(connection, bundle);
-                writeHook.afterHeadUpdate();
                 writeOperation(connection, bundle);
-                writeHook.afterOperationInsert();
+                reach(RecoverySqliteStage.AFTER_OPERATION_INSERT, bundle);
                 writeReceipt(connection, bundle);
-                writeHook.afterReceiptInsert();
+                reach(RecoverySqliteStage.AFTER_RECEIPT_INSERT, bundle);
                 connection.commit();
                 return new CommitResult.Committed(bundle.revision().revisionId(), traceIds(bundle), bundle.validation());
             } catch (CommitPersistenceException exception) {
@@ -386,6 +386,14 @@ public final class SqliteRevisionCommitRepository implements RevisionCommitRepos
         return bundle.text().traces().stream().map(OplTextTrace::traceId).toList();
     }
 
+    private void reach(RecoverySqliteStage stage, RevisionCommitBundle bundle) throws IOException {
+        faultPort.reach(stage, new RecoveryFaultContext(
+                bundle.command().projectId(),
+                bundle.command().modelId(),
+                bundle.revision().revisionId(),
+                bundle.command().commandId()));
+    }
+
     private void rollback(Connection connection, Exception exception) {
         try { connection.rollback(); } catch (SQLException rollbackException) { exception.addSuppressed(rollbackException); }
     }
@@ -403,18 +411,5 @@ public final class SqliteRevisionCommitRepository implements RevisionCommitRepos
         } catch (NoSuchAlgorithmException exception) {
             throw new IllegalStateException("SHA-256 is not available", exception);
         }
-    }
-
-    @FunctionalInterface
-    interface CommitWriteHook {
-        void beforeHeadUpdate() throws Exception;
-
-        default void afterRevisionInsert() throws Exception { }
-        default void afterParentInsert() throws Exception { }
-        default void afterTraceInsert() throws Exception { }
-        default void afterFindingInsert() throws Exception { }
-        default void afterHeadUpdate() throws Exception { }
-        default void afterOperationInsert() throws Exception { }
-        default void afterReceiptInsert() throws Exception { }
     }
 }

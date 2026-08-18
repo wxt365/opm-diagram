@@ -646,7 +646,7 @@ Annex A 明确说明其 EBNF 对概率、执行路径和复杂参与约束等表
 - 前端 handoff；
 - 开发执行包和测试策略。
 
-上述职责已由 `docs/design/opm-design-freeze-baseline.md` 归档为 `FROZEN_INCLUDED`，当前全局开发门为 `READY_FOR_DEVELOPMENT`。任何冻结输入变化必须先关闭开发门并建立新 task spec；实现与测试是否完成仍由单个开发包 Gate 判定。
+上述职责的当前状态只以`docs/design/opm-design-freeze-baseline.md`为准。当前`DFR-018/021`均为`FROZEN_INCLUDED`；Recovery的expected reopen、HTTP raw-body与Projection Digest `v1.0/0.1`已关闭设计冲突，全局开发门为`READY_FOR_DEVELOPMENT`。`RECOVERY-IMPL-01`仍为`DESIGN_READY/IMPLEMENTATION_NOT_STARTED`；任何局部实现或测试状态不得解释为production Gate、Capability或ISO证据完成。
 
 ## 15. 验证方式
 
@@ -738,8 +738,8 @@ Annex A 明确说明其 EBNF 对概率、执行路径和复杂参与约束等表
 
 ### 18.3 推荐后续顺序
 
-1. 先核对 `opm-design-freeze-baseline.md` 的开发门仍为 `READY_FOR_DEVELOPMENT`；
-2. 按 `opm-development-execution-pack.md` 选择依赖满足的单个 DEV 包并建立任务规格；
+1. 先核对 `opm-design-freeze-baseline.md` 的当前开发门；只有其为 `READY_FOR_DEVELOPMENT` 才能进入实现；
+2. 开发门为`BLOCKED_BY_DESIGN`时只推进基线指定的设计闭环；当前仅推进`DFR-018`的Projection数值规范化冲突，不进入Recovery Runner Build；
 3. 用 lockfile、Maven dependency management 和最小 PoC 验证准确依赖版本；
 4. 按 DEV-00~09、DEV-CANVAS-00~06 小步实现并保存分层证据；
 5. 只有新规格正式重启 `FROZEN_DEFERRED` 项后，才能建设 ISO 原子规则、完整 Symbol/Grammar 或 Conformance Suite；

@@ -1,0 +1,27 @@
+{
+  "fixture_id": "fixture.e2e.e2e-canvas-001.state_mobile_create_reopen",
+  "case_id": "E2E-CANVAS-001.STATE_MOBILE_CREATE_REOPEN",
+  "project_name": "Release E2E E2E-CANVAS-001.STATE_MOBILE_CREATE_REOPEN",
+  "model_name": "Release E2E E2E-CANVAS-001.STATE_MOBILE_CREATE_REOPEN",
+  "initial_revision": "revision.e2e.e2e-canvas-001.state_mobile_create_reopen",
+  "action": {
+    "action_id": "action.001",
+    "expected_status": "PASS_MATCHED",
+    "expected_transaction": {
+      "revision_delta": 1,
+      "revision_parent_delta": 1,
+      "text_artifact_delta": 1,
+      "text_trace_delta": 1,
+      "finding_delta": 0,
+      "operation_delta": 1,
+      "receipt_delta": 1,
+      "draft_head_changed": true
+    },
+    "reopen_checkpoint": {
+      "expected_head_changed": true,
+      "projection_matches": true,
+      "text_trace_matches": true
+    }
+  },
+  "fixture_kind": "BASE"
+}

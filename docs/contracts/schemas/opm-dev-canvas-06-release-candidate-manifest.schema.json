@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:opm:contract:dev-canvas-06-release-candidate-manifest:0.1",
+  "title": "OPM DEV-CANVAS-06 Release Candidate Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "manifest_id", "generated_at", "generator", "manifest_status", "release_scope", "handoff_ref", "intake_report_ref", "release_evidence", "enablement_candidate_ref", "source_build", "dependency_locks", "artifacts", "target_environment", "smoke_catalog", "production_gate", "blockers"],
+  "properties": {
+    "schema_id": {"const": "OPM-DEV-CANVAS-06-RELEASE-CANDIDATE-MANIFEST-001"},
+    "schema_version": {"const": "0.1"},
+    "manifest_id": {"pattern": "^dev-canvas-06\\.release\\.[a-f0-9]{12}\\.[a-f0-9]{12}\\.[a-z0-9][a-z0-9._-]*\\.[a-z0-9][a-z0-9._-]*$"},
+    "generated_at": {"type": "string", "format": "date-time"},
+    "generator": {"$ref": "#/$defs/generator"},
+    "manifest_status": {"enum": ["BLOCKED", "READY_FOR_RELEASE_SMOKE"]},
+    "release_scope": {"enum": ["PARTIAL", "COMPLETE"]},
+    "handoff_ref": {"$ref": "#/$defs/fileRef"},
+    "intake_report_ref": {"$ref": "#/$defs/fileRef"},
+    "release_evidence": {"$ref": "#/$defs/releaseEvidence"},
+    "enablement_candidate_ref": {"allOf": [{"$ref": "#/$defs/fileRef"}, {"properties": {"kind": {"const": "ENABLEMENT_CANDIDATE"}}}]},
+    "source_build": {"$ref": "#/$defs/sourceBuild"},
+    "dependency_locks": {"$ref": "#/$defs/dependencyLocks"},
+    "artifacts": {"$ref": "#/$defs/artifacts"},
+    "target_environment": {"$ref": "#/$defs/targetEnvironment"},
+    "smoke_catalog": {"$ref": "#/$defs/smokeCatalog"},
+    "production_gate": {"$ref": "#/$defs/productionGate"},
+    "blockers": {"type": "array", "items": {"$ref": "#/$defs/failure"}}
+  },
+  "allOf": [
+    {"if": {"properties": {"manifest_status": {"const": "READY_FOR_RELEASE_SMOKE"}}}, "then": {"properties": {"artifacts": {"$ref": "#/$defs/assembledArtifacts"}, "blockers": {"maxItems": 0}}}},
+    {"if": {"properties": {"manifest_status": {"const": "BLOCKED"}}}, "then": {"properties": {"artifacts": {"$ref": "#/$defs/blockedArtifacts"}, "blockers": {"minItems": 1}}}}
+  ],
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "safePath": {"type": "string", "minLength": 1, "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$"},
+    "fileRef": {"type": "object", "additionalProperties": false, "required": ["kind", "path", "byte_length", "sha256"], "properties": {"kind": {"type": "string", "minLength": 1}, "path": {"$ref": "#/$defs/safePath"}, "byte_length": {"type": "integer", "minimum": 0}, "sha256": {"$ref": "#/$defs/digest"}}},
+    "generator": {"type": "object", "additionalProperties": false, "required": ["runner_version", "source_commit", "node_version", "os", "command", "runner_source_sha256"], "properties": {"runner_version": {"const": "0.1.0"}, "source_commit": {"pattern": "^[a-f0-9]{40}$"}, "node_version": {"type": "string", "minLength": 1}, "os": {"type": "string", "minLength": 1}, "command": {"type": "string", "minLength": 1}, "runner_source_sha256": {"$ref": "#/$defs/digest"}}},
+    "releaseEvidence": {"type": "object", "additionalProperties": false, "required": ["visual_manifest_ref", "visual_report_ref", "e2e_manifest_ref", "e2e_report_ref", "performance_manifest_ref", "performance_report_ref", "recovery_manifest_ref", "recovery_report_ref"], "properties": {"visual_manifest_ref": {"$ref": "#/$defs/fileRef"}, "visual_report_ref": {"$ref": "#/$defs/fileRef"}, "e2e_manifest_ref": {"$ref": "#/$defs/fileRef"}, "e2e_report_ref": {"$ref": "#/$defs/fileRef"}, "performance_manifest_ref": {"$ref": "#/$defs/fileRef"}, "performance_report_ref": {"$ref": "#/$defs/fileRef"}, "recovery_manifest_ref": {"$ref": "#/$defs/fileRef"}, "recovery_report_ref": {"$ref": "#/$defs/fileRef"}}},
+    "sourceBuild": {"type": "object", "additionalProperties": false, "required": ["git_commit", "git_tree", "dirty_before_build", "build_commands", "build_exit_codes", "build_log_refs", "toolchain", "dependency_lock_refs", "source_input_refs"], "properties": {"git_commit": {"pattern": "^[a-f0-9]{40}$"}, "git_tree": {"pattern": "^[a-f0-9]{40}$"}, "dirty_before_build": {"const": false}, "build_commands": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}}, "build_exit_codes": {"type": "array", "minItems": 1, "items": {"type": "integer", "minimum": 0}}, "build_log_refs": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/fileRef"}}, "toolchain": {"type": "object", "additionalProperties": false, "required": ["java_version", "node_version", "maven_version", "os"], "properties": {"java_version": {"type": "string", "minLength": 1}, "node_version": {"type": "string", "minLength": 1}, "maven_version": {"type": "string", "minLength": 1}, "os": {"type": "string", "minLength": 1}}}, "dependency_lock_refs": {"type": "array", "minItems": 5, "items": {"$ref": "#/$defs/fileRef"}}, "source_input_refs": {"type": "array", "minItems": 4, "items": {"$ref": "#/$defs/fileRef"}}}},
+    "dependencyLocks": {"type": "object", "additionalProperties": false, "required": ["package_lock_ref", "root_package_json_ref", "web_package_json_ref", "local_runtime_pom_ref", "maven_wrapper_properties_ref"], "properties": {"package_lock_ref": {"$ref": "#/$defs/fileRef"}, "root_package_json_ref": {"$ref": "#/$defs/fileRef"}, "web_package_json_ref": {"$ref": "#/$defs/fileRef"}, "local_runtime_pom_ref": {"$ref": "#/$defs/fileRef"}, "maven_wrapper_properties_ref": {"$ref": "#/$defs/fileRef"}}},
+    "webDist": {"type": "object", "additionalProperties": false, "required": ["file_count", "tree_sha256", "file_manifest_ref"], "properties": {"file_count": {"type": "integer", "minimum": 1}, "tree_sha256": {"$ref": "#/$defs/digest"}, "file_manifest_ref": {"$ref": "#/$defs/fileRef"}}},
+    "artifacts": {"type": "object", "additionalProperties": false, "required": ["status"], "properties": {"status": {"enum": ["ABSENT", "INVALID", "ASSEMBLED"]}, "web_dist": {"$ref": "#/$defs/webDist"}, "local_runtime_jar_ref": {"$ref": "#/$defs/fileRef"}, "profile_assets_tree_ref": {"$ref": "#/$defs/fileRef"}, "bundle_content_ref": {"$ref": "#/$defs/fileRef"}, "release_zip_ref": {"$ref": "#/$defs/fileRef"}}},
+    "assembledArtifacts": {"allOf": [{"$ref": "#/$defs/artifacts"}, {"required": ["web_dist", "local_runtime_jar_ref", "profile_assets_tree_ref", "bundle_content_ref", "release_zip_ref"], "properties": {"status": {"const": "ASSEMBLED"}}}]},
+    "blockedArtifacts": {"allOf": [{"$ref": "#/$defs/artifacts"}, {"properties": {"status": {"enum": ["ABSENT", "INVALID"]}}}]},
+    "targetEnvironment": {"type": "object", "additionalProperties": false, "required": ["target_os", "target_arch", "java_major", "loopback_only", "single_origin", "no_external_network", "browser_engine", "browser_patch", "viewport", "device_scale_factor"], "properties": {"target_os": {"type": "string", "minLength": 1}, "target_arch": {"type": "string", "minLength": 1}, "java_major": {"const": 21}, "loopback_only": {"const": true}, "single_origin": {"const": true}, "no_external_network": {"const": true}, "browser_engine": {"const": "chromium"}, "browser_patch": {"type": "string", "minLength": 1}, "viewport": {"type": "object", "additionalProperties": false, "required": ["width", "height"], "properties": {"width": {"const": 1440}, "height": {"const": 900}}}, "device_scale_factor": {"const": 1}}},
+    "smokeCase": {"type": "object", "additionalProperties": false, "required": ["case_id", "required_attempt_count", "threshold_us"], "properties": {"case_id": {"enum": ["SMK-CANVAS-001.CLEAN_INSTALL", "SMK-CANVAS-002.START", "SMK-CANVAS-003.HEALTH", "SMK-CANVAS-004.OPEN", "SMK-CANVAS-005.REOPEN", "SMK-CANVAS-006.EXIT"]}, "required_attempt_count": {"const": 2}, "threshold_us": {"type": "integer", "minimum": 1}}},
+    "smokeCatalog": {"type": "array", "minItems": 6, "maxItems": 6, "prefixItems": [{"allOf": [{"$ref": "#/$defs/smokeCase"}, {"properties": {"case_id": {"const": "SMK-CANVAS-001.CLEAN_INSTALL"}}}]}, {"allOf": [{"$ref": "#/$defs/smokeCase"}, {"properties": {"case_id": {"const": "SMK-CANVAS-002.START"}}}]}, {"allOf": [{"$ref": "#/$defs/smokeCase"}, {"properties": {"case_id": {"const": "SMK-CANVAS-003.HEALTH"}}}]}, {"allOf": [{"$ref": "#/$defs/smokeCase"}, {"properties": {"case_id": {"const": "SMK-CANVAS-004.OPEN"}}}]}, {"allOf": [{"$ref": "#/$defs/smokeCase"}, {"properties": {"case_id": {"const": "SMK-CANVAS-005.REOPEN"}}}]}, {"allOf": [{"$ref": "#/$defs/smokeCase"}, {"properties": {"case_id": {"const": "SMK-CANVAS-006.EXIT"}}}]}], "items": false},
+    "productionGate": {"type": "object", "additionalProperties": false, "required": ["state", "enabled_capability_ids", "candidate_loader_status"], "properties": {"state": {"const": "DISABLED"}, "enabled_capability_ids": {"type": "array", "maxItems": 0}, "candidate_loader_status": {"const": "NOT_ACTIVE"}}},
+    "failureCode": {"enum": ["CANVAS06_RELEASE_INPUT_SCHEMA_INVALID", "CANVAS06_RELEASE_REF_INVALID", "CANVAS06_RELEASE_UPSTREAM_GATE_BLOCKED", "CANVAS06_RELEASE_CANDIDATE_NOT_READY", "CANVAS06_RELEASE_CANDIDATE_SCOPE_MISMATCH", "CANVAS06_RELEASE_PRODUCTION_GATE_NOT_DISABLED", "CANVAS06_RELEASE_SOURCE_BUILD_MISMATCH", "CANVAS06_RELEASE_LOCKFILE_MISMATCH", "CANVAS06_RELEASE_WEB_DIST_MISMATCH", "CANVAS06_RELEASE_JAR_MISMATCH", "CANVAS06_RELEASE_BUNDLE_MISMATCH", "CANVAS06_RELEASE_ENVIRONMENT_MISMATCH", "CANVAS06_RELEASE_INSTALL_FAILED", "CANVAS06_RELEASE_START_FAILED", "CANVAS06_RELEASE_HEALTH_FAILED", "CANVAS06_RELEASE_OPEN_FAILED", "CANVAS06_RELEASE_REOPEN_FAILED", "CANVAS06_RELEASE_EXIT_FAILED", "CANVAS06_RELEASE_ISOLATION_FAILED", "CANVAS06_RELEASE_UNEXPECTED_RUNTIME_ERROR"]},
+    "failure": {"type": "object", "additionalProperties": false, "required": ["code", "evidence_refs", "message_key"], "properties": {"code": {"$ref": "#/$defs/failureCode"}, "case_id": {"type": "string", "minLength": 1}, "lane_id": {"enum": ["LANE-01", "LANE-02"]}, "evidence_refs": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/fileRef"}}, "message_key": {"type": "string", "minLength": 1}}}
+  }
+}

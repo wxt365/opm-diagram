@@ -4,7 +4,11 @@
 
 验收日期：`2026-07-31`
 
+外部输入刷新：`2026-08-03`，仅更新clean DEV-CANVAS-05 Handoff/Bundle与Intake exact evidence，不重新计算本报告的20项实现责任汇总。
+
 总体状态：`FAIL / NOT_READY_FOR_RELEASE`
+
+当前适用性：`PARTIALLY_SUPERSEDED`。本报告实际重验范围是冻结基线 `v1.1` 的 `DFR-001~020`；当前冻结基线已升为 `v1.15`，本报告未执行或评估 `DFR-021` Golden Authoring v1.4/Visual Common Materialization v1.1/JCS owner与parity/02B/03C、`DFR-022` Materializer v1.5/Verifier Catalog v1.1、E2E Manifest/Runner/Attempt Artifact，以及 Recovery Execution v1.2/template/Factory输出/runner，因此 `PASS=14/FAIL=6` 只能作为 20 项历史实现快照，不能作为当前 22 项 included responsibility 的实现符合性结论。当前发布结论仍为 `FAIL / NOT_READY_FOR_RELEASE`，刷新责任汇总必须另行完整重验。
 
 ## 1. 结论
 
@@ -60,10 +64,10 @@ DEV-CANVAS-05 handoff 已达到 `READY_FOR_DEV_CANVAS_06`，34 个 Capability �
 
 直接证据：
 
-- handoff raw SHA-256 为 `38accdf1e54c8b95214c217ff09a3f349b3f715defc4b7eade20fdfc8bc674da`；
+- handoff raw SHA-256 为`aab281cf686d2b3c0e4ef1e9f62860d9318e3bed11c805e1dd53a40cd6f8e5a4`；source commit为`1847172f509005e8d50b525e274d41b9d73cf46c`，Evidence Bundle SHA-256为`f336780b3f3641accbdd7b4fa5432f3041d5701dcba0e474edfbef63543f7360`；
 - `handoff_status=READY_FOR_DEV_CANVAS_06`，`34/34` Capability 为 `ELIGIBLE_FOR_RELEASE_VALIDATION`；
 - `GATE-05-01~06` 均为 `MATCHED`，Revision compatibility 为 `6 PASS + 7` 个预期 `BLOCKED`，失败 `0`；
-- Intake runner 单测通过；exact Handoff 的 `8/8` checks 与 `34/34` capability intake 均为 `MATCHED`，状态为 `READY_FOR_RELEASE_VALIDATION`；
+- Intake runner 单测通过；exact Handoff 的 `8/8` checks 与 `34/34` capability intake 均为 `MATCHED`，状态为 `READY_FOR_RELEASE_VALIDATION`，Intake raw SHA-256为`9bff5271d28723b6e076534566fb19a625ee8a66caffb846ce46431a92107887`；
 - Enablement 定向测试 `4/4 PASS`；verifier 能拒绝 status/proposed/decision/batch/source-build 篡改，重复输出不能覆盖，缺少 GATE-06-06 exact Schema/READY Report 时 Activation 返回阻断且不生成文件；
 - production gate 仍为 `DISABLED`，`enabled_capability_ids=[]`。
 
@@ -142,12 +146,13 @@ DEV-CANVAS-05 handoff 已达到 `READY_FOR_DEV_CANVAS_06`，34 个 Capability �
 
 ## 8. 后续实现顺序
 
-1. 实现并执行 `GATE-06-03~05` 的 378 visual、194 release E2E、性能和恢复机器闭包；
-2. 基于四类 exact Report 生成并复验真实 Candidate，保持 production gate disabled；
-3. 完成 `GATE-06-06` release candidate、clean install/start/health/open/reopen/exit `6/6 case、12/12 attempt`，取得 READY Report 后再生成 Activation；
-4. 实现两配置档 96 Capability registry/isolation；
-5. 按 `.opmp` 1.0 契约实现机器 Schema、ZIP reader/writer、staging、版本守卫和 golden roundtrip；
-6. 全部 Gate 有 exact SHA、Schema 和机器报告后，才能生成 Activation；生产 Capability 不得手工启用。
+1. 保留已实现的三类 Authoring `0.1` Schema/Capture Planner，按冻结顺序实现 Materialization Report/Runtime Materializer、Authoring Report 0.2、candidate author、Approval Record 0.2/verifier、immutable Publisher、Visual Manifest 0.2，并生成真实 approved version；
+2. 实现并执行 `GATE-06-03~05` 的 378 visual、194 release E2E、性能和恢复机器闭包；
+3. 基于四类 exact Report 生成并复验真实 Candidate，保持 production gate disabled；
+4. 完成 `GATE-06-06` release candidate、clean install/start/health/open/reopen/exit `6/6 case、12/12 attempt`，取得 READY Report 后再生成 Activation；
+5. 实现两配置档 96 Capability registry/isolation；
+6. 按 `.opmp` 1.0 契约实现机器 Schema、ZIP reader/writer、staging、版本守卫和 golden roundtrip；
+7. 全部 Gate 有 exact SHA、Schema 和机器报告后，才能生成 Activation；生产 Capability 不得手工启用。
 
 ## 9. 事实与限定
 

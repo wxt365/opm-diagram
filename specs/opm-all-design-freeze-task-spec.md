@@ -157,3 +157,5 @@ development_gate=READY_FOR_DEVELOPMENT
 ```
 
 该结果只授权按既有依赖创建和执行一个开发包；实现、测试、发布和 ISO 声明继续受各自 Gate 约束。
+
+> 历史快照说明（2026-08-07 更新指针）：上述`30/20/10`是本任务完成时的冻结结果。当前唯一状态源`docs/design/opm-design-freeze-baseline.md`已升为`v1.21`，当前口径为`32/22/10`；不得用本历史Spec覆盖当前基线。

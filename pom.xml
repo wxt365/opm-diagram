@@ -20,6 +20,7 @@
 
     <modules>
         <module>services/local-runtime</module>
+        <module>services/recovery-test-tools</module>
     </modules>
 
     <properties>

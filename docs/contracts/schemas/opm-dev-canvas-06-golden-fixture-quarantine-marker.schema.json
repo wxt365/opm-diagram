@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:opm:contract:dev-canvas-06-golden-fixture-quarantine-marker:0.1",
+  "title": "OPM DEV-CANVAS-06 Golden Fixture Quarantine Marker",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "change_id", "fixture_ref_key", "source_storage_path", "quarantine_storage_path", "primary_failure_code", "cleanup_failure_code", "generated_at", "marker_payload_sha256"],
+  "properties": {
+    "schema_id": {"const": "OPM-DEV-CANVAS-06-GFM-QUARANTINE-MARKER-001"},
+    "schema_version": {"const": "0.1"},
+    "change_id": {"pattern": "^GOLDEN-CANVAS06-[0-9]{8}-[0-9]{3}$"},
+    "fixture_ref_key": {"pattern": "^[a-f0-9]{64}$"},
+    "source_storage_path": {"pattern": "^fixtures/[a-f0-9]{64}/storage$"},
+    "quarantine_storage_path": {"pattern": "^quarantine/[a-f0-9]{64}/storage$"},
+    "primary_failure_code": {"pattern": "^GFM_[A-Z_]+$"},
+    "cleanup_failure_code": {"const": "GFM_CLEANUP_FAILED"},
+    "generated_at": {"type": "string", "format": "date-time"},
+    "marker_payload_sha256": {"pattern": "^[a-f0-9]{64}$"}
+  }
+}

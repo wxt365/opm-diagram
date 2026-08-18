@@ -1,0 +1,190 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:opm:contract:dev-canvas-06-recovery-launch-proof:0.1",
+  "title": "OPM DEV-CANVAS-06 Recovery Launch Proof",
+  "oneOf": [
+    {"$ref": "#/$defs/childReady"},
+    {"$ref": "#/$defs/reachpointProof"},
+    {"$ref": "#/$defs/parentObserved"},
+    {"$ref": "#/$defs/terminationProof"}
+  ],
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "caseId": {"type": "string", "pattern": "^RCV-CANVAS-(0[0-2][0-9])\\.[A-Z0-9_]+$"},
+    "path": {"type": "string", "minLength": 1, "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*//)(?!.*\\\\)(?!.*\\u0000).+$"},
+    "fileRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "path", "byte_length", "sha256"],
+      "properties": {
+        "kind": {"type": "string", "minLength": 1},
+        "path": {"$ref": "#/$defs/path"},
+        "byte_length": {"type": "integer", "minimum": 0},
+        "sha256": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "launchRequestRef": {
+      "allOf": [
+        {"$ref": "#/$defs/fileRef"},
+        {"properties": {"kind": {"const": "RECOVERY_LAUNCH_REQUEST"}, "path": {"const": "control/launch-request.json"}}}
+      ]
+    },
+    "proofRef": {
+      "allOf": [
+        {"$ref": "#/$defs/fileRef"},
+        {"properties": {"kind": {"enum": ["RECOVERY_CHILD_READY", "RECOVERY_REACHPOINT", "RECOVERY_PARENT_OBSERVED"]}}}
+      ]
+    },
+    "childReady": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_id", "schema_version", "protocol_version", "case_id", "attempt_ordinal", "sequence", "pid", "boot_nonce", "parent_challenge_sha256", "runtime_jar_sha256", "launcher_jar_sha256", "launch_request_ref", "actual_loopback_port", "storage_root_identity_sha256", "active_binding_digest", "challenge_loaded", "payload_sha256"],
+      "properties": {
+        "schema_id": {"const": "OPM-DEV-CANVAS-06-RECOVERY-CHILD-READY-001"},
+        "schema_version": {"const": "0.1"},
+        "protocol_version": {"const": "0.1"},
+        "case_id": {"$ref": "#/$defs/caseId"},
+        "attempt_ordinal": {"enum": [1, 2]},
+        "sequence": {"const": 0},
+        "pid": {"type": "integer", "minimum": 1},
+        "boot_nonce": {"type": "string", "pattern": "^[a-f0-9]{32}$"},
+        "parent_challenge_sha256": {"$ref": "#/$defs/digest"},
+        "runtime_jar_sha256": {"$ref": "#/$defs/digest"},
+        "launcher_jar_sha256": {"$ref": "#/$defs/digest"},
+        "launch_request_ref": {"$ref": "#/$defs/launchRequestRef"},
+        "actual_loopback_port": {"type": "integer", "minimum": 1024, "maximum": 65535},
+        "storage_root_identity_sha256": {"$ref": "#/$defs/digest"},
+        "active_binding_digest": {"$ref": "#/$defs/digest"},
+        "challenge_loaded": {"const": true},
+        "payload_sha256": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "reachpointProof": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_id", "schema_version", "protocol_version", "case_id", "attempt_ordinal", "sequence", "pid", "boot_nonce", "parent_challenge_sha256", "runtime_jar_sha256", "launcher_jar_sha256", "launch_request_ref", "child_ready_ref", "reachpoint", "transaction_phase", "revision_inserted", "head_updated", "operation_inserted", "receipt_inserted", "connection_commit_returned", "http_response_bytes_written", "sqlite_file_set_ref", "payload_sha256"],
+      "properties": {
+        "schema_id": {"const": "OPM-DEV-CANVAS-06-RECOVERY-REACHPOINT-001"},
+        "schema_version": {"const": "0.1"},
+        "protocol_version": {"const": "0.1"},
+        "case_id": {"$ref": "#/$defs/caseId"},
+        "attempt_ordinal": {"enum": [1, 2]},
+        "sequence": {"const": 1},
+        "pid": {"type": "integer", "minimum": 1},
+        "boot_nonce": {"type": "string", "pattern": "^[a-f0-9]{32}$"},
+        "parent_challenge_sha256": {"$ref": "#/$defs/digest"},
+        "runtime_jar_sha256": {"$ref": "#/$defs/digest"},
+        "launcher_jar_sha256": {"$ref": "#/$defs/digest"},
+        "launch_request_ref": {"$ref": "#/$defs/launchRequestRef"},
+        "child_ready_ref": {
+          "allOf": [
+            {"$ref": "#/$defs/fileRef"},
+            {"properties": {"kind": {"const": "RECOVERY_CHILD_READY"}, "path": {"const": "control/child-ready.json"}}}
+          ]
+        },
+        "reachpoint": {"enum": ["AFTER_REVISION_INSERT_BEFORE_PARENT", "AFTER_HEAD_UPDATE_BEFORE_OPERATION", "AFTER_CONNECTION_COMMIT_BEFORE_HTTP_FIRST_BYTE", "IDLE_AFTER_CONFIRMED_RESPONSE"]},
+        "transaction_phase": {"enum": ["IN_TRANSACTION", "COMMITTED_BEFORE_RESPONSE", "IDLE_AFTER_RESPONSE"]},
+        "revision_inserted": {"type": "boolean"},
+        "head_updated": {"type": "boolean"},
+        "operation_inserted": {"type": "boolean"},
+        "receipt_inserted": {"type": "boolean"},
+        "connection_commit_returned": {"type": "boolean"},
+        "http_response_bytes_written": {"type": "integer", "minimum": 0},
+        "sqlite_file_set_ref": {"$ref": "#/$defs/fileRef"},
+        "payload_sha256": {"$ref": "#/$defs/digest"}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"reachpoint": {"enum": ["AFTER_REVISION_INSERT_BEFORE_PARENT", "AFTER_HEAD_UPDATE_BEFORE_OPERATION"]}}},
+          "then": {"properties": {"transaction_phase": {"const": "IN_TRANSACTION"}, "connection_commit_returned": {"const": false}, "http_response_bytes_written": {"const": 0}}}
+        },
+        {
+          "if": {"properties": {"reachpoint": {"const": "AFTER_CONNECTION_COMMIT_BEFORE_HTTP_FIRST_BYTE"}}},
+          "then": {"properties": {"transaction_phase": {"const": "COMMITTED_BEFORE_RESPONSE"}, "connection_commit_returned": {"const": true}, "http_response_bytes_written": {"const": 0}}}
+        },
+        {
+          "if": {"properties": {"reachpoint": {"const": "IDLE_AFTER_CONFIRMED_RESPONSE"}}},
+          "then": {"properties": {"transaction_phase": {"const": "IDLE_AFTER_RESPONSE"}, "connection_commit_returned": {"const": true}, "http_response_bytes_written": {"type": "integer", "minimum": 1}}}
+        }
+      ]
+    },
+    "parentObserved": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_id", "schema_version", "protocol_version", "case_id", "attempt_ordinal", "sequence", "pid", "boot_nonce", "parent_challenge_sha256", "runtime_jar_sha256", "launcher_jar_sha256", "launch_request_ref", "child_ready_ref", "reachpoint_ref", "pid_alive", "identity_matched", "challenge_matched", "proof_payloads_matched", "observed_at_monotonic_ns", "payload_sha256"],
+      "properties": {
+        "schema_id": {"const": "OPM-DEV-CANVAS-06-RECOVERY-PARENT-OBSERVED-001"},
+        "schema_version": {"const": "0.1"},
+        "protocol_version": {"const": "0.1"},
+        "case_id": {"$ref": "#/$defs/caseId"},
+        "attempt_ordinal": {"enum": [1, 2]},
+        "sequence": {"const": 2},
+        "pid": {"type": "integer", "minimum": 1},
+        "boot_nonce": {"type": "string", "pattern": "^[a-f0-9]{32}$"},
+        "parent_challenge_sha256": {"$ref": "#/$defs/digest"},
+        "runtime_jar_sha256": {"$ref": "#/$defs/digest"},
+        "launcher_jar_sha256": {"$ref": "#/$defs/digest"},
+        "launch_request_ref": {"$ref": "#/$defs/launchRequestRef"},
+        "child_ready_ref": {
+          "allOf": [
+            {"$ref": "#/$defs/fileRef"},
+            {"properties": {"kind": {"const": "RECOVERY_CHILD_READY"}, "path": {"const": "control/child-ready.json"}}}
+          ]
+        },
+        "reachpoint_ref": {
+          "allOf": [
+            {"$ref": "#/$defs/fileRef"},
+            {"properties": {"kind": {"const": "RECOVERY_REACHPOINT"}, "path": {"const": "control/reachpoint.json"}}}
+          ]
+        },
+        "pid_alive": {"const": true},
+        "identity_matched": {"const": true},
+        "challenge_matched": {"const": true},
+        "proof_payloads_matched": {"const": true},
+        "observed_at_monotonic_ns": {"type": "integer", "minimum": 0},
+        "payload_sha256": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "terminationProof": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_id", "schema_version", "protocol_version", "case_id", "attempt_ordinal", "sequence", "pid", "boot_nonce", "parent_challenge_sha256", "runtime_jar_sha256", "launcher_jar_sha256", "launch_request_ref", "parent_observed_ref", "requested_primitive", "observed_exit_kind", "observed_signal", "observed_exit_code", "started_at_monotonic_ns", "ended_at_monotonic_ns", "child_alive_after", "owned_residual_process_count", "payload_sha256"],
+      "properties": {
+        "schema_id": {"const": "OPM-DEV-CANVAS-06-RECOVERY-TERMINATION-001"},
+        "schema_version": {"const": "0.1"},
+        "protocol_version": {"const": "0.1"},
+        "case_id": {"$ref": "#/$defs/caseId"},
+        "attempt_ordinal": {"enum": [1, 2]},
+        "sequence": {"const": 3},
+        "pid": {"type": "integer", "minimum": 1},
+        "boot_nonce": {"type": "string", "pattern": "^[a-f0-9]{32}$"},
+        "parent_challenge_sha256": {"$ref": "#/$defs/digest"},
+        "runtime_jar_sha256": {"$ref": "#/$defs/digest"},
+        "launcher_jar_sha256": {"$ref": "#/$defs/digest"},
+        "launch_request_ref": {"$ref": "#/$defs/launchRequestRef"},
+        "parent_observed_ref": {
+          "allOf": [
+            {"$ref": "#/$defs/fileRef"},
+            {"properties": {"kind": {"const": "RECOVERY_PARENT_OBSERVED"}, "path": {"const": "control/parent-observed.json"}}}
+          ]
+        },
+        "requested_primitive": {"enum": ["SIGKILL", "TERMINATE_PROCESS"]},
+        "observed_exit_kind": {"enum": ["SIGNAL", "TERMINATED_PROCESS"]},
+        "observed_signal": {"oneOf": [{"const": "SIGKILL"}, {"type": "null"}]},
+        "observed_exit_code": {"oneOf": [{"type": "integer"}, {"type": "null"}]},
+        "started_at_monotonic_ns": {"type": "integer", "minimum": 0},
+        "ended_at_monotonic_ns": {"type": "integer", "minimum": 0},
+        "child_alive_after": {"const": false},
+        "owned_residual_process_count": {"const": 0},
+        "payload_sha256": {"$ref": "#/$defs/digest"}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"requested_primitive": {"const": "SIGKILL"}}},
+          "then": {"properties": {"observed_exit_kind": {"const": "SIGNAL"}, "observed_signal": {"const": "SIGKILL"}, "observed_exit_code": {"type": "null"}}},
+          "else": {"properties": {"observed_exit_kind": {"const": "TERMINATED_PROCESS"}, "observed_signal": {"type": "null"}, "observed_exit_code": {"type": "integer"}}}
+        }
+      ]
+    }
+  }
+}

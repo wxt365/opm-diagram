@@ -1,0 +1,18 @@
+{
+  "fixture_id": "fixture.visual.candidate_layer",
+  "subject_id": "CANDIDATE_LAYER",
+  "project_name": "Release visual CANDIDATE_LAYER",
+  "model_name": "Release visual CANDIDATE_LAYER",
+  "expected_revision": "revision.visual.candidate_layer",
+  "focus_target_id": "fact.visual.candidate_layer",
+  "focus_anchor": "CENTER",
+  "expected_cells": 3,
+  "critical_regions": [
+    "FOCUS_BBOX",
+    "CANVAS"
+  ],
+  "seed": {
+    "object_id": "object.visual.candidate_layer",
+    "process_id": "process.visual.candidate_layer"
+  }
+}

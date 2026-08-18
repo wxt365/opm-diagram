@@ -1,0 +1,323 @@
+{
+  "schema_id": "OPM-DEV-CANVAS-06-PROJECTION-DIGEST-PARITY-VECTORS-001",
+  "schema_version": "0.1",
+  "catalog_id": "dev-canvas-06.projection-digest-v01-parity",
+  "catalog_version": "0.1.0",
+  "preimage_schema_ref": "urn:opm:contract:dev-canvas-06-projection-digest-preimage:0.1",
+  "positive_vectors": [
+    {
+      "vector_id": "PDV01-EMPTY",
+      "input_projection_data": {
+        "context_id": "context.empty",
+        "constructs": []
+      },
+      "expected_preimage": {
+        "schema_id": "OPM-DEV-CANVAS-06-PROJECTION-DIGEST-PREIMAGE-001",
+        "schema_version": "0.1",
+        "source_projection_contract": "API-CTX-002/0.2.0-draft",
+        "float_encoding": "IEEE754_BINARY64_BE_HEX",
+        "data": {
+          "context_id": "context.empty",
+          "constructs": []
+        }
+      },
+      "expected_canonical_utf8_hex": "7b2264617461223a7b22636f6e73747275637473223a5b5d2c22636f6e746578745f6964223a22636f6e746578742e656d707479227d2c22666c6f61745f656e636f64696e67223a22494545453735345f42494e41525936345f42455f484558222c22736368656d615f6964223a224f504d2d4445562d43414e5641532d30362d50524f4a454354494f4e2d4449474553542d505245494d4147452d303031222c22736368656d615f76657273696f6e223a22302e31222c22736f757263655f70726f6a656374696f6e5f636f6e7472616374223a224150492d4354582d3030322f302e322e302d6472616674227d",
+      "expected_projection_sha256": "a94c7ddc23144aedac575c636add8ad36821d51333ffd0d076b8e9571e852378"
+    },
+    {
+      "vector_id": "PDV01-SIGNED-ZERO",
+      "input_projection_data": {
+        "context_id": "context.signed-zero",
+        "constructs": [
+          {
+            "occurrence_id": "occurrence.signed-zero",
+            "target_id": "object.signed-zero",
+            "construct_role": "OBJECT",
+            "label": "Signed zero",
+            "layout": {
+              "x": {"$input_binary64": "0000000000000000"},
+              "y": {"$input_binary64": "8000000000000000"},
+              "width": {"$input_binary64": "3ff0000000000000"},
+              "height": {"$input_binary64": "c004000000000000"},
+              "z_order": 0
+            }
+          }
+        ]
+      },
+      "expected_preimage": {
+        "schema_id": "OPM-DEV-CANVAS-06-PROJECTION-DIGEST-PREIMAGE-001",
+        "schema_version": "0.1",
+        "source_projection_contract": "API-CTX-002/0.2.0-draft",
+        "float_encoding": "IEEE754_BINARY64_BE_HEX",
+        "data": {
+          "context_id": "context.signed-zero",
+          "constructs": [
+            {
+              "occurrence_id": "occurrence.signed-zero",
+              "target_id": "object.signed-zero",
+              "construct_role": "OBJECT",
+              "label": "Signed zero",
+              "layout": {
+                "x": {"$binary64": "0000000000000000"},
+                "y": {"$binary64": "8000000000000000"},
+                "width": {"$binary64": "3ff0000000000000"},
+                "height": {"$binary64": "c004000000000000"},
+                "z_order": 0
+              }
+            }
+          ]
+        }
+      },
+      "expected_canonical_utf8_hex": "7b2264617461223a7b22636f6e73747275637473223a5b7b22636f6e7374727563745f726f6c65223a224f424a454354222c226c6162656c223a225369676e6564207a65726f222c226c61796f7574223a7b22686569676874223a7b222462696e6172793634223a2263303034303030303030303030303030227d2c227769647468223a7b222462696e6172793634223a2233666630303030303030303030303030227d2c2278223a7b222462696e6172793634223a2230303030303030303030303030303030227d2c2279223a7b222462696e6172793634223a2238303030303030303030303030303030227d2c227a5f6f72646572223a307d2c226f6363757272656e63655f6964223a226f6363757272656e63652e7369676e65642d7a65726f222c227461726765745f6964223a226f626a6563742e7369676e65642d7a65726f227d5d2c22636f6e746578745f6964223a22636f6e746578742e7369676e65642d7a65726f227d2c22666c6f61745f656e636f64696e67223a22494545453735345f42494e41525936345f42455f484558222c22736368656d615f6964223a224f504d2d4445562d43414e5641532d30362d50524f4a454354494f4e2d4449474553542d505245494d4147452d303031222c22736368656d615f76657273696f6e223a22302e31222c22736f757263655f70726f6a656374696f6e5f636f6e7472616374223a224150492d4354582d3030322f302e322e302d6472616674227d",
+      "expected_projection_sha256": "6a4fab5792ea97f95568a3ae7610167630aef1d5225728bb15a1efaf90c363fc"
+    },
+    {
+      "vector_id": "PDV01-EXTREME-FINITE",
+      "input_projection_data": {
+        "context_id": "context.extreme",
+        "constructs": [
+          {
+            "occurrence_id": "occurrence.extreme",
+            "target_id": "process.extreme",
+            "construct_role": "PROCESS",
+            "label": "Extreme finite",
+            "layout": {
+              "x": {"$input_binary64": "0000000000000001"},
+              "y": {"$input_binary64": "8000000000000001"},
+              "width": {"$input_binary64": "7fefffffffffffff"},
+              "height": {"$input_binary64": "ffefffffffffffff"},
+              "z_order": 2147483647
+            }
+          }
+        ]
+      },
+      "expected_preimage": {
+        "schema_id": "OPM-DEV-CANVAS-06-PROJECTION-DIGEST-PREIMAGE-001",
+        "schema_version": "0.1",
+        "source_projection_contract": "API-CTX-002/0.2.0-draft",
+        "float_encoding": "IEEE754_BINARY64_BE_HEX",
+        "data": {
+          "context_id": "context.extreme",
+          "constructs": [
+            {
+              "occurrence_id": "occurrence.extreme",
+              "target_id": "process.extreme",
+              "construct_role": "PROCESS",
+              "label": "Extreme finite",
+              "layout": {
+                "x": {"$binary64": "0000000000000001"},
+                "y": {"$binary64": "8000000000000001"},
+                "width": {"$binary64": "7fefffffffffffff"},
+                "height": {"$binary64": "ffefffffffffffff"},
+                "z_order": 2147483647
+              }
+            }
+          ]
+        }
+      },
+      "expected_canonical_utf8_hex": "7b2264617461223a7b22636f6e73747275637473223a5b7b22636f6e7374727563745f726f6c65223a2250524f43455353222c226c6162656c223a2245787472656d652066696e697465222c226c61796f7574223a7b22686569676874223a7b222462696e6172793634223a2266666566666666666666666666666666227d2c227769647468223a7b222462696e6172793634223a2237666566666666666666666666666666227d2c2278223a7b222462696e6172793634223a2230303030303030303030303030303031227d2c2279223a7b222462696e6172793634223a2238303030303030303030303030303031227d2c227a5f6f72646572223a323134373438333634377d2c226f6363757272656e63655f6964223a226f6363757272656e63652e65787472656d65222c227461726765745f6964223a2270726f636573732e65787472656d65227d5d2c22636f6e746578745f6964223a22636f6e746578742e65787472656d65227d2c22666c6f61745f656e636f64696e67223a22494545453735345f42494e41525936345f42455f484558222c22736368656d615f6964223a224f504d2d4445562d43414e5641532d30362d50524f4a454354494f4e2d4449474553542d505245494d4147452d303031222c22736368656d615f76657273696f6e223a22302e31222c22736f757263655f70726f6a656374696f6e5f636f6e7472616374223a224150492d4354582d3030322f302e322e302d6472616674227d",
+      "expected_projection_sha256": "5983fc1a5be5f88a4d80f42aa02b99bcb7aa88f2d9ee232b4f36b5e7b49fdd5a"
+    },
+    {
+      "vector_id": "PDV01-FULL-ORDERED",
+      "input_projection_data": {
+        "context_id": "context.full",
+        "constructs": [
+          {
+            "occurrence_id": "occurrence.z",
+            "target_id": "object.z",
+            "construct_role": "OBJECT",
+            "label": "Object Z",
+            "layout": {
+              "x": {"$input_binary64": "4000000000000000"},
+              "y": {"$input_binary64": "4008000000000000"},
+              "width": {"$input_binary64": "4010000000000000"},
+              "height": {"$input_binary64": "4014000000000000"},
+              "z_order": 2
+            }
+          },
+          {
+            "occurrence_id": "occurrence.a",
+            "target_id": "fact.a",
+            "construct_role": "PROCEDURAL_LINK",
+            "label": "consumes",
+            "layout": {
+              "x": {"$input_binary64": "3fb999999999999a"},
+              "y": {"$input_binary64": "bfb999999999999a"},
+              "width": {"$input_binary64": "4060080000000000"},
+              "height": {"$input_binary64": "4050200000000000"},
+              "z_order": -1
+            },
+            "source_id": "object.z",
+            "process_id": "process.a",
+            "source_occurrence_id": "occurrence.z",
+            "target_occurrence_id": "occurrence.process-a",
+            "symbol_ref": "symbol.link.consumption",
+            "layout_ref": "layout.fact-a",
+            "capability_id": "CAP-ISO-PROC-001",
+            "direction": "DIRECTED",
+            "endpoints": [
+              {
+                "role": "CONSUMING_PROCESS",
+                "target_kind": "ELEMENT",
+                "target_id": "process.a",
+                "ordinal": 1
+              },
+              {
+                "role": "CONSUMED_OBJECT",
+                "target_kind": "ELEMENT",
+                "target_id": "object.z",
+                "ordinal": 0
+              }
+            ],
+            "modifiers": [
+              {"modifier_id": "control.segment", "value": "PROCESS_INPUT"},
+              {"modifier_id": "control.capability", "value": "CAP-ISO-CTRL-001"}
+            ],
+            "labels": [
+              {"slot_id": "secondary", "text": "B"},
+              {"slot_id": "primary", "text": "A"}
+            ],
+            "collection_completeness": "NOT_APPLICABLE"
+          }
+        ]
+      },
+      "expected_preimage": {
+        "schema_id": "OPM-DEV-CANVAS-06-PROJECTION-DIGEST-PREIMAGE-001",
+        "schema_version": "0.1",
+        "source_projection_contract": "API-CTX-002/0.2.0-draft",
+        "float_encoding": "IEEE754_BINARY64_BE_HEX",
+        "data": {
+          "context_id": "context.full",
+          "constructs": [
+            {
+              "occurrence_id": "occurrence.z",
+              "target_id": "object.z",
+              "construct_role": "OBJECT",
+              "label": "Object Z",
+              "layout": {
+                "x": {"$binary64": "4000000000000000"},
+                "y": {"$binary64": "4008000000000000"},
+                "width": {"$binary64": "4010000000000000"},
+                "height": {"$binary64": "4014000000000000"},
+                "z_order": 2
+              }
+            },
+            {
+              "occurrence_id": "occurrence.a",
+              "target_id": "fact.a",
+              "construct_role": "PROCEDURAL_LINK",
+              "label": "consumes",
+              "layout": {
+                "x": {"$binary64": "3fb999999999999a"},
+                "y": {"$binary64": "bfb999999999999a"},
+                "width": {"$binary64": "4060080000000000"},
+                "height": {"$binary64": "4050200000000000"},
+                "z_order": -1
+              },
+              "source_id": "object.z",
+              "process_id": "process.a",
+              "source_occurrence_id": "occurrence.z",
+              "target_occurrence_id": "occurrence.process-a",
+              "symbol_ref": "symbol.link.consumption",
+              "layout_ref": "layout.fact-a",
+              "capability_id": "CAP-ISO-PROC-001",
+              "direction": "DIRECTED",
+              "endpoints": [
+                {
+                  "role": "CONSUMING_PROCESS",
+                  "target_kind": "ELEMENT",
+                  "target_id": "process.a",
+                  "ordinal": 1
+                },
+                {
+                  "role": "CONSUMED_OBJECT",
+                  "target_kind": "ELEMENT",
+                  "target_id": "object.z",
+                  "ordinal": 0
+                }
+              ],
+              "modifiers": [
+                {"modifier_id": "control.segment", "value": "PROCESS_INPUT"},
+                {"modifier_id": "control.capability", "value": "CAP-ISO-CTRL-001"}
+              ],
+              "labels": [
+                {"slot_id": "secondary", "text": "B"},
+                {"slot_id": "primary", "text": "A"}
+              ],
+              "collection_completeness": "NOT_APPLICABLE"
+            }
+          ]
+        }
+      },
+      "expected_canonical_utf8_hex": "7b2264617461223a7b22636f6e73747275637473223a5b7b22636f6e7374727563745f726f6c65223a224f424a454354222c226c6162656c223a224f626a656374205a222c226c61796f7574223a7b22686569676874223a7b222462696e6172793634223a2234303134303030303030303030303030227d2c227769647468223a7b222462696e6172793634223a2234303130303030303030303030303030227d2c2278223a7b222462696e6172793634223a2234303030303030303030303030303030227d2c2279223a7b222462696e6172793634223a2234303038303030303030303030303030227d2c227a5f6f72646572223a327d2c226f6363757272656e63655f6964223a226f6363757272656e63652e7a222c227461726765745f6964223a226f626a6563742e7a227d2c7b226361706162696c6974795f6964223a224341502d49534f2d50524f432d303031222c22636f6c6c656374696f6e5f636f6d706c6574656e657373223a224e4f545f4150504c494341424c45222c22636f6e7374727563745f726f6c65223a2250524f4345445552414c5f4c494e4b222c22646972656374696f6e223a224449524543544544222c22656e64706f696e7473223a5b7b226f7264696e616c223a312c22726f6c65223a22434f4e53554d494e475f50524f43455353222c227461726765745f6964223a2270726f636573732e61222c227461726765745f6b696e64223a22454c454d454e54227d2c7b226f7264696e616c223a302c22726f6c65223a22434f4e53554d45445f4f424a454354222c227461726765745f6964223a226f626a6563742e7a222c227461726765745f6b696e64223a22454c454d454e54227d5d2c226c6162656c223a22636f6e73756d6573222c226c6162656c73223a5b7b22736c6f745f6964223a227365636f6e64617279222c2274657874223a2242227d2c7b22736c6f745f6964223a227072696d617279222c2274657874223a2241227d5d2c226c61796f7574223a7b22686569676874223a7b222462696e6172793634223a2234303530323030303030303030303030227d2c227769647468223a7b222462696e6172793634223a2234303630303830303030303030303030227d2c2278223a7b222462696e6172793634223a2233666239393939393939393939393961227d2c2279223a7b222462696e6172793634223a2262666239393939393939393939393961227d2c227a5f6f72646572223a2d317d2c226c61796f75745f726566223a226c61796f75742e666163742d61222c226d6f64696669657273223a5b7b226d6f6469666965725f6964223a22636f6e74726f6c2e7365676d656e74222c2276616c7565223a2250524f434553535f494e505554227d2c7b226d6f6469666965725f6964223a22636f6e74726f6c2e6361706162696c697479222c2276616c7565223a224341502d49534f2d4354524c2d303031227d5d2c226f6363757272656e63655f6964223a226f6363757272656e63652e61222c2270726f636573735f6964223a2270726f636573732e61222c22736f757263655f6964223a226f626a6563742e7a222c22736f757263655f6f6363757272656e63655f6964223a226f6363757272656e63652e7a222c2273796d626f6c5f726566223a2273796d626f6c2e6c696e6b2e636f6e73756d7074696f6e222c227461726765745f6964223a22666163742e61222c227461726765745f6f6363757272656e63655f6964223a226f6363757272656e63652e70726f636573732d61227d5d2c22636f6e746578745f6964223a22636f6e746578742e66756c6c227d2c22666c6f61745f656e636f64696e67223a22494545453735345f42494e41525936345f42455f484558222c22736368656d615f6964223a224f504d2d4445562d43414e5641532d30362d50524f4a454354494f4e2d4449474553542d505245494d4147452d303031222c22736368656d615f76657273696f6e223a22302e31222c22736f757263655f70726f6a656374696f6e5f636f6e7472616374223a224150492d4354582d3030322f302e322e302d6472616674227d",
+      "expected_projection_sha256": "feeec4959d46c062e4c3679f3f0774c9a767e3ba89449bb77d3c159bbcb32ca0"
+    }
+  ],
+  "negative_vectors": [
+    {
+      "vector_id": "PDV01-NEG-NAN",
+      "base_positive_vector_id": "PDV01-FULL-ORDERED",
+      "mutation": {"operation": "SET_RUNTIME_NUMBER", "json_pointer": "/constructs/1/layout/x", "value_token": "NAN"},
+      "expected_error_code": "PROJECTION_DIGEST_NON_FINITE_FLOAT",
+      "expected_error_pointer": "/data/constructs/1/layout/x"
+    },
+    {
+      "vector_id": "PDV01-NEG-POSITIVE-INFINITY",
+      "base_positive_vector_id": "PDV01-FULL-ORDERED",
+      "mutation": {"operation": "SET_RUNTIME_NUMBER", "json_pointer": "/constructs/1/layout/y", "value_token": "POSITIVE_INFINITY"},
+      "expected_error_code": "PROJECTION_DIGEST_NON_FINITE_FLOAT",
+      "expected_error_pointer": "/data/constructs/1/layout/y"
+    },
+    {
+      "vector_id": "PDV01-NEG-NEGATIVE-INFINITY",
+      "base_positive_vector_id": "PDV01-FULL-ORDERED",
+      "mutation": {"operation": "SET_RUNTIME_NUMBER", "json_pointer": "/constructs/1/layout/width", "value_token": "NEGATIVE_INFINITY"},
+      "expected_error_code": "PROJECTION_DIGEST_NON_FINITE_FLOAT",
+      "expected_error_pointer": "/data/constructs/1/layout/width"
+    },
+    {
+      "vector_id": "PDV01-NEG-MISSING-LAYOUT-FIELD",
+      "base_positive_vector_id": "PDV01-FULL-ORDERED",
+      "mutation": {"operation": "REMOVE_PROPERTY", "json_pointer": "/constructs/1/layout/height", "value_token": "ABSENT"},
+      "expected_error_code": "PROJECTION_DIGEST_SCHEMA_MISMATCH",
+      "expected_error_pointer": "/data/constructs/1/layout/height"
+    },
+    {
+      "vector_id": "PDV01-NEG-UNKNOWN-LAYOUT-FIELD",
+      "base_positive_vector_id": "PDV01-FULL-ORDERED",
+      "mutation": {"operation": "ADD_JSON_STRING", "json_pointer": "/constructs/1/layout/depth", "value_token": "STRING:x"},
+      "expected_error_code": "PROJECTION_DIGEST_SCHEMA_MISMATCH",
+      "expected_error_pointer": "/data/constructs/1/layout/depth"
+    },
+    {
+      "vector_id": "PDV01-NEG-NON-LAYOUT-FRACTION",
+      "base_positive_vector_id": "PDV01-FULL-ORDERED",
+      "mutation": {"operation": "SET_RUNTIME_NUMBER", "json_pointer": "/constructs/1/layout/z_order", "value_token": "NUMBER:1.5"},
+      "expected_error_code": "PROJECTION_DIGEST_NUMBER_DOMAIN_INVALID",
+      "expected_error_pointer": "/data/constructs/1/layout/z_order"
+    },
+    {
+      "vector_id": "PDV01-NEG-UNSAFE-INTEGER",
+      "base_positive_vector_id": "PDV01-FULL-ORDERED",
+      "mutation": {"operation": "SET_RUNTIME_NUMBER", "json_pointer": "/constructs/1/endpoints/0/ordinal", "value_token": "NUMBER:9007199254740992"},
+      "expected_error_code": "PROJECTION_DIGEST_NUMBER_DOMAIN_INVALID",
+      "expected_error_pointer": "/data/constructs/1/endpoints/0/ordinal"
+    },
+    {
+      "vector_id": "PDV01-NEG-UNKNOWN-CONSTRUCT-FIELD",
+      "base_positive_vector_id": "PDV01-FULL-ORDERED",
+      "mutation": {"operation": "ADD_JSON_STRING", "json_pointer": "/constructs/1/debug", "value_token": "STRING:x"},
+      "expected_error_code": "PROJECTION_DIGEST_SCHEMA_MISMATCH",
+      "expected_error_pointer": "/data/constructs/1/debug"
+    },
+    {
+      "vector_id": "PDV01-NEG-LONE-SURROGATE",
+      "base_positive_vector_id": "PDV01-FULL-ORDERED",
+      "mutation": {"operation": "SET_JSON_STRING", "json_pointer": "/constructs/1/label", "value_token": "UTF16_LONE_HIGH_D800"},
+      "expected_error_code": "PROJECTION_DIGEST_UNICODE_INVALID",
+      "expected_error_pointer": "/data/constructs/1/label"
+    }
+  ],
+  "catalog_payload_sha256": "fd81cdfdc10c7137ecf48c314766251632f01fe6f6da458f0b1c47b1f49113f4"
+}

@@ -1,10 +1,10 @@
 # OPM 单机建模工具全量设计冻结基线
 
-文档版本：`1.1`
+文档版本：`1.26`
 
 初始冻结日期：`2026-07-30`
 
-最近复核日期：`2026-07-31`
+最近复核日期：`2026-08-18`
 
 设计冻结状态：`FROZEN`
 
@@ -14,7 +14,7 @@
 
 本文档是 OPM 单机建模工具设计状态和开发准入的唯一事实源。需求、架构、页面、交互、语义、API、数据、测试、发布、任务规格和 checklist 继续承载各自的详细设计；它们不得单独改变全局设计冻结状态。
 
-本基线只证明开发输入已经闭合，不证明代码、机器资产、构建、测试、安装包、性能、发布或 ISO 19450:2024 符合性已经完成。
+本基线是开发输入是否闭合的唯一判定源；当前32项责任已闭合为`22 FROZEN_INCLUDED + 10 FROZEN_DEFERRED`。恢复开发准入只表示允许按独立实现规格进入Build，不证明代码、机器资产、构建、测试、安装包、性能、发布或ISO 19450:2024符合性已经完成。
 
 冻结状态只允许：
 
@@ -35,7 +35,7 @@
 5. Semantic Model 单一事实源、OPD/OPL/Trace/Finding 投影、不可变 Revision、Draft Head 和 Baseline；
 6. ISO 配置档下的只读实时 OPL、Token/Trace、golden 和原子提交；
 7. P0 应用 API、完整画布目标 API、SQLite V1、版本化 Revision 文档，以及 `.opmp` ZIP、Canonical JSON、SHA-256、`exchange_format_version=1.0/minimum_reader_version=1.0` 原生交换边界；
-8. 分层测试、视觉/E2E/性能/恢复和发布 Gate 设计。
+8. 分层测试、Golden Authoring、release-only Fixture Materializer、视觉/E2E/性能/恢复和发布 Gate 设计。
 
 P04-P06 的页面、状态、字段和组件设计已经冻结，但生产实现不属于当前开发包。开发必须按 `DEV-00~09`、`DEV-CANVAS-00~06` 的依赖和单包 Gate 逐步进行。
 
@@ -89,14 +89,16 @@ Launcher 仍只启动 loopback 服务并打开系统默认浏览器。前端在�
 
 核心动作必须具备键盘路径和可访问名称；焦点可见；状态、错误和所有权不得只用颜色表达；陌生图标必须有 tooltip；文本和控件不得重叠。
 
-## 4. `FROZEN_INCLUDED` 责任矩阵
+## 4. 当前设计责任矩阵
 
-以下 `20` 项均为当前开发输入。`owner` 是设计和变更责任角色，不表示多用户权限模型。
+当前`22`项设计责任为`FROZEN_INCLUDED`，没有`BLOCKED`。`owner`是设计和变更责任角色，不表示多用户权限模型。
+
+### 4.1 `FROZEN_INCLUDED`
 
 | ID | 设计责任 | 冻结版本/来源 | Owner | 可执行验收 | 变更控制 |
 | --- | --- | --- | --- | --- | --- |
 | `DFR-001` | 单机、本地、单用户、loopback 产品边界 | 需求 `v1.0` 第 8、13 章；ARC-007 | Product + M01 | FR-LOCAL、NFR-SEC-001~006 | 新 task spec + 本基线升版 |
-| `DFR-002` | 当前开发范围和 P01-P03/完整画布交付顺序 | 开发执行包 `v1.0` | Architecture | DEV-00~09、DEV-CANVAS-00~06 单包 DoD | 禁止跨包静默扩围 |
+| `DFR-002` | 当前开发范围和 P01-P03/完整画布交付顺序 | 开发执行包 `v1.17` | Architecture | DEV-00~09、DEV-CANVAS-00~06 单包 DoD | 禁止跨包静默扩围 |
 | `DFR-003` | P01-P06 页面、IA、状态、字段和组件职责 | 页面四文档 + handoff | Frontend Architecture | 原型报告、P01-P06 状态与字段映射 | 页面变更同时更新四文档与 handoff |
 | `DFR-004` | State、图标工具链、关系目录和 16/8/10 完整画布 UX | 完整画布设计 `v1.0` | M01/M05/M06 | `ACC-CANVAS-*`、DEV-CANVAS-01~04 | Capability/事件/字段变更必须升版 |
 | `DFR-005` | 浏览器、视口、缩放和可访问性矩阵 | 本文第 3 章 | Frontend + QA | NFR-UX-001~006、visual/cross-browser E2E | 浏览器或阈值变化必须升版本基线 |
@@ -112,9 +114,15 @@ Launcher 仍只启动 loopback 服务并打开系统默认浏览器。前端在�
 | `DFR-015` | Revision 0.2 目标机器表示和 0.1 兼容读取 | 核心字段 + 持久化 +物理设计 | M09/M12 | Fact `modifiers[]`、旧 reader、roundtrip、immutable | 发布独立 `/0.2` Schema；不得改写 0.1 历史 Revision |
 | `DFR-016` | SQLite V1、不可变 Revision、Draft Head、原子提交和恢复 | 持久化 +物理设计 + V1 DDL | M09/M12 | migration、FK、immutable trigger、故障注入 | 当前语义扩展不修改 SQLite V1 |
 | `DFR-017` | `.opmp` 1.0 原生交换、版本兼容和资产 exact binding | 原生交换契约 | M02/M10/M12 | ZIP/Canonical JSON/SHA-256、1.0 reader/writer、staging、digest、未知版本阻断、回滚 | 不得宣称为 ISO 或第三方标准交换格式 |
-| `DFR-018` | 分层测试、fixture、visual/E2E/性能/恢复证据边界 | 测试策略 `v1.0` | QA +各模块 | 需求矩阵与 GATE-05/06 | 设计状态与执行状态分栏 |
-| `DFR-019` | 工具链 release、enablement、rollback 和 6/12 smoke | DEV-CANVAS-06 规格/checklist | Release + QA | GATE-06-01~06 READY 算法 | Candidate 不等于 Activation；production gate 默认关闭 |
+| `DFR-018` | 分层测试、fixture、visual/E2E/性能/恢复证据与Projection摘要边界 | 测试策略`v1.17`；Visual Common `v1.4`；E2E Artifact `v1.3`、Family Identity Catalog `0.1/0.1.0`、Report `0.2`、Runner Source Set `0.1`；Recovery Execution `v1.5`与Launch Request/Proof `0.1`；Projection Digest Closure `v1.0/0.1` | QA + Runtime + Architecture | safe-integer JCS不放宽；Common五类index/8类UI step/43文件self-contained root；Family Project Catalog/178 -> 2/deep join；Fault Plan ordinal唯一来源；binary64大端raw-bit preimage；Node/Java parity；Recovery launch原子proof；E2E Java/source identity；Recovery 28/56、E2E 194/388及只读verifier | Projection/source/index/step/numeric位置/encoding、Family identity Catalog、Launch协议或E2E Report identity变化必须升级对应版本，禁止重解释历史SHA |
+| `DFR-019` | 工具链 release、enablement、rollback 和 6/12 smoke | DEV-CANVAS-06规格/checklist + Common 02B/03C + E2E Manifest/Runner规格 + Family Identity闭包规格 + Versioned Handoff Report Ref Closure规格 + Recovery runner规格 | Release + QA | GATE-06-01~06 READY算法；Visual `378/756`；E2E `194/388`；Recovery `28/56`；E2E Manifest完整复制活动Common 43文件root并锁定Family Identity Catalog raw ref；Handoff direct raw ref仅指向同一不可变版本根 | Candidate不等于Activation；production gate默认关闭；固定Handoff只原子替换JSON；旧mutable reports alias不得成为active ref；旧合并builder和旧Common source布局禁用；Family Project禁止派生；release/test-only materializer/fault launcher不得进入默认生产装配 |
 | `DFR-020` | 正式索引、handoff、开发门和冻结后变更 | 本文 + `docs/README.md` | Architecture | blocked/conflict/status 计数为 0 | 任一冻结输入变化先关闭开发门再评审 |
+| `DFR-021` | Visual Golden Authoring、Common materialization、审批与不可变版本 | Golden Authoring `v1.4` + Visual Common Materialization `v1.4` + Common Visual Fixture`0.1` + Catalog历史`0.1.0`/活动`0.2.0` + Environment `0.2` + 02B/03C/03B/04/05规格 | QA + Release + Runtime | 8个完整Visual fixture、32个E2E asset、唯一空Text Artifact与`text_traces=[]`、固定`1/1/0`计数、五类index逐列映射、8类UI step/exact数组、`43=1+8+32+2` root、24项factory ref、8 base/72 capture/144 clone、normalized Projection、唯一Node JCS owner与Node/Java parity、`srgb -> sRGB IEC61966-2.1`、candidate/approval/publish exact join | 旧fixture/Catalog`0.1.0`/Plan和旧Common source布局不可改写或作为活动输入；活动Catalog只用`0.2.0`；03B等待02B/03C；设计冻结不得提升production Gate |
+| `DFR-022` | Release-only Golden Fixture Materializer | Fixture Materializer设计`v1.5` + Verifier Catalog `v1.1` + 03A实现规格 | Runtime + QA + Release | 130 exact archive fixture、non-web guard、Check 8接纳点、stable projection、Report pipeline、pending attestation、唯一四阶段cleanup/quarantine、semantic verifier `63=57+6`、稳定`GFMV_*`/优先级、并发与性能 | 禁止公共API/生产装配；pre-acceptance零Report；pending verifier不持久化且不替代完整verifier；不得伪造identity |
+
+### 4.2 `BLOCKED`
+
+无。
 
 ## 5. `FROZEN_DEFERRED` 责任矩阵
 
@@ -176,8 +184,8 @@ Launcher 仍只启动 loopback 服务并打开系统默认浏览器。前端在�
 
 ```text
 design_freeze_status == FROZEN
-AND design_responsibility_count == 30
-AND frozen_included_count == 20
+AND design_responsibility_count == 32
+AND frozen_included_count == 22
 AND frozen_deferred_count == 10
 AND blocked_count == 0
 AND unresolved_design_status_count == 0
@@ -190,8 +198,8 @@ AND every(FROZEN_DEFERRED has non_goal/restart_trigger/owner/prohibited_implemen
 
 ```text
 design_freeze_status=FROZEN
-design_responsibility_count=30
-frozen_included_count=20
+design_responsibility_count=32
+frozen_included_count=22
 frozen_deferred_count=10
 blocked_count=0
 unresolved_design_status_count=0
@@ -199,13 +207,59 @@ cross_document_conflict_count=0
 development_gate=READY_FOR_DEVELOPMENT
 ```
 
-2026-07-31 复核记录：原生交换契约第 1 章曾保留“物理格式未冻结”的早期表述，与架构 ARC-008、物理数据设计第 10 章及该契约第 16.2 节冲突；冲突存续期间不得引用上述 `cross_document_conflict_count=0`。本次按 `specs/opm-design-conflict-remediation-and-conformance-refresh-task-spec.md` 删除开放选型表述、冻结首发 1.0/reader 1.0，并重新核对 30 项责任后恢复为 `0`。
+2026-07-31 复核记录一：原生交换契约第 1 章曾保留“物理格式未冻结”的早期表述，与架构 ARC-008、物理数据设计第 10 章及该契约第 16.2 节冲突；冲突存续期间不得引用上述 `cross_document_conflict_count=0`。本次按 `specs/opm-design-conflict-remediation-and-conformance-refresh-task-spec.md` 删除开放选型表述、冻结首发 1.0/reader 1.0，并重新核对当时 30 项责任后恢复为 `0`。
 
-`READY_FOR_DEVELOPMENT` 只授权开发人员创建并执行一个满足依赖的任务规格。它不授权跳过 `DEV-*`/`DEV-CANVAS-*` 输入 Gate，不授权启用未通过 release evidence 的 Capability，也不授权 ISO 声明。
+2026-07-31 复核记录二：新增独立 Golden Authoring `DFR-021`，冻结无 PNG Capture Plan、固定 author 环境、Applicant/Approver 分离、INITIAL/SUPERSEDE 不可变版本和 Visual Manifest approved evidence 守卫；同步 DEV-CANVAS-06、测试策略与索引后，当前 31 项责任无开放状态或跨文档冲突。三类新 Schema/runner、approved golden 和 Visual Manifest 0.2 仍是实现缺口，不改变设计冻结结论。
+
+2026-07-31 复核记录三：新增 release-only Golden Fixture Materializer `DFR-022`，冻结 130 个 exact Evidence Bundle `MS-REV-001/0.2` ref、确定性 Project/原样 Model-Revision 身份、non-web Runtime guard、空 storage、SQLite V1 seed、attempt clone 隔离、Materialization Report、Approval Record 0.2 集合覆盖和 Authoring Report 0.2 exact 引用。同步 Golden Authoring、DEV-CANVAS-06、测试策略和索引后，当前 32 项责任无开放状态或跨文档冲突；实现与真实报告仍缺失。
+
+2026-08-01 复核记录四：Materialization Report `0.1` 强制 `fixture_identity`，而旧规格要求任一单项 preflight 失败写 BLOCKED Report，导致 Bundle/Archive/Fixture 尚未可信时无法构造真实证据。本次以独立 bugfix Spec 把 Check 8 PASSED 后冻结为唯一 reportable invocation 接纳点：Check 1~8 失败为 pre-acceptance 零 storage/report，Check 9 以后失败使用真实 fixture identity 写 BLOCKED Report，report-out 物理交付失败固定为 `GFM_REPORT_WRITE_FAILED/4` 和零最终 Report。Materializer 设计升为 v1.1；重新核对后责任仍为 `32=22+10`，开放状态和跨文档冲突均为 0。
+
+2026-08-01 复核记录五：对 Materializer v1.1、Golden Authoring v1.1、DEV-CANVAS-06 和实现状态再次交叉审计，发现确定性/per-run evidence、Report engine 自失败、cleanup/quarantine、semantic verifier、并发停止、Approval/Authoring/Visual Manifest 0.2 producer 及 `20+10/22+10` 状态存在七类冲突。本次把两份主设计升为 `v1.2`，冻结 stable projection、content/engine/write 失败互斥、Quarantine Marker、唯一 verifier、candidate report -> Approval -> Publisher exact join 和 Visual Manifest 八字段；新增 03B/04/05 直接开发 spec/checklist，并同步测试策略、执行包、DEV-CANVAS-06、需求矩阵和索引。复核通过后责任仍为 `32=22+10`，`blocked/unresolved/cross_document_conflict` 均为 `0`；这只恢复设计开发门，不提升任何实现或发布状态。
+
+2026-08-01 复核记录六：唯一 semantic verifier 已有检查范围和 `0/2/3/4`，但缺少受控 factory、稳定 verifier 错误目录、首错优先级、single/full-root 边界和 Report/root 可执行正反例；“额外项返回 3”还混淆了非法证据与合法不可消费状态。本次把 Materializer 升为 `v1.3`，新增 Verifier Catalog `v1.0`，冻结 57 个 case、`GFMV_*`、单变量变异、三种枚举顺序和前后 tree digest；额外/未知/unsafe 固定为 `2`，合法 BLOCKED/缺失/quarantine 固定为 `3`。该闭包仍属于 `DFR-022`，责任保持 `32=22+10`，`blocked/unresolved/cross_document_conflict` 均为 `0`；实现、真实 release 和 ISO 状态未提升。
+
+2026-08-03 复核记录七：历史 Visual/E2E 输入实现规格仍授权合并 `0.1` builder，与生产 Visual Manifest `0.2` 目标冲突；E2E 版本和受控/生产 bundle 隔离也未唯一冻结。本次新增 Visual/E2E 输入修正规格，固定独立 builder、Visual `0.2/0.2.0`、E2E `0.1/0.1.0`、approved Report/Approval/Environment/Plan/130 Report/database transitive exact join，以及 `CONTROLLED_TEST/PRODUCTION_HANDOFF` 根、身份和禁止互用；旧规格降级为 `HISTORICAL/SUPERSEDED`。该修正归入 `DFR-018/019/021`，责任仍为 `32=22+10`，重新核对后 `blocked/unresolved/cross_document_conflict` 均为 `0`；builder、真实 Manifest/Report、Gate、Candidate、Activation 和 ISO 状态未提升。
+
+2026-08-03 复核记录八：继续检查发现三个执行级缺口：E2E `0.1` 缺完整CLI/controlled archive与fixture布局/ref映射/单事务零输出；Materializer完整verifier与cleanup移动顺序形成循环；Recovery缺factory/template raw ref/fault hook/强停proof/artifact格式。本次新增E2E builder实现规格、Recovery Execution设计与runner规格，并把Materializer升为`v1.5`、Verifier Catalog升为`v1.1`，冻结`pending预验证 -> 原子移动residual -> 原子写marker -> 完整selected verifier`唯一顺序和`63=57+6`受控case。该闭包归入`DFR-018/019/022`，不新增责任项；重新核对后仍为`32=22+10`，`blocked/unresolved/cross_document_conflict`均为`0`。设计冻结不表示builder、63/63、Recovery 28/56、Gate、Candidate、Activation、Capability或ISO证据已经完成。
+
+2026-08-04 复核记录九：Recovery Execution `v1.0`虽然冻结了factory/fault/launcher流程，但没有两份template完整bytes、四条command payload、request digest算法、七类结果digest固定键和Gate 34项闭包，runner规格还授权实现阶段重新author template。本次以独立bugfix Spec新增两份不可变`0.1.0` JSON，将Execution升为`v1.1`，冻结RFC 8785 JCS request digest、规范化结果投影、deterministic ID port、raw/payload/fixture SHA和runner只读消费边界；同步后`DFR-018/019`无冲突，责任仍为`32=22+10`，`blocked/unresolved/cross_document_conflict`均为`0`。template输入冻结不表示factory、runner、28/56、Recovery READY、Gate、Candidate、Activation、Capability或ISO证据已经完成。
+
+2026-08-04 复核记录十：E2E Manifest `0.1` builder/verifier已经实现并完成定向`22/22`，但原正式入口仍将其与未实现Runner合并描述，且`194/388`执行缺少process/browser/storage隔离、Common/Family物化、raw artifact、Report可报告边界、失败优先级和只读verifier的直接开发规格。本次新增E2E Runner设计闭环bugfix及implementation spec/checklist，将测试策略升为`v1.3`，冻结self-contained Report transaction、真实identity边界和production/controlled守卫，E2E Runner子包达到`FROZEN_FOR_IMPLEMENTATION`。全局交叉复核同时确认`DFR-021`仍有两个未冻结输入：Visual Common Fixture Runtime Materialization没有唯一映射，且Capture Plan的`srgb`与Golden Environment的`sRGB IEC61966-2.1`没有canonical映射和比较算法。因此当前责任为`32=21 FROZEN_INCLUDED + 10 FROZEN_DEFERRED + 1 BLOCKED`，`unresolved=1`、`cross_document_conflict=1`，全局开发门关闭。局部Runner冻结不表示Runner已实现、production Manifest/Report已生成、194/388已执行或Gate/Capability/ISO状态提升。
+
+2026-08-04 复核记录十一：以独立bugfix规格和Visual Common Materialization `v1.0`关闭`DFR-021`两个阻塞。Common Fixture新增`0.1/0.1.0`完整契约，唯一物化路径固定为exact Runtime JAR的release-only non-web SQLite V1；8个subject的Project/Model/Revision、元素/State/Fact、layout/index、UI setup、focus、normalized Projection、8个immutable base和`72*2=144`个fresh clone均已冻结。Plan raw `srgb`与唯一Chromium参数只允许映射到Environment canonical `sRGB IEC61966-2.1`，禁止trim/case/alias。新增02B/03C implementation spec/checklist，03B在两者通过前保持`BLOCKED_BY_DEPENDENCY`，旧fixture/Catalog和`GOLDEN-CANVAS06-20260803-001`保持不可变历史输入。交叉复核后恢复`32=22 FROZEN_INCLUDED + 10 FROZEN_DEFERRED`，`blocked/unresolved/cross_document_conflict=0`和`READY_FOR_DEVELOPMENT`。这不表示02B/03C/03B已实现、production 130项或8/144已执行、PNG/candidate/approved/Report已生成、Gate/Capability/ISO状态提升。
+
+2026-08-04 复核记录十二：在02B实现前置审计中确认，仓库只有Planner等脚本的局部`jcs()`和Java `Rfc8785JsonCanonicalizer`，不存在02B Builder/Verifier/Planner可共同导入的共享Node owner，且缺少Node生成digest与Java 03C复算的跨Runtime parity输入。本次以独立bugfix规格将Visual Common Materialization升为`v1.1`，冻结唯一Node模块`scripts/canvas06-rfc8785.mjs`及`canonicalizeJcs/sha256Jcs`导出、safe integer/有效Unicode值域、RFC 8785 UTF-16 key排序与拒绝边界、10项exact共用向量`tests/e2e/release/dev-canvas-06/fixtures/common-visual-jcs-vectors.json`和Java继续复用既有canonicalizer的责任。历史`v1.0`记录保持不变，活动入口统一指向`v1.1`。交叉复核后责任仍为`32=22 FROZEN_INCLUDED + 10 FROZEN_DEFERRED`，`blocked/unresolved/cross_document_conflict=0`和`READY_FOR_DEVELOPMENT`；共享模块、向量、02B/03C/03B、production evidence、Gate、Capability和ISO状态均未提升。
+
+2026-08-04 复核记录十三：Recovery Execution `v1.1`已冻结template与runner协议，但Factory返回仍使用开放描述，缺Attempt Materialization/Tree Descriptor机器形状、helper JAR身份、source mirror、Report普通ref映射、完整SQLite表集合/逐列映射、原子提交与只读首错。此次以独立bugfix规格新增两份`0.1` Schema，将Execution升为`v1.2`，冻结28 case到四base scenario、独立`services/recovery-test-tools`、固定JAR Manifest/source commit、21表精确集合、Handoff binding owner、Node/helper单写边界、fsync/no-replace/residual和verifier顺序；既有Manifest/Gate Fixture/Report三份`0.1` Schema及两份template bytes不变。`RECOVERY-IMPL-01`因此达到`DESIGN_READY/IMPLEMENTATION_NOT_STARTED`；责任仍为`32=22+10`，`blocked/unresolved/cross_document_conflict=0`和`READY_FOR_DEVELOPMENT`。这不表示helper/factory/runner已实现、28/56已执行、Recovery READY、Candidate、Activation、Capability或ISO状态提升。
+
+2026-08-04 复核记录十四：E2E Runner规格要求11类attempt JSON递归`additionalProperties=false`，但仓库此前只有Manifest/Report Schema和字段摘要，Materializer、launcher、collector与verifier仍可自行发明中间机器格式。本次以独立bugfix规格新增E2E Attempt Artifact执行设计`v1.0`和union Schema `0.1`，冻结filename/schema identity、三类fault映射、Family/Common materialization、Runtime/Browser/Network/Console/Transaction/Reopen/API、10个Index必需kind、JCS/SHA、Report投影与不可报告失败边界；11类root及反例并入Visual/E2E Schema定向验证并达到`12/12`。该闭包归入`DFR-018/019`，责任仍为`32=22+10`，`blocked/unresolved/cross_document_conflict=0`和`READY_FOR_DEVELOPMENT`。E2E Runner仍为局部基础层`IN_PROGRESS`，artifact producer/verifier、controlled/production 194/388、READY Report、Gate、Candidate、Activation、Capability和ISO状态均未提升。
+
+2026-08-04 复核记录十五：Recovery Manifest `0.1`的`expected_reopen`允许任意对象，且HTTP设计要求比较raw body与JCS bytes，却未冻结Controller前捕获、严格解析、replay和零执行边界。本次以独立bugfix规格将Recovery Execution升为`v1.3`，保留历史Manifest `0.1`，新增活动Manifest `0.2`、Reopen Catalog `0.1.0`及Schema、HTTP Request Artifact union Schema，冻结三个profile、28项exact join、raw/payload/profile SHA、test-only eager filter/body advice与HTTP 422零Controller/Service/repository调用。两个P1因此关闭。交叉复核同时确认Recovery snapshot仍要求对含`double`布局的Projection计算JCS摘要，而共享Node/Java owner仅接受safe integer并拒绝浮点；`DFR-018`转为唯一`BLOCKED`，当前责任为`32=21 FROZEN_INCLUDED + 10 FROZEN_DEFERRED + 1 BLOCKED`，`blocked/unresolved/cross_document_conflict=1`，全局开发门为`BLOCKED_BY_DESIGN`。这不表示Runner已实现、28/56已执行、Recovery READY、Candidate、Activation、Capability或ISO状态提升。
+
+2026-08-04 复核记录十六：以独立bugfix规格和Projection Digest Closure设计`v1.0/0.1`关闭`DFR-018`。新增封闭preimage Schema和parity vector Catalog Schema，layout四个有限binary64唯一编码为IEEE-754 raw bits的8-byte big-endian 16位小写hex tag，safe-integer JCS owner保持不变；4个正向量覆盖空Projection、正负零、subnormal、max finite和数组顺序，9个负向量冻结非有限数、shape、数值域和Unicode错误，Catalog payload/raw SHA闭合。Recovery Execution升为`v1.4`，E2E Attempt Artifact设计升为`v1.1`，两者的正式Projection摘要绑定同一版本；Recovery template既有scenario projection digest保持独立且bytes不变。交叉复核后恢复`32=22 FROZEN_INCLUDED + 10 FROZEN_DEFERRED`，`blocked/unresolved/cross_document_conflict=0`和`READY_FOR_DEVELOPMENT`；`RECOVERY-IMPL-01=DESIGN_READY/IMPLEMENTATION_NOT_STARTED`。这不表示Projection normalizer、Recovery/E2E runner、28/56、194/388、READY Report、Gate、Candidate、Activation、Capability、production release或ISO状态提升。
+
+2026-08-07 复核记录十七：按`02B -> Recovery Launch -> E2E Java/Source Identity`顺序完成执行契约设计修正。Visual Common Materialization升为`v1.2`，冻结唯一空`text_artifact`、版本化JCS摘要、显式`text_traces=[]`及SQLite/Verifier `1/1/0`计数；Recovery Execution升为`v1.5`，新增Launch Request/Proof `0.1` Schema，冻结32-byte challenge、四阶段proof、single-writer原子发布和首错；E2E Attempt Artifact升为`v1.2`，历史Report `0.1`保持只读，活动Report升为`0.2`并新增Java executable mirror/ref和23项Runner Source Set `0.1`。Recovery Schema正反例`17/17`、Visual/E2E Schema正反例`15/15`通过。该修正归入`DFR-018/019/021`，不新增责任项；复核后仍为`32=22+10`，`blocked/unresolved/cross_document_conflict=0`和`READY_FOR_DEVELOPMENT`。02B/03C、Recovery 28/56、E2E 194/388、READY Report、Gate、Candidate、Activation、Capability、production和ISO状态均未提升。
+
+2026-08-07 复核记录十八：继续审计02B直接开发输入，确认`index_seed`此前只有五个数组名和数量、UI setup只有步骤简写、Catalog source ref没有self-contained source owner；新完整fixture/source bytes若继续复用历史`catalog_version=0.1.0`还会违反同版本不可变规则。本次以独立bugfix Spec将Visual Common Materialization升为`v1.3`，新增Common Visual Fixture`0.1`机器Schema，冻结五类entry字段/排序/固定ID时间状态/null及Revision到SQLite V1逐列映射、8类step union与每subject exact JSON、实际generator/factory两份source mirror和只读verifier边界；Catalog机器Schema仍为`0.1`，历史`0.1.0`不可变，活动版本固定`0.2.0`。测试策略与执行包升为`v1.10`。该修正归入`DFR-018/019/021`，不新增责任；复核后仍为`32=22+10`，`blocked/unresolved/cross_document_conflict=0`和`READY_FOR_DEVELOPMENT`。Schema存在不表示02B validator/fixture/mirror/producer/verifier、03C/03B、base/clone、Report、Gate、Candidate、Activation、Capability、production或ISO状态提升。
+
+2026-08-07 复核记录十九：继续审计活动Catalog `0.2.0`的机器ref，确认Schema强制携带16个E2E case，但Visual Common `v1.3`的02B输出根只包含Catalog、8个Visual和两份source mirror；`e2e_cases[].base_fixture_ref/input_ref`无法在受控root内解析，而verifier又禁止外部checkout。本次选择唯一方案“E2E assets纳入输出布局”，将Visual Common升为`v1.4`，冻结`43=1 Catalog+8 Visual+32 E2E+2 source mirror`、同一静态factory生成算法、24项factory ref一致性、全树verifier和零输出事务；E2E Manifest只接受已验证活动43文件root并逐byte复制完整树到`inputs/common/`。既有E2E Manifest `22/22`降为旧布局历史快照，当前实现为`CONTRACT_UPDATE_REQUIRED`。测试策略和开发执行包升为`v1.11`。该修正归入`DFR-018/019/021`，不新增责任；复核后仍为`32=22+10`，`blocked/unresolved/cross_document_conflict=0`和`READY_FOR_DEVELOPMENT`。这不表示02B、E2E Manifest新适配、03C/03B、Manifest/Report、Gate、Candidate、Activation、Capability、production或ISO状态提升。
+
+2026-08-17 复核记录二十：继续审计Family Materializer直接开发输入，确认`MS-REV-001/0.2`和E2E Manifest case均不含`project_id`，而旧Runner/Artifact文档要求保留“fixture原Project”并禁止业务ID派生；Golden Materializer的`project.golden.fixture.<sha256>`只属于Authoring隔离库，不能填补该来源。另确认旧Artifact设计只禁止路径覆盖ordinal，未冻结下游producer必须从Fault Plan读取。本次以独立bugfix Spec新增Family Fixture Identity Catalog Schema `0.1`及活动`0.1.0`两项不可变输入，冻结Evidence Bundle -> Manifest唯一raw ref、178个Family base ref去重为2、Project只读Catalog、Model/Context/base Revision/sequence与fixture deep join、fixture可选parent字段缺失到Catalog显式`null`的唯一归一、`base_revision=fixture.revision_id`、Golden/Recovery/路径/SHA派生禁令及零SQLite边界；Artifact设计升为`v1.3`，Fault Plan成为attempt ordinal唯一机器来源。测试策略与开发执行包升为`v1.12`。该修正归入`DFR-018/019`，不新增责任；复核后仍为`32=22+10`，`blocked/unresolved/cross_document_conflict=0`和`READY_FOR_DEVELOPMENT`。Catalog尚未进入clean Handoff/Evidence Bundle/Manifest，Builder为`CONTRACT_UPDATE_REQUIRED`，Family Materializer切片为`BLOCKED_BY_DEPENDENCY`；这不表示Runner、194/388、READY Report、Gate、Candidate、Activation、Capability、production或ISO状态提升。
+
+2026-08-17 复核记录二十一：Family Identity Catalog与E2E Manifest Builder的Common/Family适配已完成定向`23/23`，但旧Clean Handoff重建规格只授权replay report并绑定历史source commit，不能授权本轮source/Handoff/Intake/production Manifest重建。本次新增Family Production Input最小重建bugfix规格，固定base commit `6d76bf6050adecfa5aa0acfb4b7b8a62d413df14`、`36=3 M+33 A`精确source delta（新增第7.1节直接读取的JCS parity vectors与Common Fixture Catalog两份固定测试资产及其raw SHA）、双clean worktree、两个外部Common/Manifest隔离root、同父安装staging、版本化release布局、历史descriptor临时alias恢复、固定Handoff原子切换/回滚，以及production Manifest预验和安装后重验。E2E Builder状态改为`IMPLEMENTED_RELEASE_INPUT_REBUILD_REQUIRED`，重建执行状态为`NOT_STARTED`；测试策略和开发执行包升为`v1.13`。该修正归入`DFR-019`，不新增责任；复核后仍为`32=22+10`，`blocked/unresolved/cross_document_conflict=0`和`READY_FOR_DEVELOPMENT`。这不表示新source commit、Bundle/Handoff/Intake、production Manifest、Family Materializer、194/388 Report、Gate、Candidate、Activation、Capability、production release或ISO状态提升。
+
+2026-08-18 复核记录二十二：首次按36项delta形成source commit `ef268177d9c9e64f6d72d64832328c790638cc70`和patch SHA `94ed125044ef3de97b09a14ef26ad55102392e0d29a7590710585d39a2661b2f`，34项定向测试通过且上游Bundle已生成，但GATE evidence generator未显式指定Node test reporter；Node 24默认spec输出与TAP计数正则不匹配，造成进程成功而`observed_cases=0`，Handoff受控阻断。修正规格将生成器加入allowlist，delta冻结为`37=4 M+33 A`；GATE-05-01唯一命令冻结为`node --test --test-reporter=tap --test-name-pattern=GATE-05-01 scripts/validate-opl-golden-manifest.test.mjs`，Report command必须逐项相等，禁止依赖未安装Node 22或默认reporter。首次retry commit `70b73e806fee0ad12616d85923695095be07c62a`暴露plural断言漂移；第二次retry commit `7f4deb0b3f5eacb1790885dc09b8905f857de909`关闭该断言后暴露三个helper绕过Intake读取历史固定Handoff的Runtime ref漂移。最终source commit `a36a7f1fd709b72e66c57e5aea634da525c9c515`保持`37=4 M+33 A`，patch SHA为`63dbbf49b99a51ccbb2bc72a9bb424df0979adaca883a40aa7c82e864391e74a`；三个helper均改为按exact Intake `handoff_ref.path`读取同一Candidate Handoff，定向`34/34`、显式TAP `16/16 MATCHED`和完整集成`5/5`通过，Bundle、READY Handoff和READY Intake已重建。production Common/Manifest、安装和固定Handoff切换仍未开始。测试策略和开发执行包为`v1.15`。该修正归入`DFR-018/019`，不新增责任；复核后仍为`32=22+10`、`blocked/unresolved/cross_document_conflict=0`和`READY_FOR_DEVELOPMENT`。这不表示E2E Report、Gate-06、Candidate、Activation、Capability、production或ISO状态提升。
+
+2026-08-18 复核记录二十三：随后production Common、E2E Manifest和版本根`clean-a36a7f1fd709`已安装，production预验通过；固定Handoff切换后，Candidate仍以`reports/**`解析10个直接Report/Schema/Asset ref，与真实handoff根固定alias bytes的length/SHA不一致，validator失败并按原子回滚恢复固定Handoff SHA `0778d77f75a68b4fb447fd26614d71885af88982dba5f2e7e1e9bd70d98b1326`。本次新增Versioned Handoff Report Ref Closure bugfix规格，冻结base `a36a7f1fd709...`、新source `12=10 M+2 A`、唯一direct ref owner、版本根`handoff/reports/**` 12文件集合、`17+43+exact Manifest tree`布局、STAGING/INSTALLED双模式、先安装重验后仅原子替换固定Handoff JSON，以及`clean-a36a7f1fd709`永久只读边界。测试策略和开发执行包升为`v1.16`。该修正归入`DFR-018/019`，不新增责任；复核后仍为`32=22+10`、`blocked/unresolved/cross_document_conflict=0`和`READY_FOR_DEVELOPMENT`，但Family production installation/fixed Handoff activation保持`VERSIONED_HANDOFF_REPORT_REF_CLOSURE_REQUIRED`。这不表示新source、版本根、E2E Report、Gate-06、Candidate、Activation、Capability、production或ISO状态提升。
+
+2026-08-18 复核记录二十四：隔离验证确认`loadReadyTrustChain()`的production调用点位于E2E Manifest builder和verifier，旧`12=10 M+2 A`allowlist没有授权修改这两个调用点；而在trust内部默认`INSTALLED`会违反显式mode和禁止fallback规则。修正规格将delta收敛为`14=12 M+2 A`，新增`scripts/release-canvas06-e2e-manifest-v01.mjs`与`scripts/verify-canvas06-e2e-manifest-v01.mjs`，冻结production分支逐字传`mode: 'INSTALLED'`、controlled helper逐字传`mode: 'CONTROLLED'`、版本化物理resolver仍仅`STAGING/INSTALLED`，并固定production Manifest测试按clean source HEAD派生临时版本根、复制12个report seed、重算全部direct ref且不得形成release evidence。测试策略和开发执行包升为`v1.17`。该修正归入`DFR-018/019`，不新增责任；复核后仍为`32=22+10`、`blocked/unresolved/cross_document_conflict=0`和`READY_FOR_DEVELOPMENT`。source commit仍为`NOT_STARTED`，固定Handoff、`clean-a36a7f1fd709`、Capability、Candidate、Activation、production和ISO状态均未变化。
+
+当前允许按已冻结独立实现规格恢复Recovery `RECOVERY-IMPL-01`，并继续其他已解锁切片；每个切片仍须独立Build/Verify，不能引用全局设计准入冒充实现或release完成。
 
 ## 9. 实现与证据状态
 
-设计状态与实现状态必须分栏。当前冻结结论不修改以下事实：
+设计状态与实现状态必须分栏。当前设计冻结结论不修改以下事实：
 
 | 证据面 | 本任务结论 |
 | --- | --- |
@@ -213,7 +267,10 @@ development_gate=READY_FOR_DEVELOPMENT
 | OpenAPI 0.2 generated client/handler | 待 DEV-CANVAS-00 验收 |
 | Revision 0.2 reader/writer/roundtrip | 待 DEV-CANVAS-00/03 验收 |
 | DEV-CANVAS-05 golden/Trace 机器证据 | 以对应 checklist 当前执行记录为准，本任务不重跑 |
-| DEV-CANVAS-06 visual/E2E/performance/recovery/release | `NOT_RUN` 或以未来报告为准 |
+| DEV-CANVAS-06 visual/E2E/performance/recovery/release | Visual/E2E/Performance/Release设计输入按各规格冻结；02B空Text Artifact/index/UI/43文件root、Recovery Launch、E2E Java/Source identity、Family Project来源和attempt ordinal来源歧义已关闭。E2E Manifest Common/Family适配定向`23/23`、Family source `a36a7f1fd709...`、Bundle/Handoff/Intake、Common/Manifest和版本根安装已完成；固定Handoff因mutable report ref失败并回滚，后继Versioned Handoff Report Ref Closure为`DESIGN_FROZEN_AFTER_ALLOWLIST_MODE_CORRECTION/IMPLEMENTATION_NOT_STARTED`。活动Report `0.2`/Source Set `0.1`及既有E2E Artifact Schema正反例为`15/15`，Runner Node基础层为`IN_PROGRESS`，Family Materializer为`BLOCKED_BY_DEPENDENCY`；新版本化report ref source/build/install、02B/03C、Java mirror/source producer、Visual/E2E product runner及Recovery launcher/runner未完成；真实READY Report仍为`NOT_RUN` |
+| Golden Authoring Schema/runner/approved version | 三类`0.1` Schema、Capture Planner及Environment/Approval/Authoring/Visual Manifest `0.2` Schema已实现；Common Visual Fixture`0.1`Schema与共享Node JCS模块/10项vector已存在，但02B validator/contract test/8 Visual/32 E2E/两份source mirror/43文件producer/verifier及03C为`NOT_STARTED`，03B为`BLOCKED_BY_DEPENDENCY`，04/05及真实实体/approved version为`NOT_IMPLEMENTED/NOT_RUN` |
+| Golden Fixture Materializer | `IMPLEMENTED/NOT_RELEASE_VALIDATED`；`v1.5` pending预验证、唯一四阶段quarantine、Catalog `v1.1` 63/63、受控130项串行/并发4及contract/backend已闭环；真实production 130项与release evidence尚未生成 |
+| Recovery Execution | 历史五份`0.1` Schema、活动Manifest `0.2`、Reopen Catalog/API Request Artifact/Launch Request/Launch Proof `0.1` Schema已实现，Execution设计`v1.5`、Projection Digest `v1.0/0.1`、Catalog与两份`0.1.0` template输入已冻结；`RECOVERY-IMPL-01=DESIGN_READY/IMPLEMENTATION_NOT_STARTED`，完整factory、fault/reachpoint、launcher、artifact、真实28/56及READY Report为`NOT_IMPLEMENTED/NOT_RUN` |
 | `.opmp` 1.0 Schema/reader/writer/golden roundtrip | `NOT_IMPLEMENTED/NOT_RUN`；物理格式已冻结不等于实现完成 |
 | production enablement | 默认 `DISABLED` |
 | ISO 19450:2024 conformance | `EVIDENCE_MISSING/无法判断` |
@@ -223,7 +280,7 @@ development_gate=READY_FOR_DEVELOPMENT
 1. 任何范围、字段、状态、Capability、规则、句式、API、Schema、浏览器、阈值、Gate 或验收变化，先把 `development_gate` 置为 `BLOCKED_BY_DESIGN`；
 2. 建立新 task spec 和 Spec Mapping checklist，说明兼容、迁移、测试、回滚及受影响责任；
 3. 更新责任文档、机器契约目标和本基线版本；
-4. 重新计算 30 项责任和跨文档冲突；
+4. 重新计算 32 项责任和跨文档冲突；
 5. 只有重新满足第 8 章算法才能恢复 `READY_FOR_DEVELOPMENT`；
 6. 实现发现设计歧义时不得自行猜测，必须回到设计变更流程。
 
@@ -232,7 +289,7 @@ development_gate=READY_FOR_DEVELOPMENT
 ### 11.1 事实
 
 1. 需求、模块、P01-P06 页面四文档、完整画布、API、持久化、交换、字段 Schema、handoff、测试策略和开发包均已有正式承接文档；
-2. Control/Structural concrete OPL、Token/Trace、golden 和 DEV-CANVAS-05/06 Gate 设计已冻结；
+2. Control/Structural concrete OPL、Token/Trace、golden、Golden Authoring `v1.4`、Visual Common Materialization `v1.4`、Common Visual Fixture`0.1`、Catalog历史`0.1.0`/活动`0.2.0`及43文件self-contained root、Golden Fixture Materializer `v1.5`、Verifier Catalog `v1.1`、E2E Manifest `0.1`/活动Report `0.2`/Runner Source Set `0.1`/Attempt Artifact `v1.3`/Family Fixture Identity Catalog `0.1/0.1.0`、Recovery Execution `v1.5`与Launch Request/Proof `0.1`、Projection Digest `v1.0/0.1`均已冻结；
 3. 当前 OpenAPI 已出现 `base_fact_capability_ref`、`AllowedModifier` 和 State/Fact command union；Revision 0.1 Schema 已出现 Fact `modifiers[]`；
 4. 当前机器文件的存在不等于 generated client、handler、roundtrip、release 或 ISO 证据通过；
 5. `.opmp` 首发物理格式和版本已经冻结，机器 Schema、reader/writer、golden package 与 roundtrip 仍待实现；
@@ -240,4 +297,4 @@ development_gate=READY_FOR_DEVELOPMENT
 
 ### 11.2 假设/解释
 
-“所有设计冻结”解释为：当前开发基线的必需设计全部 `FROZEN_INCLUDED`，未来范围全部以可审计边界 `FROZEN_DEFERRED`；不要求在设计任务中提前完成延期能力的详细实现设计或生成运行证据。
+“所有设计冻结”的目标解释为：当前开发基线的必需设计全部`FROZEN_INCLUDED`，未来范围全部以可审计边界`FROZEN_DEFERRED`；不要求在设计任务中提前完成延期能力的详细实现设计或生成运行证据。当前已达到该设计目标；实现和证据仍按各开发包与Gate独立判定。

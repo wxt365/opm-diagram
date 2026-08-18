@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:opm:contract:dev-canvas-06-recovery-api-request-artifact:0.1",
+  "title": "OPM DEV-CANVAS-06 Recovery API Request Artifact",
+  "oneOf": [
+    {"$ref": "#/$defs/ingress"},
+    {"$ref": "#/$defs/parsed"},
+    {"$ref": "#/$defs/observation"}
+  ],
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "path": {"type": "string", "minLength": 1, "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$"},
+    "caseId": {"type": "string", "pattern": "^RCV-CANVAS-(0[0-2][0-9])\\.[A-Z0-9_]+$"},
+    "scenarioId": {"enum": ["RECOVERY-COMMAND-STATE-001", "RECOVERY-COMMAND-PROCEDURAL-001", "RECOVERY-COMMAND-CONTROL-001", "RECOVERY-COMMAND-STRUCTURAL-FAN-001"]},
+    "fileRef": {"type": "object", "additionalProperties": false, "required": ["kind", "path", "byte_length", "sha256"], "properties": {"kind": {"type": "string", "minLength": 1}, "path": {"$ref": "#/$defs/path"}, "byte_length": {"type": "integer", "minimum": 0}, "sha256": {"$ref": "#/$defs/digest"}}},
+    "bodyRef": {"allOf": [{"$ref": "#/$defs/fileRef"}, {"properties": {"kind": {"const": "RECOVERY_API_REQUEST_BODY"}}}]},
+    "ingressRef": {"allOf": [{"$ref": "#/$defs/fileRef"}, {"properties": {"kind": {"const": "RECOVERY_API_REQUEST_INGRESS"}}}]},
+    "parsedRef": {"allOf": [{"$ref": "#/$defs/fileRef"}, {"properties": {"kind": {"const": "RECOVERY_API_REQUEST_PARSED"}}}]},
+    "responseRef": {"allOf": [{"$ref": "#/$defs/fileRef"}, {"properties": {"kind": {"const": "RECOVERY_API_RESPONSE"}}}]},
+    "ingress": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_id", "schema_version", "case_id", "attempt_ordinal", "command_scenario_id", "request_id", "command_id", "expected_request_digest", "request_body_ref", "method", "route_template", "content_type", "raw_byte_length", "raw_body_sha256", "canonical_body_sha256", "validation_status", "strict_utf8", "bom_absent", "duplicate_keys_absent", "single_json_object", "raw_equals_canonical", "digest_matches_template", "dispatch_authorized", "ingress_payload_sha256"],
+      "properties": {
+        "schema_id": {"const": "OPM-DEV-CANVAS-06-RECOVERY-API-REQUEST-INGRESS-001"},
+        "schema_version": {"const": "0.1"},
+        "case_id": {"$ref": "#/$defs/caseId"},
+        "attempt_ordinal": {"enum": [1, 2]},
+        "command_scenario_id": {"$ref": "#/$defs/scenarioId"},
+        "request_id": {"type": "string", "minLength": 1},
+        "command_id": {"type": "string", "minLength": 1},
+        "expected_request_digest": {"$ref": "#/$defs/digest"},
+        "request_body_ref": {"$ref": "#/$defs/bodyRef"},
+        "method": {"const": "POST"},
+        "route_template": {"const": "/api/v1/projects/{projectId}/models/{modelId}/contexts/{contextId}/commands"},
+        "content_type": {"const": "application/json"},
+        "raw_byte_length": {"type": "integer", "minimum": 1, "maximum": 65536},
+        "raw_body_sha256": {"$ref": "#/$defs/digest"},
+        "canonical_body_sha256": {"$ref": "#/$defs/digest"},
+        "validation_status": {"enum": ["MATCHED", "REJECTED"]},
+        "strict_utf8": {"type": "boolean"},
+        "bom_absent": {"type": "boolean"},
+        "duplicate_keys_absent": {"type": "boolean"},
+        "single_json_object": {"type": "boolean"},
+        "raw_equals_canonical": {"type": "boolean"},
+        "digest_matches_template": {"type": "boolean"},
+        "dispatch_authorized": {"type": "boolean"},
+        "ingress_payload_sha256": {"$ref": "#/$defs/digest"}
+      },
+      "allOf": [
+        {"if": {"properties": {"validation_status": {"const": "MATCHED"}}}, "then": {"properties": {"strict_utf8": {"const": true}, "bom_absent": {"const": true}, "duplicate_keys_absent": {"const": true}, "single_json_object": {"const": true}, "raw_equals_canonical": {"const": true}, "digest_matches_template": {"const": true}, "dispatch_authorized": {"const": true}}}},
+        {"if": {"properties": {"validation_status": {"const": "REJECTED"}}}, "then": {"properties": {"dispatch_authorized": {"const": false}}}}
+      ]
+    },
+    "parsed": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_id", "schema_version", "case_id", "attempt_ordinal", "command_scenario_id", "request_id", "command_id", "ingress_ref", "expected_request_digest", "parsed_body_sha256", "validation_status", "parsed_equals_raw", "controller_authorized", "parsed_payload_sha256"],
+      "properties": {
+        "schema_id": {"const": "OPM-DEV-CANVAS-06-RECOVERY-API-REQUEST-PARSED-001"},
+        "schema_version": {"const": "0.1"},
+        "case_id": {"$ref": "#/$defs/caseId"},
+        "attempt_ordinal": {"enum": [1, 2]},
+        "command_scenario_id": {"$ref": "#/$defs/scenarioId"},
+        "request_id": {"type": "string", "minLength": 1},
+        "command_id": {"type": "string", "minLength": 1},
+        "ingress_ref": {"$ref": "#/$defs/ingressRef"},
+        "expected_request_digest": {"$ref": "#/$defs/digest"},
+        "parsed_body_sha256": {"$ref": "#/$defs/digest"},
+        "validation_status": {"enum": ["MATCHED", "REJECTED"]},
+        "parsed_equals_raw": {"type": "boolean"},
+        "controller_authorized": {"type": "boolean"},
+        "parsed_payload_sha256": {"$ref": "#/$defs/digest"}
+      },
+      "allOf": [
+        {"if": {"properties": {"validation_status": {"const": "MATCHED"}}}, "then": {"properties": {"parsed_equals_raw": {"const": true}, "controller_authorized": {"const": true}}}},
+        {"if": {"properties": {"validation_status": {"const": "REJECTED"}}}, "then": {"properties": {"controller_authorized": {"const": false}}}}
+      ]
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_id", "schema_version", "case_id", "attempt_ordinal", "request_body_ref", "ingress_ref", "validation_status", "http_status", "controller_invocation_count", "service_invocation_count", "repository_commit_call_count", "observation_payload_sha256"],
+      "properties": {
+        "schema_id": {"const": "OPM-DEV-CANVAS-06-RECOVERY-API-REQUEST-OBSERVATION-001"},
+        "schema_version": {"const": "0.1"},
+        "case_id": {"$ref": "#/$defs/caseId"},
+        "attempt_ordinal": {"enum": [1, 2]},
+        "request_body_ref": {"$ref": "#/$defs/bodyRef"},
+        "ingress_ref": {"$ref": "#/$defs/ingressRef"},
+        "parsed_ref": {"$ref": "#/$defs/parsedRef"},
+        "validation_status": {"enum": ["MATCHED", "REJECTED"]},
+        "http_status": {"type": "integer", "minimum": 100, "maximum": 599},
+        "response_ref": {"$ref": "#/$defs/responseRef"},
+        "controller_invocation_count": {"type": "integer", "minimum": 0, "maximum": 1},
+        "service_invocation_count": {"type": "integer", "minimum": 0, "maximum": 1},
+        "repository_commit_call_count": {"type": "integer", "minimum": 0, "maximum": 1},
+        "observation_payload_sha256": {"$ref": "#/$defs/digest"}
+      },
+      "allOf": [
+        {"if": {"properties": {"validation_status": {"const": "MATCHED"}}}, "then": {"required": ["parsed_ref"], "properties": {"controller_invocation_count": {"const": 1}, "service_invocation_count": {"const": 1}}}},
+        {"if": {"properties": {"validation_status": {"const": "REJECTED"}}}, "then": {"properties": {"http_status": {"const": 422}, "controller_invocation_count": {"const": 0}, "service_invocation_count": {"const": 0}, "repository_commit_call_count": {"const": 0}}}}
+      ]
+    }
+  }
+}

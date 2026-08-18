@@ -64,7 +64,7 @@ Gate 编号表示职责，不表示一次性线性执行顺序。执行依赖固
 | --- | --- | --- |
 | `GATE-06-01 Handoff Intake` | 验证 Handoff 原始 bytes、Schema、上游 Gate、覆盖、兼容、34 项 eligibility 和禁用生产门 | `OPM-DEV-CANVAS-06-INTAKE-REPORT-001/0.1` |
 | `GATE-06-02 Enablement Manifest` | 冻结三批次、逐 Capability 依赖/证据闭包、候选启用和不可变状态迁移 | `OPM-DEV-CANVAS-06-ENABLEMENT-001/0.1` |
-| `GATE-06-03 Visual/E2E Closure` | 生成固定视觉矩阵、canvas pixel、遮挡和 `E2E-CANVAS-001~007` 机器报告 | `OPM-DEV-CANVAS-06-VISUAL-MANIFEST/REPORT-001/0.1`、`OPM-DEV-CANVAS-06-E2E-MANIFEST/REPORT-001/0.1` |
+| `GATE-06-03 Visual/E2E Closure` | 生成固定视觉矩阵、canvas pixel、遮挡和 `E2E-CANVAS-001~007` 机器报告 | Visual Manifest `0.2`、Visual Report `0.1`、E2E Manifest `0.1`、E2E Report `0.2` |
 | `GATE-06-04 Performance Closure` | 生成环境、fixture、原始样本、统计量、阈值和失败分类报告 | `OPM-DEV-CANVAS-06-PERFORMANCE-MANIFEST/SAMPLES/REPORT-001/0.1` |
 | `GATE-06-05 Recovery/Rollback` | 证明故障零增量、重开恢复、整体/逐 Capability 只读回退 | `OPM-DEV-CANVAS-06-RECOVERY-MANIFEST/GATE-FIXTURE/REPORT-001/0.1` |
 | `GATE-06-06 Release Candidate Evidence` | 汇总 Intake、Visual/E2E、Performance、Recovery、clean smoke、Candidate manifest 和发布边界 | `OPM-DEV-CANVAS-06-RELEASE-CANDIDATE-MANIFEST/REPORT-001/0.1` |
@@ -87,12 +87,18 @@ Gate 编号表示职责，不表示一次性线性执行顺序。执行依赖固
 2. E2E 固定为 `194` 个 case：从 Intake/Handoff coverage keys 派生 `178=130 PASS+48 BLOCKED` 个家族 case，再加 State、候选归一化、删除影响、故障/只读共 `16` 个公共 case。
 3. Visual `378` 和 E2E `194` 每项都执行两次独立 attempt，分别形成 `756` 和 `388` 条 attempt evidence；禁止 retry、skip、only、失败后更新 golden 或只保留最终绿色结果。
 4. Gate 必须继承 Intake 的 exact upstream build/artifacts、Profile binding 和 Revision/fixture digest，并在同一个 clean DEV-CANVAS-06 target release build 与 Chromium patch 上生成 Visual/E2E 报告；upstream build 与 target build 不得混为同一身份。现有 dev server E2E、组件截图或人工浏览不计为 Gate PASS。
-5. Visual 使用固定 PNG 像素算法、非空对照、关键几何/遮挡/溢出断言；E2E 同时断言 Revision、Projection、OPL/Trace、事务增量和重开结果。具体字段、case ID、阈值和失败码以 checklist `GATE-06-03` 契约为准。
+5. Visual 使用固定 PNG 像素算法、非空对照、关键几何/遮挡/溢出断言；E2E 同时断言 Revision、Projection、OPL/Trace、事务增量和重开结果。具体 case ID、阈值、失败码和 READY 算法以 checklist `GATE-06-03` 契约为准；11类attempt JSON的字段、file/schema identity、Family Project/ordinal来源、digest、join、Report投影和verifier顺序只以`docs/design/opm-dev-canvas-06-e2e-attempt-artifact-design.md v1.3`、Family Fixture Identity Catalog `0.1/0.1.0`及其Schema为准。
 6. 当前 exact Symbol Catalog 只提供 34 个 Capability 的主 symbol 条目，不提供受控 visual variant 列表；GATE-06-03 不修改 Profile binding，而是以 READY Intake/Handoff 为根，对 exact Coverage Catalog、Golden Manifest 和 Golden Replay Report 做一对一 join，派生 family variant、fixture、expected projection 和 transaction。任一原始 ref/SHA、join key、expectation 或两次 replay 不一致即 BLOCKED。
 7. family visual variant 固定取 130 个 PASS coverage key，按 Capability 与 coverage key 排序；`visual_variant_key` 使用完整 coverage key。Visual case 保持 `378`，但 fixture/revision/focus/cell/golden/critical region 必须位于每个 variant capture 内，不能放在包含多个 variant 的 case 层。
 8. 当前基线的 family capture 为 `130×3×3=1170`，加 8 个公共 subject 的 `72` 个 capture，固定 `capture_count=1242`、`attempt_capture_count=2484`。这些数量不改变 `378/756` case/attempt 口径。
-9. 上游 family fixture 必须从 Handoff exact evidence bundle 安全物化，并同时绑定 bundle raw SHA、archive entry path 和物化文件 SHA；普通 file ref 不得冒充 archive entry ref。8 个公共 Visual 与 16 个公共 E2E 必须来自独立版本化 common fixture/factory catalog，expected action/transaction 不得由 observed 结果反填。
-10. golden 必须由版本化 `golden-environment.json` 索引 exact PNG、9 个 blank baseline 和环境指纹；Manifest 不能通过目录扫描猜测 golden。common fixture catalog、golden index、六个输入/输出 Schema 和 runner 均未实现前，`GATE-06-03` 保持 BLOCKED。
+9. 上游 family fixture 必须从 Handoff exact evidence bundle 安全物化，并同时绑定 bundle raw SHA、archive entry path 和物化文件 SHA；普通 file ref 不得冒充 archive entry ref。178个Family base ref当前深度去重为2，Project只来自同一Evidence Bundle内Family Fixture Identity Catalog，Model/Context/base Revision/sequence与fixture bytes深度一致，parent按“fixture字段存在则字符串、缺失则Catalog显式`null`”归一后相等；禁止SHA/路径/case/Golden/Recovery派生Project。8 个公共 Visual 与 16 个公共 E2E 必须来自独立版本化 common fixture/factory catalog，expected action/transaction 不得由 observed 结果反填。
+10. golden 必须由显式 approved version 内的 `golden-environment.json` 索引 exact PNG、9 个 blank baseline 和环境指纹；Manifest 不能通过目录扫描猜测 golden 或选择 mutable latest。
+11. Golden Authoring 必须先按独立设计包生成不依赖既有 PNG 的 Capture Plan；130 个 Family PASS fixture 必须经 release-only Golden Fixture Materializer 形成隔离 SQLite 和 exact Report；8 个 Common fixture必须通过02B完整契约和03C release-only SQLite V1物化形成8个immutable base及144个fresh clone；随后才允许 fixed clean build/Runtime/Chromium/font/clock/wait candidate author。
+12. Candidate 必须使用生产 Approval Record 0.2，经 Applicant/Approver 分离审批后排他发布不可变 `INITIAL/SUPERSEDE` 版本；其 candidate/new set digest 必须覆盖 130 份 Materialization Report 与 130 个 SQLite base。validation runner 永久只读。Visual Manifest 必须同时绑定 exact `APPROVED_PUBLISHED` Authoring Report 0.2 与 Golden Environment；缺 materialization/capture、环境不一致、未审批、旧/新 SHA 不闭合或输出路径可覆盖时必须零输出并保持 BLOCKED。
+13. 生产 Visual Manifest 目标版本为 `OPM-DEV-CANVAS-06-VISUAL-MANIFEST-001/0.2`、`manifest_version=0.2.0`，必填 `golden_authoring_report_ref`；现有 `0.1` Schema 只保留为历史实现输入，不得作为生产 Visual Gate Manifest。
+14. Golden Authoring唯一实施口径为主设计`v1.4`和Visual Common Materialization设计`v1.4`；Family Fixture Materializer唯一实施口径为主设计`v1.5`和Verifier Catalog`v1.1`。当前三类Authoring 0.1 Schema、Capture Planner、Materialization Report Schema和03A Materializer实现已存在；pending预验证、四阶段quarantine、63/63、受控130项串行/并发4及contract/backend已闭环，Golden Environment`0.2` Schema/离线verifier已实现。Visual Common `v1.4` 的共享Node JCS模块与Node/Java parity vector已存在；02B/03C/03B、production 130项Materialization、8个Common base/144 clone、04/05、真实approved evidence、Visual Manifest 0.2和release runner未闭合前，`GATE-06-03`保持BLOCKED。
+15. Visual/E2E builder的唯一活动输入修正规则为`opm-dev-canvas-06-visual-e2e-input-correction-bugfix-task-spec.md`：Visual只输出`0.2/0.2.0`，E2E保持`0.1/0.1.0`；两者使用独立入口并强制`CONTROLLED_TEST/PRODUCTION_HANDOFF`模式。E2E `0.1`的完整CLI、controlled archive/Catalog/fixture布局、ref映射和单一目录原子事务只由`opm-dev-canvas-06-e2e-manifest-v01-builder-implementation-task-spec.md`承接。旧Visual/E2E `0.1`合并builder规格是历史快照，禁止继续实现或作为production输入。
+16. E2E plan builder必须先原子写入并验证`fault-plan.json`；其余producer只从该文件读取`attempt_ordinal`并与Manifest schedule交叉校验。路径、循环下标、执行顺序或回调参数不得成为identity来源。Family Identity Catalog尚未进入新clean Handoff/Evidence Bundle和Manifest，Family Materializer切片保持`BLOCKED_BY_DEPENDENCY`。
 
 ### 4.5 Performance Closure 边界
 
@@ -108,7 +114,7 @@ Gate 编号表示职责，不表示一次性线性执行顺序。执行依赖固
 2. Case 固定分为前置资产/语义 `8`、SQLite 七写阶段 `7`、强停重开 `4`、服务/恢复状态 `3`、回退 `6`。每个 attempt 必须在独立资产副本、项目目录、SQLite 和进程中执行，并由新进程重开复核。
 3. 零增量沿用 DEV-CANVAS-05 的 Revision/Parent/Text/Trace/Finding/Operation/Receipt 七项与 Draft Head ID/sequence 口径；commit 后断连或 Projection 回读失败必须证明恰好一次耐久提交和相同 command_id 幂等回放。
 4. 发布前回退演练使用生产 loader 明确拒绝的 test-only Gate Fixture，只调用与生产相同的 rollback evaluator；不得伪造 `GATE-06-06` READY Report、生成可被生产 loader 接受的 Activation 或改变 production gate。
-5. 逐 Capability 回退按 `(previous enabled - requested - reverse dependency closure)` 计算；历史含已回退语义的 Revision 仍按 exact binding 只读渲染，但相关新写入必须阻断。具体 case ID、故障到达规则、Report 字段、失败码和 READY 算法以 checklist `GATE-06-05` 契约为准。
+5. 逐Capability回退按`(previous enabled - requested - reverse dependency closure)`计算；历史含已回退语义的Revision仍按exact binding只读渲染，但相关新写入必须阻断。case ID、Report字段、失败码和READY算法以checklist `GATE-06-05`为准；两份immutable template、五份机器Schema、独立helper JAR、21表Factory映射、七个SQLite hook、四个forced-stop reachpoint/launcher和artifact index只以`docs/design/opm-dev-canvas-06-recovery-execution-design.md v1.4`为准。
 
 ### 4.7 Release Candidate Evidence 边界
 
@@ -150,7 +156,7 @@ Gate 编号表示职责，不表示一次性线性执行顺序。执行依赖固
 | Handoff Intake | exact `handoff_ref.sha256`、8 项检查和 34 项 intake 均 matched，Intake Report Schema 合法 |
 | 完整工具链 | 组件测试和 P03 浏览器主路径，图标/tooltip/搜索/候选/检查器完整 |
 | Capability gate | 每个 ID 的上游 evidence 指纹、五项依赖、coverage keys、视觉/家族 E2E/公共 Gate 闭包与稳定 reason；Candidate 与 Activation manifest 均可复核 |
-| 视觉 | `378/378` case、`756/756` attempt、`1242` capture、`2484` attempt capture；三视口/三缩放、130 个 exact PASS family variant、8 个公共主题、golden/canvas pixel/几何/遮挡/溢出均 matched |
+| 视觉 | 130 份 exact Materialization Report/SQLite base、生产 Approval Record 0.2、approved Authoring Report 0.2/Golden Environment；`378/378` case、`756/756` attempt、`1242` capture、`2484` attempt capture；三视口/三缩放、130 个 exact PASS family variant、8 个公共主题、golden/canvas pixel/几何/遮挡/溢出均 matched |
 | E2E | `194/194` case、`388/388` attempt；`178=130+48` coverage keys 和 16 个公共 case 全 matched，Revision/Projection/OPL/Trace/事务/重开闭合 |
 | 性能 | `7/7` scenario、`11/11` metric instance、7 份 raw sample set；nearest-rank P50/P95/Max 可复算，阈值/功能/完整性/零 OOM/零失败全部 matched |
 | 恢复/回退 | `28/28` case、`56/56` attempt；七项事务/Head、强停重开、幂等回放、`ROLLED_BACK_PARTIAL/ROLLED_BACK` 和历史只读均 matched |
@@ -181,7 +187,7 @@ Gate 编号表示职责，不表示一次性线性执行顺序。执行依赖固
 1. 性能阈值和采样方法已由本规格冻结；
 2. 通过本包只能证明指定版本、fixture 和环境的发布验收，不自动证明其他硬件或 ISO 符合性；
 3. 本包不能修改上游语义输入来换取 UI 或性能通过；
-4. `GATE-06-01~06` 的 Schema 身份、Gate 顺序、三批次、Visual/E2E/Performance/Recovery/Release 数量、状态、失败分类和 READY 边界均已冻结；GATE-06-03 的可执行输入还要求 exact 三表 join、bundle 物化、common fixture catalog 和 golden index，不能把高层数量冻结解释为机器资产已存在。
+4. `GATE-06-01~06` 的 Schema 身份、Gate 顺序、三批次、Visual/E2E/Performance/Recovery/Release 数量、状态、失败分类和 READY 边界均已冻结；GATE-06-03 的可执行输入还要求 exact 三表 join、130 个 release-only SQLite materialization/Report、common fixture catalog、Golden Authoring approved version 和 golden index，不能把高层数量或设计冻结解释为机器资产已存在。
 
 ### 10.2 待实现验证
 

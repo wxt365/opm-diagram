@@ -120,7 +120,7 @@
 3. [x] `GATE-05-03 Exact Coverage`：版本化 catalog 与 manifest 的 `178` 个 requirement 精确匹配，`npm run golden:coverage` 返回 `EXACT`，没有 missing、unexpected 或 mismatched case。
 4. [x] `GATE-05-04 Token/Trace Closure`：所有 concrete variant 的 Token/Trace Golden、`TTRACE-MUT-001~022` 参数化分支、Revision Schema 校验、SQLite 深度回读与 Trace index 精确元组均已通过；ACTIVE 生成路径不出现 `LEGACY/PROCESS/OBJECT`。
 5. [x] `GATE-05-05 Structural/Atomic Closure`：`Structural 24/24` 已通过；`19` 个 Atomic BLOCKED case 以独立 Profile 副本、独立 SQLite 和两次 attempt 从正式 `CandidateRevisionCommitter` 回放，均命中冻结的顶层/detail 错误。SQLite 重开后 Revision、Parent、Trace、Finding、Operation、Receipt 均为零增量，Head ID/sequence 不变；预提交失败路径的 repository `commit()` 调用次数为 `0`。
-6. [ ] `GATE-05-06 Compatibility/Handoff`：本 checklist 下方已冻结不可变 Revision `0.1`、独立 `0.2`、13 个兼容 case、旧/新 exact binding、Handoff Schema、34 项 eligibility 和 DEV-CANVAS-06 准入；设计输入状态为 `FROZEN`，实现验收状态仍为 `BLOCKED`。关闭证据为 Compatibility `13/13`、前五 Gate 报告全 matched、clean release artifacts/handoff SHA 完整且 production gate 仍为 `DISABLED`；未关闭前不得勾选 DEV-CANVAS-06 输入门槛。
+6. [x] `GATE-05-06 Compatibility/Handoff`：设计输入状态为`FROZEN`，实现验收状态为`CLOSED`。clean source commit`1847172f5090`生成Compatibility`13/13=6+7`、前五Gate全matched、版本化Runtime/Bundle和`34/34` eligibility；Handoff SHA=`aab281cf686d2b3c0e4ef1e9f62860d9318e3bed11c805e1dd53a40cd6f8e5a4`，production gate仍为`DISABLED + []`。
 
 ### 2026-07-29 Golden Contract 增量证据
 
@@ -1035,24 +1035,33 @@ Handoff 文件不进入 Profile 四项 required manifest、package digest 或五
 - [x] 不可变 `0.1`、独立 `0.2`、Reader/Writer 路由、Legacy Renderer 和 ACTIVE Grammar 边界已冻结。
 - [x] 两组 exact package/Grammar/binding digest、13 个兼容 case、错误映射和重复执行已冻结。
 - [x] Handoff Schema、报告引用、34 项 eligibility、READY 算法和 DEV-CANVAS-06 准入/回流已冻结。
-- [ ] 原 `opm-revision.schema.json` 已恢复为 `0.1`，独立 `opm-revision-v0.2.schema.json`、Router、Readers 和 `RevisionV02Writer` 已实现并通过测试。
-- [ ] `CandidateRevisionCommand.grammar` 已从 ACTIVE command 删除，legacy replay 无 commit 入口，ACTIVE committed Revision 不出现 `PROCESS/OBJECT/LEGACY`。
-- [ ] Compatibility `13/13` 两次 matched，Report 为 `6/7/0`，所有历史输入 raw SHA、只读表和 Head 保持不变。
-- [ ] `GATE-05-01~05` 实现证据全部关闭，clean release build、reports 和 artifacts 的 exact SHA 已生成。
-- [ ] Handoff 通过 Schema，`34/34` eligibility、`handoff_status=READY_FOR_DEV_CANVAS_06`、production gate=`DISABLED`。
-- [ ] DEV-CANVAS-06 checklist 已冻结 exact `handoff_ref` 后才可关闭输入门槛；当前不得启动 production enablement。
+- [x] 原 `opm-revision.schema.json` 已恢复为 `0.1`，独立 `opm-revision-v0.2.schema.json`、Router、Readers 和 `RevisionV02Writer` 已实现并通过测试。
+- [x] `CandidateRevisionCommand.grammar` 已从 ACTIVE command 删除，legacy replay 无 commit 入口，ACTIVE committed Revision 不出现 `PROCESS/OBJECT/LEGACY`。
+- [x] Compatibility `13/13` 两次 matched，Report 为 `6/7/0`，所有历史输入 raw SHA、只读表和 Head 保持不变。
+- [x] `GATE-05-01~05` 实现证据全部关闭，clean release build、reports 和 artifacts 的 exact SHA 已生成。
+- [x] Handoff 通过 Schema，`34/34` eligibility、`handoff_status=READY_FOR_DEV_CANVAS_06`、production gate=`DISABLED`。
+- [x] DEV-CANVAS-06 checklist 已冻结新exact `handoff_ref`并由READY Intake复核；production enablement仍须等待`GATE-06-03~06`。
 
 #### 2026-07-30 GATE-05-06 实现证据
 
 1. `JAVA_HOME=<JDK21> npm run handoff:evidence` 生成并 Schema 校验两份独立机器报告：`GATE-05-01` 的 `16/16` Golden Contract mutation，以及 `GATE-05-04` 的 `160/160` JDK 21 Token/Trace 测试；后者同时验证 `130` 个 PASS Golden case 的两次 replay 均有 Trace SHA-256。
 2. `JAVA_HOME=<JDK21> npm run handoff:check` 将两份报告及其 TAP/Surefire 原始结果复制到 handoff bundle，`GATE-05-01~06` 均为 `MATCHED`，Handoff Schema 校验通过。
-3. 当前 handoff 仍为 `BLOCKED`，且 `34` 项 Capability 全部保持 `BLOCKED`、production gate 为 `DISABLED`。稳定 blocker 仅为 `SOURCE_BUILD_DIRTY` 与 `RELEASE_ARTIFACTS_MISSING`：当前工作树未清理，也未从 clean commit 生成 `LOCAL_RUNTIME_JAR/EVIDENCE_BUNDLE`。不得以当前 target 目录中的诊断报告替代 release artifact。
+3. 该轮Handoff仍为`BLOCKED`，且`34`项Capability全部保持`BLOCKED`、production gate为`DISABLED`。当时稳定blocker为`SOURCE_BUILD_DIRTY`与`RELEASE_ARTIFACTS_MISSING`；该记录是历史执行快照，已由下方2026-08-03 clean重建证据替代。
 
 #### 2026-07-31 Clean Release Build 入口
 
 `npm run handoff:release` 是正式构建入口。它在任何报告、JAR 或 bundle 写入前检查当前 checkout 的 `git status --porcelain`，仅接受 clean committed source；随后执行 Golden、Compatibility、Gate Evidence 与 JDK 21 Maven package，生成 `handoff/release/local-runtime-0.1.0-SNAPSHOT.jar`、包含 runner/Schema/Profile `0.1.0/0.2.0` 的 `handoff/release/dev-canvas-05-evidence-bundle.jar`，并写入 release-build 元数据。
 
-`handoff:check` 仅在 release-build 元数据的 source commit 与当前 `HEAD` 一致、构建前 dirty=false、release 后除 `handoff/**` 工件外源码未变化、两种 artifact 均存在时才可生成 READY。校验器逐个复算所有报告、Schema、blocker 与 artifact ref 的 byte length/SHA；READY 还要求两个指定 artifact 和 `34/34` eligibility。release 输出目录已存在时构建拒绝覆盖，必须使用新的干净 checkout 或明确的新输出目录。当前工作树仍不满足 clean-source 前置，因此不得运行该入口生成 READY handoff。
+`handoff:check` 仅在 release-build 元数据的 source commit 与当前 `HEAD` 一致、构建前 dirty=false、release 后除 `handoff/**` 工件外源码未变化、两种 artifact 均存在时才可生成 READY。校验器逐个复算所有报告、Schema、blocker 与 artifact ref 的 byte length/SHA；READY 还要求两个指定 artifact 和 `34/34` eligibility。release 输出目录已存在时构建拒绝覆盖，必须使用新的干净 checkout 或明确的新输出目录。当前主工作树不作为release source；2026-08-03已在独立clean worktree按该规则生成版本化输出。
+
+#### 2026-08-03 Clean Handoff/Evidence Bundle重建证据
+
+1. source commit=`1847172f509005e8d50b525e274d41b9d73cf46c`，descriptor记录`dirty_before_build=false`；不可变生成物提交=`de095b04d3d055ffd49c7a20342b5b6092398639`；
+2. Evidence Bundle SHA=`f336780b3f3641accbdd7b4fa5432f3041d5701dcba0e474edfbef63543f7360`，其中`handoff/reports/golden-replay.json`恰好一次，raw SHA=`3e3c9d9e6e444e30ed86fbca9cf10e2923f236e7acd84630bdd68ee9efe5b3da`；
+3. Runtime JAR SHA=`0cfe0f14f2190e64e4cbc39b8a8bfbb8c9a5b733607cb24c4801c872f87b3f49`，Release Build descriptor SHA=`b04558d6ff29417372be6a0a0391b4c37b349dcd236a327d09573c895e25a76f`；
+4. Handoff SHA=`aab281cf686d2b3c0e4ef1e9f62860d9318e3bed11c805e1dd53a40cd6f8e5a4`，状态`READY_FOR_DEV_CANVAS_06`，6/6 Gate、34/34 Capability、零blocker；
+5. Intake SHA=`9bff5271d28723b6e076534566fb19a625ee8a66caffb846ce46431a92107887`，状态`READY_FOR_RELEASE_VALIDATION`，8/8 check、34/34 Capability、零blocker；
+6. 该证据只关闭DEV-CANVAS-05 Handoff与DEV-CANVAS-06 Intake外部输入，不生成Visual/E2E/Performance/Recovery READY Report、Candidate、Activation或ISO结论。
 
 ### Control `20/20` 覆盖审计
 

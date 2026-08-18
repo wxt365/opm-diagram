@@ -56,3 +56,5 @@
 - [x] 修改文档表格、code fence、相对引用和状态术语检查通过
 - [x] `git diff --check` 通过
 - [x] 复核本任务人工编辑未修改业务源码、机器契约、Profile、Golden、handoff/release 资产和生产 gate；工作树中相关改动为本任务开始前已确认保留的用户实现
+
+> 历史快照说明（2026-08-07 更新指针）：本 checklist 的30项责任和20项实现状态复核对应早期基线。当前唯一状态源`docs/design/opm-design-freeze-baseline.md`为`v1.20`，责任口径为`32/22/10`；本 checklist 不构成后续执行契约的实现或重验证据。

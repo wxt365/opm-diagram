@@ -43,24 +43,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import static org.opm.localruntime.application.RuntimeActiveBindingProvider.*;
+
 @Service
 public class LocalApiService {
-
-    private static final String PROFILE_ID = "profile.iso19450.2024.draft";
-    private static final String PROFILE_VERSION = "0.2.0";
-    private static final String RULE_VERSION = "0.1.0";
-    private static final String GRAMMAR_VERSION = "0.2.0";
-    private static final String SYMBOL_VERSION = "0.1.0";
-    private static final String NORMALIZATION_VERSION = "0.1.0";
-    private static final String PROFILE_DIGEST = "5287d3ceb77c4c664b88c6e34a3a5d1c34f85c36037ab2f587705f9d607f899c";
-    private static final String RULE_ID = "rules.iso19450.2024.draft";
-    private static final String RULE_DIGEST = "4293cb22cf2e2e92fe212ed3c31119992509c8a675daa554c64a2ccf10457d64";
-    private static final String GRAMMAR_ID = "grammar.opl.iso19450.2024.draft";
-    private static final String GRAMMAR_DIGEST = "c88e672bd9db7f0405a7ef3fc464043f15cae844931192e3412c94ce05339e7d";
-    private static final String SYMBOL_ID = "symbols.iso19450.2024.draft";
-    private static final String SYMBOL_DIGEST = "511dbaec2adb6f49ed6a4d28844e69d1310eb7a67f213e4a30b0ddfc21ef6098";
-    private static final String NORMALIZATION_ID = "normalization.iso19450.2024.draft";
-    private static final String NORMALIZATION_DIGEST = "6401336ad4b63127047ccd5d50cc418554f0c8490547a6024939b4da5774194c";
 
     private final ProjectDatabaseFactory databaseFactory;
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -1451,10 +1437,8 @@ public class LocalApiService {
                 new OplGrammar.Template("opl.exception.overtime.v1", 10), new OplGrammar.Template("opl.exception.undertime.v1", 10)));
     }
     private SemanticRevision.ProfileBinding profileBinding() {
-        SemanticRevision.ProfileBinding binding = new SemanticRevision.ProfileBinding(asset(PROFILE_ID, PROFILE_VERSION, PROFILE_DIGEST), asset(RULE_ID, RULE_VERSION, RULE_DIGEST), asset(GRAMMAR_ID, GRAMMAR_VERSION, GRAMMAR_DIGEST), asset(SYMBOL_ID, SYMBOL_VERSION, SYMBOL_DIGEST), asset(NORMALIZATION_ID, NORMALIZATION_VERSION, NORMALIZATION_DIGEST), "pending");
-        return new SemanticRevision.ProfileBinding(binding.profile(), binding.ruleSet(), binding.textGrammar(), binding.symbolCatalog(), binding.normalizationAdapter(), ProfilePackageAssembler.bindingDigest(binding));
+        return RuntimeActiveBindingProvider.current();
     }
-    private SemanticRevision.AssetReference asset(String id, String version, String digest) { return new SemanticRevision.AssetReference(id, version, digest); }
     private SemanticRevision.CapabilityReference capability(String id) { return new SemanticRevision.CapabilityReference(id, PROFILE_ID, PROFILE_VERSION); }
     private SemanticRevision.QualifiedName qualifiedName(String localName) { return new SemanticRevision.QualifiedName("urn:opm:runtime", localName); }
     private SemanticRevision.SourceProvenance source(String kind) { return new SemanticRevision.SourceProvenance(PROFILE_ID, PROFILE_VERSION, kind, "profile." + kind.toLowerCase()); }

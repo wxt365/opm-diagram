@@ -58,6 +58,7 @@ for (const source of [
   'packages/profiles/profile.iso19450.2024.draft/0.2.0/rules',
   'packages/profiles/profile.iso19450.2024.draft/0.2.0/symbols',
   'packages/profiles/profile.iso19450.2024.draft/0.2.0/profile.json',
+  'packages/profiles/profile.iso19450.2024.draft/0.2.0/handoff/reports',
   'services/local-runtime/src/main/java/org/opm/localruntime/golden',
   'services/local-runtime/src/main/java/org/opm/localruntime/compatibility'
 ]) {

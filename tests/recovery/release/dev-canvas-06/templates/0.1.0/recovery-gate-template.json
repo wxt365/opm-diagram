@@ -1,0 +1,216 @@
+{
+  "schema_id": "OPM-DEV-CANVAS-06-RECOVERY-GATE-TEMPLATE-001",
+  "schema_version": "0.1",
+  "template_id": "OPM-DEV-CANVAS-06-RECOVERY-GATE-TEMPLATE-001/0.1",
+  "template_version": "0.1.0",
+  "fixture_id": "RECOVERY-FIXTURE-GATE",
+  "source_date_epoch": 1785758631,
+  "handoff_identity": {
+    "handoff_id": "dev-canvas-05.profile.iso19450.2024.draft.0.2.0.b940ac9bb734",
+    "handoff_status": "READY_FOR_DEV_CANVAS_06",
+    "source_commit": "b940ac9bb73442c3a697cce8bfa7c9df52856b3a",
+    "binding_digest": "93805d6e2fdb3ea73c4ddfc0a995d662fbf13dee2d8a6f24fc20c79ecff65d1d",
+    "handoff_ref": {
+      "kind": "HANDOFF",
+      "path": "packages/profiles/profile.iso19450.2024.draft/0.2.0/handoff/dev-canvas-05-handoff.json",
+      "byte_length": 37088,
+      "sha256": "0778d77f75a68b4fb447fd26614d71885af88982dba5f2e7e1e9bd70d98b1326"
+    }
+  },
+  "intake_identity": {
+    "report_id": "dev-canvas-06.intake.dev-canvas-05.profile.iso19450.2024.draft.0.2.0.b940ac9bb734.0778d77f75a6",
+    "intake_status": "READY_FOR_RELEASE_VALIDATION",
+    "intake_report_ref": {
+      "kind": "INTAKE_REPORT",
+      "path": "packages/profiles/profile.iso19450.2024.draft/0.2.0/handoff/releases/clean-b940ac9bb734/dev-canvas-06-intake-report.json",
+      "byte_length": 50823,
+      "sha256": "54d56bab7792122781bc2b8b785c3488a4bd1d4f7ecc741845ecbcccdb2d85ee"
+    }
+  },
+  "production_gate_guard": {
+    "before": {"state": "DISABLED", "enabled_capability_ids": []},
+    "during": {"state": "DISABLED", "enabled_capability_ids": []},
+    "after": {"state": "DISABLED", "enabled_capability_ids": []},
+    "production_loader_expected_status": "REJECTED",
+    "production_gate_mutation_count": 0
+  },
+  "capability_order": [
+    "CAP-ISO-PROC-001",
+    "CAP-ISO-PROC-002",
+    "CAP-ISO-PROC-003",
+    "CAP-ISO-PROC-004",
+    "CAP-ISO-PROC-005",
+    "CAP-ISO-PROC-006",
+    "CAP-ISO-PROC-007",
+    "CAP-ISO-PROC-008",
+    "CAP-ISO-PROC-009",
+    "CAP-ISO-PROC-010",
+    "CAP-ISO-PROC-011",
+    "CAP-ISO-PROC-012",
+    "CAP-ISO-PROC-013",
+    "CAP-ISO-PROC-014",
+    "CAP-ISO-PROC-015",
+    "CAP-ISO-PROC-016",
+    "CAP-ISO-CTRL-001",
+    "CAP-ISO-CTRL-002",
+    "CAP-ISO-CTRL-003",
+    "CAP-ISO-CTRL-004",
+    "CAP-ISO-CTRL-005",
+    "CAP-ISO-CTRL-006",
+    "CAP-ISO-CTRL-007",
+    "CAP-ISO-CTRL-008",
+    "CAP-ISO-STRUCT-001",
+    "CAP-ISO-STRUCT-002",
+    "CAP-ISO-STRUCT-003",
+    "CAP-ISO-STRUCT-004",
+    "CAP-ISO-STRUCT-005",
+    "CAP-ISO-STRUCT-006",
+    "CAP-ISO-STRUCT-007",
+    "CAP-ISO-STRUCT-008",
+    "CAP-ISO-STRUCT-009",
+    "CAP-ISO-STRUCT-010"
+  ],
+  "eligible_capability_ids": [
+    "CAP-ISO-PROC-001",
+    "CAP-ISO-PROC-002",
+    "CAP-ISO-PROC-003",
+    "CAP-ISO-PROC-004",
+    "CAP-ISO-PROC-005",
+    "CAP-ISO-PROC-006",
+    "CAP-ISO-PROC-007",
+    "CAP-ISO-PROC-008",
+    "CAP-ISO-PROC-009",
+    "CAP-ISO-PROC-010",
+    "CAP-ISO-PROC-011",
+    "CAP-ISO-PROC-012",
+    "CAP-ISO-PROC-013",
+    "CAP-ISO-PROC-014",
+    "CAP-ISO-PROC-015",
+    "CAP-ISO-PROC-016",
+    "CAP-ISO-CTRL-001",
+    "CAP-ISO-CTRL-002",
+    "CAP-ISO-CTRL-003",
+    "CAP-ISO-CTRL-004",
+    "CAP-ISO-CTRL-005",
+    "CAP-ISO-CTRL-006",
+    "CAP-ISO-CTRL-007",
+    "CAP-ISO-CTRL-008",
+    "CAP-ISO-STRUCT-001",
+    "CAP-ISO-STRUCT-002",
+    "CAP-ISO-STRUCT-003",
+    "CAP-ISO-STRUCT-004",
+    "CAP-ISO-STRUCT-005",
+    "CAP-ISO-STRUCT-006",
+    "CAP-ISO-STRUCT-007",
+    "CAP-ISO-STRUCT-008",
+    "CAP-ISO-STRUCT-009",
+    "CAP-ISO-STRUCT-010"
+  ],
+  "reverse_control_dependencies": {
+    "CAP-ISO-PROC-001": ["CAP-ISO-CTRL-001", "CAP-ISO-CTRL-005"],
+    "CAP-ISO-PROC-002": [],
+    "CAP-ISO-PROC-003": ["CAP-ISO-CTRL-001", "CAP-ISO-CTRL-005"],
+    "CAP-ISO-PROC-004": ["CAP-ISO-CTRL-002", "CAP-ISO-CTRL-006"],
+    "CAP-ISO-PROC-005": ["CAP-ISO-CTRL-002", "CAP-ISO-CTRL-006"],
+    "CAP-ISO-PROC-006": ["CAP-ISO-CTRL-003", "CAP-ISO-CTRL-007"],
+    "CAP-ISO-PROC-007": [],
+    "CAP-ISO-PROC-008": ["CAP-ISO-CTRL-003", "CAP-ISO-CTRL-007"],
+    "CAP-ISO-PROC-009": ["CAP-ISO-CTRL-003", "CAP-ISO-CTRL-007"],
+    "CAP-ISO-PROC-010": ["CAP-ISO-CTRL-003", "CAP-ISO-CTRL-007"],
+    "CAP-ISO-PROC-011": ["CAP-ISO-CTRL-004", "CAP-ISO-CTRL-008"],
+    "CAP-ISO-PROC-012": ["CAP-ISO-CTRL-004", "CAP-ISO-CTRL-008"],
+    "CAP-ISO-PROC-013": [],
+    "CAP-ISO-PROC-014": [],
+    "CAP-ISO-PROC-015": [],
+    "CAP-ISO-PROC-016": []
+  },
+  "simulated_effective_state": {
+    "manifest_state": "ACTIVE_COMPLETE",
+    "production_gate": "ENABLED",
+    "enabled_capability_ids_source": "eligible_capability_ids",
+    "test_only": true
+  },
+  "rollback_algorithm": {
+    "requested_normalization": "handoff capability_order",
+    "effective_disabled": "requested union reverse_control_dependencies(requested procedural)",
+    "remaining": "eligible_capability_ids minus effective_disabled preserving capability_order",
+    "partial_state": "ROLLED_BACK_PARTIAL",
+    "empty_state": "ROLLED_BACK",
+    "unknown_or_duplicate_request": "REJECTED_WITHOUT_MANIFEST",
+    "tampered_input": "REJECTED_WITHOUT_MANIFEST"
+  },
+  "rollback_targets": {
+    "STRUCTURAL": {"scope": "SELECTED", "requested_capability_ids": ["CAP-ISO-STRUCT-001"]},
+    "CONTROL": {"scope": "SELECTED", "requested_capability_ids": ["CAP-ISO-CTRL-001"]},
+    "PROCEDURAL_CASCADE": {"scope": "SELECTED", "requested_capability_ids": ["CAP-ISO-PROC-001"]},
+    "ALL": {"scope": "ALL", "requested_capability_ids": []}
+  },
+  "expected_results": {
+    "ROLLBACK_STRUCTURAL": {
+      "requested_capability_ids": ["CAP-ISO-STRUCT-001"],
+      "effective_disabled_capability_ids": ["CAP-ISO-STRUCT-001"],
+      "remaining_capability_count": 33,
+      "remaining_capability_ids_sha256": "677fed1fd2beda2c5d5d88fbb5c07fc0529e837dfba7d55070ec8cfaf6eda6f8",
+      "manifest_state": "ROLLED_BACK_PARTIAL",
+      "test_effective_gate": "ENABLED"
+    },
+    "ROLLBACK_CONTROL": {
+      "requested_capability_ids": ["CAP-ISO-CTRL-001"],
+      "effective_disabled_capability_ids": ["CAP-ISO-CTRL-001"],
+      "remaining_capability_count": 33,
+      "remaining_capability_ids_sha256": "f73e53f038ac6b03f983075abdceec917857df2a4a5417db1b4f5155eb70c1b9",
+      "manifest_state": "ROLLED_BACK_PARTIAL",
+      "test_effective_gate": "ENABLED"
+    },
+    "ROLLBACK_PROCEDURAL_CASCADE": {
+      "requested_capability_ids": ["CAP-ISO-PROC-001"],
+      "effective_disabled_capability_ids": ["CAP-ISO-PROC-001", "CAP-ISO-CTRL-001", "CAP-ISO-CTRL-005"],
+      "remaining_capability_count": 31,
+      "remaining_capability_ids_sha256": "066f0c9d03a229620d58a7b9542d1dcfdb541f7c0d4a412541b170061d2716ab",
+      "manifest_state": "ROLLED_BACK_PARTIAL",
+      "test_effective_gate": "ENABLED"
+    },
+    "ROLLBACK_ALL": {
+      "requested_capability_ids": [],
+      "effective_disabled_capability_ids_source": "eligible_capability_ids",
+      "remaining_capability_count": 0,
+      "remaining_capability_ids_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "manifest_state": "ROLLED_BACK",
+      "test_effective_gate": "DISABLED"
+    },
+    "ROLLBACK_UNKNOWN": {"requested_capability_ids": ["CAP-ISO-PROC-999"], "status": "REJECTED", "output_manifest_count": 0, "effective_state_unchanged": true},
+    "ROLLBACK_TAMPERED": {"tamper": "INPUT_MANIFEST_RAW_SHA_MISMATCH", "status": "REJECTED", "output_manifest_count": 0, "effective_state_unchanged": true}
+  },
+  "result_digest_policy": {
+    "algorithm": "SHA-256",
+    "canonicalization": "RFC8785-JCS",
+    "ordered_keys": [
+      "capability_order_sha256",
+      "eligible_capability_ids_sha256",
+      "reverse_control_dependencies_sha256",
+      "rollback_structural_sha256",
+      "rollback_control_sha256",
+      "rollback_procedural_cascade_sha256",
+      "rollback_all_sha256"
+    ],
+    "preimages": {
+      "capability_order_sha256": "UTF8(JCS(capability_order))",
+      "eligible_capability_ids_sha256": "UTF8(JCS(eligible_capability_ids))",
+      "reverse_control_dependencies_sha256": "UTF8(JCS(reverse_control_dependencies))",
+      "rollback_structural_sha256": "UTF8(JCS(expected_results.ROLLBACK_STRUCTURAL))",
+      "rollback_control_sha256": "UTF8(JCS(expected_results.ROLLBACK_CONTROL))",
+      "rollback_procedural_cascade_sha256": "UTF8(JCS(expected_results.ROLLBACK_PROCEDURAL_CASCADE))",
+      "rollback_all_sha256": "UTF8(JCS(expected_results.ROLLBACK_ALL))"
+    }
+  },
+  "expected_result_digests": {
+    "capability_order_sha256": "28edad18d83c76d3c42b99c0ff6c7baf04e4d3e1620613b1e7365eb0f88d5362",
+    "eligible_capability_ids_sha256": "28edad18d83c76d3c42b99c0ff6c7baf04e4d3e1620613b1e7365eb0f88d5362",
+    "reverse_control_dependencies_sha256": "59ec44041f2b3ad4ec1fcea18c08fb2f63d4888426bc3619743dc5589c8befb2",
+    "rollback_structural_sha256": "e654d0af452e708fb010c91b0c9c9ff9aeacb6daaf2ec0cb74659d53971f1b0d",
+    "rollback_control_sha256": "5830ae49c9172b9885ace82cd2a8ee30ce03268f690d73706658fafcf4231527",
+    "rollback_procedural_cascade_sha256": "f8197acedf879f754789d8eaa9b2f8c9fe16cc1a166d48e39ef8a45e8f4d01fa",
+    "rollback_all_sha256": "cc3cfb0218f538e030f1323909d0c37c4e0a16595a132c84c93e5a81a0fa5658"
+  },
+  "template_payload_sha256": "410f014d6d1b89e882c64661747d053acaa7750c3a591750446359b14459a743"
+}

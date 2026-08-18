@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:opm:contract:dev-canvas-06-recovery-tree-descriptor:0.1",
+  "title": "OPM DEV-CANVAS-06 Recovery Tree Descriptor",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "descriptor_id", "descriptor_version", "scope", "root_path", "entries", "tree_sha256", "descriptor_payload_sha256"],
+  "properties": {
+    "schema_id": {"const": "OPM-DEV-CANVAS-06-RECOVERY-TREE-DESCRIPTOR-001"},
+    "schema_version": {"const": "0.1"},
+    "descriptor_id": {"pattern": "^dev-canvas-06\\.recovery-tree\\.RCV-CANVAS-0[0-2][0-9]\\.[A-Z0-9_]+\\.[12]\\.(assets|input)$"},
+    "descriptor_version": {"const": "0.1.0"},
+    "scope": {"enum": ["ASSET_TREE", "INPUT_TREE"]},
+    "root_path": {"$ref": "#/$defs/path"},
+    "entries": {"type": "array", "minItems": 5, "maxItems": 11, "items": {"$ref": "#/$defs/entry"}},
+    "tree_sha256": {"$ref": "#/$defs/digest"},
+    "descriptor_payload_sha256": {"$ref": "#/$defs/digest"}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"scope": {"const": "ASSET_TREE"}}, "required": ["scope"]},
+      "then": {
+        "properties": {
+          "descriptor_id": {"pattern": "\\.assets$"},
+          "root_path": {"const": "fixture/assets"},
+          "entries": {
+            "minItems": 5,
+            "maxItems": 5,
+            "items": {"properties": {"kind": {"enum": ["PROFILE_PACKAGE", "RULE_SET", "SYMBOL_ASSET", "GRAMMAR_ASSET", "NORMALIZATION_DATA"]}}},
+            "allOf": [
+              {"contains": {"properties": {"kind": {"const": "PROFILE_PACKAGE"}}, "required": ["kind"]}, "minContains": 1, "maxContains": 1},
+              {"contains": {"properties": {"kind": {"const": "RULE_SET"}}, "required": ["kind"]}, "minContains": 1, "maxContains": 1},
+              {"contains": {"properties": {"kind": {"const": "SYMBOL_ASSET"}}, "required": ["kind"]}, "minContains": 1, "maxContains": 1},
+              {"contains": {"properties": {"kind": {"const": "GRAMMAR_ASSET"}}, "required": ["kind"]}, "minContains": 1, "maxContains": 1},
+              {"contains": {"properties": {"kind": {"const": "NORMALIZATION_DATA"}}, "required": ["kind"]}, "minContains": 1, "maxContains": 1}
+            ]
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "descriptor_id": {"pattern": "\\.input$"},
+          "root_path": {"const": "fixture"},
+          "entries": {
+            "minItems": 10,
+            "maxItems": 11,
+            "allOf": [
+              {"contains": {"properties": {"kind": {"const": "SOURCE_TEMPLATE"}}, "required": ["kind"]}, "minContains": 2, "maxContains": 2},
+              {"contains": {"properties": {"kind": {"const": "BASE_REVISION"}}, "required": ["kind"]}, "minContains": 1, "maxContains": 1},
+              {"contains": {"properties": {"kind": {"const": "PROFILE_PACKAGE"}}, "required": ["kind"]}, "minContains": 1, "maxContains": 1},
+              {"contains": {"properties": {"kind": {"const": "RULE_SET"}}, "required": ["kind"]}, "minContains": 1, "maxContains": 1},
+              {"contains": {"properties": {"kind": {"const": "SYMBOL_ASSET"}}, "required": ["kind"]}, "minContains": 1, "maxContains": 1},
+              {"contains": {"properties": {"kind": {"const": "GRAMMAR_ASSET"}}, "required": ["kind"]}, "minContains": 1, "maxContains": 1},
+              {"contains": {"properties": {"kind": {"const": "NORMALIZATION_DATA"}}, "required": ["kind"]}, "minContains": 1, "maxContains": 1},
+              {"contains": {"properties": {"kind": {"const": "TREE_DESCRIPTOR"}}, "required": ["kind"]}, "minContains": 1, "maxContains": 1},
+              {"contains": {"properties": {"kind": {"const": "PROJECT_DB"}}, "required": ["kind"]}, "minContains": 1, "maxContains": 1},
+              {"contains": {"properties": {"kind": {"const": "GATE_WORK_COPY"}}, "required": ["kind"]}, "minContains": 0, "maxContains": 1}
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "path": {"type": "string", "minLength": 1, "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*//)(?!.*\\\\)(?!.*\\u0000).+$"},
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "path", "media_type", "byte_length", "sha256"],
+      "properties": {
+        "kind": {"enum": ["SOURCE_TEMPLATE", "BASE_REVISION", "PROFILE_PACKAGE", "RULE_SET", "SYMBOL_ASSET", "GRAMMAR_ASSET", "NORMALIZATION_DATA", "PROJECT_DB", "GATE_WORK_COPY", "TREE_DESCRIPTOR"]},
+        "path": {"$ref": "#/$defs/path"},
+        "media_type": {"enum": ["application/json", "application/vnd.sqlite3"]},
+        "byte_length": {"type": "integer", "minimum": 0},
+        "sha256": {"$ref": "#/$defs/digest"}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"kind": {"const": "PROJECT_DB"}}, "required": ["kind"]},
+          "then": {"properties": {"media_type": {"const": "application/vnd.sqlite3"}}},
+          "else": {"properties": {"media_type": {"const": "application/json"}}}
+        }
+      ]
+    }
+  }
+}

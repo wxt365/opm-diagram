@@ -130,3 +130,5 @@
 ## 当前结论
 
 `design_freeze_status=FROZEN`，`design_responsibility_count=30`，`frozen_included_count=20`，`frozen_deferred_count=10`，`blocked_count=0`，`development_gate=READY_FOR_DEVELOPMENT`。开发人员只能按既有依赖选择一个 DEV 包并建立独立 task spec；未通过实现 Gate 的能力不得启用。
+
+> 历史快照说明（2026-08-07 更新指针）：本结论记录原冻结任务完成时的`30/20/10`。当前唯一状态源为`docs/design/opm-design-freeze-baseline.md` `v1.21`，当前口径为`32/22/10/READY_FOR_DEVELOPMENT`；本 checklist 不再作为当前责任计数来源。

@@ -1,0 +1,254 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:opm:contract:dev-canvas-06-projection-digest-parity-vectors:0.1",
+  "title": "OPM DEV-CANVAS-06 Projection Digest Parity Vectors 0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_id",
+    "schema_version",
+    "catalog_id",
+    "catalog_version",
+    "preimage_schema_ref",
+    "positive_vectors",
+    "negative_vectors",
+    "catalog_payload_sha256"
+  ],
+  "properties": {
+    "schema_id": {
+      "const": "OPM-DEV-CANVAS-06-PROJECTION-DIGEST-PARITY-VECTORS-001"
+    },
+    "schema_version": {"const": "0.1"},
+    "catalog_id": {"const": "dev-canvas-06.projection-digest-v01-parity"},
+    "catalog_version": {"const": "0.1.0"},
+    "preimage_schema_ref": {
+      "const": "urn:opm:contract:dev-canvas-06-projection-digest-preimage:0.1"
+    },
+    "positive_vectors": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "prefixItems": [
+        {"allOf": [{"$ref": "#/$defs/positiveVector"}, {"properties": {"vector_id": {"const": "PDV01-EMPTY"}}}]},
+        {"allOf": [{"$ref": "#/$defs/positiveVector"}, {"properties": {"vector_id": {"const": "PDV01-SIGNED-ZERO"}}}]},
+        {"allOf": [{"$ref": "#/$defs/positiveVector"}, {"properties": {"vector_id": {"const": "PDV01-EXTREME-FINITE"}}}]},
+        {"allOf": [{"$ref": "#/$defs/positiveVector"}, {"properties": {"vector_id": {"const": "PDV01-FULL-ORDERED"}}}]}
+      ],
+      "items": false
+    },
+    "negative_vectors": {
+      "type": "array",
+      "minItems": 9,
+      "maxItems": 9,
+      "prefixItems": [
+        {"$ref": "#/$defs/negativeNan"},
+        {"$ref": "#/$defs/negativePositiveInfinity"},
+        {"$ref": "#/$defs/negativeNegativeInfinity"},
+        {"$ref": "#/$defs/negativeMissingLayout"},
+        {"$ref": "#/$defs/negativeUnknownLayout"},
+        {"$ref": "#/$defs/negativeNonLayoutFraction"},
+        {"$ref": "#/$defs/negativeUnsafeInteger"},
+        {"$ref": "#/$defs/negativeUnknownConstruct"},
+        {"$ref": "#/$defs/negativeLoneSurrogate"}
+      ],
+      "items": false
+    },
+    "catalog_payload_sha256": {"$ref": "#/$defs/digest"}
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "safeInteger": {
+      "type": "integer",
+      "minimum": -9007199254740991,
+      "maximum": 9007199254740991
+    },
+    "inputBinary64": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["$input_binary64"],
+      "properties": {
+        "$input_binary64": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{16}$"
+        }
+      }
+    },
+    "inputLayout": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y", "width", "height", "z_order"],
+      "properties": {
+        "x": {"$ref": "#/$defs/inputBinary64"},
+        "y": {"$ref": "#/$defs/inputBinary64"},
+        "width": {"$ref": "#/$defs/inputBinary64"},
+        "height": {"$ref": "#/$defs/inputBinary64"},
+        "z_order": {"$ref": "#/$defs/safeInteger"}
+      }
+    },
+    "inputEndpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "target_kind", "target_id", "ordinal"],
+      "properties": {
+        "role": {"type": "string", "minLength": 1},
+        "target_kind": {"enum": ["ELEMENT", "STATE", "FEATURE", "FACT"]},
+        "target_id": {"type": "string", "minLength": 1},
+        "ordinal": {"$ref": "#/$defs/safeInteger"}
+      }
+    },
+    "inputModifier": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["modifier_id", "value"],
+      "properties": {
+        "modifier_id": {"type": "string", "minLength": 1},
+        "value": {"type": "string"}
+      }
+    },
+    "inputLabel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["slot_id", "text"],
+      "properties": {
+        "slot_id": {"type": "string", "minLength": 1},
+        "text": {"type": "string"}
+      }
+    },
+    "inputConstruct": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["occurrence_id", "target_id", "construct_role", "label", "layout"],
+      "properties": {
+        "occurrence_id": {"type": "string", "minLength": 1},
+        "target_id": {"type": "string", "minLength": 1},
+        "construct_role": {"type": "string", "minLength": 1},
+        "label": {"type": "string"},
+        "layout": {"$ref": "#/$defs/inputLayout"},
+        "source_id": {"type": "string", "minLength": 1},
+        "process_id": {"type": "string", "minLength": 1},
+        "source_occurrence_id": {"type": "string", "minLength": 1},
+        "target_occurrence_id": {"type": "string", "minLength": 1},
+        "symbol_ref": {"type": "string", "minLength": 1},
+        "layout_ref": {"type": "string", "minLength": 1},
+        "owner_id": {"type": "string", "minLength": 1},
+        "owner_target_kind": {"enum": ["ELEMENT", "FEATURE"]},
+        "state_roles": {"type": "array", "items": {"enum": ["INITIAL", "DEFAULT", "FINAL"]}},
+        "explicitness": {"enum": ["EXPLICIT", "SUPPRESSED"]},
+        "fold_state": {"enum": ["UNFOLDED", "FOLDED"]},
+        "capability_id": {"type": "string", "minLength": 1},
+        "direction": {"enum": ["DIRECTED", "BIDIRECTIONAL", "UNDIRECTED", "PROFILE_DEFINED"]},
+        "endpoints": {"type": "array", "items": {"$ref": "#/$defs/inputEndpoint"}},
+        "modifiers": {"type": "array", "items": {"$ref": "#/$defs/inputModifier"}},
+        "labels": {"type": "array", "items": {"$ref": "#/$defs/inputLabel"}},
+        "collection_completeness": {"enum": ["COMPLETE", "INCOMPLETE", "NOT_APPLICABLE"]}
+      }
+    },
+    "inputProjectionData": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["context_id", "constructs"],
+      "properties": {
+        "context_id": {"type": "string", "minLength": 1},
+        "constructs": {"type": "array", "items": {"$ref": "#/$defs/inputConstruct"}}
+      }
+    },
+    "positiveVector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "vector_id",
+        "input_projection_data",
+        "expected_preimage",
+        "expected_canonical_utf8_hex",
+        "expected_projection_sha256"
+      ],
+      "properties": {
+        "vector_id": {"type": "string", "minLength": 1},
+        "input_projection_data": {"$ref": "#/$defs/inputProjectionData"},
+        "expected_preimage": {
+          "$ref": "urn:opm:contract:dev-canvas-06-projection-digest-preimage:0.1"
+        },
+        "expected_canonical_utf8_hex": {
+          "type": "string",
+          "pattern": "^(?:[0-9a-f]{2})+$"
+        },
+        "expected_projection_sha256": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "mutation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operation", "json_pointer", "value_token"],
+      "properties": {
+        "operation": {
+          "enum": ["SET_RUNTIME_NUMBER", "REMOVE_PROPERTY", "ADD_JSON_STRING", "SET_JSON_STRING"]
+        },
+        "json_pointer": {"type": "string", "pattern": "^/constructs(?:/[0-9]+)(?:/[^/~]*(?:~[01][^/~]*)*)+$"},
+        "value_token": {
+          "enum": [
+            "NAN",
+            "POSITIVE_INFINITY",
+            "NEGATIVE_INFINITY",
+            "ABSENT",
+            "STRING:x",
+            "NUMBER:1.5",
+            "NUMBER:9007199254740992",
+            "UTF16_LONE_HIGH_D800"
+          ]
+        }
+      }
+    },
+    "negativeVector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "vector_id",
+        "base_positive_vector_id",
+        "mutation",
+        "expected_error_code",
+        "expected_error_pointer"
+      ],
+      "properties": {
+        "vector_id": {"type": "string", "minLength": 1},
+        "base_positive_vector_id": {"const": "PDV01-FULL-ORDERED"},
+        "mutation": {"$ref": "#/$defs/mutation"},
+        "expected_error_code": {
+          "enum": [
+            "PROJECTION_DIGEST_SCHEMA_MISMATCH",
+            "PROJECTION_DIGEST_UNICODE_INVALID",
+            "PROJECTION_DIGEST_NON_FINITE_FLOAT",
+            "PROJECTION_DIGEST_NUMBER_DOMAIN_INVALID"
+          ]
+        },
+        "expected_error_pointer": {"type": "string", "minLength": 1}
+      }
+    },
+    "negativeNan": {
+      "allOf": [{"$ref": "#/$defs/negativeVector"}, {"properties": {"vector_id": {"const": "PDV01-NEG-NAN"}}}]
+    },
+    "negativePositiveInfinity": {
+      "allOf": [{"$ref": "#/$defs/negativeVector"}, {"properties": {"vector_id": {"const": "PDV01-NEG-POSITIVE-INFINITY"}}}]
+    },
+    "negativeNegativeInfinity": {
+      "allOf": [{"$ref": "#/$defs/negativeVector"}, {"properties": {"vector_id": {"const": "PDV01-NEG-NEGATIVE-INFINITY"}}}]
+    },
+    "negativeMissingLayout": {
+      "allOf": [{"$ref": "#/$defs/negativeVector"}, {"properties": {"vector_id": {"const": "PDV01-NEG-MISSING-LAYOUT-FIELD"}}}]
+    },
+    "negativeUnknownLayout": {
+      "allOf": [{"$ref": "#/$defs/negativeVector"}, {"properties": {"vector_id": {"const": "PDV01-NEG-UNKNOWN-LAYOUT-FIELD"}}}]
+    },
+    "negativeNonLayoutFraction": {
+      "allOf": [{"$ref": "#/$defs/negativeVector"}, {"properties": {"vector_id": {"const": "PDV01-NEG-NON-LAYOUT-FRACTION"}}}]
+    },
+    "negativeUnsafeInteger": {
+      "allOf": [{"$ref": "#/$defs/negativeVector"}, {"properties": {"vector_id": {"const": "PDV01-NEG-UNSAFE-INTEGER"}}}]
+    },
+    "negativeUnknownConstruct": {
+      "allOf": [{"$ref": "#/$defs/negativeVector"}, {"properties": {"vector_id": {"const": "PDV01-NEG-UNKNOWN-CONSTRUCT-FIELD"}}}]
+    },
+    "negativeLoneSurrogate": {
+      "allOf": [{"$ref": "#/$defs/negativeVector"}, {"properties": {"vector_id": {"const": "PDV01-NEG-LONE-SURROGATE"}}}]
+    }
+  }
+}

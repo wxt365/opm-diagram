@@ -70,7 +70,7 @@ async function verify() {
 
 async function activate() {
   const evidenceRoot = resolveRequired(options, 'evidence-root');
-  const candidate = await loadRef(evidenceRoot, required(options, 'candidate'), 'CANDIDATE_MANIFEST');
+  const candidate = await loadRef(evidenceRoot, required(options, 'candidate'), 'ENABLEMENT_CANDIDATE');
   await assertManifest(candidate.value, evidenceRoot, candidate.ref);
   if (candidate.value.manifest_kind !== 'CANDIDATE' || candidate.value.manifest_status !== 'READY_FOR_ACTIVATION') {
     throw new BlockedResult('Activation requires a READY_FOR_ACTIVATION Candidate manifest.');
@@ -216,8 +216,8 @@ async function releaseCandidateValidator() {
 
 function validateReleaseCandidateReport(loaded, candidate, validateRelease) {
   if (!validateRelease(loaded.value)) throw new InputError(`GATE-06-06 Release Candidate Report schema validation failed: ${JSON.stringify(validateRelease.errors)}`);
-  if (loaded.value.report_status !== 'READY') throw new BlockedResult('Activation requires a READY GATE-06-06 Release Candidate report.');
-  if (!same(loaded.value.candidate_manifest_ref, candidate.ref) || !same(loaded.value.handoff_ref, candidate.value.handoff_ref) || !same(loaded.value.source_build, candidate.value.source_build)) {
+  if (loaded.value.release_status !== 'READY') throw new BlockedResult('Activation requires a READY GATE-06-06 Release Candidate report.');
+  if (!same(loaded.value.enablement_candidate_ref, candidate.ref) || !same(loaded.value.handoff_ref, candidate.value.handoff_ref) || !same(loaded.value.source_build, candidate.value.source_build)) {
     throw new BlockedResult('GATE-06-06 Report does not bind to the supplied Candidate, Handoff, and target build.');
   }
   return loaded;

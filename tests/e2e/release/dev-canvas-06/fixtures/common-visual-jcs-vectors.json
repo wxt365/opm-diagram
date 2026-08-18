@@ -1,0 +1,12 @@
+[
+  {"vector_id":"NULL","input":null,"canonical_utf8":"null","sha256":"74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"},
+  {"vector_id":"BOOLEAN","input":true,"canonical_utf8":"true","sha256":"b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b"},
+  {"vector_id":"INTEGER_POSITIVE","input":9007199254740991,"canonical_utf8":"9007199254740991","sha256":"f40b423c2dd95ff2b2f027e22208f438cf7242862e5e746860e697308c9add26"},
+  {"vector_id":"INTEGER_NEGATIVE","input":-9007199254740991,"canonical_utf8":"-9007199254740991","sha256":"4c933a456bb8f2e9894b2d0b26480439cd72d52fb8a27cbf8fd7f323f22c7815"},
+  {"vector_id":"STRING_EMPTY","input":"","canonical_utf8":"\"\"","sha256":"12ae32cb1ec02d01eda3581b127c1fee3b0dc53572ed6baf239721a03d82e126"},
+  {"vector_id":"STRING_ESCAPED","input":"A\"\n\\\u0000","canonical_utf8":"\"A\\\"\\n\\\\\\u0000\"","sha256":"9ee57c65117d4ea2b8de0bd0bdf53ad899b6a37051808e2a347827dd5eda7d5e"},
+  {"vector_id":"STRING_NON_ASCII","input":"对象😀","canonical_utf8":"\"对象😀\"","sha256":"2784cacf62438fba2bd69fc91f4b4be35e31df9f0d61470f4004ff495ff9d1d5"},
+  {"vector_id":"ARRAY","input":[null,false,0,"x"],"canonical_utf8":"[null,false,0,\"x\"]","sha256":"77064140c2ffc30dd4f0eec3183ffbc4931a521355540ff2ae7e13c13cbb6ace"},
+  {"vector_id":"OBJECT_KEY_ORDER","input":{"":2,"😀":1,"a":0},"canonical_utf8":"{\"a\":0,\"😀\":1,\"\":2}","sha256":"356bb09cec7ab06ff968a7e17eb81536156726241da02a0b315c0293b5f1a97a"},
+  {"vector_id":"NESTED_OBJECT","input":{"z":{"b":2,"a":1},"a":[3,{"d":4,"c":5}]},"canonical_utf8":"{\"a\":[3,{\"c\":5,\"d\":4}],\"z\":{\"a\":1,\"b\":2}}","sha256":"3eb62673a009296eaa1a2a988d9d718821527c6de09be527dd72f2c237edd98c"}
+]
