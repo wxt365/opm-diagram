@@ -40,7 +40,29 @@ public final class GoldenFixtureSeedRepository {
     }
 
     public MaterializedFixture materialize(Path storageRoot, byte[] fixtureBytes, String fixtureSha256, long sourceDateEpoch) {
+        return materialize(storageRoot, fixtureBytes, fixtureSha256, sourceDateEpoch,
+                new SeedIdentity("project.golden.fixture." + fixtureSha256, "Golden Fixture", "Release-only Golden fixture materialization."));
+    }
+
+    /**
+     * 为受控 release 流程写入调用方已验证的 Project identity。
+     * Project ID 的来源与校验由调用方负责，内核不派生或替换该值。
+     */
+    public MaterializedFixture materialize(Path storageRoot, byte[] fixtureBytes, String fixtureSha256, long sourceDateEpoch,
+                                           SeedIdentity seedIdentity) {
+        return materialize(storageRoot, fixtureBytes, fixtureSha256, sourceDateEpoch, seedIdentity, RuntimeActiveBindingProvider.current());
+    }
+
+    /**
+     * 为受控调用方使用已经独立验证的五角色 binding 执行 seed，避免回退到 checkout 资产。
+     */
+    public MaterializedFixture materialize(Path storageRoot, byte[] fixtureBytes, String fixtureSha256, long sourceDateEpoch,
+                                           SeedIdentity seedIdentity, SemanticRevision.ProfileBinding activeBinding) {
         try {
+            requireSeedIdentity(seedIdentity);
+            if (activeBinding == null) {
+                throw new GoldenFixtureMaterializationException("GFM_BINDING_MISMATCH", "Active binding must be provided.");
+            }
             requireEmpty(storageRoot);
             String document = utf8(fixtureBytes);
             JsonNode root = objectMapper.readTree(fixtureBytes);
@@ -49,8 +71,8 @@ public final class GoldenFixtureSeedRepository {
             }
             SemanticRevision revision = revisionReader.read(new ByteArrayInputStream(fixtureBytes));
             verifyIdentity(root, revision);
-            verifyBinding(revision.profileBinding());
-            String projectId = "project.golden.fixture." + fixtureSha256;
+            verifyBinding(revision.profileBinding(), activeBinding);
+            String projectId = seedIdentity.projectId();
             long migrationStarted = System.nanoTime();
             ProjectDatabaseOpenResult opened;
             try {
@@ -72,7 +94,7 @@ public final class GoldenFixtureSeedRepository {
                 connection.setAutoCommit(false);
                 try {
                     fault("seed.project_metadata", "GFM_STORAGE_WRITE_FAILED");
-                    insertProject(connection, projectId, revision, createdAt);
+                    insertProject(connection, seedIdentity, revision, createdAt);
                     insertPackages(connection, revision, fixtureSha256, createdAt);
                     fault("seed.model_catalog", "GFM_STORAGE_WRITE_FAILED");
                     insertModel(connection, projectId, revision, root.required("profile_binding"), createdAt);
@@ -107,8 +129,7 @@ public final class GoldenFixtureSeedRepository {
         }
     }
 
-    private void verifyBinding(SemanticRevision.ProfileBinding binding) {
-        SemanticRevision.ProfileBinding active = RuntimeActiveBindingProvider.current();
+    private void verifyBinding(SemanticRevision.ProfileBinding binding, SemanticRevision.ProfileBinding active) {
         if (!same(binding.profile(), active.profile()) || !same(binding.ruleSet(), active.ruleSet())
                 || !same(binding.textGrammar(), active.textGrammar()) || !same(binding.symbolCatalog(), active.symbolCatalog())
                 || !same(binding.normalizationAdapter(), active.normalizationAdapter()) || !binding.bindingDigest().equals(active.bindingDigest())) {
@@ -116,14 +137,14 @@ public final class GoldenFixtureSeedRepository {
         }
     }
 
-    private void insertProject(Connection connection, String projectId, SemanticRevision revision, Instant now) throws Exception {
+    private void insertProject(Connection connection, SeedIdentity identity, SemanticRevision revision, Instant now) throws Exception {
         try (PreparedStatement statement = connection.prepareStatement("""
                 INSERT INTO project_metadata(project_id, name, normalized_name, description, status, default_profile_id, default_profile_version, created_at, updated_at)
                 VALUES (?, ?, ?, ?, 'ACTIVE', ?, ?, ?, ?)
                 """)) {
-            statement.setString(1, projectId); statement.setString(2, "Golden Fixture " + revision.revisionId());
-            statement.setString(3, ("golden fixture " + revision.revisionId()).toLowerCase(java.util.Locale.ROOT));
-            statement.setString(4, "Release-only Golden fixture materialization.");
+            statement.setString(1, identity.projectId()); statement.setString(2, identity.projectName() + " " + revision.revisionId());
+            statement.setString(3, (identity.projectName() + " " + revision.revisionId()).toLowerCase(java.util.Locale.ROOT));
+            statement.setString(4, identity.description());
             statement.setString(5, revision.profileBinding().profile().id()); statement.setString(6, revision.profileBinding().profile().version());
             statement.setString(7, now.toString()); statement.setString(8, now.toString()); statement.executeUpdate();
         }
@@ -212,6 +233,12 @@ public final class GoldenFixtureSeedRepository {
         if (Files.exists(root)) try (var paths = Files.list(root)) { if (paths.findAny().isPresent()) throw new GoldenFixtureMaterializationException("GFM_TARGET_STORAGE_NOT_EMPTY", "Target storage must be empty."); }
     }
 
+    private void requireSeedIdentity(SeedIdentity identity) {
+        if (identity == null || blank(identity.projectId()) || blank(identity.projectName()) || blank(identity.description())) {
+            throw new GoldenFixtureMaterializationException("GFM_ARGUMENT_INVALID", "Seed identity must be complete.");
+        }
+    }
+
     private void fault(String stage, String code) {
         try {
             faultInjector.check(stage);
@@ -232,5 +259,8 @@ public final class GoldenFixtureSeedRepository {
 
     public record MaterializedFixture(String projectId, String modelId, String revisionId, int revisionSequence, Path databasePath, Map<String, Integer> tableCounts, String historyMode, StageDurations stageDurations) { }
     public record StageDurations(long migrationMicros, long seedMicros, long verifyMicros) { }
+    public record SeedIdentity(String projectId, String projectName, String description) { }
     @FunctionalInterface interface FaultInjector { void check(String stage) throws Exception; }
+
+    private static boolean blank(String value) { return value == null || value.isBlank(); }
 }

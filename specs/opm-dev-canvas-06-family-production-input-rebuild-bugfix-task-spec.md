@@ -4,6 +4,8 @@
 
 执行状态：`UPSTREAM_REBUILD_COMPLETE / PRODUCTION_MANIFEST_NOT_STARTED`
 
+当前适用性：本文只承接历史E2E Manifest `0.1.0`输入链与不可变执行记录；活动production Manifest必须按独立v02 producer/verifier规格重建，本文的三个driver和v01聚合不得作为活动完成证据。
+
 ## Task Type
 
 `bugfix`

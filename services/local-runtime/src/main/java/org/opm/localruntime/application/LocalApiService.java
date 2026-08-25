@@ -19,6 +19,7 @@ import org.opm.localruntime.semantic.SemanticRevisionValidator;
 import org.opm.localruntime.storage.ProjectDatabaseFactory;
 import org.opm.localruntime.storage.ProjectDatabaseOpenResult;
 import org.opm.localruntime.storage.SqliteRevisionCommitRepository;
+import org.opm.localruntime.releaseevidence.fault.E2EFaultPort;
 import org.opm.localruntime.text.OplGenerationResult;
 import org.opm.localruntime.text.OplGrammar;
 import org.opm.localruntime.text.OplTextGenerationService;
@@ -55,15 +56,21 @@ public class LocalApiService {
     private final OplTextGenerationService textGenerationService = new OplTextGenerationService();
     private final SemanticRevisionValidator semanticValidator = new SemanticRevisionValidator();
     private final ProfilePackageAssembler profilePackageAssembler;
+    private final E2EFaultPort e2eFaultPort;
 
     public LocalApiService(ProjectDatabaseFactory databaseFactory) {
-        this(databaseFactory, new FileProfilePackageLoader(Path.of("packages/profiles")));
+        this(databaseFactory, new FileProfilePackageLoader(Path.of("packages/profiles")), E2EFaultPort.NOOP);
+    }
+
+    public LocalApiService(ProjectDatabaseFactory databaseFactory, FileProfilePackageLoader profilePackageLoader) {
+        this(databaseFactory, profilePackageLoader, E2EFaultPort.NOOP);
     }
 
     @Autowired
-    public LocalApiService(ProjectDatabaseFactory databaseFactory, FileProfilePackageLoader profilePackageLoader) {
+    public LocalApiService(ProjectDatabaseFactory databaseFactory, FileProfilePackageLoader profilePackageLoader, E2EFaultPort e2eFaultPort) {
         this.databaseFactory = databaseFactory;
-        this.profilePackageAssembler = new ProfilePackageAssembler(profilePackageLoader);
+        this.e2eFaultPort = e2eFaultPort;
+        this.profilePackageAssembler = new ProfilePackageAssembler(profilePackageLoader, e2eFaultPort);
     }
 
     public Map<String, String> activeProfileRuleBinding() {
@@ -639,7 +646,7 @@ public class LocalApiService {
         SemanticRevision candidate = applyP0Command(projectId, modelId, current.revision(), required(request, "command_type"), requiredMap(request, "payload"));
         CandidateRevisionCommand command = new CandidateRevisionCommand(projectId, modelId, commandId, baseRevisionId, current.revision(), candidate,
                 binding(current.revision()), grammar(current.revision()), requestDigest(request), "P0_EDIT", Instant.now());
-        CommitResult result = new CandidateRevisionCommitter(new SqliteRevisionCommitRepository(databaseFactory.databasePath(projectId)), profilePackageAssembler).commit(command);
+        CommitResult result = new CandidateRevisionCommitter(new SqliteRevisionCommitRepository(databaseFactory.databasePath(projectId), e2eFaultPort), profilePackageAssembler, e2eFaultPort).commit(command);
         if (result instanceof CommitResult.Rejected rejected) throw rejected(rejected.code());
         String committed = result instanceof CommitResult.Committed value ? value.committedRevisionId() : ((CommitResult.Replayed) result).committedRevisionId();
         List<String> traces = result instanceof CommitResult.Committed value ? value.traceIds() : List.of();
@@ -1443,7 +1450,7 @@ public class LocalApiService {
     private SemanticRevision.QualifiedName qualifiedName(String localName) { return new SemanticRevision.QualifiedName("urn:opm:runtime", localName); }
     private SemanticRevision.SourceProvenance source(String kind) { return new SemanticRevision.SourceProvenance(PROFILE_ID, PROFILE_VERSION, kind, "profile." + kind.toLowerCase()); }
     private SemanticRevision.Normalization core() { return new SemanticRevision.Normalization(SemanticRevision.NormalizationLevel.CORE); }
-    private ApiException rejected(CommitFailureCode code) { return switch (code) { case REVISION_CONFLICT -> new ApiException(ApiErrorCode.REVISION_CONFLICT, 409, false, "基础修订不是当前草稿"); case IDEMPOTENCY_MISMATCH -> new ApiException(ApiErrorCode.IDEMPOTENCY_MISMATCH, 409, false, "command_id 已绑定不同请求"); case RULE_VERSION_CONFLICT -> new ApiException(ApiErrorCode.RULE_VERSION_CONFLICT, 409, false, "Profile 或 Rule 版本不匹配"); case VALIDATION_BLOCKED -> new ApiException(ApiErrorCode.VALIDATION_BLOCKED, 422, false, "候选修订未通过校验"); case MODIFIER_COMBINATION_INVALID -> new ApiException(ApiErrorCode.MODIFIER_COMBINATION_INVALID, 422, false, "Control 修饰组合无效"); case TEXT_GENERATION_BLOCKED -> new ApiException(ApiErrorCode.TEXT_GENERATION_BLOCKED, 422, false, "无法生成 OPL 文本"); default -> new ApiException(ApiErrorCode.PERSISTENCE_FAILED, 500, true, "修订提交失败"); }; }
+    private ApiException rejected(CommitFailureCode code) { return switch (code) { case REVISION_CONFLICT -> new ApiException(ApiErrorCode.REVISION_CONFLICT, 409, false, "基础修订不是当前草稿"); case READ_ONLY_REVISION -> new ApiException(ApiErrorCode.READ_ONLY_REVISION, 409, false, "当前修订为只读"); case IDEMPOTENCY_MISMATCH -> new ApiException(ApiErrorCode.IDEMPOTENCY_MISMATCH, 409, false, "command_id 已绑定不同请求"); case RULE_VERSION_CONFLICT -> new ApiException(ApiErrorCode.RULE_VERSION_CONFLICT, 409, false, "Profile 或 Rule 版本不匹配"); case VALIDATION_BLOCKED -> new ApiException(ApiErrorCode.VALIDATION_BLOCKED, 422, false, "候选修订未通过校验"); case MODIFIER_COMBINATION_INVALID -> new ApiException(ApiErrorCode.MODIFIER_COMBINATION_INVALID, 422, false, "Control 修饰组合无效"); case TEXT_GENERATION_BLOCKED -> new ApiException(ApiErrorCode.TEXT_GENERATION_BLOCKED, 422, false, "无法生成 OPL 文本"); default -> new ApiException(ApiErrorCode.PERSISTENCE_FAILED, 500, true, "修订提交失败"); }; }
     private ApiException profileForbidden() { return new ApiException(ApiErrorCode.PROFILE_FORBIDDEN, 422, false, "当前 Profile 不支持该 P0 命令"); }
     private ApiException domain(String message) { return new ApiException(ApiErrorCode.DOMAIN_REJECTED, 422, false, message); }
     private ApiException notFound(String message) { return new ApiException(ApiErrorCode.NOT_FOUND, 404, false, message); }

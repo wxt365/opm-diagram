@@ -1,6 +1,6 @@
 # Checklist: DEV-CANVAS-06 Visual/E2E 输入契约修正
 
-> 状态：`COMPLETE`。本 checklist 只记录设计修正，不构成 builder、Manifest、Gate、release 或 ISO 证据。
+> 状态：`COMPLETE/HISTORICAL_E2E_DECISION_SUPERSEDED`。本 checklist 只记录设计修正；其中E2E保持`0.1/0.1.0`的历史决定已被活动Manifest `0.2`设计和独立producer/verifier规格取代，不构成 builder、Manifest、Gate、release 或 ISO 证据。
 
 ## Spec Mapping
 
@@ -29,7 +29,7 @@
 ## Design Closure
 
 - [x] Visual 唯一输出为 `schema_version=0.2/manifest_version=0.2.0/runner_version=0.2.0`。
-- [x] E2E 明确保留 `0.1/0.1.0/0.1.0`，且拒绝全部 Golden Authoring 参数。
+- [x] 历史E2E曾冻结为`0.1/0.1.0/0.1.0`并拒绝全部Golden Authoring参数；该版本决定现已被活动`0.2/0.2.0`后继规格取代，拒绝Golden Authoring参数的边界继续有效。
 - [x] Report/Approval/Environment/Plan/130 Materialization/database/八字段 exact join 已冻结。
 - [x] `--input-mode` 必填且不能由路径推断。
 - [x] controlled descriptor Schema identity、controlled/production bundle ID、source/output root 和证据边界已冻结。

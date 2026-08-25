@@ -55,6 +55,7 @@
 - [x] E2E Manifest builder已完成活动43文件root适配与`22/22`重验；后续Family Identity Catalog适配由独立契约Gate跟踪，不回退本项。
 - [ ] 8 个 SQLite base、144 个 clone、1242 PNG、candidate 和 approved version 仍不存在。
 - [ ] GATE-06-03、Candidate、Activation、Capability 和 ISO 状态不得提升。
+- [x] Common Driver改变factory语义后的32个E2E/Catalog raw ref重建由独立Common E2E输入重建规格承接，现有02B局部结果不得作为活动clean root。
 
 ## Rollback
 

@@ -262,7 +262,7 @@ release_validation_status, activation_state, blocker_codes[]
 
 1. `visual_case_ids[]`：该 Capability 在 `VP-1440X900/VP-1280X800/VP-390X844` 与 `Z-025/Z-100/Z-400` 笛卡尔积的 `9` 个 case；ID 固定为 `VIS-CANVAS.<capability_id>.<viewport_id>.<zoom_id>`，按 viewport 上述顺序再按 zoom 上述顺序排列；每个 case 必须由 `GATE-06-03` 按 exact Symbol Descriptor 展开全部 visual variant capture；
 2. `family_e2e_result_ref`：Procedural -> `E2E-CANVAS-002/<capability_id>`，Control -> `E2E-CANVAS-003/<capability_id>`，Structural -> `E2E-CANVAS-004/<capability_id>`；其 covered coverage keys 必须与 dependency closure 集合相等；
-3. `common_e2e_ids[]`：固定 `E2E-CANVAS-001/005/006/007`，全部 PASS；
+3. `common_e2e_ids[]`：固定为第8节16个完整case ID，按Manifest expectation逐项匹配，恰为`7 PASS_MATCHED+9 BLOCKED_MATCHED`；不得把四个suite ID或全部PASS作为证据；
 4. `performance_scenario_ids[]`：固定为 `PERF-CANVAS-001~007`，覆盖规格第 5 节全部 7 个场景，Performance Report overall PASS；
 5. `recovery_case_ids[]`：固定覆盖 `GATE-06-05` 的故障零增量、重开恢复、整体 gate 回退和逐 Capability gate 回退，Recovery Report overall PASS。
 
@@ -275,7 +275,7 @@ release_validation_status, activation_state, blocker_codes[]
 1. Intake status 必须 READY，`C.intake_status=MATCHED` 且 upstream eligibility=`ELIGIBLE_FOR_RELEASE_VALIDATION`；
 2. `upstream_evidence_fingerprint` 可从 Handoff 对应对象复算，dependency closure 与 Intake 深度相等；
 3. Visual Report 中 `C` 的固定 9 case 全部 matched，golden、canvas pixel 非空、marker/label/遮挡断言均 PASS；
-4. E2E Report 的四个公共 suite 全 PASS，家族 suite 中 `C` 的结果 PASS，covered coverage keys 与上游集合相等；
+4. E2E Report 的16个公共case全部等于各自expected status（`7 PASS_MATCHED+9 BLOCKED_MATCHED`），家族 suite 中 `C` 的结果按其coverage expectation匹配，covered coverage keys 与上游集合相等；
 5. Performance Report 的固定环境、样本和全部 7 个场景 overall PASS；
 6. Recovery Report overall PASS，且整体/逐 Capability 回退都证明零数据删除、最近 committed Projection 可重开；
 7. Control 额外检查其 coverage keys 引用的全部基础 Procedural Capability 在 proposed 集合中且无 BLOCKED；
@@ -336,7 +336,7 @@ ROLLED_BACK_PARTIAL --恢复证据后新 Candidate/READY--> ACTIVE_PARTIAL | ACT
 
 1. `GATE-06-01`：设计为 `FROZEN`；Intake Schema、runner 和正反例测试已实现；exact Handoff 执行为 `READY_FOR_RELEASE_VALIDATION`。该 READY 只证明 8 项检查与 `34/34` intake matched。
 2. `GATE-06-02`：设计为 `FROZEN`；Enablement Schema、builder、verifier、activate/rollback runner 及失败守卫测试已实现。verifier 会从 Intake 和四类 evidence 复算 Candidate 派生字段，manifest 禁止覆盖；缺少可执行 GATE-06-06 Report Schema/READY Report 时 `activate` 必须阻断且零输出。真实 Candidate 仍等待 `GATE-06-03~05` exact Report，真实 Activation 仍等待 `GATE-06-06` READY Report；production gate 必须保持 `DISABLED + []`。
-3. `GATE-06-03/04/05/06`设计均为`FROZEN`；`GATE-06-05`的Reopen Catalog、Manifest `0.2`、HTTP raw-body JCS、Launch Request/Proof与Projection Digest `0.1`均已冻结，`RECOVERY-IMPL-01=DESIGN_READY/IMPLEMENTATION_NOT_STARTED`。GATE-06-03的三类Authoring 0.1 Schema、Capture Planner、Materialization Report Schema和Materializer `v1.5`实现已存在，Verifier Catalog `v1.1` 63/63、受控130项串行/并发4及contract/backend已闭环。E2E Attempt Artifact设计`v1.3`、Family Fixture Identity Catalog `0.1/0.1.0`、活动Report `0.2`与Runner Source Set `0.1`已冻结；Golden Authoring为`v1.4`，Visual Common Materialization为`v1.4`，唯一空Text Artifact、`1/1/0`计数、Common Visual Fixture机器Schema、五类index逐列映射、8类UI step/exact数组和`43=1+8+32+2` self-contained root均已冻结。共享Node JCS、Projection Digest Node/Java parity已实现；E2E Manifest Common/Family适配定向`23/23`已完成，Family Production Input最小重建规格已冻结但执行为`NOT_STARTED`，Family Materializer保持阻断；新source/Handoff/Evidence Bundle/Intake/production Manifest、03C/03B、production 130项、8个Common base/144 clone、04/05、真实approved golden、Visual/E2E Java/source/runner和READY Report尚未闭合。Recovery Execution为`v1.5`且Launch正反例`17/17`通过，完整factory/launcher/28/56和READY Report仍未实现/执行；Release Candidate同样未闭合。
+3. `GATE-06-03/04/05/06`设计均为`FROZEN`；`GATE-06-05`的Reopen Catalog、Manifest `0.2`、HTTP raw-body JCS、Launch Request/Proof与Projection Digest `0.1`均已冻结，`RECOVERY-IMPL-01=DESIGN_READY/IMPLEMENTATION_NOT_STARTED`。GATE-06-03的三类Authoring 0.1 Schema、Capture Planner、Materialization Report Schema和Materializer `v1.5`实现已存在，Verifier Catalog `v1.1` 63/63、受控130项串行/并发4及contract/backend已闭环。历史 E2E Attempt Artifact `v1.3/0.1` 与活动 Manifest/Attempt Artifact `0.2`、Profile asset/digest closure、Family Fixture Identity Catalog `0.1/0.1.0`、活动Report `0.2`与Runner Source Set `0.1`已冻结；Golden Authoring为`v1.4`，Visual Common Materialization为`v1.4`，唯一空Text Artifact、`1/1/0`计数、Common Visual Fixture机器Schema、五类index逐列映射、8类UI step/exact数组和`43=1+8+32+2` self-contained root均已冻结。共享Node JCS、Projection Digest Node/Java parity已实现；E2E Manifest Common/Family适配、`clean-37c5412a9c12`输入链和fixed postverify均已闭合，但活动 Profile raw/Tokens 尚未被 CLI/Materializer/Artifact verifier 消费，Family Materializer可进入实现；03C/03B、production 130项、8个Common base/144 clone、04/05、真实approved golden、Visual/E2E Java/source/runner和READY Report尚未闭合。Recovery Execution为`v1.5`且Launch正反例`17/17`通过，完整factory/launcher/28/56和READY Report仍未实现/执行；Release Candidate同样未闭合。
 4. `GATE-06-01` READY 不构成 `GATE-06-02~06`、生产 enablement、发布或 ISO 19450:2024 符合性证明；禁止手工启用 Capability。
 
 ### GATE-06-03 Visual/E2E Closure 冻结执行契约
@@ -353,7 +353,7 @@ ROLLED_BACK_PARTIAL --恢复证据后新 Candidate/READY--> ACTIVE_PARTIAL | ACT
 - 验证：Markdown 结构与表格、case/attempt/coverage 计数、跨文档口径、限定文件 `git diff --check`；纯文档任务无需执行代码测试。
 - 回滚：只回退 Golden Authoring 任务规格允许的文档增量，不改变工作树中的并行实现和任何运行时数据。
 
-当前仓库事实：现有 `tests/e2e/playwright.config.ts` 仍是使用 Vite dev server 的普通开发 E2E，不是 release evidence；独立 E2E Manifest `0.1` builder/verifier已完成活动Common Catalog `0.2.0` 43文件root和Family Identity Catalog适配并通过定向`23/23`，但新的clean source/Handoff/Evidence Bundle/Intake和production Manifest重验均为`NOT_STARTED`；release Runner/Reporter/verifier、production Web server、release Playwright config 和真实 E2E Report 尚未实现或执行。既有开发 E2E 不能直接标记为 `GATE-06-03` PASS，也不得被新 release 入口改变含义。
+当前仓库事实：现有 `tests/e2e/playwright.config.ts` 仍是使用 Vite dev server 的普通开发 E2E，不是 release evidence；历史E2E Manifest `0.1` builder/verifier及旧production输入链已有局部证据，但活动Manifest `0.2` producer/verifier、第四`DRIVER-COMMON`、Common Driver/controlled orchestration、release Runner/Reporter/verifier、production Web server、release Playwright config 和真实E2E Report尚未实现或执行。既有开发E2E、v01 Manifest或Schema测试不能直接标记为`GATE-06-03` PASS。
 
 #### 2. 固定机器资产
 
@@ -362,8 +362,11 @@ docs/contracts/schemas/opm-dev-canvas-06-visual-manifest.schema.json
 docs/contracts/schemas/opm-dev-canvas-06-visual-manifest-v02.schema.json
 docs/contracts/schemas/opm-dev-canvas-06-visual-report.schema.json
 docs/contracts/schemas/opm-dev-canvas-06-e2e-manifest.schema.json
+docs/contracts/schemas/opm-dev-canvas-06-e2e-manifest-v02.schema.json
 docs/contracts/schemas/opm-dev-canvas-06-e2e-report.schema.json
+docs/contracts/schemas/opm-dev-canvas-06-e2e-report-v02.schema.json
 docs/contracts/schemas/opm-dev-canvas-06-e2e-attempt-artifact.schema.json
+docs/contracts/schemas/opm-dev-canvas-06-e2e-attempt-artifact-v02.schema.json
 docs/contracts/schemas/opm-dev-canvas-06-common-fixture-catalog.schema.json
 docs/contracts/schemas/opm-dev-canvas-06-golden-environment.schema.json
 docs/contracts/schemas/opm-dev-canvas-06-golden-capture-plan.schema.json       # 0.1 已实现
@@ -400,11 +403,13 @@ Schema identity 固定为：
 | Visual Manifest（现有历史输入） | `OPM-DEV-CANVAS-06-VISUAL-MANIFEST-001` | `0.1` |
 | Visual Manifest（生产目标） | `OPM-DEV-CANVAS-06-VISUAL-MANIFEST-001` | `0.2` |
 | Visual Report | `OPM-DEV-CANVAS-06-VISUAL-REPORT-001` | `0.1` |
-| E2E Manifest | `OPM-DEV-CANVAS-06-E2E-MANIFEST-001` | `0.1` |
+| E2E Manifest（历史只读） | `OPM-DEV-CANVAS-06-E2E-MANIFEST-001` | `0.1` |
+| E2E Manifest（活动） | `OPM-DEV-CANVAS-06-E2E-MANIFEST-001` | `0.2` |
 | E2E Report（历史只读） | `OPM-DEV-CANVAS-06-E2E-REPORT-001` | `0.1` |
 | E2E Report（活动） | `OPM-DEV-CANVAS-06-E2E-REPORT-001` | `0.2` |
 | E2E Runner Source Set | `OPM-DEV-CANVAS-06-E2E-RUNNER-SOURCE-SET-001` | `0.1` |
-| E2E Attempt Artifact union | 11个互斥`OPM-DEV-CANVAS-06-E2E-*-001` root | `0.1` |
+| E2E Attempt Artifact union（历史只读） | 11个互斥`OPM-DEV-CANVAS-06-E2E-*-001` root | `0.1` |
+| E2E Attempt Artifact union（活动） | 11个互斥`OPM-DEV-CANVAS-06-E2E-*-001` root + Profile asset tree/raw refs | `0.2` |
 | Common Fixture Catalog | `OPM-DEV-CANVAS-06-COMMON-FIXTURE-CATALOG-001` | `0.1` |
 | Golden Environment（历史输入） | `OPM-DEV-CANVAS-06-GOLDEN-ENVIRONMENT-001` | `0.1` |
 | Golden Environment（生产目标） | `OPM-DEV-CANVAS-06-GOLDEN-ENVIRONMENT-001` | `0.2` |
@@ -424,13 +429,13 @@ npm run release:canvas06:visual:manifest -- --input-mode PRODUCTION_HANDOFF --ha
 npm run release:canvas06:visual:manifest:verify -- --input-mode PRODUCTION_HANDOFF --evidence-root <path> --manifest <相对path> --approved-version-root <exact-version> --require-production
 npm run release:canvas06:visual:run -- --evidence-root <path> --manifest <相对path> --out <visual-report相对path>
 npm run release:canvas06:visual:verify -- --evidence-root <path> --report <相对path> --require-ready
-npm run release:canvas06:e2e:manifest -- --input-mode PRODUCTION_HANDOFF --handoff-root <只读root> --intake-report <root内相对path> --source-root <clean-checkout> --source-date-epoch <epoch> --web-dist <source-root内相对path> --runtime-jar <source-root内相对path> --common-fixture-root <source-root内相对fixtures root> --common-fixture-catalog <fixtures root内相对path> --driver-root <source-root内相对drivers root> --output-root <evidence-root> --out <dev-canvas-06/e2e/manifests/<manifest-id>/dev-canvas-06-e2e-manifest.json>
-npm run release:canvas06:e2e:manifest:verify -- --input-mode PRODUCTION_HANDOFF --handoff-root <只读root> --intake-report <root内相对path> --manifest-root <evidence-root内final transaction root> --manifest dev-canvas-06-e2e-manifest.json --require-production
-npm run release:canvas06:e2e:run -- --input-mode PRODUCTION_HANDOFF --handoff-root <只读root> --intake-report <root内相对path> --manifest-root <只读Manifest final root> --manifest dev-canvas-06-e2e-manifest.json --source-root <clean-checkout> --java-home <JDK21 home> --browser-executable <Chromium普通文件> --runtime-port <port> --web-port <port> --output-root <evidence-root> --out <dev-canvas-06/e2e/reports/<report-id>/dev-canvas-06-e2e-report.json> --require-production
-npm run release:canvas06:e2e:verify -- --input-mode PRODUCTION_HANDOFF --handoff-root <只读root> --intake-report <root内相对path> --evidence-root <evidence-root> --report <dev-canvas-06/e2e/reports/<report-id>/dev-canvas-06-e2e-report.json> --require-production --require-ready
+npm run release:canvas06:e2e:manifest:v02 -- --input-mode PRODUCTION_HANDOFF --handoff-root <只读版本化handoff root> --intake-report <root内READY intake相对path> --source-root <clean target source> --source-date-epoch <非负十进制UTC整秒> --common-fixture-root <活动0.2.0的43文件root> --profile-asset-root <exact五资产root> --output-root <evidence-root> --out <dev-canvas-06/e2e/manifests/<manifest-id>/dev-canvas-06-e2e-manifest.json> --require-production
+npm run release:canvas06:e2e:manifest:v02:verify -- --input-mode PRODUCTION_HANDOFF --handoff-root <只读版本化handoff root> --intake-report <root内READY intake相对path> --manifest-root <evidence-root内final transaction root> --manifest dev-canvas-06-e2e-manifest.json --profile-asset-root <manifest-root/inputs/upstream/profile-assets> --require-production
+npm run release:canvas06:e2e:run -- --input-mode PRODUCTION_HANDOFF --handoff-root <只读root> --intake-report <root内相对path> --manifest-root <只读Manifest final root> --manifest dev-canvas-06-e2e-manifest.json --profile-asset-root <manifest-root/inputs/upstream/profile-assets> --source-root <clean-checkout> --java-home <JDK21 home> --browser-executable <Chromium普通文件> --runtime-port <port> --web-port <port> --output-root <evidence-root> --out <dev-canvas-06/e2e/reports/<report-id>/dev-canvas-06-e2e-report.json> --require-production
+npm run release:canvas06:e2e:verify -- --scope REPORT --input-mode PRODUCTION_HANDOFF --handoff-root <只读root> --intake-report <root内相对path> --evidence-root <evidence-root> --report <dev-canvas-06/e2e/reports/<report-id>/dev-canvas-06-e2e-report.json> --require-production --require-ready
 ```
 
-E2E Runner 的 production/controlled 完整参数、模式互斥、self-contained Report root、Fixture materialization、Runtime/Web/browser启动、failure precedence、BLOCKED/零Report边界和只读verifier由`specs/opm-dev-canvas-06-e2e-runner-implementation-task-spec.md`承接；11类attempt JSON、Family Project/ordinal来源、活动Report `0.2`的Java executable mirror/ref、23项Runner Source Set、Report投影和只读验证顺序只由`docs/design/opm-dev-canvas-06-e2e-attempt-artifact-design.md v1.3`、Family Fixture Identity Catalog `0.1/0.1.0`及对应Schema承接。历史Report `0.1`只读，Manifest保持`0.1`。上述production摘要不得替代完整规格/设计。
+活动Manifest v02 producer/verifier的完整参数、Profile五资产、四driver、JAR/Web final root和`137/57`聚合由其独立实现规格承接；E2E Runner的production/controlled参数、self-contained Report root、Fixture materialization、Runtime/Web/browser启动、failure precedence、BLOCKED/零Report和只读verifier由Runner规格承接；Common 16 case、有序API期望与exact JAR/Web/fresh attempt编排由Common Driver设计`v1.2`承接；活动11类attempt JSON与摘要由Profile/Digest closure及Artifact `0.2` Schema承接。历史Manifest/Report/Artifact `0.1`只读，不得替代活动`0.2`。上述命令摘要不得覆盖各实现规格。
 
 Manifest命令：`0=Schema/计数/ref/approved authoring全合法`、`2=输入/Schema/ref无效`、`3=case/coverage/golden/approval/environment/SHA闭包不匹配`、`4=未分类I/O/内部错误`。Visual失败时目标和临时文件均零输出；E2E还必须把Manifest、clean build副本、raw copy、archive materialization、Common和driver全部置于同一staging root并单次目录atomic rename，失败时final transaction root零输出。Run命令：`0=READY_FOR_ENABLEMENT_EVALUATION`、`2=输入/Schema/ref无效`、`3=已生成合法BLOCKED Report`、`4=未分类错误`。Verify不带`--require-ready`时可对合法BLOCKED Report返回`0`；Gate流水线必须带该参数，此时BLOCKED返回`3`。
 
@@ -458,9 +463,9 @@ environment, report_status, summary,
 capability_results[], case_results[], failures[], limitations[]
 ```
 
-生产 Visual Manifest 还必须包含 `golden_environment_ref` 和八个 provenance 字段 `golden_authoring_report_ref/golden_approval_record_ref/golden_set_version/golden_set_sha256/capture_plan_ref/capture_set_sha256/fixture_materialization_set_sha256/fixture_database_set_sha256`；E2E Manifest 不包含这些字段。`upstream_input_refs[]` 恰好绑定 exact Coverage Catalog、Golden Manifest、Golden Replay Report、Symbol Catalog 和 Handoff Evidence Bundle；不得用当前 source tree 中路径相同的文件替代上游 bytes。现有 Visual Manifest `0.1` 缺少 Authoring provenance，只能作为历史 Schema；生产 builder 必须输出 `schema_version=0.2/manifest_version=0.2.0`，E2E builder 固定输出 `0.1/0.1.0`。
+生产 Visual Manifest 还必须包含 `golden_environment_ref` 和八个 provenance 字段 `golden_authoring_report_ref/golden_approval_record_ref/golden_set_version/golden_set_sha256/capture_plan_ref/capture_set_sha256/fixture_materialization_set_sha256/fixture_database_set_sha256`；E2E Manifest 不包含这些字段。`upstream_input_refs[]` 恰好绑定 exact Coverage Catalog、Golden Manifest、Golden Replay Report、Symbol Catalog 和 Handoff Evidence Bundle；不得用当前 source tree 中路径相同的文件替代上游 bytes。现有 Visual Manifest `0.1` 缺少 Authoring provenance，只能作为历史 Schema；生产 Visual 与活动 E2E producer 都必须输出 `schema_version=0.2/manifest_version=0.2.0`，E2E `0.1/0.1.0`只允许历史 verifier 读取。
 
-1. 生产 Visual `manifest_version=0.2.0`，E2E `manifest_version=0.1.0`；`manifest_id` 分别固定为 `dev-canvas-06.visual.<source-commit前12位>.<intake-sha前12位>` 和 `dev-canvas-06.e2e.<source-commit前12位>.<intake-sha前12位>`。
+1. 生产 Visual 与活动 E2E 的 `manifest_version` 均为`0.2.0`；`manifest_id` 分别固定为 `dev-canvas-06.visual.<source-commit前12位>.<intake-sha前12位>` 和 `dev-canvas-06.e2e.<source-commit前12位>.<intake-sha前12位>`。
 2. Manifest/Report 的 `handoff_ref/intake_report_ref/upstream_source_build` 必须与 READY Intake 深度相等；`source_build` 是独立的 clean DEV-CANVAS-06 target build，Visual 和 E2E 必须深度相等，禁止用上游 DEV-CANVAS-05 source commit 冒充目标 build。
 3. `generator_identity/runner_identity` 至少包含工具版本、source commit、Node/Playwright/Chromium exact version、OS、命令和 runner source SHA。target build 与 runner build 分开记录，禁止混用。
 4. `report_status` 只允许 `BLOCKED/READY_FOR_ENABLEMENT_EVALUATION`。READY 时 `failures=[]`；BLOCKED 时至少一项稳定 failure。
@@ -481,13 +486,13 @@ capability_results[], case_results[], failures[], limitations[]
 
 #### 4.2 builder、版本与 bundle class
 
-1. 唯一活动修正规格为 `specs/opm-dev-canvas-06-visual-e2e-input-correction-bugfix-task-spec.md`；原 Visual/E2E `0.1` 合并 builder spec/checklist 为 `HISTORICAL/SUPERSEDED`，未完成项不得继续实现。
-2. Visual 与 E2E 使用独立入口，一次调用只能写一类 Manifest；Visual 只输出 `0.2/0.2.0`，E2E 保持 `0.1/0.1.0`。E2E 必须拒绝 approved version、Authoring Report、Environment、Plan 和 Materialization Report 参数。
+1. Visual输入修正仍以`specs/opm-dev-canvas-06-visual-e2e-input-correction-bugfix-task-spec.md`为活动依据；原 Visual/E2E `0.1`合并builder和E2E v01独立builder spec/checklist均为`HISTORICAL/SUPERSEDED`，未完成项不得继续实现。活动E2E唯一入口为`specs/opm-dev-canvas-06-e2e-manifest-v02-builder-verifier-implementation-task-spec.md`及对应checklist。
+2. Visual 与 E2E 使用独立入口，一次调用只能写一类 Manifest；两者只输出 `0.2/0.2.0`。E2E 必须拒绝 approved version、Authoring Report、Environment、Plan 和 Materialization Report 参数；历史E2E `0.1/0.1.0`不得被活动producer输出。
 3. 两个 builder 都强制显式 `--input-mode CONTROLLED_TEST|PRODUCTION_HANDOFF`。受控只读根固定为 `tests/e2e/release/dev-canvas-06/bundles/controlled/canvas06-controlled-<bundle-identity-sha256>/`。Visual production物化根固定为 `<evidence_output_root>/dev-canvas-06/inputs/production/<bundle-sha256>/`；E2E不创建独立production物化根，只允许在其final Manifest transaction root内提交`inputs/**`。
 4. production bundle identity 固定为 `canvas06-production-<bundle-identity-sha256>`，只能从 READY Intake/Handoff exact refs 的 JCS digest 推导；controlled identity 固定为 `canvas06-controlled-<bundle-identity-sha256>`，必须由封闭 `controlled-bundle.json`、目录、refs 和 raw archive SHA 闭合。`approved_version_ref` 字段始终必填并进入 identity：Visual 必须为 exact approved version 对象，E2E 必须显式为 `null`；两者不得共用 descriptor 或 `bundle_id`。identity digest 与 archive digest 不得互换。
 5. production 读取 controlled root、controlled 写 production root、同 ID 跨 class、受控 Manifest 进入 `--require-ready/--require-production`、受控 Bundle 生成生产证据，以及 `approved_version_ref` 缺失/模式错配，均在写 Manifest bytes 前拒绝，目标与临时文件零输出。
 6. Visual还必须按修正规格第5章exact join `authoring-report.json/approval-record.json/golden-environment.json/capture-plan.json/130 reports/130 databases`和八个provenance字段；E2E不消费该链。
-7. E2E `0.1` builder/verifier的完整参数表、mode-specific external trust root、controlled root内`refs/intake|handoff|release`、Evidence Bundle内Coverage/Golden/Replay/Profile/Symbol/Family Identity Catalog/family fixture布局、Common/driver source、逐字段ref映射、percent-encoded fixture path和单一final transaction root只由`specs/opm-dev-canvas-06-e2e-manifest-v01-builder-implementation-task-spec.md`承接；任何简写命令不得覆盖该规格。
+7. 活动E2E `0.2` producer/verifier的完整参数表、mode-specific external trust root、controlled root内`refs/intake|handoff|release`、Evidence Bundle内Coverage/Golden/Replay/Profile/Symbol/Family Identity Catalog/family fixture布局、Common/四个driver source、Profile五资产、逐字段ref映射、percent-encoded fixture path和单一final transaction root只由`specs/opm-dev-canvas-06-e2e-manifest-v02-builder-verifier-implementation-task-spec.md`承接；任何简写命令不得覆盖该规格。v01规格只保留历史审计语义。
 
 #### 5. Visual 固定矩阵与 case catalog
 
@@ -588,7 +593,7 @@ expected_transaction, assertion_ids[]
 1. family coverage 恰有 `178`：expected PASS=`130`、BLOCKED=`48`；每个 coverage key 恰映射一次；
 2. Procedural -> `E2E-CANVAS-002`，Control -> `003`，Structural -> `004`；
 3. case ID=`<suite_id>.<capability_id>.<sha256(coverage_key UTF-8 bytes)前12位>`，同时保存完整 coverage key、upstream case/fixture ref、expectation、driver ID 和 input SHA；
-4. driver 只允许 `DRIVER-PROCEDURAL/DRIVER-CONTROL/DRIVER-STRUCTURAL`，输入来自 upstream fixture。前端不能修改端点、Modifier、标签或 completeness 来迁就现有 UI；无法执行时 case FAILED 并回流相应上游/实现包；
+4. `driver_catalog[]`按固定顺序只允许`DRIVER-PROCEDURAL/DRIVER-CONTROL/DRIVER-STRUCTURAL/DRIVER-COMMON`四项。家族case只能分别引用前三项且输入来自upstream fixture；公共case只能引用第四项，其16项动作、有序API期望与受控编排由Common Driver设计`v1.2`及实现规格唯一决定。前端不能修改端点、Modifier、标签或 completeness 来迁就现有 UI；无法执行时 case FAILED 并回流相应实现包；
 5. family case 在 `VP-1440X900/Z-100` 执行一次用户 mutation。PASS 必须原子提交 expected Revision 并重开；BLOCKED 必须 Head 不动且 Revision/Parent/Trace/Finding/Operation/Receipt 增量全 `0`。
 
 Family `fixture_ref/input_ref` 分别取 Golden Manifest `base_revision_fixture/input_revision_fixture` 的 exact bundle materialization；178个base `fixture_ref`深度去重后当前恰为2，并与Family Identity Catalog SHA集合一一相等。Catalog的Project是唯一Project来源，Model/Context/base Revision/sequence与fixture bytes深度相等，parent按“fixture字段存在则字符串、缺失则Catalog显式`null`”归一后相等，`base_revision=fixture.revision_id`。`expected_transaction` 取 Golden Replay 两次 attempt 完全相等的 `transaction`。BLOCKED case 还必须与 Golden Manifest `expected_transaction` 深度相等。PASS assertion IDs 固定为 `REVISION_COMMITTED/PROJECTION_MATCHED/TEXT_TRACE_MATCHED/TRANSACTION_MATCHED/REOPEN_MATCHED`；BLOCKED 固定为 `ERROR_CODE_MATCHED/TRANSACTION_ZERO/HEAD_UNCHANGED/PROJECTION_UNCHANGED/REOPEN_MATCHED`。
@@ -670,7 +675,7 @@ Golden Authoring 的唯一实施口径为 `docs/design/opm-dev-canvas-06-golden-
 
 E2E Runner 的唯一直接开发入口为`specs/opm-dev-canvas-06-e2e-runner-implementation-task-spec.md`及其implementation checklist。Family `178`使用non-web test-only materializer把exact `MS-REV-001/0.2`写入fresh attempt SQLite，Project只读Manifest锁定的Family Identity Catalog，禁止Golden/Recovery/路径/SHA派生；Common `16`固定从exact Common Factory输出创建确定性空模型后经真实UI/API执行，禁止在Runtime/API与SQLite间临时选择。每个attempt必须先原子写入并验证Fault Plan，再新建storage、Runtime、production Web、Chromium process/context并完成新进程重开，Vite/HMR和外网均禁止。
 
-E2E Attempt Artifact设计`v1.3`与union Schema `0.1`是11类JSON的唯一机器格式。Runner/verifier必须先验证Fault Plan并以其ordinal作为其余artifact机器来源，再按固定文件名选择预期root identity，不能只验证union后接受错位文件；三个fault case、其余191项NONE、Family Catalog/Family/Common materialization、INITIAL/REOPEN、Network/Console/API、Transaction/Reopen、10个Index必需kind和Report投影均不得在实现阶段重新决定。全部正式Projection SHA永久绑定Projection Digest `0.1`。
+历史 E2E Attempt Artifact设计`v1.3`/union Schema `0.1`只读；活动 Attempt Artifact `0.2`及 Profile/Digest closure 设计是11类JSON、Profile tree/raw refs、16个 Index kind 和摘要的唯一机器格式。Runner/verifier必须先验证Fault Plan并以其ordinal作为其余artifact机器来源，再按固定文件名选择预期root identity，不能只验证union后接受错位文件；三个fault case、其余191项NONE、Family Catalog/Family/Common materialization、INITIAL/REOPEN、Network/Console/API、Transaction/Reopen、Profile raw refs、Token parity和Report投影均不得在实现阶段重新决定。全部正式Projection SHA永久绑定Projection Digest `0.1`，OPL/Trace绑定Java writer，Token绑定固定JCS preimage。
 
 历史E2E Report `0.1`只读，活动producer/verifier只写Report `0.2`。活动Report固定`runner_version=0.2.0`，Java executable、`java -version` stderr与`$JAVA_HOME/release` raw bytes镜像到同一executable SHA目录；全部`runtime-process.java_ref`逐字段等于Report mirror ref。Runner Source Set `0.1`按Schema `prefixItems`恰有23项，禁止glob、目录递归、Git tracked set或import graph动态选择；Report `runner_source_sha256`等于Source Set aggregate。命令/option/token、Projection、OPL/Token/Trace、七项事务及其他证据继续作为strict raw artifact，由attempt `artifact_refs[]` exact引用。只有388项取得真实必填identity时才允许原子写Report，禁止占位identity。
 
@@ -754,8 +759,9 @@ AND family_case_count == 178
 AND family_expectations == {PASS:130, BLOCKED:48}
 AND common_case_count == 16
 AND attempt_count == 388
-AND pass_matched_count == 146
-AND blocked_matched_count == 48
+AND common_expectations == {PASS:7, BLOCKED:9}
+AND pass_matched_count == 137
+AND blocked_matched_count == 57
 AND failed_count == 0
 AND capability_results.length == 34
 AND every(case.status == expected_status(case.expectation))
@@ -771,17 +777,17 @@ AND retry_count == 0
 - [x] PNG comparator、非空、determinism、几何/遮挡/裁剪/溢出和 golden 更新边界已冻结。
 - [x] E2E `194=178+16` catalog、两次执行、事务/重开断言、失败码和 READY 算法已冻结。
 - [x] Coverage/Golden Manifest/Golden Replay exact join、variant 级 fixture、bundle 安全物化、Common Fixture Catalog 和 Golden Environment Index 契约已冻结。
-- [x] Visual/E2E 输入修正规格已冻结独立 builder、Visual `0.2`、E2E `0.1`、approved transitive exact join、两类 bundle root/identity 和禁止互用；旧合并 builder 已转为历史目标。
-- [x] Common Fixture Catalog、Common Visual Fixture `0.1`、Golden Environment `0.1/0.2`、Visual/E2E Manifest、历史/活动E2E Report、Runner Source Set及E2E Attempt Artifact union Schema已存在；Common Visual Fixture Schema已通过当前Ajv 2020编译，02B正反contract test仍未实现。既有输入Schema`4/4`、Visual/E2E Schema（含11类artifact root、Report`0.2`与23项Source Set）`15/15`、Environment`0.2`定向`5/5`正反例保持其历史验证结论。Schema验证只证明机器形状可加载，不证明fixture/source mirror/Java/browser/font、artifact producer/verifier或任何release case已执行。
+- [x] Visual/E2E 输入修正规格已冻结独立 builder、Visual `0.2`、历史 E2E `0.1`只读、活动 E2E `0.2`、approved transitive exact join、两类 bundle root/identity 和禁止互用；活动Manifest v02 producer/verifier独立规格与checklist已冻结，旧合并及v01 builder均已转为历史目标。
+- [x] Common Fixture Catalog、Common Visual Fixture `0.1`、Golden Environment `0.1/0.2`、历史/活动E2E Manifest、历史/活动E2E Report、Runner Source Set及历史/活动E2E Attempt Artifact union Schema已存在；Profile asset tree/raw ref、Token preimage/parity Schema与fixture也已冻结。活动 Manifest/Report/Attempt/Profile/Token 定向契约测试当前为`29/29`；02B Builder/Verifier与部分正反例已有局部实现，但新factory语义对应的活动32个E2E/raw ref尚未在exact clean输入上重建，Common Visual定向诊断当前为`3/6`且首错命中Ambiguous旧期望漂移。Schema或临时目录测试只证明机器形状和局部join，不证明可信Common root、Java/browser/font、artifact producer或任何release case已执行。
 - [x] Common Fixture Catalog实体、8个历史元数据Visual fixture、16个公共E2E base/input fixture与SHA校验已实现；catalog binding由READY Handoff active binding派生。历史8个Visual fixture不等于02B完整Common Visual Fixture，不能进入新03B。
 - [x] Golden Authoring三类`0.1` Schema、正反contract test和Capture Planner已实现；历史旧Bundle缺replay并继续被拒绝；新`clean-b940ac9bb734` Handoff/Bundle已由clean source重建，历史production Plan使用`jar 21.0.7`生成`1242/9`且byte-identical。该Plan的Common Projection为`HISTORICAL_PLACEHOLDER`，保持不可变并由新03B拒绝。130项production Materialization尚未执行。
-- [ ] Materialization Report Schema与Materializer`v1.5`实现已闭环，Verifier Catalog`v1.1`63/63和受控130项串行/并发4已通过；独立E2E Manifest`0.1` builder/verifier已完成活动43文件root与Family Identity Catalog适配并通过定向`23/23`。E2E Attempt Artifact设计`v1.3`、Family Identity Catalog `0.1/0.1.0`、活动Report`0.2`与Source Set`0.1`已关闭机器格式、Family Project/ordinal来源、Projection摘要和Java/source identity缺口。`DFR-021`的Common Runtime materialization、Color Profile、JCS owner、唯一空Text Artifact、五类index、8类UI step及43文件self-contained root设计已由`v1.4`关闭；共享Node模块和10项vector已存在。Family Production Input最小重建规格已冻结，但新source/Handoff/Evidence Bundle/Intake/production Manifest、Family Materializer、03C/03B、production 130项Materialization、8个Common base/144 clone、新Plan、04/05 builder/verifier、真实approved version、Golden Environment实体、Visual runner，以及E2E Java/source producer、Runner/Reporter/verifier/release Playwright config尚未闭合。全局设计开发门恢复不改变`GATE-06-03=BLOCKED`。
+- [ ] Materialization Report Schema与Materializer`v1.5`实现已闭环，Verifier Catalog`v1.1`63/63和受控130项串行/并发4已通过；历史 E2E Manifest`0.1` builder/verifier已完成43文件root消费适配并通过定向`23/23`，但活动Manifest v02 producer/verifier仍为`NOT_STARTED`。Common Driver/controlled orchestration与独立Common E2E输入重建规格均已冻结；后者工具Build为`READY_FOR_BUILD/NOT_STARTED`，生产重建为`BLOCKED_BY_EXACT_CLEAN_FACTORY`，因此不得用现有旧Catalog/BASE/INPUT冒充活动输入。活动 Manifest/Attempt Artifact `0.2`、Profile/Digest closure及Common Driver设计`v1.2`已冻结。Family Production Input最小重建规格已冻结，source/Handoff/Evidence Bundle/Intake/历史production Manifest已形成，但活动Common输入/v02 Manifest重建、Family Materializer、03C/03B、production 130项Materialization、8个Common base/144 clone、新Plan、04/05 builder/verifier、真实approved version、Golden Environment实体、Visual runner，以及活动 E2E Profile raw producer、Token writer、Java/source/artifact producer、Runner/Reporter/verifier/release Playwright config尚未闭合。全局设计开发门恢复不改变`GATE-06-03=BLOCKED`。
 - [ ] `378/378` Visual、`194/194` E2E 及全部 attempts 在 exact release build 实际通过，Report SHA 已冻结。
 - [ ] `GATE-06-02` Candidate 重新消费两个 READY Report；当前不得生成 Activation 或启用 Capability。
 
 ## GATE-06-03 设计冻结结论
 
-1. E2E Runner执行契约、E2E Attempt Artifact设计`v1.3`/Schema`0.1`、Family Identity Catalog `0.1/0.1.0`、Family Production Input最小重建规格、活动Report`0.2`、Runner Source Set`0.1`、Projection Digest`v1.0/0.1`、Golden Authoring`v1.4`、Visual Common Materialization`v1.4`、03A Materializer`v1.5`/Verifier Catalog`v1.1`均已冻结；Visual/E2E Schema既有`15/15`、Projection Digest Node/Java parity、E2E Manifest Common/Family适配定向`23/23`和03A受控实现验证已闭环，`GATE-06-03`设计输入无开放项。新source/Handoff/Evidence Bundle/Intake/production Manifest重建为`NOT_STARTED`，Family Materializer切片为`BLOCKED_BY_DEPENDENCY`；Common Visual 03C/03B仍为`NOT_STARTED/BLOCKED_BY_DEPENDENCY`；E2E Runner仅Node基础层为`IN_PROGRESS`，Java/source/artifact producer与verifier未完成；production证据仍为`BLOCKED/NOT_STARTED`。
+1. E2E Runner执行契约、历史 Attempt Artifact `v1.3`/Schema`0.1`、活动 Manifest/Attempt Artifact `0.2`与Profile/Digest closure、Manifest v02 producer/verifier独立规格/checklist、Common Driver/controlled orchestration设计`v1.2`及独立规格/checklist、Common E2E输入重建规格/checklist、Family Identity Catalog `0.1/0.1.0`、Family Production Input最小重建规格、活动Report`0.2`、Runner Source Set`0.1`、Projection Digest`v1.0/0.1`、Golden Authoring`v1.4`、Visual Common Materialization`v1.4`、03A Materializer`v1.5`/Verifier Catalog`v1.1`均已冻结；历史 Visual/E2E Schema既有定向结论、活动 Schema/Token parity 校验、Projection Digest Node/Java parity、E2E Manifest Common/Family适配定向`23/23`、`clean-37c5412a9c12`输入链与fixed postverify均已闭环，`GATE-06-03`设计输入无开放项。Manifest v02为`NOT_STARTED`，Common输入生产重建为`BLOCKED_BY_EXACT_CLEAN_FACTORY`；Family Materializer可进入实现；Common Visual 03C/03B仍为`NOT_STARTED/BLOCKED_BY_DEPENDENCY`；E2E Runner仅Node基础层为`IN_PROGRESS`，活动 Profile raw/Token/Java/source/artifact producer与verifier未完成；production证据仍为`BLOCKED/NOT_STARTED`。
 2. 本轮没有创建或更新 golden，没有运行 Visual/E2E release 验收，也没有把现有 dev E2E 解释为发布证据。
 3. 本结论只覆盖 `GATE-06-03`；`GATE-06-04 Performance Closure` 由下节独立冻结，不能用 Visual/E2E 结果替代性能证据。
 

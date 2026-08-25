@@ -55,7 +55,7 @@ test('rejects symbolic or missing artifact roots before Report aggregation', asy
 
 function aggregateFixture() {
   const case_results = Array.from({ length: 194 }, (_, index) => {
-    const expectation = index < 146 ? 'PASS' : 'BLOCKED';
+    const expectation = index < 137 ? 'PASS' : 'BLOCKED';
     const status = expectation === 'PASS' ? 'PASS_MATCHED' : 'BLOCKED_MATCHED';
     return {
       case_id: `E2E-CANVAS-001.TEST-${String(index).padStart(3, '0')}`,
@@ -76,7 +76,7 @@ function aggregateFixture() {
       summary: {
         case_count: 194, family_case_count: 178, family_pass_expectation_count: 130,
         family_blocked_expectation_count: 48, common_case_count: 16, attempt_count: 388,
-        pass_matched_count: 146, blocked_matched_count: 48, failed_count: 0, skipped_count: 0, retry_count: 0
+        pass_matched_count: 137, blocked_matched_count: 57, failed_count: 0, skipped_count: 0, retry_count: 0
       },
       report_status: 'READY_FOR_ENABLEMENT_EVALUATION',
       failures: []

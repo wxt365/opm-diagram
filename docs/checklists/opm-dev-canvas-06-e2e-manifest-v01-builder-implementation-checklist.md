@@ -1,10 +1,11 @@
 # DEV-CANVAS-06 E2E Manifest 0.1 Builder Implementation Checklist
 
-状态：`COMPLETE / VERSIONED_HANDOFF_REPORT_REF_CLOSURE_REQUIRED`。活动Common Catalog `0.2.0` 43文件root与Family Identity Catalog `0.1.0`适配均已完成；最终source `a36a7f1fd709b72e66c57e5aea634da525c9c515`保持37项精确delta（`4 M+33 A`），显式TAP `16/16`、定向`34/34`、集成`5/5`、Bundle、READY Handoff、READY Intake、production Common/Manifest和`clean-a36a7f1fd709`安装均已闭合。固定Handoff因Candidate直接report ref仍为mutable `reports/**`而重验失败并回滚；后继修正规格已修正为`14=12 M+2 A`并冻结production显式`INSTALLED`、controlled显式`CONTROLLED`及versioned integration fixture，但尚未执行。本状态不构成E2E Report、GATE-06-03、Candidate、Activation、Capability或ISO证据。
+状态：`COMPLETE / FIXED_HANDOFF_POSTVERIFY_CLOSED / V02_DESIGN_READY`。本 checklist 只记录历史 Manifest `0.1` builder/verifier、Common/Family 输入适配和 Fixed Handoff Postverify；首轮source `a36a7f1fd709...`及`clean-a36a7f1fd709`保留为历史安装证据。Versioned Handoff后继source `37c5412a9c12...`已按`14=12 M+2 A`形成，Node 24定向`13/13`、READY Handoff/Intake、production Manifest、`clean-37c5412a9c12`和安装后production verifier均已闭合。Fixed Handoff Postverify的READY Report与live guard已完成，fixed SHA为`4088e449...`；production verifier始终读取Intake锁定的versioned Handoff。活动 Manifest `0.2` 与 Profile asset/digest closure 已冻结但尚未实现；本状态不构成 E2E Report、GATE-06-03、Candidate、Activation、Capability、production或ISO证据。
 
 ## Spec Mapping
 
 - 当前规格：`specs/opm-dev-canvas-06-e2e-manifest-v01-builder-implementation-task-spec.md`
+- 活动后继规格：`specs/opm-dev-canvas-06-e2e-profile-assets-and-digest-closure-bugfix-task-spec.md`与`specs/opm-dev-canvas-06-e2e-manifest-v02-builder-verifier-implementation-task-spec.md`；活动 `0.2` builder/verifier 不在本历史 checklist 内实现。
 - Task Type：`feature`
 - Active Playbooks：`testing (primary)`、`design-module-docs`
 - 目标/非目标：规格第 1、11、13 节。
@@ -55,7 +56,7 @@
 - [x] `fixture_refs[]`按`path + NUL + sha256`排序，case fixture/input union与Catalog ref无缺项、重复或额外。
 - [x] 178个Family `fixture_ref`深度去重为2，SHA集合与Catalog相等；Model/Context/base Revision/sequence逐fixture深度一致，parent按“字段存在则字符串、缺失则Catalog显式`null`”归一后相等。
 - [x] 缺Catalog、extra/重复entry、payload/Golden Manifest SHA/fixture SHA/Project namespace/deep join drift全部在final输出前稳定拒绝。
-- [x] 新契约正反例、determinism、零输出事务、完整定向测试、`npm run contract:validate`和`git diff --check`通过后，状态恢复为`COMPLETE`；生产正例仍受新的clean Handoff/Evidence Bundle前置阻断。
+- [x] 新契约正反例、determinism、零输出事务、完整定向测试、`npm run contract:validate`和`git diff --check`通过；安装后的production verifier已确认新的clean Handoff/Evidence Bundle与活动Manifest闭合。
 
 ## Release Boundary
 

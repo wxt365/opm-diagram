@@ -4,7 +4,7 @@
 
 冻结日期：`2026-08-03`
 
-当前适用性：`HISTORICAL_RECORD`。本文记录当时冻结的 Recovery Execution `v1.0`输入；当前 runner 实现唯一消费输入已由`specs/opm-dev-canvas-06-recovery-template-input-closure-bugfix-task-spec.md`升级为Recovery Execution `v1.1`及两份只读`0.1.0` template。本文第4节的`v1.0`记录不得作为当前实现版本指针。
+当前适用性：`HISTORICAL_RECORD`。本文记录当时冻结的E2E Manifest `0.1`和Recovery Execution `v1.0`输入；活动E2E已由Profile/Digest Closure与Manifest v02 producer/verifier规格升级为`0.2/0.2.0`，当前Recovery runner消费输入已由`specs/opm-dev-canvas-06-recovery-template-input-closure-bugfix-task-spec.md`升级为Recovery Execution `v1.1`及两份只读`0.1.0` template。本文第4节旧版本记录不得作为当前实现版本指针。
 
 ## Task Type
 

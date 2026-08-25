@@ -9,6 +9,8 @@ import org.opm.localruntime.command.CommitPersistenceException;
 import org.opm.localruntime.command.CommitResult;
 import org.opm.localruntime.command.RevisionCommitBundle;
 import org.opm.localruntime.command.RevisionCommitRepository;
+import org.opm.localruntime.releaseevidence.fault.E2EFaultContext;
+import org.opm.localruntime.releaseevidence.fault.E2EFaultPort;
 import org.opm.localruntime.semantic.SemanticRevision;
 import org.opm.localruntime.semantic.SemanticRevisionJsonWriter;
 import org.opm.localruntime.text.OplParagraph;
@@ -38,29 +40,46 @@ public final class SqliteRevisionCommitRepository implements RevisionCommitRepos
     private final DataSource dataSource;
     private final SemanticRevisionJsonWriter revisionWriter;
     private final ObjectMapper objectMapper;
-    private final RecoverySqliteFaultPort faultPort;
+    private final RecoverySqliteFaultPort recoveryFaultPort;
+    private final E2EFaultPort e2eFaultPort;
 
     public SqliteRevisionCommitRepository(Path databasePath) {
-        this(SqliteConnectionFactory.create(databasePath), new SemanticRevisionJsonWriter(), new ObjectMapper(), RecoverySqliteFaultPort.NOOP);
+        this(SqliteConnectionFactory.create(databasePath), new SemanticRevisionJsonWriter(), new ObjectMapper(), RecoverySqliteFaultPort.NOOP, E2EFaultPort.NOOP);
+    }
+
+    public SqliteRevisionCommitRepository(Path databasePath, E2EFaultPort e2eFaultPort) {
+        this(SqliteConnectionFactory.create(databasePath), new SemanticRevisionJsonWriter(), new ObjectMapper(), RecoverySqliteFaultPort.NOOP, e2eFaultPort);
     }
 
     public SqliteRevisionCommitRepository(DataSource dataSource, RecoverySqliteFaultPort faultPort) {
-        this(dataSource, new SemanticRevisionJsonWriter(), new ObjectMapper(), faultPort);
+        this(dataSource, new SemanticRevisionJsonWriter(), new ObjectMapper(), faultPort, E2EFaultPort.NOOP);
+    }
+
+    public SqliteRevisionCommitRepository(DataSource dataSource, RecoverySqliteFaultPort recoveryFaultPort, E2EFaultPort e2eFaultPort) {
+        this(dataSource, new SemanticRevisionJsonWriter(), new ObjectMapper(), recoveryFaultPort, e2eFaultPort);
     }
 
     private SqliteRevisionCommitRepository(
             DataSource dataSource,
             SemanticRevisionJsonWriter revisionWriter,
             ObjectMapper objectMapper,
-            RecoverySqliteFaultPort faultPort) {
+            RecoverySqliteFaultPort recoveryFaultPort,
+            E2EFaultPort e2eFaultPort) {
         this.dataSource = Objects.requireNonNull(dataSource, "dataSource must not be null");
         this.revisionWriter = Objects.requireNonNull(revisionWriter, "revisionWriter must not be null");
         this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper must not be null");
-        this.faultPort = Objects.requireNonNull(faultPort, "faultPort must not be null");
+        this.recoveryFaultPort = Objects.requireNonNull(recoveryFaultPort, "recoveryFaultPort must not be null");
+        this.e2eFaultPort = Objects.requireNonNull(e2eFaultPort, "e2eFaultPort must not be null");
     }
 
     @Override
     public Optional<Head> currentHead(String modelId) {
+        return currentHead(modelId, E2EFaultContext.Disabled.INSTANCE);
+    }
+
+    @Override
+    public Optional<Head> currentHead(String modelId, E2EFaultContext context) {
+        Objects.requireNonNull(context, "context must not be null");
         try (Connection connection = dataSource.getConnection();
              PreparedStatement statement = connection.prepareStatement("""
                      SELECT draft_head_revision_id, head_sequence
@@ -68,7 +87,7 @@ public final class SqliteRevisionCommitRepository implements RevisionCommitRepos
                      """)) {
             statement.setString(1, modelId);
             try (ResultSet result = statement.executeQuery()) {
-                return result.next() ? Optional.of(new Head(result.getString(1), result.getInt(2), true)) : Optional.empty();
+                return result.next() ? Optional.of(e2eFaultPort.projectCurrentHead(context, new Head(result.getString(1), result.getInt(2), true))) : Optional.empty();
             }
         } catch (SQLException exception) {
             throw persistence("Cannot read model head", exception);
@@ -95,6 +114,12 @@ public final class SqliteRevisionCommitRepository implements RevisionCommitRepos
 
     @Override
     public CommitResult.Committed commit(RevisionCommitBundle bundle) {
+        return commit(bundle, E2EFaultContext.Disabled.INSTANCE);
+    }
+
+    @Override
+    public CommitResult.Committed commit(RevisionCommitBundle bundle, E2EFaultContext context) {
+        Objects.requireNonNull(context, "context must not be null");
         try (Connection connection = dataSource.getConnection()) {
             connection.setAutoCommit(false);
             try {
@@ -113,6 +138,7 @@ public final class SqliteRevisionCommitRepository implements RevisionCommitRepos
                     throw new CommitPersistenceException(CommitFailureCode.REVISION_CONFLICT,
                             "baseRevisionId is not the current draft head", null);
                 }
+                e2eFaultPort.beforeRevisionInsert(context);
                 writeRevision(connection, bundle);
                 reach(RecoverySqliteStage.AFTER_REVISION_INSERT, bundle);
                 writeParent(connection, bundle);
@@ -387,7 +413,7 @@ public final class SqliteRevisionCommitRepository implements RevisionCommitRepos
     }
 
     private void reach(RecoverySqliteStage stage, RevisionCommitBundle bundle) throws IOException {
-        faultPort.reach(stage, new RecoveryFaultContext(
+        recoveryFaultPort.reach(stage, new RecoveryFaultContext(
                 bundle.command().projectId(),
                 bundle.command().modelId(),
                 bundle.revision().revisionId(),

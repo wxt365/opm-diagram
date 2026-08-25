@@ -4,6 +4,8 @@
 
 冻结日期：`2026-08-03`
 
+当前适用性：Visual `0.2`、Golden Authoring join和bundle class规则继续有效；本文关于E2E保持`0.1/0.1.0`的决定已被`opm-dev-canvas-06-e2e-profile-assets-and-digest-closure-bugfix-task-spec.md`及`opm-dev-canvas-06-e2e-manifest-v02-builder-verifier-implementation-task-spec.md`取代。活动E2E唯一版本为`0.2/0.2.0`，本文旧E2E段落只作历史设计记录。
+
 ## Task Type
 
 `bugfix`

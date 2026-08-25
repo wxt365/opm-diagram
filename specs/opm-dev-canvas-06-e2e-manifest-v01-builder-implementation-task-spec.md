@@ -1,6 +1,6 @@
 # Spec: DEV-CANVAS-06 E2E Manifest 0.1 Builder 实现
 
-文档状态：`FROZEN_FOR_IMPLEMENTATION`
+文档状态：`HISTORICAL_IMPLEMENTED_INPUT`
 
 实现状态：`IMPLEMENTED_RELEASE_INPUT_REBUILD_REQUIRED`（活动Common 43文件root与Family Identity Catalog适配已完成定向`23/23`；production正例等待独立最小重建规格执行）
 
@@ -15,7 +15,7 @@
 
 ## 1. 目标
 
-实现唯一 E2E Manifest `0.1` builder/verifier：从 `CONTROLLED_TEST` 或 `PRODUCTION_HANDOFF` 的 exact Intake/Handoff/Evidence Bundle、Family Fixture Identity Catalog `0.1/0.1.0`、clean target build和已通过02B verifier的活动Common Fixture Catalog `0.2.0` 43文件根确定性生成 `194=178+16` 个case的Manifest，并以单一目录级原子提交保证任一失败零输出。
+实现历史 E2E Manifest `0.1` builder/verifier：从 `CONTROLLED_TEST` 或 `PRODUCTION_HANDOFF` 的 exact Intake/Handoff/Evidence Bundle、Family Fixture Identity Catalog `0.1/0.1.0`、clean target build和已通过02B verifier的活动Common Fixture Catalog `0.2.0` 43文件根确定性生成 `194=178+16` 个case的Manifest，并以单一目录级原子提交保证任一失败零输出。该 `0.1` 输入保持只读，不得承接新的 Profile asset/digest 字段。
 
 唯一输出身份固定为：
 
@@ -27,6 +27,17 @@ generator_identity.runner_version=0.1.0
 ```
 
 本规格不授权 Visual builder、E2E runner/Report、Golden Authoring、Candidate、Activation 或 production gate。
+
+## 2A. 活动后继输入（Manifest `0.2`）
+
+活动 builder/verifier 不再由本历史规格扩展 `0.1` bytes，唯一后继输入为：
+
+- 设计闭包规格：`specs/opm-dev-canvas-06-e2e-profile-assets-and-digest-closure-bugfix-task-spec.md`；
+- producer/verifier实现规格：`specs/opm-dev-canvas-06-e2e-manifest-v02-builder-verifier-implementation-task-spec.md`；
+- Schema：`docs/contracts/schemas/opm-dev-canvas-06-e2e-manifest-v02.schema.json`；
+- 设计：`docs/design/opm-dev-canvas-06-e2e-profile-assets-and-digest-closure-design.md`。
+
+后继实现必须提供独立的 Manifest `0.2/0.2.0` builder/verifier 入口，显式接受 `--manifest` 与 `--profile-asset-root`，按 Manifest raw bytes -> Schema -> semantic -> Profile tree/raw refs -> active binding join 的顺序执行，并在 preflight 失败时保持 final root、SQLite、Runtime、Browser 和 Report 零输出。历史 `0.1` CLI 不得隐式升级、补写或读取 `0.2` 字段。
 
 ## 2. 设计输入
 

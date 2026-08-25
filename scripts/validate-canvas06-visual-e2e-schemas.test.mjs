@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import test from 'node:test';
 import Ajv2020 from 'ajv/dist/2020.js';
-import { sha256Jcs } from './canvas06-rfc8785.mjs';
+import { canonicalizeJcs, sha256Jcs } from './canvas06-rfc8785.mjs';
 
 const root = resolve('.');
 const schemas = await Promise.all([
@@ -11,14 +12,18 @@ const schemas = await Promise.all([
   'opm-dev-canvas-06-visual-manifest-v02.schema.json',
   'opm-dev-canvas-06-visual-report.schema.json',
   'opm-dev-canvas-06-e2e-manifest.schema.json',
+  'opm-dev-canvas-06-e2e-manifest-v02.schema.json',
   'opm-dev-canvas-06-e2e-report.schema.json',
   'opm-dev-canvas-06-e2e-attempt-artifact.schema.json',
+  'opm-dev-canvas-06-e2e-attempt-artifact-v02.schema.json',
   'opm-dev-canvas-06-e2e-report-v02.schema.json',
-  'opm-dev-canvas-06-e2e-runner-source-set.schema.json'
+  'opm-dev-canvas-06-e2e-runner-source-set.schema.json',
+  'opm-dev-canvas-06-token-digest-preimage.schema.json',
+  'opm-dev-canvas-06-token-digest-parity-vectors.schema.json'
 ].map(schema));
 const ajv = new Ajv2020({ allErrors: true, strict: false, formats: { 'date-time': true } });
 schemas.forEach(item => ajv.addSchema(item));
-const [validateVisualManifest, validateVisualManifestV02, validateVisualReport, validateE2eManifest, validateE2eReportV01, validateE2eArtifact, validateE2eReportV02, validateE2eRunnerSourceSet] = schemas.map(item => ajv.getSchema(item.$id));
+const [validateVisualManifest, validateVisualManifestV02, validateVisualReport, validateE2eManifest, validateE2eManifestV02, validateE2eReportV01, validateE2eArtifact, validateE2eArtifactV02, validateE2eReportV02, validateE2eRunnerSourceSet, validateTokenPreimage, validateTokenParityCatalog] = schemas.map(item => ajv.getSchema(item.$id));
 
 test('Visual Manifest accepts the frozen 378/756/1242/2484 matrix', () => {
   assert.equal(validateVisualManifest(visualManifest()), true, JSON.stringify(validateVisualManifest.errors));
@@ -48,6 +53,47 @@ test('E2E Manifest rejects the Visual-only Golden Environment field', () => {
   const manifest = e2eManifest();
   manifest.golden_environment_ref = ref('GOLDEN_ENVIRONMENT', 'golden/golden-environment.json');
   assert.equal(validateE2eManifest(manifest), false);
+});
+
+test('Active E2E Manifest 0.2 requires the exact five Profile asset kinds', () => {
+  const active = e2eManifestV02();
+  assert.equal(validateE2eManifestV02(active), true, JSON.stringify(validateE2eManifestV02.errors));
+  assert.equal(validateE2eManifest(active), false);
+
+  const missing = e2eManifestV02(); missing.profile_asset_refs.pop();
+  assert.equal(validateE2eManifestV02(missing), false);
+  const duplicate = e2eManifestV02(); duplicate.profile_asset_refs[4].kind = 'GRAMMAR_ASSET';
+  assert.equal(validateE2eManifestV02(duplicate), false);
+  const generic = e2eManifestV02(); generic.profile_asset_refs[1].kind = 'PROFILE_ASSET';
+  assert.equal(validateE2eManifestV02(generic), false);
+});
+
+test('Active E2E Manifest 0.2 closes all four exact driver sources', () => {
+  const active = e2eManifestV02();
+  assert.equal(validateE2eManifestV02(active), true, JSON.stringify(validateE2eManifestV02.errors));
+  active.driver_catalog.pop();
+  assert.equal(validateE2eManifestV02(active), false);
+});
+
+test('Profile package digest closes four dependencies and differs from profile.json raw SHA', async () => {
+  const profileRoot = resolve(root, 'packages/profiles/profile.iso19450.2024.draft/0.2.0');
+  const profileBytes = await readFile(resolve(profileRoot, 'profile.json'));
+  const profile = JSON.parse(profileBytes.toString('utf8'));
+  const entries = profile.manifest.entries.filter(entry => entry.required)
+    .sort((left, right) => Buffer.compare(Buffer.from(left.logical_path, 'utf8'), Buffer.from(right.logical_path, 'utf8')));
+  assert.equal(entries.length, 4);
+  const rows = [];
+  for (const entry of entries) {
+    const bytes = await readFile(resolve(profileRoot, entry.logical_path));
+    const sha = createHash('sha256').update(bytes).digest('hex');
+    assert.equal(bytes.length, entry.byte_length, entry.logical_path);
+    assert.equal(sha, entry.digest.digest, entry.logical_path);
+    rows.push(`${entry.logical_path}\n${entry.byte_length}\n${sha}\n`);
+  }
+  const packageDigest = createHash('sha256').update(rows.join(''), 'utf8').digest('hex');
+  const profileRawSha = createHash('sha256').update(profileBytes).digest('hex');
+  assert.equal(packageDigest, profile.manifest.package_digest.digest);
+  assert.notEqual(profileRawSha, packageDigest);
 });
 
 test('Visual Report accepts READY only with all fixed outcomes and no failures', () => {
@@ -174,8 +220,40 @@ test('E2E Artifact Index requires exactly one of each ten core artifact kinds', 
   assert.equal(validateE2eArtifact(optionalCore), false);
 });
 
+test('Active E2E Attempt Artifact 0.2 closes Profile refs and the 16-entry index', () => {
+  for (const artifact of e2eAttemptArtifactsV02()) {
+    assert.equal(validateE2eArtifactV02(artifact), true, `${artifact.schema_id}: ${JSON.stringify(validateE2eArtifactV02.errors)}`);
+    assert.equal(validateE2eArtifact(artifact), false, artifact.schema_id);
+  }
+
+  const missingAsset = artifactIndexV02(); missingAsset.refs.pop();
+  assert.equal(validateE2eArtifactV02(missingAsset), false);
+  const duplicateAssetKind = artifactIndexV02(); duplicateAssetKind.refs[15].asset_kind = 'GRAMMAR_ASSET';
+  assert.equal(validateE2eArtifactV02(duplicateAssetKind), false);
+  const genericRawRef = fixtureMaterializationV02(); genericRawRef.profile_asset_refs[1].kind = 'PROFILE_ASSET';
+  assert.equal(validateE2eArtifactV02(genericRawRef), false);
+});
+
+test('Token digest parity catalog matches the frozen JCS bytes and payload SHA', async () => {
+  const catalog = JSON.parse(await readFile(resolve(root, 'tests/e2e/release/dev-canvas-06/fixtures/token-digest-v01-parity-vectors.json'), 'utf8'));
+  assert.equal(validateTokenParityCatalog(catalog), true, JSON.stringify(validateTokenParityCatalog.errors));
+  for (const vector of catalog.positive_vectors) {
+    assert.equal(validateTokenPreimage(vector.expected_preimage), true, JSON.stringify(validateTokenPreimage.errors));
+    const canonical = canonicalizeJcs(vector.expected_preimage);
+    assert.equal(Buffer.from(canonical, 'utf8').toString('hex'), vector.expected_canonical_utf8_hex, vector.vector_id);
+    assert.equal(createHash('sha256').update(canonical, 'utf8').digest('hex'), vector.expected_token_sha256, vector.vector_id);
+  }
+  const payload = structuredClone(catalog); delete payload.catalog_payload_sha256;
+  assert.equal(sha256Jcs(payload), catalog.catalog_payload_sha256);
+});
+
 function e2eAttemptArtifacts() {
   return [faultPlan(), fixtureMaterialization(), attemptObservation(), runtimeProcess(), browserEnvironment(), networkObservation(), consoleErrors(), transactionObservation(), reopenObservation(), apiExchangeIndex(), artifactIndex()];
+}
+
+function e2eAttemptArtifactsV02() {
+  return [faultPlan(), fixtureMaterializationV02(), attemptObservation(), runtimeProcess(), browserEnvironment(), networkObservation(), consoleErrors(), transactionObservation(), reopenObservation(), apiExchangeIndex(), artifactIndexV02()]
+    .map(artifact => ({ ...artifact, schema_version: '0.2' }));
 }
 
 function artifactBase(schemaId, caseId = artifactCaseId()) {
@@ -288,6 +366,29 @@ function artifactIndex() {
   };
 }
 
+function fixtureMaterializationV02() {
+  const value = fixtureMaterialization();
+  value.schema_version = '0.2';
+  value.profile_asset_tree_ref = ref('PROFILE_ASSET_TREE', 'profile/assets');
+  value.profile_asset_refs = profileAssetRefs('profile/assets');
+  value.profile_package_digest = value.active_binding.profile.sha256;
+  return value;
+}
+
+function artifactIndexV02() {
+  const value = artifactIndex();
+  value.schema_version = '0.2';
+  value.refs.push({ ...artifactEntry('PROFILE_ASSET_TREE', 'attempts/case/1/profile/assets'), capture_phase: 'MATERIALIZE' });
+  for (const asset of profileAssetRefs('attempts/case/1/profile/assets')) {
+    value.refs.push({ ...artifactEntry('PROFILE_ASSET', asset.path), asset_kind: asset.kind, capture_phase: 'MATERIALIZE' });
+  }
+  return value;
+}
+
+function artifactEntry(kind, path) {
+  return { kind, path, media_type: 'application/json', byte_length: 1, sha256: digest(), capture_phase: 'FINALIZE', required: true };
+}
+
 function binding() {
   const asset = id => ({ id, version: '0.2.0', sha256: digest() });
   return { profile: asset('profile'), rule_set: asset('rules'), text_grammar: asset('grammar'), symbol_catalog: asset('symbols'), normalization_adapter: asset('normalization'), binding_digest: digest() };
@@ -332,6 +433,32 @@ function e2eManifest() {
   };
 }
 
+function e2eManifestV02() {
+  const manifest = e2eManifest();
+  manifest.schema_version = '0.2';
+  manifest.manifest_version = '0.2.0';
+  manifest.generator_identity.runner_version = '0.2.0';
+  manifest.driver_catalog = [
+    ['DRIVER-PROCEDURAL', 'procedural-driver.mjs'],
+    ['DRIVER-CONTROL', 'control-driver.mjs'],
+    ['DRIVER-STRUCTURAL', 'structural-driver.mjs'],
+    ['DRIVER-COMMON', 'common-driver.mjs']
+  ].map(([driver_id, file]) => ({ driver_id, source_ref: ref('E2E_DRIVER_SOURCE', `inputs/drivers/${file}`) }));
+  manifest.profile_asset_tree_ref = ref('PROFILE_ASSET_TREE', 'inputs/upstream/profile-assets');
+  manifest.profile_asset_refs = profileAssetRefs('inputs/upstream/profile-assets');
+  return manifest;
+}
+
+function profileAssetRefs(rootPath) {
+  return [
+    ref('GRAMMAR_ASSET', `${rootPath}/grammar/representative-opl-grammar.json`),
+    ref('NORMALIZATION_DATA', `${rootPath}/normalization/representative-normalization.json`),
+    ref('PROFILE_PACKAGE', `${rootPath}/profile.json`),
+    ref('RULE_SET', `${rootPath}/rules/representative-rule-set.json`),
+    ref('SYMBOL_ASSET', `${rootPath}/symbols/representative-symbol-catalog.json`)
+  ];
+}
+
 function e2eCase(index, expectation) {
   const family = index % 3 === 0 ? 'PROC' : index % 3 === 1 ? 'CTRL' : 'STRUCT';
   const suite_id = family === 'PROC' ? 'E2E-CANVAS-002' : family === 'CTRL' ? 'E2E-CANVAS-003' : 'E2E-CANVAS-004';
@@ -362,6 +489,15 @@ function e2eReportV02(status, sourceSet = e2eRunnerSourceSet()) {
     runner_source_set_ref: ref('E2E_RUNNER_SOURCE_SET', 'inputs/runner/runner-source-set.json'),
     java_executable: javaExecutable()
   };
+  for (const item of value.case_results.slice(178, 187)) {
+    item.expectation = 'BLOCKED';
+    item.status = status === 'READY_FOR_ENABLEMENT_EVALUATION' ? 'BLOCKED_MATCHED' : 'FAILED';
+    for (const attempt of item.attempts) attempt.status = item.status;
+  }
+  if (status === 'READY_FOR_ENABLEMENT_EVALUATION') {
+    value.summary.pass_matched_count = 137;
+    value.summary.blocked_matched_count = 57;
+  }
   return value;
 }
 

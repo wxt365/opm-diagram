@@ -1,12 +1,12 @@
 # OPM 单机建模工具开发执行包
 
-文档版本：`v1.17`
+文档版本：`v1.25`
 
 文档状态：`FROZEN_FOR_IMPLEMENTATION`；全局设计门为`READY_FOR_DEVELOPMENT`，实现与release evidence仍按独立包/Gate判定
 
 全局设计状态、延期边界和开发准入以 `opm-design-freeze-baseline.md` 为唯一事实源。
 
-更新时间：2026-08-18
+更新时间：2026-08-24
 
 ## Task Type
 
@@ -39,6 +39,7 @@
 14. `opm-dev-canvas-06-materialization-verifier-controlled-case-catalog.md`
 15. `opm-dev-canvas-06-recovery-execution-design.md`
 16. `opm-dev-canvas-06-execution-contract-design-correction.md`
+17. `opm-dev-canvas-06-e2e-fault-launcher-design.md`
 
 ## 3. P0 范围冻结
 
@@ -164,20 +165,25 @@ prototype
 | `GOLDEN-AUTHORING-05` | Visual Manifest 0.2 builder/verifier | 04 approved version verified + Visual/E2E 输入修正规格 | Visual Manifest 0.2 implementation spec/checklist |
 | `GOLDEN-AUTHORING-06` | 真实 INITIAL/SUPERSEDE authoring evidence | 03A~05 工具实现通过 + clean release 输入 | DEV-CANVAS-06 GATE-06-03 执行契约 |
 
-03A~05 的代码完成、06 的真实证据、GATE-06-03 READY、Candidate、Activation 和 ISO 状态必须分别记录，禁止从前一状态推导后一状态。Visual builder实现必须消费`opm-dev-canvas-06-visual-e2e-input-correction-bugfix-task-spec.md`；独立E2E Manifest builder已完成活动Common与Family适配定向`23/23`，Family Production Input、Common/Manifest和`clean-a36a7f1fd709`安装已完成，但固定Handoff因mutable report ref重验失败并回滚。后继执行只能按Versioned Handoff Report Ref Closure规格生成新source和新版本根。旧合并builder规格只保留Common Fixture历史快照。
+03A~05 的代码完成、06 的真实证据、GATE-06-03 READY、Candidate、Activation 和 ISO 状态必须分别记录，禁止从前一状态推导后一状态。Versioned Handoff source`37c5412a9c12...`、`clean-37c5412a9c12`和production预验已形成；Fixed Handoff Postverify tool、READY Report和live guard已闭合，fixed SHA为`4088e449...`。旧合并builder规格只保留Common Fixture历史快照。
 
 ### 5.4 DEV-CANVAS-06 独立执行契约
 
 | 包 | 冻结范围 | 前置依赖 | 直接开发入口 |
 | --- | --- | --- | --- |
-| `DEV-CANVAS-06-E2E-MANIFEST-01` | E2E Manifest `0.1` 完整CLI、controlled archive、活动Common 43文件root验证/整树复制、逐字段ref、`194/388`派生和单一final transaction root零输出事务 | READY Intake/Handoff、controlled bundle verifier、clean target build、02B已验证Catalog `0.2.0` 43文件root | [规格](../../specs/opm-dev-canvas-06-e2e-manifest-v01-builder-implementation-task-spec.md) / [checklist](../checklists/opm-dev-canvas-06-e2e-manifest-v01-builder-implementation-checklist.md) |
+| `DEV-CANVAS-06-E2E-MANIFEST-01-HISTORICAL` | 历史E2E Manifest `0.1` CLI与既有输入重建证据，只读兼容审计，不再作为活动producer/verifier目标 | 不得进入活动Report/Gate | [历史规格](../../specs/opm-dev-canvas-06-e2e-manifest-v01-builder-implementation-task-spec.md) / [checklist](../checklists/opm-dev-canvas-06-e2e-manifest-v01-builder-implementation-checklist.md) |
+| `DEV-CANVAS-06-E2E-MANIFEST-02` | 活动Manifest `0.2` producer/verifier、Profile五资产、四driver、exact Runtime JAR/Web、`178+16`、Common `7/9`、Report `137/57`和单一final root | exact clean base、活动Common Driver source、READY Intake/Handoff；Build为`READY_FOR_BUILD/NOT_STARTED` | [规格](../../specs/opm-dev-canvas-06-e2e-manifest-v02-builder-verifier-implementation-task-spec.md) / [checklist](../checklists/opm-dev-canvas-06-e2e-manifest-v02-builder-verifier-implementation-checklist.md) |
 | `DEV-CANVAS-06-FAMILY-PRODUCTION-INPUT-REBUILD` | base SHA、37项source delta（`4 M+33 A`，含两份固定测试资产和GATE evidence generator）、GATE-05-01显式TAP命令/Report command、集成测试absolute directories exact断言、三个helper的exact Intake -> Candidate Handoff解析、双clean worktree、版本化Bundle/Handoff/Intake/Common/Manifest、固定Handoff原子切换和production双重验 | source `a36a7f1fd709...`、Bundle/Handoff/Intake、Common/Manifest和版本根已形成；固定Handoff因Candidate直接ref仍为`reports/**`而失败并回滚，历史结果由后继修正规格承接 | [规格](../../specs/opm-dev-canvas-06-family-production-input-rebuild-bugfix-task-spec.md) / [checklist](../checklists/opm-dev-canvas-06-family-production-input-rebuild-bugfix-checklist.md) |
-| `DEV-CANVAS-06-VERSIONED-HANDOFF-REPORT-REF-CLOSURE` | base `a36a7f1fd709...`、新source `14=12 M+2 A`、唯一direct ref owner、production builder/verifier显式`INSTALLED`、controlled helper显式`CONTROLLED`、临时versioned integration fixture、12个版本化report文件、`17+43+Manifest tree` staging、先安装后仅原子替换固定Handoff JSON | allowlist/mode冲突已关闭并重新冻结；实现、新source、新版本根和固定Handoff切换均未开始；`clean-a36a7f1fd709`永久只读 | [规格](../../specs/opm-dev-canvas-06-versioned-handoff-report-ref-closure-bugfix-task-spec.md) / [checklist](../checklists/opm-dev-canvas-06-versioned-handoff-report-ref-closure-bugfix-checklist.md) |
-| `DEV-CANVAS-06-E2E-RUNNER-01` | production/controlled CLI、Family/Common SQLite物化、production Web/Runtime/browser隔离、388 attempt artifact、活动Report `0.2`聚合/事务和只读verifier；11类JSON只读消费Artifact设计`v1.3`/Schema `0.1`，Family Project只读Identity Catalog且ordinal只读Fault Plan，Java executable消费byte mirror/ref，Runner source identity消费固定23项Source Set `0.1`，正式Projection SHA消费Digest `0.1` | 已验证E2E Manifest `0.1` final root、Projection Digest Schema/vector、clean target source、JDK 21、Playwright/Chromium exact环境 | [规格](../../specs/opm-dev-canvas-06-e2e-runner-implementation-task-spec.md) / [artifact设计](opm-dev-canvas-06-e2e-attempt-artifact-design.md) / [checklist](../checklists/opm-dev-canvas-06-e2e-runner-implementation-checklist.md) |
+| `DEV-CANVAS-06-VERSIONED-HANDOFF-REPORT-REF-CLOSURE` | base `a36a7f1fd709...`、source `37c5412a9c12...`、`14=12 M+2 A`、唯一direct ref owner、显式trust mode、12个版本化report文件和版本根布局 | source、Node 24定向`13/13`、`clean-37c5412a9c12`、READY Handoff/Intake、Manifest与production预验已完成；fixed switch转由postverify后继规格 | [规格](../../specs/opm-dev-canvas-06-versioned-handoff-report-ref-closure-bugfix-task-spec.md) / [checklist](../checklists/opm-dev-canvas-06-versioned-handoff-report-ref-closure-bugfix-checklist.md) |
+| `DEV-CANVAS-06-FIXED-HANDOFF-POSTVERIFY-CLOSURE` | fixed/versioned/Manifest copy/production verifier四方join、Report`0.1`、tool/subject source分离、`4=1 M+3 A`、原子Report、backup恢复和live guard | tool source`2f2d0f9...`、READY Report、fixed switch与live guard已执行；fixed SHA为`4088e449...`且无pending marker | [规格](../../specs/opm-dev-canvas-06-fixed-handoff-postverify-closure-bugfix-task-spec.md) / [checklist](../checklists/opm-dev-canvas-06-fixed-handoff-postverify-closure-bugfix-checklist.md) |
+| `DEV-CANVAS-06-E2E-RUNNER-01` | production/controlled CLI、Family/Common SQLite物化、production Web/Runtime/browser隔离、388 attempt artifact、活动Report `0.2`聚合/事务和只读verifier；活动 Manifest/Attempt Artifact `0.2`、Profile asset tree/raw refs、16类 Index、OPL/Trace Java writer和Token parity均为唯一输入，历史 `0.1` 仅只读，Family Project只读Identity Catalog且ordinal只读Fault Plan，Java executable消费byte mirror/ref，Runner source identity消费固定23项Source Set `0.1`，正式Projection SHA消费Digest `0.1` | 已验证版本化 Handoff/Manifest 输入、Projection Digest Schema/vector、clean target source、JDK 21、Playwright/Chromium exact环境；活动 Profile/digest CLI 成功路径及Fault Launcher尚未实现 | [规格](../../specs/opm-dev-canvas-06-e2e-runner-implementation-task-spec.md) / [Profile/digest设计](opm-dev-canvas-06-e2e-profile-assets-and-digest-closure-design.md) / [Fault Launcher设计](opm-dev-canvas-06-e2e-fault-launcher-design.md) / [历史artifact设计](opm-dev-canvas-06-e2e-attempt-artifact-design.md) / [checklist](../checklists/opm-dev-canvas-06-e2e-runner-implementation-checklist.md) |
+| `DEV-CANVAS-06-E2E-COMMON-DRIVER-01` | 16 Common case的初始状态、八类step JSON、selector、API/error、事务、REOPEN、三个稳定UI selector、Fact删除和controlled attempt编排 | 活动Manifest `0.2`、exact clean base、Fault Launcher；Build为`READY_FOR_BUILD/NOT_STARTED` | [设计](opm-dev-canvas-06-e2e-common-driver-controlled-orchestration-design.md) / [规格](../../specs/opm-dev-canvas-06-e2e-common-driver-controlled-orchestration-implementation-task-spec.md) / [checklist](../checklists/opm-dev-canvas-06-e2e-common-driver-controlled-orchestration-implementation-checklist.md) |
+| `DEV-CANVAS-06-COMMON-E2E-INPUT-REBUILD-01` | 只读消费exact clean Common factory，原子生成活动Catalog `0.2.0`、32个BASE/INPUT、两份source mirror与全部raw ref，Verifier独立按同一factory重算 | Common Driver factory完成并形成clean source commit/SHA；工具Build为`READY_FOR_BUILD/NOT_STARTED`，生产重建为`BLOCKED_BY_EXACT_CLEAN_FACTORY` | [规格](../../specs/opm-dev-canvas-06-common-e2e-input-rebuild-implementation-task-spec.md) / [checklist](../checklists/opm-dev-canvas-06-common-e2e-input-rebuild-implementation-checklist.md) |
+| `DEV-CANVAS-06-E2E-FAULT-LAUNCHER-01` | 三个故障case INITIAL的九项test-only命令行配置、Spring fail-closed装配、32-byte nonce/challenge HMAC、Plan raw SHA/链接/首错、三个精确hook、一次性状态机、稳定错误码、38个精确逻辑路径和Common/Catalog/Manifest原子重建 | Fault Plan`0.2`、活动Manifest/Attempt Artifact`0.2`、exact Runtime JAR；Java Build当前`READY_FOR_BUILD/NOT_STARTED`，受控source commit为`BLOCKED_BY_BASE_INTAKE` | [实现规格](../../specs/opm-dev-canvas-06-e2e-fault-launcher-implementation-task-spec.md) / [设计](opm-dev-canvas-06-e2e-fault-launcher-design.md) / [implementation checklist](../checklists/opm-dev-canvas-06-e2e-fault-launcher-implementation-checklist.md) / [设计闭包记录](../../specs/opm-dev-canvas-06-e2e-fault-launcher-design-closure-bugfix-task-spec.md) |
 | `GOLDEN-AUTHORING-03A-CLEANUP` | `verifyPendingQuarantine()`内存attestation、residual原子移动、Marker原子写入、完整selected verifier唯一四阶段顺序 | Materializer `v1.5`、Verifier Catalog `v1.1`、63/63实现证据 | [规格](../../specs/opm-dev-canvas-06-golden-fixture-materializer-implementation-task-spec.md) / [checklist](../checklists/opm-dev-canvas-06-golden-fixture-materializer-implementation-checklist.md) |
 | `DEV-CANVAS-06-RECOVERY-RUNNER-01` | 两份immutable template、历史五份`0.1` Schema、活动Manifest `0.2`、Reopen Catalog/API Request Artifact/Launch Request/Launch Proof、Projection Digest `0.1`、factory三接口、独立helper JAR、21表SQLite映射、test-only HTTP JCS guard、七SQLite hook、四forced-stop reachpoint、PropertiesLauncher、32-byte challenge、PID/nonce/proof和artifact index | Projection Digest及Launch Schema正反例、READY Intake/Handoff、exact Runtime JAR和disabled production gate | [规格](../../specs/opm-dev-canvas-06-recovery-runner-implementation-task-spec.md) / [Recovery设计](opm-dev-canvas-06-recovery-execution-design.md) / [Projection Digest设计](opm-dev-canvas-06-projection-digest-closure-design.md) / [checklist](../checklists/opm-dev-canvas-06-recovery-runner-implementation-checklist.md) |
 
-E2E Manifest、Family Production Input重建、Versioned Handoff Report Ref Closure、E2E Runner和03A cleanup五个入口的设计状态按各自规格执行；Recovery的expected reopen、HTTP raw-body与Projection Digest冲突均已闭合，`RECOVERY-IMPL-01=DESIGN_READY/IMPLEMENTATION_NOT_STARTED`，允许进入Build。E2E Manifest builder/verifier Common/Family适配已完成定向`23/23`，`clean-a36a7f1fd709`已安装但未激活；新版本化report ref source/build/install为`NOT_STARTED`，固定Handoff保持旧SHA。E2E Runner为`IN_PROGRESS`且仅Node CLI/preflight/staging/聚合基础层已有定向实现，Family Materializer为`BLOCKED_BY_DEPENDENCY`；11类Artifact机器设计、Family Project/ordinal来源和Projection Digest Node/Java parity已闭合，完整artifact producer/verifier仍未实现；03A cleanup按其当前implementation checklist记录。任一代码包完成都不能单独关闭`GATE-06-03/05`，更不能生成Candidate、Activation、Capability enablement或ISO结论。
+活动E2E Manifest v02、Common Driver/controlled orchestration、Common E2E输入重建、Family Production Input、Versioned Handoff、Fixed Handoff Postverify、E2E Runner、E2E Fault Launcher和03A cleanup九个入口按各自规格执行；历史Manifest v01仅保留审计。`clean-37c5412a9c12`及fixed postverify是旧输入链证据，不能替代活动v02；Manifest v02与Common E2E输入重建工具均为`NOT_STARTED`，输入生产重建等待exact clean factory，Fault Launcher Java Build为`READY_FOR_BUILD/NOT_STARTED`，Recovery为`DESIGN_READY/IMPLEMENTATION_NOT_STARTED`。任一代码包完成都不能单独关闭`GATE-06-03/05`，更不能生成Candidate、Activation、Capability enablement或ISO结论。
 
 ## 6. 开发包完成定义
 
@@ -311,6 +317,8 @@ E2E Manifest、Family Production Input重建、Versioned Handoff Report Ref Clos
 6. 发布报告明确 ISO 证据状态，不因完整工具菜单自动声明符合。
 7. Family E2E Materializer只从Manifest锁定的Family Fixture Identity Catalog读取Project identity，178个Family base ref当前去重为2；Model/Context/base Revision/sequence与fixture深度一致，parent按fixture字段存在时取字符串、缺失时Catalog显式`null`归一，禁止SHA/路径/case派生Project。
 8. 每个attempt先原子写入并验证`fault-plan.json`，其余producer只从该文件读取`attempt_ordinal`；目录名、循环下标和执行顺序不得成为identity来源。
+9. Common 16 case只按Common Driver设计`v1.2`执行：`7 PASS+9 BLOCKED`，有序`expected_apis[]`与`WAIT_API`一一对应，活动Report总计`137 PASS+57 BLOCKED`；任何未定义step、selector fallback、临时payload、漏等API或旧`146/48`聚合均阻断。
+10. controlled bundle只证明上游trust；exact Runtime JAR、production Web dist、Profile和四driver只从活动Manifest final root复制到fresh attempt，INITIAL/REOPEN进程全新且复用同一storage。
 
 | 性能场景 | DEV-CANVAS-06 门槛 |
 | --- | --- |
@@ -435,9 +443,9 @@ DEV-00~09 和 DEV-CANVAS-00~06 每包必须在自己的 task spec 中写更具�
 | Revision 0.2 目标与 SQLite V1 | `FROZEN_INCLUDED` | 0.2 reader/writer/roundtrip 待 DEV-CANVAS-00/03 | 持久化、物理设计、V1 |
 | 完整画布专题与 16/8/10 | `FROZEN_INCLUDED` | 按 DEV-CANVAS-01~04 | 工具链设计 + handoff |
 | concrete OPL/precedence/Token/Trace/golden | `FROZEN_INCLUDED` | 按 GATE-05-01~06 报告 | 符号文本契约 + DEV-CANVAS-05 |
-| 视觉/E2E/性能/release | `FROZEN_INCLUDED` | E2E Manifest Common/Family适配和`clean-a36a7f1fd709`安装已完成，但固定Handoff因mutable report ref失败并回滚；Versioned Handoff Report Ref Closure为`DESIGN_FROZEN_AFTER_ALLOWLIST_MODE_CORRECTION/IMPLEMENTATION_NOT_STARTED`，Family Materializer继续等待已激活的版本化Handoff，E2E runner待完成；真实报告保持`NOT_RUN` | 测试策略 + DEV-CANVAS-06 + Family Identity/Production Input/Versioned Handoff Ref规格 + E2E Manifest/Runner规格 |
+| 视觉/E2E/性能/release | `FROZEN_INCLUDED` | `clean-37c5412a9c12`、READY Handoff/Intake、历史Manifest和Fixed Postverify证据已完成；活动Manifest v02、Common Driver/controlled orchestration及Common E2E输入重建设计/实现输入已冻结，输入生产重建为`BLOCKED_BY_EXACT_CLEAN_FACTORY`，Fault Launcher Java Build为`READY_FOR_BUILD/NOT_STARTED`；真实活动E2E/Gate报告保持`NOT_RUN` | 测试策略 + DEV-CANVAS-06 + Versioned Handoff/Fixed Postverify + Manifest v02/Common Driver/Common输入重建/Runner/Fault Launcher规格 |
 | Recovery | `DFR-018=FROZEN_INCLUDED` | Reopen Catalog、Manifest `0.2`、HTTP JCS、Launch Request/Proof与Projection Digest `0.1`已冻结；`RECOVERY-IMPL-01=DESIGN_READY/IMPLEMENTATION_NOT_STARTED` | Recovery Execution `v1.5` + Projection Digest Closure `v1.0/0.1` + runner规格 |
-| Golden Authoring/Materializer | `DFR-021/022=FROZEN_INCLUDED` | 03A实现已闭环，production 130项待执行；Common Visual Fixture Schema、五类index逐列映射、8类UI step/exact数组和43文件self-contained root规则已冻结，但02B/03C未实现，03B等待依赖；04/05待实现；06未执行 | Golden Authoring v1.4 + Visual Common Materialization v1.4 + Materializer v1.5 + Verifier Catalog v1.1 + 七个子包入口 |
+| Golden Authoring/Materializer | `DFR-021/022=FROZEN_INCLUDED` | 03A实现已闭环，production 130项待执行；Common Visual Fixture Schema、五类index逐列映射、8类UI step/exact数组和43文件self-contained root规则已冻结，02B Builder/Verifier已有局部实现，但新factory对应32个E2E/raw ref尚未完成clean重建；03C未实现，03B等待依赖；04/05待实现；06未执行 | Golden Authoring v1.4 + Visual Common Materialization v1.4 + Common E2E输入重建 + Materializer v1.5 + Verifier Catalog v1.1 |
 | 开发拆包/DoD/回滚 | `FROZEN_INCLUDED` | 每包重新核验依赖 | 本文 DEV-00~09、DEV-CANVAS-00~06 |
 | P04-P06 生产实现 | `FROZEN_DEFERRED` | `NOT_RUN` | DFD-001 |
 | 中文专属能力、完整 ISO 资产/符合性及其他延期 | `FROZEN_DEFERRED` | `EVIDENCE_MISSING` | DFD-002~010 |

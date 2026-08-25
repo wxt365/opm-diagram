@@ -17,7 +17,7 @@
 
 实现 `GOLDEN-AUTHORING-02B`：发布 Common Visual Fixture `0.1/0.1.0` Schema，按冻结的 8 个 subject 构造完整Visual fixture，并由同一静态factory确定性生成16组32个E2E asset和新 Common Fixture Catalog，以只读 semantic verifier 复算43文件树、Schema、raw ref、payload、binding、Revision/index/setup/Projection闭包，并修正 Capture Planner 的 Common Projection 与 Color Profile semantic join。
 
-本包完成后只表示新 Common fixture/Catalog/Plan 输入可被确定性构造和验证；不创建 SQLite、Runtime、PNG、candidate、approved version 或 release Report。
+本包完成后只表示新 Common fixture/Catalog/Plan 输入可被确定性构造和验证；Common Driver后续改变E2E factory语义时，活动Catalog/32个BASE/INPUT/raw ref必须由独立Common E2E输入重建规格重新闭合，不能沿用本包旧执行结果。不创建 SQLite、Runtime、PNG、candidate、approved version 或 release Report。
 
 ## 2. 设计输入
 

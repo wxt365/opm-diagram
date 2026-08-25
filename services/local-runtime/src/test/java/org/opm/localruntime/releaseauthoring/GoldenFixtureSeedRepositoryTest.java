@@ -54,6 +54,29 @@ class GoldenFixtureSeedRepositoryTest {
     }
 
     @Test
+    void materializesAnExplicitProjectIdentityWithoutUsingTheGoldenProjectDerivation() throws Exception {
+        byte[] bytes = Files.readAllBytes(fixturePath("g-opl-proc-001-consumption-object-pass.json"));
+        String fixtureSha256 = sha256(bytes);
+        GoldenFixtureSeedRepository.SeedIdentity identity = new GoldenFixtureSeedRepository.SeedIdentity(
+                "project.e2e.family.proc.001", "E2E Family Fixture", "Release E2E fixture materialization.");
+
+        var result = new GoldenFixtureSeedRepository().materialize(
+                temporaryDirectory.resolve("family"), bytes, fixtureSha256, 1782864000L, identity);
+
+        assertEquals(identity.projectId(), result.projectId());
+        assertEquals(temporaryDirectory.resolve("family").resolve("projects").resolve(identity.projectId()).resolve("project.db"), result.databasePath());
+        assertFalse(Files.exists(temporaryDirectory.resolve("family").resolve("projects").resolve("project.golden.fixture." + fixtureSha256)));
+        try (var connection = DriverManager.getConnection("jdbc:sqlite:" + result.databasePath())) {
+            try (var row = connection.createStatement().executeQuery("SELECT project_id, name, description FROM project_metadata")) {
+                assertTrue(row.next());
+                assertEquals(identity.projectId(), row.getString("project_id"));
+                assertEquals(identity.projectName() + " " + result.revisionId(), row.getString("name"));
+                assertEquals(identity.description(), row.getString("description"));
+            }
+        }
+    }
+
+    @Test
     void mapsMigrationSeedCommitAndVerifyFaultsWithoutLeavingPartialSeedTransactions() throws Exception {
         byte[] bytes = Files.readAllBytes(fixturePath("g-opl-proc-001-consumption-object-pass.json"));
         String fixtureSha256 = sha256(bytes);

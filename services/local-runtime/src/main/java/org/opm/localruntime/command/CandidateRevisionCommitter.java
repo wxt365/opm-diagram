@@ -2,6 +2,8 @@ package org.opm.localruntime.command;
 
 import org.opm.localruntime.assets.ProfilePackageAssembler;
 import org.opm.localruntime.assets.ProfilePackageAssemblyException;
+import org.opm.localruntime.releaseevidence.fault.E2EFaultContext;
+import org.opm.localruntime.releaseevidence.fault.E2EFaultPort;
 import org.opm.localruntime.semantic.SemanticRevision;
 import org.opm.localruntime.semantic.SemanticRevisionValidator;
 import org.opm.localruntime.semantic.SemanticValidationProblem;
@@ -25,13 +27,18 @@ public final class CandidateRevisionCommitter {
     private final SemanticRevisionValidator semanticValidator;
     private final OplTextGenerationService textGenerationService;
     private final ProfilePackageAssembler profilePackageAssembler;
+    private final E2EFaultPort e2eFaultPort;
 
     public CandidateRevisionCommitter(RevisionCommitRepository repository) {
-        this(repository, new SemanticRevisionValidator(), new OplTextGenerationService(), null);
+        this(repository, new SemanticRevisionValidator(), new OplTextGenerationService(), null, E2EFaultPort.NOOP);
     }
 
     public CandidateRevisionCommitter(RevisionCommitRepository repository, ProfilePackageAssembler profilePackageAssembler) {
-        this(repository, new SemanticRevisionValidator(), new OplTextGenerationService(), profilePackageAssembler);
+        this(repository, new SemanticRevisionValidator(), new OplTextGenerationService(), profilePackageAssembler, E2EFaultPort.NOOP);
+    }
+
+    public CandidateRevisionCommitter(RevisionCommitRepository repository, ProfilePackageAssembler profilePackageAssembler, E2EFaultPort e2eFaultPort) {
+        this(repository, new SemanticRevisionValidator(), new OplTextGenerationService(), profilePackageAssembler, e2eFaultPort);
     }
 
     CandidateRevisionCommitter(
@@ -39,10 +46,20 @@ public final class CandidateRevisionCommitter {
             SemanticRevisionValidator semanticValidator,
             OplTextGenerationService textGenerationService,
             ProfilePackageAssembler profilePackageAssembler) {
+        this(repository, semanticValidator, textGenerationService, profilePackageAssembler, E2EFaultPort.NOOP);
+    }
+
+    CandidateRevisionCommitter(
+            RevisionCommitRepository repository,
+            SemanticRevisionValidator semanticValidator,
+            OplTextGenerationService textGenerationService,
+            ProfilePackageAssembler profilePackageAssembler,
+            E2EFaultPort e2eFaultPort) {
         this.repository = Objects.requireNonNull(repository, "repository must not be null");
         this.semanticValidator = Objects.requireNonNull(semanticValidator, "semanticValidator must not be null");
         this.textGenerationService = Objects.requireNonNull(textGenerationService, "textGenerationService must not be null");
         this.profilePackageAssembler = profilePackageAssembler;
+        this.e2eFaultPort = Objects.requireNonNull(e2eFaultPort, "e2eFaultPort must not be null");
     }
 
     public CommitResult commit(CandidateRevisionCommand command) {
@@ -57,15 +74,16 @@ public final class CandidateRevisionCommitter {
     }
 
     private CommitResult commitInternal(CandidateRevisionCommand command) {
+        E2EFaultContext context = e2eFaultPort.contextFor(command);
         CommitResult replay = replay(command);
         if (replay != null) return replay;
-        CommitResult.Rejected guardFailure = guards(command);
+        CommitResult.Rejected guardFailure = guards(command, context);
         if (guardFailure != null) return guardFailure;
 
         final TextGenerationAssets assets;
         final OplGrammar grammar;
         try {
-            assets = profilePackageAssembler == null ? null : profilePackageAssembler.assemble(command.candidateRevision().profileBinding());
+            assets = profilePackageAssembler == null ? null : profilePackageAssembler.assemble(command.candidateRevision().profileBinding(), context);
             grammar = assets == null ? command.grammar() : assets.grammar();
         } catch (ProfilePackageAssemblyException exception) {
             return rejected(CommitFailureCode.TEXT_GENERATION_BLOCKED, List.of(), exception.code().name());
@@ -93,7 +111,7 @@ public final class CandidateRevisionCommitter {
             }
             return rejected(CommitFailureCode.TEXT_GENERATION_BLOCKED, List.of(), exception.code().name());
         }
-        return repository.commit(new RevisionCommitBundle(command, command.candidateRevision(), text, validation));
+        return repository.commit(new RevisionCommitBundle(command, command.candidateRevision(), text, validation), context);
     }
 
     private CommitResult replay(CandidateRevisionCommand command) {
@@ -104,8 +122,8 @@ public final class CandidateRevisionCommitter {
                 .orElse(null);
     }
 
-    private CommitResult.Rejected guards(CandidateRevisionCommand command) {
-        RevisionCommitRepository.Head head = repository.currentHead(command.modelId())
+    private CommitResult.Rejected guards(CandidateRevisionCommand command, E2EFaultContext context) {
+        RevisionCommitRepository.Head head = repository.currentHead(command.modelId(), context)
                 .orElse(null);
         if (head == null || !head.revisionId().equals(command.baseRevisionId())
                 || !command.baseRevisionId().equals(command.baseRevision().revisionId())) {

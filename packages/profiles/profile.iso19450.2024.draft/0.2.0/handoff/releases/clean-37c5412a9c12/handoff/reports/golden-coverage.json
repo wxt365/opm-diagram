@@ -1,0 +1,75 @@
+{
+  "schema_id": "OPL-GOLDEN-COVERAGE-REPORT-001",
+  "schema_version": "0.1",
+  "status": "EXACT",
+  "manifest": {
+    "id": "golden.opl.iso19450.2024.draft",
+    "version": "0.2.0",
+    "sha256": "8aaca22c69402e08ff58a4a3e19eb38b260511dc7649c1deae8ac4fffce280a7"
+  },
+  "catalog": {
+    "id": "coverage.opl.iso19450.2024.draft",
+    "version": "0.1.0",
+    "sha256": "dfde1f5b9ae003b8455712378b2a06439a0212682d79253739443e2734fe7466"
+  },
+  "summary": {
+    "expected": 178,
+    "matched": 178,
+    "missing": 0,
+    "unexpected": 0,
+    "mismatched": 0
+  },
+  "families": {
+    "PROC": {
+      "PASS": {
+        "expected": 16,
+        "matched": 16,
+        "missing": 0,
+        "unexpected": 0,
+        "mismatched": 0
+      },
+      "BLOCKED": {
+        "expected": 17,
+        "matched": 17,
+        "missing": 0,
+        "unexpected": 0,
+        "mismatched": 0
+      }
+    },
+    "CTRL": {
+      "PASS": {
+        "expected": 20,
+        "matched": 20,
+        "missing": 0,
+        "unexpected": 0,
+        "mismatched": 0
+      },
+      "BLOCKED": {
+        "expected": 15,
+        "matched": 15,
+        "missing": 0,
+        "unexpected": 0,
+        "mismatched": 0
+      }
+    },
+    "STRUCT": {
+      "PASS": {
+        "expected": 94,
+        "matched": 94,
+        "missing": 0,
+        "unexpected": 0,
+        "mismatched": 0
+      },
+      "BLOCKED": {
+        "expected": 16,
+        "matched": 16,
+        "missing": 0,
+        "unexpected": 0,
+        "mismatched": 0
+      }
+    }
+  },
+  "missing": [],
+  "unexpected": [],
+  "mismatched": []
+}

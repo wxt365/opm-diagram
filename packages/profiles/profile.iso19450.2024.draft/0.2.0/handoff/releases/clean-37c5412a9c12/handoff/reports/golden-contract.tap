@@ -1,0 +1,113 @@
+TAP version 13
+# Subtest: GATE-05-01 的 13 类 Golden mutation 返回冻结错误码
+    # Subtest: PASS 空 Token
+    ok 1 - PASS 空 Token
+      ---
+      duration_ms: 490.044459
+      type: 'test'
+      ...
+    # Subtest: PASS 缺 Trace
+    ok 2 - PASS 缺 Trace
+      ---
+      duration_ms: 871.4455
+      type: 'test'
+      ...
+    # Subtest: PASS Trace 缺 binding digest
+    ok 3 - PASS Trace 缺 binding digest
+      ---
+      duration_ms: 626.523375
+      type: 'test'
+      ...
+    # Subtest: PASS 携带 error
+    ok 4 - PASS 携带 error
+      ---
+      duration_ms: 512.681542
+      type: 'test'
+      ...
+    # Subtest: BLOCKED 携带生成输出
+    ok 5 - BLOCKED 携带生成输出
+      ---
+      duration_ms: 518.334084
+      type: 'test'
+      ...
+    # Subtest: 缺 Normalization ref
+    ok 6 - 缺 Normalization ref
+      ---
+      duration_ms: 381.186292
+      type: 'test'
+      ...
+    # Subtest: Rule version 错误
+    ok 7 - Rule version 错误
+      ---
+      duration_ms: 531.985291
+      type: 'test'
+      ...
+    # Subtest: Symbol 内部 ID 改动导致 package digest 不匹配
+    ok 8 - Symbol 内部 ID 改动导致 package digest 不匹配
+      ---
+      duration_ms: 913.43075
+      type: 'test'
+      ...
+    # Subtest: Profile file SHA 冒充 package digest
+    ok 9 - Profile file SHA 冒充 package digest
+      ---
+      duration_ms: 487.6635
+      type: 'test'
+      ...
+    # Subtest: Normalization digest 错误
+    ok 10 - Normalization digest 错误
+      ---
+      duration_ms: 439.967833
+      type: 'test'
+      ...
+    # Subtest: Profile dependency 与 ref 不一致
+    ok 11 - Profile dependency 与 ref 不一致
+      ---
+      duration_ms: 444.057292
+      type: 'test'
+      ...
+    # Subtest: binding digest 错误
+    ok 12 - binding digest 错误
+      ---
+      duration_ms: 468.176084
+      type: 'test'
+      ...
+    # Subtest: fixture 路径越界
+    ok 13 - fixture 路径越界
+      ---
+      duration_ms: 360.6725
+      type: 'test'
+      ...
+    # Subtest: base/candidate model 不匹配
+    ok 14 - base/candidate model 不匹配
+      ---
+      duration_ms: 352.804417
+      type: 'test'
+      ...
+    # Subtest: base/candidate revision sequence 不匹配
+    ok 15 - base/candidate revision sequence 不匹配
+      ---
+      duration_ms: 350.585958
+      type: 'test'
+      ...
+    # Subtest: base/candidate parent revision 不匹配
+    ok 16 - base/candidate parent revision 不匹配
+      ---
+      duration_ms: 377.0345
+      type: 'test'
+      ...
+    1..16
+ok 1 - GATE-05-01 的 13 类 Golden mutation 返回冻结错误码
+  ---
+  duration_ms: 8130.773167
+  type: 'test'
+  ...
+1..1
+# tests 17
+# suites 0
+# pass 17
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 8203.351542

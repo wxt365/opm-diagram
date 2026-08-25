@@ -9,11 +9,16 @@ import org.opm.localruntime.command.CandidateRevisionCommand;
 import org.opm.localruntime.command.CandidateRevisionCommitter;
 import org.opm.localruntime.command.CommitFailureCode;
 import org.opm.localruntime.command.CommitResult;
+import org.opm.localruntime.command.CommitPersistenceException;
 import org.opm.localruntime.command.ProfileRuleBinding;
+import org.opm.localruntime.command.RevisionCommitRepository;
 import org.opm.localruntime.semantic.SemanticRevision;
 import org.opm.localruntime.semantic.SemanticRevisionJsonWriter;
 import org.opm.localruntime.semantic.SemanticRevisionReader;
 import org.opm.localruntime.text.OplGrammar;
+import org.opm.localruntime.assets.ProfilePackageDescriptor;
+import org.opm.localruntime.releaseevidence.fault.E2EFaultContext;
+import org.opm.localruntime.releaseevidence.fault.E2EFaultPort;
 
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
@@ -27,6 +32,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Instant;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -99,6 +105,35 @@ class SqliteRevisionCommitRepositoryTest {
             assertEquals(0, integer(connection, "SELECT COUNT(*) FROM idempotency_record"));
             assertEquals(0, integer(connection, "SELECT COUNT(*) FROM text_trace_index"));
         }
+    }
+
+    @Test
+    void e2ePersistenceHookRunsBeforeTheFirstInsertAndDoesNotReachRecoveryHooks() throws Exception {
+        Path database = initializedDatabase();
+        SemanticRevision base = base();
+        AtomicInteger recoveryCalls = new AtomicInteger();
+        AtomicInteger e2eCalls = new AtomicInteger();
+        E2EFaultPort e2e = new E2EFaultPort() {
+            @Override public E2EFaultContext contextFor(CandidateRevisionCommand command) {
+                return new E2EFaultContext.Active("E2E-CANVAS-007.PERSISTENCE_FAILED", 1, command.projectId(), command.modelId(),
+                        command.baseRevisionId(), command.candidateRevision().revisionId(), command.commandId(), "profile", "0.2", "a".repeat(64));
+            }
+            @Override public void beforeSymbolAssetLoad(E2EFaultContext context, ProfilePackageDescriptor.RequiredAsset asset) { }
+            @Override public void beforeRevisionInsert(E2EFaultContext context) {
+                e2eCalls.incrementAndGet();
+                throw new CommitPersistenceException(CommitFailureCode.PERSISTENCE_FAILED, "E2E persistence fault", null);
+            }
+            @Override public RevisionCommitRepository.Head projectCurrentHead(E2EFaultContext context, RevisionCommitRepository.Head head) { return head; }
+        };
+        SqliteRevisionCommitRepository repository = new SqliteRevisionCommitRepository(SqliteConnectionFactory.create(database),
+                (stage, context) -> recoveryCalls.incrementAndGet(), e2e);
+
+        CommitResult result = new CandidateRevisionCommitter(repository, null, e2e)
+                .commit(command(base, candidate(base), "command.e2e.persistence", "digest-e2e-persistence"));
+
+        assertRejectedWithoutWrites(database, result, CommitFailureCode.PERSISTENCE_FAILED);
+        assertEquals(1, e2eCalls.get());
+        assertEquals(0, recoveryCalls.get());
     }
 
     @Test

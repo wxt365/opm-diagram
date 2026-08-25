@@ -1,0 +1,206 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:opm:contract:dev-canvas-06-fixed-handoff-postverify-report:0.1",
+  "title": "OPM DEV-CANVAS-06 Fixed Handoff Postverify Report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_id",
+    "schema_version",
+    "report_id",
+    "generated_at",
+    "report_status",
+    "attempt_id",
+    "subject_source_commit",
+    "release_prefix",
+    "handoff_id",
+    "manifest_id",
+    "runner_identity",
+    "subject_refs",
+    "checks",
+    "production_manifest_verifier",
+    "blockers",
+    "report_payload_sha256"
+  ],
+  "properties": {
+    "schema_id": {"const": "OPM-DEV-CANVAS-06-FIXED-HANDOFF-POSTVERIFY-REPORT-001"},
+    "schema_version": {"const": "0.1"},
+    "report_id": {"pattern": "^dev-canvas-06\\.fixed-handoff-postverify\\.[a-f0-9]{12}\\.[a-f0-9]{12}\\.[a-f0-9]{32}$"},
+    "generated_at": {"type": "string", "format": "date-time"},
+    "report_status": {"enum": ["READY_FOR_SWITCH_FINALIZATION", "BLOCKED"]},
+    "attempt_id": {"$ref": "#/$defs/attemptId"},
+    "subject_source_commit": {"$ref": "#/$defs/commit"},
+    "release_prefix": {"pattern": "^releases/clean-[a-f0-9]{12}$"},
+    "handoff_id": {"pattern": "^dev-canvas-05\\.profile\\.iso19450\\.2024\\.draft\\.0\\.2\\.0\\.[a-f0-9]{12}$"},
+    "manifest_id": {"pattern": "^dev-canvas-06\\.e2e\\.[a-f0-9]{12}\\.[a-f0-9]{12}$"},
+    "runner_identity": {"$ref": "#/$defs/runnerIdentity"},
+    "subject_refs": {"$ref": "#/$defs/subjectRefs"},
+    "checks": {"$ref": "#/$defs/checks"},
+    "production_manifest_verifier": {"$ref": "#/$defs/verifierResult"},
+    "blockers": {"type": "array", "maxItems": 1, "items": {"$ref": "#/$defs/blocker"}},
+    "report_payload_sha256": {"$ref": "#/$defs/digest"}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"report_status": {"const": "READY_FOR_SWITCH_FINALIZATION"}}, "required": ["report_status"]},
+      "then": {
+        "properties": {
+          "checks": {"contains": {"properties": {"status": {"const": "MATCHED"}}, "required": ["status"]}, "minContains": 8, "maxContains": 8},
+          "production_manifest_verifier": {
+            "properties": {
+              "status": {"const": "MATCHED"},
+              "exit_code": {"const": 0},
+              "stdout": {"const": "dev-canvas-06-e2e-manifest.json\n"},
+              "stderr_code": {"type": "null"}
+            }
+          },
+          "blockers": {"maxItems": 0}
+        }
+      }
+    },
+    {
+      "if": {"properties": {"report_status": {"const": "BLOCKED"}}, "required": ["report_status"]},
+      "then": {
+        "properties": {
+          "checks": {"contains": {"properties": {"status": {"const": "BLOCKED"}}, "required": ["status"]}, "minContains": 1, "maxContains": 1},
+          "blockers": {"minItems": 1, "maxItems": 1}
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "commit": {"type": "string", "pattern": "^[a-f0-9]{40}$"},
+    "attemptId": {"type": "string", "pattern": "^[a-f0-9]{32}$"},
+    "path": {"type": "string", "pattern": "^(?!/)(?!.*\\\\)(?!.*%)(?!.*(?:^|/)\\.(?:/|$))(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*//).+$"},
+    "fileRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "path", "byte_length", "sha256"],
+      "properties": {
+        "kind": {"enum": ["HANDOFF", "INTAKE_REPORT", "E2E_MANIFEST"]},
+        "path": {"$ref": "#/$defs/path"},
+        "byte_length": {"type": "integer", "minimum": 1},
+        "sha256": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "runnerIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "runner_version",
+        "tool_source_commit",
+        "dirty_before_run",
+        "node_version",
+        "os",
+        "command",
+        "runner_source_sha256",
+        "production_verifier_source_sha256",
+        "report_schema_sha256"
+      ],
+      "properties": {
+        "runner_version": {"const": "0.1.0"},
+        "tool_source_commit": {"$ref": "#/$defs/commit"},
+        "dirty_before_run": {"const": false},
+        "node_version": {"type": "string", "minLength": 1},
+        "os": {"type": "string", "minLength": 1},
+        "command": {"type": "string", "minLength": 1},
+        "runner_source_sha256": {"$ref": "#/$defs/digest"},
+        "production_verifier_source_sha256": {"$ref": "#/$defs/digest"},
+        "report_schema_sha256": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "subjectRefs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fixed_handoff_ref", "versioned_handoff_ref", "intake_report_ref", "manifest_ref", "manifest_handoff_copy_ref"],
+      "properties": {
+        "fixed_handoff_ref": {"allOf": [{"$ref": "#/$defs/fileRef"}, {"properties": {"kind": {"const": "HANDOFF"}}}]},
+        "versioned_handoff_ref": {"allOf": [{"$ref": "#/$defs/fileRef"}, {"properties": {"kind": {"const": "HANDOFF"}}}]},
+        "intake_report_ref": {"allOf": [{"$ref": "#/$defs/fileRef"}, {"properties": {"kind": {"const": "INTAKE_REPORT"}}}]},
+        "manifest_ref": {"allOf": [{"$ref": "#/$defs/fileRef"}, {"properties": {"kind": {"const": "E2E_MANIFEST"}}}]},
+        "manifest_handoff_copy_ref": {"allOf": [{"$ref": "#/$defs/fileRef"}, {"properties": {"kind": {"const": "HANDOFF"}}}]}
+      }
+    },
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["check_id", "status", "evidence_refs", "observed_summary"],
+      "properties": {
+        "check_id": {
+          "enum": [
+            "FHPOST-001.FIXED_FILE",
+            "FHPOST-002.INTAKE_VERSIONED_REF",
+            "FHPOST-003.VERSIONED_CLOSURE",
+            "FHPOST-004.FIXED_VERSIONED_RAW_EQUAL",
+            "FHPOST-005.HANDOFF_IDENTITY",
+            "FHPOST-006.MANIFEST_COPY_RAW_EQUAL",
+            "FHPOST-007.PRODUCTION_MANIFEST_VERIFIER",
+            "FHPOST-008.SUBJECT_STABLE"
+          ]
+        },
+        "status": {"enum": ["MATCHED", "BLOCKED", "NOT_RUN"]},
+        "evidence_refs": {"type": "array", "items": {"$ref": "#/$defs/fileRef"}},
+        "observed_summary": {"type": "string", "minLength": 1}
+      }
+    },
+    "checks": {
+      "type": "array",
+      "minItems": 8,
+      "maxItems": 8,
+      "prefixItems": [
+        {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"check_id": {"const": "FHPOST-001.FIXED_FILE"}}}]},
+        {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"check_id": {"const": "FHPOST-002.INTAKE_VERSIONED_REF"}}}]},
+        {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"check_id": {"const": "FHPOST-003.VERSIONED_CLOSURE"}}}]},
+        {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"check_id": {"const": "FHPOST-004.FIXED_VERSIONED_RAW_EQUAL"}}}]},
+        {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"check_id": {"const": "FHPOST-005.HANDOFF_IDENTITY"}}}]},
+        {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"check_id": {"const": "FHPOST-006.MANIFEST_COPY_RAW_EQUAL"}}}]},
+        {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"check_id": {"const": "FHPOST-007.PRODUCTION_MANIFEST_VERIFIER"}}}]},
+        {"allOf": [{"$ref": "#/$defs/check"}, {"properties": {"check_id": {"const": "FHPOST-008.SUBJECT_STABLE"}}}]}
+      ],
+      "items": false
+    },
+    "verifierResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "command", "exit_code", "stdout", "stderr_code"],
+      "properties": {
+        "status": {"enum": ["MATCHED", "BLOCKED", "NOT_RUN"]},
+        "command": {"type": "string", "minLength": 1},
+        "exit_code": {"type": ["integer", "null"], "minimum": 0},
+        "stdout": {"type": "string"},
+        "stderr_code": {"type": ["string", "null"], "pattern": "^[A-Z0-9_]+$"}
+      }
+    },
+    "blocker": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "check_id", "message_key"],
+      "properties": {
+        "code": {
+          "enum": [
+            "POSTVERIFY_INTAKE_VERSIONED_MISMATCH",
+            "POSTVERIFY_VERSIONED_CLOSURE_INVALID",
+            "POSTVERIFY_FIXED_VERSIONED_MISMATCH",
+            "POSTVERIFY_HANDOFF_IDENTITY_MISMATCH",
+            "POSTVERIFY_MANIFEST_COPY_MISMATCH",
+            "POSTVERIFY_PRODUCTION_VERIFIER_BLOCKED",
+            "POSTVERIFY_SUBJECT_DRIFT"
+          ]
+        },
+        "check_id": {
+          "enum": [
+            "FHPOST-002.INTAKE_VERSIONED_REF",
+            "FHPOST-003.VERSIONED_CLOSURE",
+            "FHPOST-004.FIXED_VERSIONED_RAW_EQUAL",
+            "FHPOST-005.HANDOFF_IDENTITY",
+            "FHPOST-006.MANIFEST_COPY_RAW_EQUAL",
+            "FHPOST-007.PRODUCTION_MANIFEST_VERIFIER",
+            "FHPOST-008.SUBJECT_STABLE"
+          ]
+        },
+        "message_key": {"pattern": "^postverify\\.[a-z0-9_.-]+$"}
+      }
+    }
+  }
+}

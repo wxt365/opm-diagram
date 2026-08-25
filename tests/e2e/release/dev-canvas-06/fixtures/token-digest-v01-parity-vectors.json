@@ -1,0 +1,55 @@
+{
+  "schema_id": "OPM-DEV-CANVAS-06-TOKEN-DIGEST-PARITY-VECTORS-001",
+  "schema_version": "0.1",
+  "catalog_id": "dev-canvas-06.token-digest-v01-parity",
+  "catalog_version": "0.1.0",
+  "preimage_schema_ref": "urn:opm:contract:dev-canvas-06-token-digest-preimage:0.1",
+  "positive_vectors": [
+    {
+      "vector_id": "TOKV01-EMPTY",
+      "input_revision_id": "revision.empty",
+      "input_tokens": [],
+      "expected_preimage": {
+        "schema_id": "OPM-DEV-CANVAS-06-TOKEN-DIGEST-PREIMAGE-001",
+        "schema_version": "0.1",
+        "revision_id": "revision.empty",
+        "tokens": []
+      },
+      "expected_canonical_utf8_hex": "7b227265766973696f6e5f6964223a227265766973696f6e2e656d707479222c22736368656d615f6964223a224f504d2d4445562d43414e5641532d30362d544f4b454e2d4449474553542d505245494d4147452d303031222c22736368656d615f76657273696f6e223a22302e31222c22746f6b656e73223a5b5d7d",
+      "expected_token_sha256": "005df77c3ddc85610d19c53b023065ddbda2ee36c39afb08f93731a26ccc505e"
+    },
+    {
+      "vector_id": "TOKV01-ASCII",
+      "input_revision_id": "revision.ascii",
+      "input_tokens": [{"token_id": "token.1", "sentence_id": "sentence.1", "ordinal": 0, "text": "Object", "kind": "ENTITY", "start_utf8_byte": 0, "end_utf8_byte": 6, "source_refs": [{"source_kind": "ELEMENT", "stable_id": "element.1"}]}],
+      "expected_preimage": {
+        "schema_id": "OPM-DEV-CANVAS-06-TOKEN-DIGEST-PREIMAGE-001",
+        "schema_version": "0.1",
+        "revision_id": "revision.ascii",
+        "tokens": [{"token_id": "token.1", "sentence_id": "sentence.1", "ordinal": 0, "text": "Object", "kind": "ENTITY", "start_utf8_byte": 0, "end_utf8_byte": 6, "source_refs": [{"source_kind": "ELEMENT", "stable_id": "element.1"}]}]
+      },
+      "expected_canonical_utf8_hex": "7b227265766973696f6e5f6964223a227265766973696f6e2e6173636969222c22736368656d615f6964223a224f504d2d4445562d43414e5641532d30362d544f4b454e2d4449474553542d505245494d4147452d303031222c22736368656d615f76657273696f6e223a22302e31222c22746f6b656e73223a5b7b22656e645f757466385f62797465223a362c226b696e64223a22454e54495459222c226f7264696e616c223a302c2273656e74656e63655f6964223a2273656e74656e63652e31222c22736f757263655f72656673223a5b7b22736f757263655f6b696e64223a22454c454d454e54222c22737461626c655f6964223a22656c656d656e742e31227d5d2c2273746172745f757466385f62797465223a302c2274657874223a224f626a656374222c22746f6b656e5f6964223a22746f6b656e2e31227d5d7d",
+      "expected_token_sha256": "642ef8fa8541d27f676881173d4470c385b7033ce334fbc6013e22e8f77bc5f7"
+    },
+    {
+      "vector_id": "TOKV01-UNICODE-SOURCES",
+      "input_revision_id": "revision.unicode",
+      "input_tokens": [{"token_id": "token.1", "sentence_id": "sentence.1", "ordinal": 0, "text": "对象", "kind": "OBJECT", "start_utf8_byte": 0, "end_utf8_byte": 6, "source_refs": [{"source_kind": "ELEMENT", "stable_id": "element.1", "field_path": "name.local_name", "endpoint_ordinal": 0, "sentence_slot": "SINGLE"}, {"source_kind": "TEMPLATE", "stable_id": "template.1"}]}],
+      "expected_preimage": {
+        "schema_id": "OPM-DEV-CANVAS-06-TOKEN-DIGEST-PREIMAGE-001",
+        "schema_version": "0.1",
+        "revision_id": "revision.unicode",
+        "tokens": [{"token_id": "token.1", "sentence_id": "sentence.1", "ordinal": 0, "text": "对象", "kind": "OBJECT", "start_utf8_byte": 0, "end_utf8_byte": 6, "source_refs": [{"source_kind": "ELEMENT", "stable_id": "element.1", "field_path": "name.local_name", "endpoint_ordinal": 0, "sentence_slot": "SINGLE"}, {"source_kind": "TEMPLATE", "stable_id": "template.1"}]}]
+      },
+      "expected_canonical_utf8_hex": "7b227265766973696f6e5f6964223a227265766973696f6e2e756e69636f6465222c22736368656d615f6964223a224f504d2d4445562d43414e5641532d30362d544f4b454e2d4449474553542d505245494d4147452d303031222c22736368656d615f76657273696f6e223a22302e31222c22746f6b656e73223a5b7b22656e645f757466385f62797465223a362c226b696e64223a224f424a454354222c226f7264696e616c223a302c2273656e74656e63655f6964223a2273656e74656e63652e31222c22736f757263655f72656673223a5b7b22656e64706f696e745f6f7264696e616c223a302c226669656c645f70617468223a226e616d652e6c6f63616c5f6e616d65222c2273656e74656e63655f736c6f74223a2253494e474c45222c22736f757263655f6b696e64223a22454c454d454e54222c22737461626c655f6964223a22656c656d656e742e31227d2c7b22736f757263655f6b696e64223a2254454d504c415445222c22737461626c655f6964223a2274656d706c6174652e31227d5d2c2273746172745f757466385f62797465223a302c2274657874223a22e5afb9e8b1a1222c22746f6b656e5f6964223a22746f6b656e2e31227d5d7d",
+      "expected_token_sha256": "16ded5f0c391bfdf39f9e372223f278dafc75920fdac1334445f9a4714e972be"
+    }
+  ],
+  "negative_vectors": [
+    {"vector_id": "TOKV01-NEG-NFC", "base_positive_vector_id": "TOKV01-ASCII", "mutation": {"operation": "SET_NON_NFC_STRING", "json_pointer": "/tokens/0/text", "value_token": "NON_NFC_É"}, "expected_error_code": "TOKEN_DIGEST_UNICODE_INVALID", "expected_error_pointer": "/tokens/0/text"},
+    {"vector_id": "TOKV01-NEG-RANGE", "base_positive_vector_id": "TOKV01-ASCII", "mutation": {"operation": "SET_RANGE_INVALID", "json_pointer": "/tokens/0/end_utf8_byte", "value_token": "END_BEFORE_START"}, "expected_error_code": "TOKEN_DIGEST_RANGE_INVALID", "expected_error_pointer": "/tokens/0/end_utf8_byte"},
+    {"vector_id": "TOKV01-NEG-NUMBER", "base_positive_vector_id": "TOKV01-ASCII", "mutation": {"operation": "SET_UNSAFE_INTEGER", "json_pointer": "/tokens/0/ordinal", "value_token": "NUMBER:9007199254740992"}, "expected_error_code": "TOKEN_DIGEST_NUMBER_DOMAIN_INVALID", "expected_error_pointer": "/tokens/0/ordinal"},
+    {"vector_id": "TOKV01-NEG-ENUM", "base_positive_vector_id": "TOKV01-ASCII", "mutation": {"operation": "SET_UNKNOWN_KIND", "json_pointer": "/tokens/0/kind", "value_token": "UNKNOWN_KIND"}, "expected_error_code": "TOKEN_DIGEST_ENUM_INVALID", "expected_error_pointer": "/tokens/0/kind"}
+  ],
+  "catalog_payload_sha256": "f724d3c1b1c145f4ca6ecf58e8347d0bcfd4ab3c16d11a34023c1927541b1fca"
+}

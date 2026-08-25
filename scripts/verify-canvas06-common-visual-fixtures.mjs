@@ -1,10 +1,13 @@
 import { createHash } from 'node:crypto';
 import { lstat, readFile, readdir, realpath, stat } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { basename, resolve } from 'node:path';
 import Ajv2020 from 'ajv/dist/2020.js';
 import { sha256Jcs } from './canvas06-rfc8785.mjs';
+import { e2eCases, e2eFixture, visualSubjects } from '../tests/e2e/release/dev-canvas-06/fixtures/factories/common-fixture-factory.mjs';
 
 const root = resolve('.');
+const factoryPath = fileURLToPath(new URL('../tests/e2e/release/dev-canvas-06/fixtures/factories/common-fixture-factory.mjs', import.meta.url));
 
 try {
   const options = parseOptions(process.argv.slice(2));
@@ -39,8 +42,13 @@ async function verify(fixtureRoot, binding) {
   await verifyRef(fixtureRoot, catalog.generator_ref, 'GENERATOR_SOURCE', 'sources/scripts/build-canvas06-common-visual-fixtures.mjs');
   if (catalog.visual_subjects.length !== 8 || catalog.e2e_cases.length !== 16) fail('GOLDEN_COMMON_FIXTURE_REF_MISMATCH', 2, 'Catalog subject count differs.');
   const factoryRef = catalog.visual_subjects[0]?.factory_source_ref;
-  await verifyRef(fixtureRoot, factoryRef, 'FACTORY_SOURCE', 'sources/tests/e2e/release/dev-canvas-06/fixtures/factories/common-fixture-factory.mjs');
-  for (const [index, subjectId] of subjects().entries()) {
+  const factoryMirror = 'sources/tests/e2e/release/dev-canvas-06/fixtures/factories/common-fixture-factory.mjs';
+  await assertSourceOwner(factoryPath, 'tests/e2e/release/dev-canvas-06/fixtures/factories/common-fixture-factory.mjs');
+  await verifyRef(fixtureRoot, factoryRef, 'FACTORY_SOURCE', factoryMirror);
+  if (!same(await readFile(factoryPath), await readFile(resolveInside(fixtureRoot, factoryMirror)))) fail('GOLDEN_COMMON_FIXTURE_REF_MISMATCH', 2, 'Factory source mirror differs from the static import owner.');
+  const expectedFactoryRef = await fileRef(fixtureRoot, factoryMirror, 'FACTORY_SOURCE');
+  for (const item of [...catalog.visual_subjects, ...catalog.e2e_cases]) if (!same(item.factory_source_ref, expectedFactoryRef)) fail('GOLDEN_COMMON_FIXTURE_REF_MISMATCH', 2, 'Factory source references do not form an exact join.');
+  for (const [index, subjectId] of visualSubjects.entries()) {
     const item = catalog.visual_subjects[index];
     if (item.subject_id !== subjectId || !same(item.factory_source_ref, factoryRef)) fail('GOLDEN_COMMON_FIXTURE_REF_MISMATCH', 2, `Visual Catalog entry differs: ${subjectId}`);
     await verifyRef(fixtureRoot, item.fixture_ref, 'FIXTURE', `visual/${subjectId}.json`);
@@ -48,15 +56,16 @@ async function verify(fixtureRoot, binding) {
     if (!validateFixture(fixture)) fail('GOLDEN_COMMON_FIXTURE_SCHEMA_INVALID', 2, `${subjectId}: ${JSON.stringify(validateFixture.errors)}`);
     verifyVisual(fixture, item, binding);
   }
-  for (const [index, caseId] of cases().entries()) {
+  const fixtures = cacheE2eFixtures();
+  for (const [index, caseId] of e2eCases.entries()) {
     const item = catalog.e2e_cases[index];
     if (item.case_id !== caseId || !same(item.factory_source_ref, factoryRef)) fail('GOLDEN_COMMON_FIXTURE_REF_MISMATCH', 2, `E2E Catalog entry differs: ${caseId}`);
     await verifyRef(fixtureRoot, item.base_fixture_ref, 'FIXTURE', `e2e/${caseId}.base.json`);
     await verifyRef(fixtureRoot, item.input_ref, 'INPUT', `e2e/${caseId}.input.json`);
-    const base = await json(resolveInside(fixtureRoot, item.base_fixture_ref.path));
-    const input = await json(resolveInside(fixtureRoot, item.input_ref.path));
-    const expected = expectedE2e(caseId);
-    if (!same(base, { ...expected, fixture_kind: 'BASE' }) || !same(input, { ...expected, fixture_kind: 'INPUT' }) || !same(item.actions, [expected.action])) fail('GOLDEN_COMMON_FIXTURE_REF_MISMATCH', 2, `E2E fixture differs: ${caseId}`);
+    const fixture = fixtures.get(caseId);
+    await verifyExpectedBytes(fixtureRoot, item.base_fixture_ref.path, { ...fixture, fixture_kind: 'BASE' });
+    await verifyExpectedBytes(fixtureRoot, item.input_ref.path, { ...fixture, fixture_kind: 'INPUT' });
+    if (!same(item.actions, [fixture.action])) fail('GOLDEN_COMMON_FIXTURE_REF_MISMATCH', 2, `Catalog action differs: ${caseId}`);
   }
 }
 
@@ -95,18 +104,15 @@ async function verifyRef(base, ref, kind, path) {
   if (info.size !== ref.byte_length || sha(await readFile(target)) !== ref.sha256) fail('GOLDEN_COMMON_FIXTURE_REF_MISMATCH', 2, `Reference bytes differ: ${path}`);
 }
 
-function expectedE2e(caseId) {
-  const blocked = /AMBIGUOUS|STALE|MISMATCHED|ASSET_MISSING|TEXT_BLOCKED|CONFLICT|PERSISTENCE_FAILED|READONLY/.test(caseId);
-  const delta = blocked ? 0 : 1;
-  return { fixture_id: `fixture.e2e.${caseId.toLowerCase()}`, case_id: caseId, project_name: `Release E2E ${caseId}`, model_name: `Release E2E ${caseId}`, initial_revision: `revision.e2e.${caseId.toLowerCase()}`, action: { action_id: 'action.001', expected_status: blocked ? 'BLOCKED_MATCHED' : 'PASS_MATCHED', ...(blocked ? { expected_error_code: 'DOMAIN_REJECTED' } : {}), expected_transaction: { revision_delta: delta, revision_parent_delta: delta, text_artifact_delta: delta, text_trace_delta: delta, finding_delta: 0, operation_delta: delta, receipt_delta: delta, draft_head_changed: !blocked }, reopen_checkpoint: { expected_head_changed: !blocked, projection_matches: true, text_trace_matches: true } } };
-}
+function cacheE2eFixtures() { if (e2eCases.length !== 16 || new Set(e2eCases).size !== 16) fail('GOLDEN_COMMON_INPUT_INVALID', 2, 'Factory case set is invalid.'); const cache = new Map(); for (const caseId of e2eCases) cache.set(caseId, e2eFixture(caseId)); return cache; }
+async function verifyExpectedBytes(base, path, expected) { const target = resolveInside(base, path); const actual = await readFile(target); const encoded = Buffer.from(`${JSON.stringify(expected, null, 2)}\n`, 'utf8'); if (!actual.equals(encoded)) fail('GOLDEN_COMMON_FIXTURE_REF_MISMATCH', 2, `E2E fixture bytes differ: ${path}`); }
+async function fileRef(base, path, kind) { const target = resolveInside(base, path); const info = await regularFile(target); return { kind, path, byte_length: info.size, sha256: sha(await readFile(target)) }; }
+async function assertSourceOwner(path, logical) { const first = await lstat(path); if (!first.isFile() || first.isSymbolicLink() || first.nlink !== 1 || basename(path) !== basename(logical)) fail('GOLDEN_COMMON_INPUT_INVALID', 2, `Invalid source owner: ${logical}`); const actual = await realpath(path); const second = await lstat(actual); if (actual !== path || !second.isFile() || second.isSymbolicLink() || second.nlink !== 1) fail('GOLDEN_COMMON_INPUT_INVALID', 2, `Invalid source owner: ${logical}`); }
 
 async function files(base) { const result = []; async function walk(path) { for (const entry of await readdir(path, { withFileTypes: true })) { const child = resolve(path, entry.name); if (entry.isDirectory()) await walk(child); else { const info = await regularFile(child); result.push({ path: child.slice(`${resolve(base)}/`.length), byte_length: info.size, sha256: sha(await readFile(child)) }); } } } await walk(base); return result.sort((left, right) => left.path.localeCompare(right.path)); }
 async function regularFile(path) { const first = await lstat(path); if (!first.isFile() || first.isSymbolicLink() || first.nlink !== 1) fail('GOLDEN_COMMON_FIXTURE_REF_MISMATCH', 2, `Non-regular file: ${path}`); const second = await lstat(await realpath(path)); if (!second.isFile() || second.isSymbolicLink() || second.nlink !== 1) fail('GOLDEN_COMMON_FIXTURE_REF_MISMATCH', 2, `Non-regular file: ${path}`); return stat(path); }
 async function treeDigest(base) { return sha256Jcs(await files(base)); }
-function expectedPaths() { return ['dev-canvas-06-common-fixture-catalog.json', ...subjects().map(id => `visual/${id}.json`), ...cases().flatMap(id => [`e2e/${id}.base.json`, `e2e/${id}.input.json`]), 'sources/scripts/build-canvas06-common-visual-fixtures.mjs', 'sources/tests/e2e/release/dev-canvas-06/fixtures/factories/common-fixture-factory.mjs'].sort((left, right) => left.localeCompare(right)); }
-function subjects() { return ['STATE_ROLES', 'LONG_LABELS', 'FUNDAMENTAL_FAN', 'CANDIDATE_LAYER', 'INSPECTOR', 'TOOLCHAIN_CATALOG', 'FINDING_FOCUS', 'BLOCKED_FEEDBACK']; }
-function cases() { return ['E2E-CANVAS-001.STATE_CREATE_RENAME_ROLES', 'E2E-CANVAS-001.STATE_EXPLICITNESS_EXPANSION', 'E2E-CANVAS-001.STATE_MOBILE_CREATE_REOPEN', 'E2E-CANVAS-001.STATE_TEXT_TRACE_ROUNDTRIP', 'E2E-CANVAS-005.REVERSE_DRAG_NORMALIZED', 'E2E-CANVAS-005.AMBIGUOUS_OPTIONS_NOT_AUTOCOMMITTED', 'E2E-CANVAS-005.STALE_OPTION_BLOCKED', 'E2E-CANVAS-006.STATE_IMPACT_CONFIRMED', 'E2E-CANVAS-006.FACT_IMPACT_CONFIRMED', 'E2E-CANVAS-006.STALE_TOKEN_BLOCKED', 'E2E-CANVAS-006.MISMATCHED_TOKEN_BLOCKED', 'E2E-CANVAS-007.ASSET_MISSING', 'E2E-CANVAS-007.TEXT_BLOCKED', 'E2E-CANVAS-007.REVISION_CONFLICT', 'E2E-CANVAS-007.PERSISTENCE_FAILED', 'E2E-CANVAS-007.READONLY']; }
+function expectedPaths() { return ['dev-canvas-06-common-fixture-catalog.json', ...visualSubjects.map(id => `visual/${id}.json`), ...e2eCases.flatMap(id => [`e2e/${id}.base.json`, `e2e/${id}.input.json`]), 'sources/scripts/build-canvas06-common-visual-fixtures.mjs', 'sources/tests/e2e/release/dev-canvas-06/fixtures/factories/common-fixture-factory.mjs'].sort((left, right) => left.localeCompare(right)); }
 async function json(path) { return JSON.parse(await readFile(path, 'utf8')); }
 function parseOptions(values) { const allowed = new Set(['handoff', 'fixture-root', 'catalog']); const result = new Map(); for (let index = 0; index < values.length; index += 2) { const flag = values[index]; const value = values[index + 1]; if (!flag?.startsWith('--') || !allowed.has(flag.slice(2)) || value === undefined || result.has(flag.slice(2))) fail('GOLDEN_COMMON_INPUT_INVALID', 2, 'Invalid verifier options.'); result.set(flag.slice(2), value); } return result; }
 function required(values, key) { const value = values.get(key); if (!value) fail('GOLDEN_COMMON_INPUT_INVALID', 2, `Missing --${key}.`); return value; }

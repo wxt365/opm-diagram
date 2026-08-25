@@ -30,7 +30,6 @@ export default defineConfig({
         rollupOptions: {
             output: {
                 manualChunks: {
-                    "element-plus": ["element-plus"],
                     "opd-canvas": ["@antv/x6"],
                     "vue-runtime": ["pinia", "vue", "vue-router"],
                 },

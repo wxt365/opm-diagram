@@ -147,9 +147,9 @@ Builder先只读验证源根，再把完整43文件树逐byte复制到：
 ## 8. 兼容与状态
 
 1. Catalog Schema `0.1`不变，历史`0.1.0`bytes不变，活动`0.2.0`仍为兼容字段升级；
-2. E2E Manifest Schema/Manifest版本保持`0.1/0.1.0`，只收紧Common输入semantic preflight和final布局；
+2. 历史E2E Manifest `0.1/0.1.0` bytes保持不变；活动E2E Manifest `0.2/0.2.0`继续消费本规格冻结的43文件Common root，并由独立v02 producer/verifier规格增加第四driver、Profile/JAR/Web和聚合闭包；
 3. 既有E2E Manifest Builder `22/22`是旧Common source布局的历史实现快照；完成本规格对应实现和重验前，其当前符合性状态为`CONTRACT_UPDATE_REQUIRED`；
-4. 本修正不改变`194/388`、driver、transaction、Report或Gate算法。
+4. 本修正本身不改变`194/388`、transaction、Report或Gate算法；第四`DRIVER-COMMON`与`137/57`聚合由后继Manifest v02规格唯一冻结。
 
 ## 9. 验收与验证
 

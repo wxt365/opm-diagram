@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:opm:contract:dev-canvas-06-token-digest-preimage:0.1",
+  "title": "OPM DEV-CANVAS-06 Token Digest Preimage 0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "revision_id", "tokens"],
+  "properties": {
+    "schema_id": {"const": "OPM-DEV-CANVAS-06-TOKEN-DIGEST-PREIMAGE-001"},
+    "schema_version": {"const": "0.1"},
+    "revision_id": {"type": "string", "minLength": 1},
+    "tokens": {"type": "array", "items": {"$ref": "#/$defs/token"}}
+  },
+  "$defs": {
+    "sourceRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_kind", "stable_id"],
+      "properties": {
+        "source_kind": {"enum": ["FACT", "CAPABILITY", "ENDPOINT", "ELEMENT", "FEATURE", "STATE", "MODIFIER", "OCCURRENCE", "TEMPLATE", "GRAMMAR", "RULE", "LEGACY"]},
+        "stable_id": {"type": "string", "minLength": 1},
+        "field_path": {"type": "string", "minLength": 1},
+        "endpoint_ordinal": {"type": "integer", "minimum": 0},
+        "sentence_slot": {"type": "string", "minLength": 1}
+      }
+    },
+    "token": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["token_id", "sentence_id", "ordinal", "text", "kind", "start_utf8_byte", "end_utf8_byte", "source_refs"],
+      "properties": {
+        "token_id": {"type": "string", "minLength": 1},
+        "sentence_id": {"type": "string", "minLength": 1},
+        "ordinal": {"type": "integer", "minimum": 0, "maximum": 9007199254740991},
+        "text": {"type": "string", "minLength": 1},
+        "kind": {"enum": ["ENTITY", "STATE", "RELATION_VERB", "CONTROL_KEYWORD", "LIST_SEPARATOR", "PUNCTUATION", "WHITESPACE", "KEYWORD", "PROCESS", "OBJECT"]},
+        "start_utf8_byte": {"type": "integer", "minimum": 0, "maximum": 9007199254740991},
+        "end_utf8_byte": {"type": "integer", "minimum": 1, "maximum": 9007199254740991},
+        "source_refs": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/sourceRef"}}
+      }
+    }
+  }
+}

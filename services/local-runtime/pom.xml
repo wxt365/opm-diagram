@@ -58,6 +58,13 @@
                     <include>V*__*.sql</include>
                 </includes>
             </resource>
+            <resource>
+                <directory>../../docs/contracts/schemas</directory>
+                <targetPath>releaseevidence/schema</targetPath>
+                <includes>
+                    <include>opm-dev-canvas-06-e2e-attempt-artifact-v02.schema.json</include>
+                </includes>
+            </resource>
         </resources>
         <plugins>
             <plugin>

@@ -64,7 +64,7 @@ Gate 编号表示职责，不表示一次性线性执行顺序。执行依赖固
 | --- | --- | --- |
 | `GATE-06-01 Handoff Intake` | 验证 Handoff 原始 bytes、Schema、上游 Gate、覆盖、兼容、34 项 eligibility 和禁用生产门 | `OPM-DEV-CANVAS-06-INTAKE-REPORT-001/0.1` |
 | `GATE-06-02 Enablement Manifest` | 冻结三批次、逐 Capability 依赖/证据闭包、候选启用和不可变状态迁移 | `OPM-DEV-CANVAS-06-ENABLEMENT-001/0.1` |
-| `GATE-06-03 Visual/E2E Closure` | 生成固定视觉矩阵、canvas pixel、遮挡和 `E2E-CANVAS-001~007` 机器报告 | Visual Manifest `0.2`、Visual Report `0.1`、E2E Manifest `0.1`、E2E Report `0.2` |
+| `GATE-06-03 Visual/E2E Closure` | 生成固定视觉矩阵、canvas pixel、遮挡和 `E2E-CANVAS-001~007` 机器报告 | Visual Manifest `0.2`、Visual Report `0.1`、E2E Manifest `0.2`、E2E Report `0.2` |
 | `GATE-06-04 Performance Closure` | 生成环境、fixture、原始样本、统计量、阈值和失败分类报告 | `OPM-DEV-CANVAS-06-PERFORMANCE-MANIFEST/SAMPLES/REPORT-001/0.1` |
 | `GATE-06-05 Recovery/Rollback` | 证明故障零增量、重开恢复、整体/逐 Capability 只读回退 | `OPM-DEV-CANVAS-06-RECOVERY-MANIFEST/GATE-FIXTURE/REPORT-001/0.1` |
 | `GATE-06-06 Release Candidate Evidence` | 汇总 Intake、Visual/E2E、Performance、Recovery、clean smoke、Candidate manifest 和发布边界 | `OPM-DEV-CANVAS-06-RELEASE-CANDIDATE-MANIFEST/REPORT-001/0.1` |
@@ -97,8 +97,8 @@ Gate 编号表示职责，不表示一次性线性执行顺序。执行依赖固
 12. Candidate 必须使用生产 Approval Record 0.2，经 Applicant/Approver 分离审批后排他发布不可变 `INITIAL/SUPERSEDE` 版本；其 candidate/new set digest 必须覆盖 130 份 Materialization Report 与 130 个 SQLite base。validation runner 永久只读。Visual Manifest 必须同时绑定 exact `APPROVED_PUBLISHED` Authoring Report 0.2 与 Golden Environment；缺 materialization/capture、环境不一致、未审批、旧/新 SHA 不闭合或输出路径可覆盖时必须零输出并保持 BLOCKED。
 13. 生产 Visual Manifest 目标版本为 `OPM-DEV-CANVAS-06-VISUAL-MANIFEST-001/0.2`、`manifest_version=0.2.0`，必填 `golden_authoring_report_ref`；现有 `0.1` Schema 只保留为历史实现输入，不得作为生产 Visual Gate Manifest。
 14. Golden Authoring唯一实施口径为主设计`v1.4`和Visual Common Materialization设计`v1.4`；Family Fixture Materializer唯一实施口径为主设计`v1.5`和Verifier Catalog`v1.1`。当前三类Authoring 0.1 Schema、Capture Planner、Materialization Report Schema和03A Materializer实现已存在；pending预验证、四阶段quarantine、63/63、受控130项串行/并发4及contract/backend已闭环，Golden Environment`0.2` Schema/离线verifier已实现。Visual Common `v1.4` 的共享Node JCS模块与Node/Java parity vector已存在；02B/03C/03B、production 130项Materialization、8个Common base/144 clone、04/05、真实approved evidence、Visual Manifest 0.2和release runner未闭合前，`GATE-06-03`保持BLOCKED。
-15. Visual/E2E builder的唯一活动输入修正规则为`opm-dev-canvas-06-visual-e2e-input-correction-bugfix-task-spec.md`：Visual只输出`0.2/0.2.0`，E2E保持`0.1/0.1.0`；两者使用独立入口并强制`CONTROLLED_TEST/PRODUCTION_HANDOFF`模式。E2E `0.1`的完整CLI、controlled archive/Catalog/fixture布局、ref映射和单一目录原子事务只由`opm-dev-canvas-06-e2e-manifest-v01-builder-implementation-task-spec.md`承接。旧Visual/E2E `0.1`合并builder规格是历史快照，禁止继续实现或作为production输入。
-16. E2E plan builder必须先原子写入并验证`fault-plan.json`；其余producer只从该文件读取`attempt_ordinal`并与Manifest schedule交叉校验。路径、循环下标、执行顺序或回调参数不得成为identity来源。Family Identity Catalog尚未进入新clean Handoff/Evidence Bundle和Manifest，Family Materializer切片保持`BLOCKED_BY_DEPENDENCY`。
+15. Visual builder继续只输出`0.2/0.2.0`；活动E2E producer/verifier同样只输出/接受`0.2/0.2.0`，其完整CLI、controlled archive/Catalog/fixture布局、Profile五资产、四driver、exact Runtime JAR/Web、ref映射、单一目录原子事务和`137 PASS+57 BLOCKED`聚合只由`opm-dev-canvas-06-e2e-manifest-v02-builder-verifier-implementation-task-spec.md`及对应checklist承接。两类builder均强制`CONTROLLED_TEST/PRODUCTION_HANDOFF`模式。E2E `0.1/0.1.0`及其合并/v01 builder规格只保留历史读取和审计，禁止继续作为活动production输入。
+16. E2E plan builder必须先原子写入并验证`fault-plan.json`；其余producer只从该文件读取`attempt_ordinal`并与Manifest schedule交叉校验。路径、循环下标、执行顺序或回调参数不得成为identity来源。Family Identity Catalog已在新clean Handoff/Evidence Bundle和活动Manifest中闭合，Family Materializer可进入实现；这不构成Runner、Report或Gate完成。
 
 ### 4.5 Performance Closure 边界
 

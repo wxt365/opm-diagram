@@ -1,0 +1,2434 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:opm:contract:dev-canvas-06-e2e-attempt-artifact:0.2",
+  "title": "OPM DEV-CANVAS-06 E2E Attempt Artifact 0.2",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/faultPlan"
+    },
+    {
+      "$ref": "#/$defs/fixtureMaterialization"
+    },
+    {
+      "$ref": "#/$defs/attemptObservation"
+    },
+    {
+      "$ref": "#/$defs/runtimeProcess"
+    },
+    {
+      "$ref": "#/$defs/browserEnvironment"
+    },
+    {
+      "$ref": "#/$defs/networkObservation"
+    },
+    {
+      "$ref": "#/$defs/consoleErrors"
+    },
+    {
+      "$ref": "#/$defs/transactionObservation"
+    },
+    {
+      "$ref": "#/$defs/reopenObservation"
+    },
+    {
+      "$ref": "#/$defs/apiExchangeIndex"
+    },
+    {
+      "$ref": "#/$defs/artifactIndex"
+    }
+  ],
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "path": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*//)(?!.*\\\\)(?!.*\\u0000).+$"
+    },
+    "caseId": {
+      "type": "string",
+      "pattern": "^E2E-CANVAS-00[1-7]\\..+$"
+    },
+    "nullableString": {
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 1
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "nullableFileRef": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/fileRef"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "fileRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "path",
+        "byte_length",
+        "sha256"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "minLength": 1
+        },
+        "path": {
+          "$ref": "#/$defs/path"
+        },
+        "byte_length": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sha256": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "assetIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "version",
+        "sha256"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "rule_set",
+        "text_grammar",
+        "symbol_catalog",
+        "normalization_adapter",
+        "binding_digest"
+      ],
+      "properties": {
+        "profile": {
+          "$ref": "#/$defs/assetIdentity"
+        },
+        "rule_set": {
+          "$ref": "#/$defs/assetIdentity"
+        },
+        "text_grammar": {
+          "$ref": "#/$defs/assetIdentity"
+        },
+        "symbol_catalog": {
+          "$ref": "#/$defs/assetIdentity"
+        },
+        "normalization_adapter": {
+          "$ref": "#/$defs/assetIdentity"
+        },
+        "binding_digest": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "transaction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "revision_delta",
+        "revision_parent_delta",
+        "text_artifact_delta",
+        "text_trace_delta",
+        "finding_delta",
+        "operation_delta",
+        "receipt_delta",
+        "draft_head_changed"
+      ],
+      "properties": {
+        "revision_delta": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "revision_parent_delta": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "text_artifact_delta": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "text_trace_delta": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "finding_delta": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "operation_delta": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "receipt_delta": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "draft_head_changed": {
+          "type": "boolean"
+        }
+      }
+    },
+    "assertionResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "assertion_id",
+        "status",
+        "evidence_refs"
+      ],
+      "properties": {
+        "assertion_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "enum": [
+            "PASS",
+            "FAILED"
+          ]
+        },
+        "evidence_refs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/fileRef"
+          }
+        }
+      }
+    },
+    "materializedIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "project_id",
+        "model_id",
+        "context_id",
+        "base_revision",
+        "head_revision"
+      ],
+      "properties": {
+        "project_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "context_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "base_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "head_revision": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "materializedStorage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "storage_root",
+        "project_db_ref",
+        "storage_schema_version",
+        "sqlite_quick_check",
+        "foreign_key_check_count",
+        "sidecar_absent"
+      ],
+      "properties": {
+        "storage_root": {
+          "const": "storage"
+        },
+        "project_db_ref": {
+          "$ref": "#/$defs/fileRef"
+        },
+        "storage_schema_version": {
+          "const": "1.0"
+        },
+        "sqlite_quick_check": {
+          "const": "ok"
+        },
+        "foreign_key_check_count": {
+          "const": 0
+        },
+        "sidecar_absent": {
+          "const": true
+        }
+      }
+    },
+    "materializerIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "main_class",
+        "runtime_jar_ref",
+        "source_sha256"
+      ],
+      "properties": {
+        "main_class": {
+          "const": "org.opm.localruntime.releaseevidence.E2EFixtureMaterializerCli"
+        },
+        "runtime_jar_ref": {
+          "$ref": "#/$defs/fileRef"
+        },
+        "source_sha256": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "stateDigests": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "revision_document_sha256",
+        "projection_sha256",
+        "opl_sha256",
+        "token_sha256",
+        "trace_sha256"
+      ],
+      "properties": {
+        "revision_document_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "projection_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "opl_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "token_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "trace_sha256": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "faultPlan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_id",
+        "schema_version",
+        "case_id",
+        "attempt_ordinal",
+        "fault_kind",
+        "target",
+        "trigger_count",
+        "nonce",
+        "plan_sha256",
+        "artifact_payload_sha256"
+      ],
+      "properties": {
+        "schema_id": {
+          "const": "OPM-DEV-CANVAS-06-E2E-FAULT-PLAN-001"
+        },
+        "schema_version": {
+          "const": "0.2"
+        },
+        "case_id": {
+          "$ref": "#/$defs/caseId"
+        },
+        "attempt_ordinal": {
+          "enum": [
+            1,
+            2
+          ]
+        },
+        "fault_kind": {
+          "enum": [
+            "NONE",
+            "ASSET_MISSING",
+            "PERSISTENCE_FAILED",
+            "READONLY"
+          ]
+        },
+        "target": {
+          "enum": [
+            "NONE",
+            "SYMBOL_CATALOG_ASSET",
+            "SQLITE_BEFORE_REVISION_INSERT",
+            "PROJECT_STORAGE_READ_ONLY"
+          ]
+        },
+        "trigger_count": {
+          "enum": [
+            0,
+            1
+          ]
+        },
+        "nonce": {
+          "$ref": "#/$defs/digest"
+        },
+        "plan_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "artifact_payload_sha256": {
+          "$ref": "#/$defs/digest"
+        }
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "case_id": {
+              "const": "E2E-CANVAS-007.ASSET_MISSING"
+            },
+            "fault_kind": {
+              "const": "ASSET_MISSING"
+            },
+            "target": {
+              "const": "SYMBOL_CATALOG_ASSET"
+            },
+            "trigger_count": {
+              "const": 1
+            }
+          }
+        },
+        {
+          "properties": {
+            "case_id": {
+              "const": "E2E-CANVAS-007.PERSISTENCE_FAILED"
+            },
+            "fault_kind": {
+              "const": "PERSISTENCE_FAILED"
+            },
+            "target": {
+              "const": "SQLITE_BEFORE_REVISION_INSERT"
+            },
+            "trigger_count": {
+              "const": 1
+            }
+          }
+        },
+        {
+          "properties": {
+            "case_id": {
+              "const": "E2E-CANVAS-007.READONLY"
+            },
+            "fault_kind": {
+              "const": "READONLY"
+            },
+            "target": {
+              "const": "PROJECT_STORAGE_READ_ONLY"
+            },
+            "trigger_count": {
+              "const": 1
+            }
+          }
+        },
+        {
+          "properties": {
+            "case_id": {
+              "not": {
+                "enum": [
+                  "E2E-CANVAS-007.ASSET_MISSING",
+                  "E2E-CANVAS-007.PERSISTENCE_FAILED",
+                  "E2E-CANVAS-007.READONLY"
+                ]
+              }
+            },
+            "fault_kind": {
+              "const": "NONE"
+            },
+            "target": {
+              "const": "NONE"
+            },
+            "trigger_count": {
+              "const": 0
+            }
+          }
+        }
+      ]
+    },
+    "fixtureMaterialization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_id",
+        "schema_version",
+        "case_id",
+        "attempt_ordinal",
+        "fixture_kind",
+        "fixture_ref",
+        "input_ref",
+        "active_binding",
+        "identity",
+        "storage",
+        "materializer_identity",
+        "state_digests",
+        "materialization_payload_sha256",
+        "artifact_payload_sha256",
+        "profile_asset_tree_ref",
+        "profile_asset_refs",
+        "profile_package_digest"
+      ],
+      "properties": {
+        "schema_id": {
+          "const": "OPM-DEV-CANVAS-06-E2E-FIXTURE-MATERIALIZATION-001"
+        },
+        "schema_version": {
+          "const": "0.2"
+        },
+        "case_id": {
+          "$ref": "#/$defs/caseId"
+        },
+        "attempt_ordinal": {
+          "enum": [
+            1,
+            2
+          ]
+        },
+        "fixture_kind": {
+          "enum": [
+            "FAMILY",
+            "COMMON"
+          ]
+        },
+        "fixture_ref": {
+          "$ref": "#/$defs/fileRef"
+        },
+        "input_ref": {
+          "$ref": "#/$defs/fileRef"
+        },
+        "active_binding": {
+          "$ref": "#/$defs/binding"
+        },
+        "identity": {
+          "$ref": "#/$defs/materializedIdentity"
+        },
+        "storage": {
+          "$ref": "#/$defs/materializedStorage"
+        },
+        "materializer_identity": {
+          "$ref": "#/$defs/materializerIdentity"
+        },
+        "state_digests": {
+          "$ref": "#/$defs/stateDigests"
+        },
+        "materialization_payload_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "artifact_payload_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "profile_asset_tree_ref": {
+          "$ref": "#/$defs/profileAssetTreeRef"
+        },
+        "profile_asset_refs": {
+          "type": "array",
+          "minItems": 5,
+          "maxItems": 5,
+          "prefixItems": [
+            {
+              "$ref": "#/$defs/grammarAssetRef"
+            },
+            {
+              "$ref": "#/$defs/normalizationDataRef"
+            },
+            {
+              "$ref": "#/$defs/profilePackageRef"
+            },
+            {
+              "$ref": "#/$defs/ruleSetRef"
+            },
+            {
+              "$ref": "#/$defs/symbolAssetRef"
+            }
+          ],
+          "items": false
+        },
+        "profile_package_digest": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "attemptObservation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_id",
+        "schema_version",
+        "case_id",
+        "suite_id",
+        "expectation",
+        "attempt_ordinal",
+        "fixture_sha256",
+        "input_sha256",
+        "project_id",
+        "model_id",
+        "context_id",
+        "base_revision",
+        "head_revision",
+        "committed_revision",
+        "command_id",
+        "option_id",
+        "impact_token_id",
+        "expected_status",
+        "observed_status",
+        "status",
+        "top_error_code",
+        "detail_error_code",
+        "projection_before_sha256",
+        "projection_after_sha256",
+        "projection_reopen_sha256",
+        "opl_before_sha256",
+        "opl_after_sha256",
+        "opl_reopen_sha256",
+        "token_before_sha256",
+        "token_after_sha256",
+        "token_reopen_sha256",
+        "trace_before_sha256",
+        "trace_after_sha256",
+        "trace_reopen_sha256",
+        "transaction",
+        "assertion_results",
+        "semantic_comparison_digest",
+        "artifact_payload_sha256"
+      ],
+      "properties": {
+        "schema_id": {
+          "const": "OPM-DEV-CANVAS-06-E2E-ATTEMPT-OBSERVATION-001"
+        },
+        "schema_version": {
+          "const": "0.2"
+        },
+        "case_id": {
+          "$ref": "#/$defs/caseId"
+        },
+        "suite_id": {
+          "enum": [
+            "E2E-CANVAS-001",
+            "E2E-CANVAS-002",
+            "E2E-CANVAS-003",
+            "E2E-CANVAS-004",
+            "E2E-CANVAS-005",
+            "E2E-CANVAS-006",
+            "E2E-CANVAS-007"
+          ]
+        },
+        "capability_id": {
+          "type": "string",
+          "pattern": "^CAP-ISO-(PROC|CTRL|STRUCT)-\\d{3}$"
+        },
+        "coverage_key": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expectation": {
+          "enum": [
+            "PASS",
+            "BLOCKED"
+          ]
+        },
+        "attempt_ordinal": {
+          "enum": [
+            1,
+            2
+          ]
+        },
+        "fixture_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "input_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "project_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "context_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "base_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "head_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "committed_revision": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "command_id": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "option_id": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "impact_token_id": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "expected_status": {
+          "enum": [
+            "PASS",
+            "BLOCKED"
+          ]
+        },
+        "observed_status": {
+          "enum": [
+            "PASS_MATCHED",
+            "BLOCKED_MATCHED",
+            "FAILED"
+          ]
+        },
+        "status": {
+          "enum": [
+            "PASS_MATCHED",
+            "BLOCKED_MATCHED",
+            "FAILED"
+          ]
+        },
+        "top_error_code": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "detail_error_code": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "projection_before_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "projection_after_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "projection_reopen_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "opl_before_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "opl_after_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "opl_reopen_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "token_before_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "token_after_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "token_reopen_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "trace_before_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "trace_after_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "trace_reopen_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "transaction": {
+          "$ref": "#/$defs/transaction"
+        },
+        "assertion_results": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/assertionResult"
+          }
+        },
+        "semantic_comparison_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "artifact_payload_sha256": {
+          "$ref": "#/$defs/digest"
+        }
+      },
+      "dependentRequired": {
+        "capability_id": [
+          "coverage_key"
+        ],
+        "coverage_key": [
+          "capability_id"
+        ]
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "expectation": {
+                "const": "PASS"
+              }
+            },
+            "required": [
+              "expectation"
+            ]
+          },
+          "then": {
+            "properties": {
+              "expected_status": {
+                "const": "PASS"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "expected_status": {
+                "const": "BLOCKED"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "healthSample": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ordinal",
+        "status",
+        "observed_at"
+      ],
+      "properties": {
+        "ordinal": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "status": {
+          "enum": [
+            "UP",
+            "DOWN",
+            "UNREACHABLE"
+          ]
+        },
+        "observed_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "termination": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "exit_code",
+        "signal",
+        "owned_process_terminated"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "NORMAL",
+            "SIGNAL",
+            "EXIT_CODE"
+          ]
+        },
+        "exit_code": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "signal": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "owned_process_terminated": {
+          "const": true
+        }
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "kind": {
+              "const": "NORMAL"
+            },
+            "exit_code": {
+              "const": 0
+            },
+            "signal": {
+              "type": "null"
+            }
+          }
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "SIGNAL"
+            },
+            "exit_code": {
+              "type": "null"
+            },
+            "signal": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "EXIT_CODE"
+            },
+            "exit_code": {
+              "type": "integer",
+              "not": {
+                "const": 0
+              }
+            },
+            "signal": {
+              "type": "null"
+            }
+          }
+        }
+      ]
+    },
+    "processCycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cycle",
+        "normalized_command",
+        "java_ref",
+        "runtime_jar_ref",
+        "pid",
+        "parent_nonce",
+        "host",
+        "port",
+        "health_samples",
+        "started_at",
+        "stopped_at",
+        "termination",
+        "stdout_ref",
+        "stderr_ref",
+        "owned_child_count_after_stop"
+      ],
+      "properties": {
+        "cycle": {
+          "enum": [
+            "INITIAL",
+            "REOPEN"
+          ]
+        },
+        "normalized_command": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "java_ref": {
+          "$ref": "#/$defs/fileRef"
+        },
+        "runtime_jar_ref": {
+          "$ref": "#/$defs/fileRef"
+        },
+        "pid": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "parent_nonce": {
+          "$ref": "#/$defs/digest"
+        },
+        "host": {
+          "const": "127.0.0.1"
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1024,
+          "maximum": 65535
+        },
+        "health_samples": {
+          "type": "array",
+          "minItems": 3,
+          "items": {
+            "$ref": "#/$defs/healthSample"
+          }
+        },
+        "started_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "stopped_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "termination": {
+          "$ref": "#/$defs/termination"
+        },
+        "stdout_ref": {
+          "$ref": "#/$defs/fileRef"
+        },
+        "stderr_ref": {
+          "$ref": "#/$defs/fileRef"
+        },
+        "owned_child_count_after_stop": {
+          "const": 0
+        }
+      }
+    },
+    "runtimeProcess": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_id",
+        "schema_version",
+        "case_id",
+        "attempt_ordinal",
+        "cycles",
+        "artifact_payload_sha256"
+      ],
+      "properties": {
+        "schema_id": {
+          "const": "OPM-DEV-CANVAS-06-E2E-RUNTIME-PROCESS-001"
+        },
+        "schema_version": {
+          "const": "0.2"
+        },
+        "case_id": {
+          "$ref": "#/$defs/caseId"
+        },
+        "attempt_ordinal": {
+          "enum": [
+            1,
+            2
+          ]
+        },
+        "cycles": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "prefixItems": [
+            {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/processCycle"
+                },
+                {
+                  "properties": {
+                    "cycle": {
+                      "const": "INITIAL"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/processCycle"
+                },
+                {
+                  "properties": {
+                    "cycle": {
+                      "const": "REOPEN"
+                    }
+                  }
+                }
+              ]
+            }
+          ],
+          "items": false
+        },
+        "artifact_payload_sha256": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "viewport": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "viewport_id",
+        "width",
+        "height",
+        "device_scale_factor"
+      ],
+      "properties": {
+        "viewport_id": {
+          "enum": [
+            "VP-1440X900",
+            "VP-1280X800",
+            "VP-390X844"
+          ]
+        },
+        "width": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "device_scale_factor": {
+          "const": 1
+        }
+      }
+    },
+    "browserEnvironment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_id",
+        "schema_version",
+        "case_id",
+        "attempt_ordinal",
+        "node_version",
+        "playwright_version",
+        "chromium_version",
+        "browser_executable_ref",
+        "launch_args",
+        "viewport",
+        "zoom_id",
+        "locale",
+        "timezone",
+        "color_scheme",
+        "reduced_motion",
+        "web_server_source_ref",
+        "web_dist_ref",
+        "web_origin",
+        "runtime_origin",
+        "environment_fingerprint",
+        "artifact_payload_sha256"
+      ],
+      "properties": {
+        "schema_id": {
+          "const": "OPM-DEV-CANVAS-06-E2E-BROWSER-ENVIRONMENT-001"
+        },
+        "schema_version": {
+          "const": "0.2"
+        },
+        "case_id": {
+          "$ref": "#/$defs/caseId"
+        },
+        "attempt_ordinal": {
+          "enum": [
+            1,
+            2
+          ]
+        },
+        "node_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "playwright_version": {
+          "const": "1.57.0"
+        },
+        "chromium_version": {
+          "const": "143.0.7499.4"
+        },
+        "browser_executable_ref": {
+          "$ref": "#/$defs/fileRef"
+        },
+        "launch_args": {
+          "type": "array",
+          "minItems": 7,
+          "maxItems": 7,
+          "prefixItems": [
+            {
+              "const": "--disable-background-networking"
+            },
+            {
+              "const": "--disable-component-update"
+            },
+            {
+              "const": "--disable-default-apps"
+            },
+            {
+              "const": "--disable-extensions"
+            },
+            {
+              "const": "--disable-sync"
+            },
+            {
+              "const": "--no-first-run"
+            },
+            {
+              "const": "--no-default-browser-check"
+            }
+          ],
+          "items": false
+        },
+        "viewport": {
+          "$ref": "#/$defs/viewport"
+        },
+        "zoom_id": {
+          "const": "Z-100"
+        },
+        "locale": {
+          "const": "zh-CN"
+        },
+        "timezone": {
+          "const": "Asia/Shanghai"
+        },
+        "color_scheme": {
+          "const": "light"
+        },
+        "reduced_motion": {
+          "const": "reduce"
+        },
+        "web_server_source_ref": {
+          "$ref": "#/$defs/fileRef"
+        },
+        "web_dist_ref": {
+          "$ref": "#/$defs/fileRef"
+        },
+        "web_origin": {
+          "type": "string",
+          "pattern": "^http://127\\.0\\.0\\.1:(?:[1-9][0-9]{3,4})$"
+        },
+        "runtime_origin": {
+          "type": "string",
+          "pattern": "^http://127\\.0\\.0\\.1:(?:[1-9][0-9]{3,4})$"
+        },
+        "environment_fingerprint": {
+          "$ref": "#/$defs/digest"
+        },
+        "artifact_payload_sha256": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "networkRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sequence",
+        "method",
+        "normalized_url",
+        "resource_type",
+        "status",
+        "failure_code",
+        "request_body_ref",
+        "response_body_ref",
+        "operation_id",
+        "revision",
+        "allow_decision"
+      ],
+      "properties": {
+        "sequence": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "method": {
+          "enum": [
+            "GET",
+            "POST",
+            "PUT",
+            "PATCH",
+            "DELETE",
+            "HEAD",
+            "OPTIONS"
+          ]
+        },
+        "normalized_url": {
+          "type": "string",
+          "minLength": 1
+        },
+        "resource_type": {
+          "enum": [
+            "DOCUMENT",
+            "STYLESHEET",
+            "IMAGE",
+            "MEDIA",
+            "FONT",
+            "SCRIPT",
+            "XHR",
+            "FETCH",
+            "EVENTSOURCE",
+            "WEBSOCKET",
+            "MANIFEST",
+            "OTHER"
+          ]
+        },
+        "status": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 100,
+              "maximum": 599
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "failure_code": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "request_body_ref": {
+          "$ref": "#/$defs/nullableFileRef"
+        },
+        "response_body_ref": {
+          "$ref": "#/$defs/nullableFileRef"
+        },
+        "operation_id": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "revision": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "allow_decision": {
+          "enum": [
+            "ALLOWED",
+            "REJECTED"
+          ]
+        }
+      }
+    },
+    "networkObservation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_id",
+        "schema_version",
+        "case_id",
+        "attempt_ordinal",
+        "requests",
+        "external_request_count",
+        "websocket_count",
+        "service_worker_count",
+        "download_count",
+        "popup_count",
+        "artifact_payload_sha256"
+      ],
+      "properties": {
+        "schema_id": {
+          "const": "OPM-DEV-CANVAS-06-E2E-NETWORK-OBSERVATION-001"
+        },
+        "schema_version": {
+          "const": "0.2"
+        },
+        "case_id": {
+          "$ref": "#/$defs/caseId"
+        },
+        "attempt_ordinal": {
+          "enum": [
+            1,
+            2
+          ]
+        },
+        "requests": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/networkRequest"
+          }
+        },
+        "external_request_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "websocket_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "service_worker_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "download_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "popup_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "artifact_payload_sha256": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "consoleEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sequence",
+        "event_kind",
+        "message_sha256",
+        "source_ref",
+        "allow_decision"
+      ],
+      "properties": {
+        "sequence": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "event_kind": {
+          "enum": [
+            "CONSOLE_ERROR",
+            "CONSOLE_WARNING",
+            "PAGE_ERROR",
+            "UNHANDLED_REJECTION",
+            "DIALOG",
+            "DOWNLOAD",
+            "POPUP"
+          ]
+        },
+        "message_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "source_ref": {
+          "$ref": "#/$defs/nullableFileRef"
+        },
+        "allow_decision": {
+          "enum": [
+            "ALLOWED",
+            "REJECTED"
+          ]
+        }
+      }
+    },
+    "consoleErrors": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_id",
+        "schema_version",
+        "case_id",
+        "attempt_ordinal",
+        "events",
+        "artifact_payload_sha256"
+      ],
+      "properties": {
+        "schema_id": {
+          "const": "OPM-DEV-CANVAS-06-E2E-CONSOLE-ERRORS-001"
+        },
+        "schema_version": {
+          "const": "0.2"
+        },
+        "case_id": {
+          "$ref": "#/$defs/caseId"
+        },
+        "attempt_ordinal": {
+          "enum": [
+            1,
+            2
+          ]
+        },
+        "events": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/consoleEvent"
+          }
+        },
+        "artifact_payload_sha256": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "countSnapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "revision_document_count",
+        "revision_parent_count",
+        "text_artifact_count",
+        "text_trace_count",
+        "finding_count",
+        "operation_count",
+        "receipt_count",
+        "draft_head_revision_id",
+        "head_sequence"
+      ],
+      "properties": {
+        "revision_document_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "revision_parent_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "text_artifact_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "text_trace_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "finding_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "operation_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "receipt_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "draft_head_revision_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "head_sequence": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "transactionObservation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_id",
+        "schema_version",
+        "case_id",
+        "attempt_ordinal",
+        "before",
+        "after",
+        "expected_transaction",
+        "observed_transaction",
+        "matches",
+        "transaction_payload_sha256",
+        "artifact_payload_sha256"
+      ],
+      "properties": {
+        "schema_id": {
+          "const": "OPM-DEV-CANVAS-06-E2E-TRANSACTION-OBSERVATION-001"
+        },
+        "schema_version": {
+          "const": "0.2"
+        },
+        "case_id": {
+          "$ref": "#/$defs/caseId"
+        },
+        "attempt_ordinal": {
+          "enum": [
+            1,
+            2
+          ]
+        },
+        "before": {
+          "$ref": "#/$defs/countSnapshot"
+        },
+        "after": {
+          "$ref": "#/$defs/countSnapshot"
+        },
+        "expected_transaction": {
+          "$ref": "#/$defs/transaction"
+        },
+        "observed_transaction": {
+          "$ref": "#/$defs/transaction"
+        },
+        "matches": {
+          "type": "boolean"
+        },
+        "transaction_payload_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "artifact_payload_sha256": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "reopenObservation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_id",
+        "schema_version",
+        "case_id",
+        "attempt_ordinal",
+        "runtime_process_ref",
+        "initial_process_nonce",
+        "reopen_process_nonce",
+        "initial_browser_context_id",
+        "reopen_browser_context_id",
+        "new_process",
+        "new_context",
+        "project_id",
+        "model_id",
+        "context_id",
+        "head_revision",
+        "projection_before_sha256",
+        "projection_reopen_sha256",
+        "opl_before_sha256",
+        "opl_reopen_sha256",
+        "token_before_sha256",
+        "token_reopen_sha256",
+        "trace_before_sha256",
+        "trace_reopen_sha256",
+        "projection_matches",
+        "opl_matches",
+        "token_matches",
+        "trace_matches",
+        "reopen_matches",
+        "reopen_payload_sha256",
+        "artifact_payload_sha256"
+      ],
+      "properties": {
+        "schema_id": {
+          "const": "OPM-DEV-CANVAS-06-E2E-REOPEN-OBSERVATION-001"
+        },
+        "schema_version": {
+          "const": "0.2"
+        },
+        "case_id": {
+          "$ref": "#/$defs/caseId"
+        },
+        "attempt_ordinal": {
+          "enum": [
+            1,
+            2
+          ]
+        },
+        "runtime_process_ref": {
+          "$ref": "#/$defs/fileRef"
+        },
+        "initial_process_nonce": {
+          "$ref": "#/$defs/digest"
+        },
+        "reopen_process_nonce": {
+          "$ref": "#/$defs/digest"
+        },
+        "initial_browser_context_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reopen_browser_context_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "new_process": {
+          "const": true
+        },
+        "new_context": {
+          "const": true
+        },
+        "project_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "context_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "head_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "projection_before_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "projection_reopen_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "opl_before_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "opl_reopen_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "token_before_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "token_reopen_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "trace_before_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "trace_reopen_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "projection_matches": {
+          "type": "boolean"
+        },
+        "opl_matches": {
+          "type": "boolean"
+        },
+        "token_matches": {
+          "type": "boolean"
+        },
+        "trace_matches": {
+          "type": "boolean"
+        },
+        "reopen_matches": {
+          "type": "boolean"
+        },
+        "reopen_payload_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "artifact_payload_sha256": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "apiExchange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sequence",
+        "operation_id",
+        "method",
+        "normalized_url",
+        "request_ref",
+        "response_ref",
+        "status",
+        "revision"
+      ],
+      "properties": {
+        "sequence": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "operation_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "method": {
+          "enum": [
+            "GET",
+            "POST",
+            "PUT",
+            "PATCH",
+            "DELETE",
+            "HEAD",
+            "OPTIONS"
+          ]
+        },
+        "normalized_url": {
+          "type": "string",
+          "minLength": 1
+        },
+        "request_ref": {
+          "$ref": "#/$defs/nullableFileRef"
+        },
+        "response_ref": {
+          "$ref": "#/$defs/nullableFileRef"
+        },
+        "status": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 599
+        },
+        "revision": {
+          "$ref": "#/$defs/nullableString"
+        }
+      }
+    },
+    "apiExchangeIndex": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_id",
+        "schema_version",
+        "case_id",
+        "attempt_ordinal",
+        "exchanges",
+        "exchange_set_sha256",
+        "artifact_payload_sha256"
+      ],
+      "properties": {
+        "schema_id": {
+          "const": "OPM-DEV-CANVAS-06-E2E-API-EXCHANGE-INDEX-001"
+        },
+        "schema_version": {
+          "const": "0.2"
+        },
+        "case_id": {
+          "$ref": "#/$defs/caseId"
+        },
+        "attempt_ordinal": {
+          "enum": [
+            1,
+            2
+          ]
+        },
+        "exchanges": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/apiExchange"
+          }
+        },
+        "exchange_set_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "artifact_payload_sha256": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "artifactEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "path",
+        "media_type",
+        "byte_length",
+        "sha256",
+        "capture_phase",
+        "required"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "FAULT_PLAN",
+            "FIXTURE_MATERIALIZATION",
+            "ATTEMPT_OBSERVATION",
+            "RUNTIME_PROCESS",
+            "BROWSER_ENVIRONMENT",
+            "NETWORK_OBSERVATION",
+            "CONSOLE_ERRORS",
+            "TRANSACTION_OBSERVATION",
+            "REOPEN_OBSERVATION",
+            "API_EXCHANGE_INDEX",
+            "API_REQUEST_BODY",
+            "API_RESPONSE_BODY",
+            "STDOUT_LOG",
+            "STDERR_LOG",
+            "FAILURE_ARTIFACT",
+            "PROFILE_ASSET_TREE",
+            "PROFILE_ASSET"
+          ]
+        },
+        "path": {
+          "$ref": "#/$defs/path"
+        },
+        "media_type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "byte_length": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "capture_phase": {
+          "enum": [
+            "MATERIALIZE",
+            "RUNTIME",
+            "ACTION",
+            "REOPEN",
+            "FINALIZE"
+          ]
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "asset_kind": {
+          "enum": [
+            "PROFILE_PACKAGE",
+            "RULE_SET",
+            "SYMBOL_ASSET",
+            "GRAMMAR_ASSET",
+            "NORMALIZATION_DATA"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "enum": [
+                  "FAULT_PLAN",
+                  "FIXTURE_MATERIALIZATION",
+                  "ATTEMPT_OBSERVATION",
+                  "RUNTIME_PROCESS",
+                  "BROWSER_ENVIRONMENT",
+                  "NETWORK_OBSERVATION",
+                  "CONSOLE_ERRORS",
+                  "TRANSACTION_OBSERVATION",
+                  "REOPEN_OBSERVATION",
+                  "API_EXCHANGE_INDEX"
+                ]
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "media_type": {
+                "const": "application/json"
+              },
+              "required": {
+                "const": true
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "PROFILE_ASSET"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "required": [
+              "asset_kind"
+            ]
+          },
+          "else": {
+            "not": {
+              "required": [
+                "asset_kind"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "artifactIndex": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_id",
+        "schema_version",
+        "case_id",
+        "attempt_ordinal",
+        "refs",
+        "tree_sha256",
+        "artifact_payload_sha256"
+      ],
+      "properties": {
+        "schema_id": {
+          "const": "OPM-DEV-CANVAS-06-E2E-ARTIFACT-INDEX-001"
+        },
+        "schema_version": {
+          "const": "0.2"
+        },
+        "case_id": {
+          "$ref": "#/$defs/caseId"
+        },
+        "attempt_ordinal": {
+          "enum": [
+            1,
+            2
+          ]
+        },
+        "refs": {
+          "type": "array",
+          "minItems": 16,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/artifactEntry"
+          }
+        },
+        "tree_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "artifact_payload_sha256": {
+          "$ref": "#/$defs/digest"
+        }
+      },
+      "allOf": [
+        {
+          "properties": {
+            "refs": {
+              "contains": {
+                "properties": {
+                  "kind": {
+                    "const": "FAULT_PLAN"
+                  }
+                },
+                "required": [
+                  "kind"
+                ]
+              },
+              "minContains": 1,
+              "maxContains": 1
+            }
+          }
+        },
+        {
+          "properties": {
+            "refs": {
+              "contains": {
+                "properties": {
+                  "kind": {
+                    "const": "FIXTURE_MATERIALIZATION"
+                  }
+                },
+                "required": [
+                  "kind"
+                ]
+              },
+              "minContains": 1,
+              "maxContains": 1
+            }
+          }
+        },
+        {
+          "properties": {
+            "refs": {
+              "contains": {
+                "properties": {
+                  "kind": {
+                    "const": "ATTEMPT_OBSERVATION"
+                  }
+                },
+                "required": [
+                  "kind"
+                ]
+              },
+              "minContains": 1,
+              "maxContains": 1
+            }
+          }
+        },
+        {
+          "properties": {
+            "refs": {
+              "contains": {
+                "properties": {
+                  "kind": {
+                    "const": "RUNTIME_PROCESS"
+                  }
+                },
+                "required": [
+                  "kind"
+                ]
+              },
+              "minContains": 1,
+              "maxContains": 1
+            }
+          }
+        },
+        {
+          "properties": {
+            "refs": {
+              "contains": {
+                "properties": {
+                  "kind": {
+                    "const": "BROWSER_ENVIRONMENT"
+                  }
+                },
+                "required": [
+                  "kind"
+                ]
+              },
+              "minContains": 1,
+              "maxContains": 1
+            }
+          }
+        },
+        {
+          "properties": {
+            "refs": {
+              "contains": {
+                "properties": {
+                  "kind": {
+                    "const": "NETWORK_OBSERVATION"
+                  }
+                },
+                "required": [
+                  "kind"
+                ]
+              },
+              "minContains": 1,
+              "maxContains": 1
+            }
+          }
+        },
+        {
+          "properties": {
+            "refs": {
+              "contains": {
+                "properties": {
+                  "kind": {
+                    "const": "CONSOLE_ERRORS"
+                  }
+                },
+                "required": [
+                  "kind"
+                ]
+              },
+              "minContains": 1,
+              "maxContains": 1
+            }
+          }
+        },
+        {
+          "properties": {
+            "refs": {
+              "contains": {
+                "properties": {
+                  "kind": {
+                    "const": "TRANSACTION_OBSERVATION"
+                  }
+                },
+                "required": [
+                  "kind"
+                ]
+              },
+              "minContains": 1,
+              "maxContains": 1
+            }
+          }
+        },
+        {
+          "properties": {
+            "refs": {
+              "contains": {
+                "properties": {
+                  "kind": {
+                    "const": "REOPEN_OBSERVATION"
+                  }
+                },
+                "required": [
+                  "kind"
+                ]
+              },
+              "minContains": 1,
+              "maxContains": 1
+            }
+          }
+        },
+        {
+          "properties": {
+            "refs": {
+              "contains": {
+                "properties": {
+                  "kind": {
+                    "const": "API_EXCHANGE_INDEX"
+                  }
+                },
+                "required": [
+                  "kind"
+                ]
+              },
+              "minContains": 1,
+              "maxContains": 1
+            }
+          }
+        },
+        {
+          "properties": {
+            "refs": {
+              "contains": {
+                "properties": {
+                  "kind": {
+                    "const": "PROFILE_ASSET_TREE"
+                  }
+                },
+                "required": [
+                  "kind"
+                ]
+              },
+              "minContains": 1,
+              "maxContains": 1
+            }
+          }
+        },
+        {
+          "properties": {
+            "refs": {
+              "contains": {
+                "properties": {
+                  "kind": {
+                    "const": "PROFILE_ASSET"
+                  }
+                },
+                "required": [
+                  "kind"
+                ]
+              },
+              "minContains": 5,
+              "maxContains": 5
+            }
+          }
+        },
+        {
+          "properties": {
+            "refs": {
+              "contains": {
+                "properties": {
+                  "kind": {
+                    "const": "PROFILE_ASSET"
+                  },
+                  "asset_kind": {
+                    "const": "PROFILE_PACKAGE"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "asset_kind"
+                ]
+              },
+              "minContains": 1,
+              "maxContains": 1
+            }
+          }
+        },
+        {
+          "properties": {
+            "refs": {
+              "contains": {
+                "properties": {
+                  "kind": {
+                    "const": "PROFILE_ASSET"
+                  },
+                  "asset_kind": {
+                    "const": "RULE_SET"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "asset_kind"
+                ]
+              },
+              "minContains": 1,
+              "maxContains": 1
+            }
+          }
+        },
+        {
+          "properties": {
+            "refs": {
+              "contains": {
+                "properties": {
+                  "kind": {
+                    "const": "PROFILE_ASSET"
+                  },
+                  "asset_kind": {
+                    "const": "SYMBOL_ASSET"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "asset_kind"
+                ]
+              },
+              "minContains": 1,
+              "maxContains": 1
+            }
+          }
+        },
+        {
+          "properties": {
+            "refs": {
+              "contains": {
+                "properties": {
+                  "kind": {
+                    "const": "PROFILE_ASSET"
+                  },
+                  "asset_kind": {
+                    "const": "GRAMMAR_ASSET"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "asset_kind"
+                ]
+              },
+              "minContains": 1,
+              "maxContains": 1
+            }
+          }
+        },
+        {
+          "properties": {
+            "refs": {
+              "contains": {
+                "properties": {
+                  "kind": {
+                    "const": "PROFILE_ASSET"
+                  },
+                  "asset_kind": {
+                    "const": "NORMALIZATION_DATA"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "asset_kind"
+                ]
+              },
+              "minContains": 1,
+              "maxContains": 1
+            }
+          }
+        }
+      ]
+    },
+    "profileAssetTreeRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "path",
+        "byte_length",
+        "sha256"
+      ],
+      "properties": {
+        "kind": {
+          "const": "PROFILE_ASSET_TREE"
+        },
+        "path": {
+          "$ref": "#/$defs/path"
+        },
+        "byte_length": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sha256": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "profileAssetRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "path",
+        "byte_length",
+        "sha256"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "PROFILE_PACKAGE",
+            "RULE_SET",
+            "SYMBOL_ASSET",
+            "GRAMMAR_ASSET",
+            "NORMALIZATION_DATA"
+          ]
+        },
+        "path": {
+          "$ref": "#/$defs/path"
+        },
+        "byte_length": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sha256": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "profilePackageRef": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/profileAssetRef"
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "PROFILE_PACKAGE"
+            },
+            "path": {
+              "pattern": "(?:^|/)profile.json$"
+            }
+          }
+        }
+      ]
+    },
+    "ruleSetRef": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/profileAssetRef"
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "RULE_SET"
+            }
+          }
+        }
+      ]
+    },
+    "symbolAssetRef": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/profileAssetRef"
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "SYMBOL_ASSET"
+            }
+          }
+        }
+      ]
+    },
+    "grammarAssetRef": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/profileAssetRef"
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "GRAMMAR_ASSET"
+            }
+          }
+        }
+      ]
+    },
+    "normalizationDataRef": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/profileAssetRef"
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "NORMALIZATION_DATA"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

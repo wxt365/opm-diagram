@@ -1,6 +1,8 @@
 package org.opm.localruntime.assets;
 
 import org.opm.localruntime.semantic.SemanticRevision;
+import org.opm.localruntime.releaseevidence.fault.E2EFaultContext;
+import org.opm.localruntime.releaseevidence.fault.E2EFaultPort;
 import org.opm.localruntime.text.OplGrammar;
 import org.opm.localruntime.text.OplGrammarAssetLoader;
 import org.opm.localruntime.text.TextGenerationAssets;
@@ -20,9 +22,14 @@ public final class ProfilePackageAssembler {
     private final OplSymbolCatalogAssetLoader symbolCatalogLoader;
     private final OplGrammarAssetLoader grammarLoader;
     private final NormalizationAssetLoader normalizationLoader;
+    private final E2EFaultPort e2eFaultPort;
 
     public ProfilePackageAssembler(FileProfilePackageLoader packageLoader) {
-        this(packageLoader, new RuleSetAssetLoader(), new OplSymbolCatalogAssetLoader(), new OplGrammarAssetLoader(), new NormalizationAssetLoader());
+        this(packageLoader, E2EFaultPort.NOOP);
+    }
+
+    public ProfilePackageAssembler(FileProfilePackageLoader packageLoader, E2EFaultPort e2eFaultPort) {
+        this(packageLoader, new RuleSetAssetLoader(), new OplSymbolCatalogAssetLoader(), new OplGrammarAssetLoader(), new NormalizationAssetLoader(), e2eFaultPort);
     }
 
     ProfilePackageAssembler(
@@ -31,15 +38,31 @@ public final class ProfilePackageAssembler {
             OplSymbolCatalogAssetLoader symbolCatalogLoader,
             OplGrammarAssetLoader grammarLoader,
             NormalizationAssetLoader normalizationLoader) {
+        this(packageLoader, ruleSetLoader, symbolCatalogLoader, grammarLoader, normalizationLoader, E2EFaultPort.NOOP);
+    }
+
+    ProfilePackageAssembler(
+            FileProfilePackageLoader packageLoader,
+            RuleSetAssetLoader ruleSetLoader,
+            OplSymbolCatalogAssetLoader symbolCatalogLoader,
+            OplGrammarAssetLoader grammarLoader,
+            NormalizationAssetLoader normalizationLoader,
+            E2EFaultPort e2eFaultPort) {
         this.packageLoader = Objects.requireNonNull(packageLoader, "packageLoader must not be null");
         this.ruleSetLoader = Objects.requireNonNull(ruleSetLoader, "ruleSetLoader must not be null");
         this.symbolCatalogLoader = Objects.requireNonNull(symbolCatalogLoader, "symbolCatalogLoader must not be null");
         this.grammarLoader = Objects.requireNonNull(grammarLoader, "grammarLoader must not be null");
         this.normalizationLoader = Objects.requireNonNull(normalizationLoader, "normalizationLoader must not be null");
+        this.e2eFaultPort = Objects.requireNonNull(e2eFaultPort, "e2eFaultPort must not be null");
     }
 
     public TextGenerationAssets assemble(SemanticRevision.ProfileBinding binding) {
+        return assemble(binding, E2EFaultContext.Disabled.INSTANCE);
+    }
+
+    public TextGenerationAssets assemble(SemanticRevision.ProfileBinding binding, E2EFaultContext context) {
         Objects.requireNonNull(binding, "binding must not be null");
+        Objects.requireNonNull(context, "context must not be null");
         try {
             ProfilePackageDescriptor descriptor = packageLoader.loadPackage(
                     binding.profile().id(), binding.profile().version(), binding.profile().sha256());
@@ -51,8 +74,9 @@ public final class ProfilePackageAssembler {
             }
             OplGrammar grammar = grammarLoader.load(descriptor.requiredAsset("GRAMMAR_ASSET").path(), binding.textGrammar());
             RuleSetAssetLoader.RuleSet ruleSet = ruleSetLoader.load(descriptor.requiredAsset("RULE_SET").path(), binding.ruleSet());
-            OplSymbolCatalogAssetLoader.Catalog symbols = symbolCatalogLoader.load(
-                    descriptor.requiredAsset("SYMBOL_ASSET").path(), binding.symbolCatalog());
+            ProfilePackageDescriptor.RequiredAsset symbolAsset = descriptor.requiredAsset("SYMBOL_ASSET");
+            e2eFaultPort.beforeSymbolAssetLoad(context, symbolAsset);
+            OplSymbolCatalogAssetLoader.Catalog symbols = symbolCatalogLoader.load(symbolAsset.path(), binding.symbolCatalog());
             NormalizationAssetLoader.Policy normalization = normalizationLoader.load(
                     descriptor.requiredAsset("NORMALIZATION_DATA").path(), binding.normalizationAdapter());
             Map<String, ProfilePackageDescriptor.CapabilityBinding> capabilities = descriptor.capabilityIndex();

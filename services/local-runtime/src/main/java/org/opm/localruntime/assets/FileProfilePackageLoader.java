@@ -6,7 +6,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
@@ -15,6 +17,7 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -22,14 +25,33 @@ public final class FileProfilePackageLoader {
 
     private final Path assetRoot;
     private final ObjectMapper objectMapper;
+    private final LocationMode locationMode;
+    private final Set<DirectPackageFile> verifiedDirectFiles;
 
     public FileProfilePackageLoader(Path assetRoot) {
-        this(assetRoot, new ObjectMapper());
+        this(assetRoot, new ObjectMapper(), LocationMode.HIERARCHICAL_ASSET_ROOT, Set.of());
     }
 
     FileProfilePackageLoader(Path assetRoot, ObjectMapper objectMapper) {
-        this.assetRoot = resolveAssetRoot(Objects.requireNonNull(assetRoot, "assetRoot must not be null"));
+        this(assetRoot, objectMapper, LocationMode.HIERARCHICAL_ASSET_ROOT, Set.of());
+    }
+
+    private FileProfilePackageLoader(Path assetRoot, ObjectMapper objectMapper, LocationMode locationMode,
+                                     Set<DirectPackageFile> verifiedDirectFiles) {
+        this.locationMode = Objects.requireNonNull(locationMode, "locationMode must not be null");
+        this.assetRoot = locationMode == LocationMode.DIRECT_PACKAGE_ROOT
+                ? Objects.requireNonNull(assetRoot, "assetRoot must not be null").toAbsolutePath().normalize()
+                : resolveAssetRoot(Objects.requireNonNull(assetRoot, "assetRoot must not be null"));
         this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper must not be null");
+        this.verifiedDirectFiles = Set.copyOf(Objects.requireNonNull(verifiedDirectFiles, "verifiedDirectFiles must not be null"));
+    }
+
+    /**
+     * 仅供受控 E2E attempt 装配已逐 byte 校验的五项 Profile 文件。
+     * 此模式不搜索父目录，也不根据 Profile identity 拼接其他路径。
+     */
+    public static FileProfilePackageLoader forVerifiedDirectPackageRoot(Path packageRoot, Set<DirectPackageFile> verifiedFiles) {
+        return new FileProfilePackageLoader(packageRoot, new ObjectMapper(), LocationMode.DIRECT_PACKAGE_ROOT, verifiedFiles);
     }
 
     private Path resolveAssetRoot(Path configuredRoot) {
@@ -44,6 +66,40 @@ public final class FileProfilePackageLoader {
         return resolved;
     }
 
+    private void validateDirectPackageRoot(Path packageDirectory) {
+        Set<DirectPackageFile> actual = new java.util.HashSet<>();
+        try (var paths = Files.walk(packageDirectory)) {
+            for (Path candidate : paths.toList()) {
+                if (candidate.equals(packageDirectory)) continue;
+                BasicFileAttributes attributes = Files.readAttributes(candidate, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+                if (Files.isSymbolicLink(candidate) || !attributes.isDirectory() && (!attributes.isRegularFile() || !singleLink(candidate))) {
+                    throw new AssetLoadException("Verified direct Profile root contains an uncontrolled entry");
+                }
+                if (attributes.isDirectory()) continue;
+                String relative = packageDirectory.relativize(candidate).toString().replace(candidate.getFileSystem().getSeparator(), "/");
+                actual.add(new DirectPackageFile(kindFor(relative), relative, attributes.size(), sha256(Files.readAllBytes(candidate))));
+            }
+        } catch (IOException exception) {
+            throw new AssetLoadException("Verified direct Profile root cannot be read", exception);
+        }
+        if (!actual.equals(verifiedDirectFiles)) {
+            throw new AssetLoadException("Verified direct Profile root differs from the accepted raw file set");
+        }
+    }
+
+    private boolean singleLink(Path path) throws IOException {
+        try {
+            return ((Number) Files.getAttribute(path, "unix:nlink", LinkOption.NOFOLLOW_LINKS)).longValue() == 1;
+        } catch (UnsupportedOperationException exception) {
+            return true;
+        }
+    }
+
+    private String kindFor(String relativePath) {
+        return verifiedDirectFiles.stream().filter(item -> item.path().equals(relativePath)).map(DirectPackageFile::kind).findFirst()
+                .orElseThrow(() -> new AssetLoadException("Verified direct Profile root contains an unexpected file"));
+    }
+
     public ProfileBindingSummary load(String profileId, String packageVersion, String expectedPackageDigest) {
         return loadPackage(profileId, packageVersion, expectedPackageDigest).binding();
     }
@@ -56,10 +112,12 @@ public final class FileProfilePackageLoader {
         validatePathSegment(packageVersion, "package version");
         requireSha256(expectedPackageDigest, "expected package digest");
 
-        Path packageDirectory = assetRoot.resolve(profileId).resolve(packageVersion).normalize();
+        Path packageDirectory = locationMode == LocationMode.DIRECT_PACKAGE_ROOT
+                ? assetRoot : assetRoot.resolve(profileId).resolve(packageVersion).normalize();
         if (!packageDirectory.startsWith(assetRoot)) {
             throw new AssetLoadException("Profile package path escapes the configured asset root");
         }
+        if (locationMode == LocationMode.DIRECT_PACKAGE_ROOT) validateDirectPackageRoot(packageDirectory);
 
         JsonNode profile = readJson(packageDirectory.resolve("profile.json"));
         JsonNode identity = requiredObject(profile, "identity", "profile");
@@ -346,4 +404,18 @@ public final class FileProfilePackageLoader {
 
     private record Dependency(String role, AssetReference reference, boolean required, int loadOrder) {
     }
+
+    public record DirectPackageFile(String kind, String path, long byteLength, String sha256) {
+        private static final Set<String> REQUIRED_KINDS = Set.of(
+                "PROFILE_PACKAGE", "RULE_SET", "SYMBOL_ASSET", "GRAMMAR_ASSET", "NORMALIZATION_DATA");
+
+        public DirectPackageFile {
+            if (!REQUIRED_KINDS.contains(kind) || path == null || path.isBlank() || Path.of(path).isAbsolute()
+                    || path.contains("\\") || path.contains("..") || byteLength < 0 || sha256 == null || !sha256.matches("[a-f0-9]{64}")) {
+                throw new IllegalArgumentException("Verified direct Profile file is invalid");
+            }
+        }
+    }
+
+    private enum LocationMode { HIERARCHICAL_ASSET_ROOT, DIRECT_PACKAGE_ROOT }
 }

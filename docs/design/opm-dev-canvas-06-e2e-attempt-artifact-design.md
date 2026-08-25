@@ -8,9 +8,11 @@
 
 ## 1. 定位与边界
 
-本文是 `GATE-06-03` E2E Runner 每个 attempt 原始机器证据的唯一执行级设计。E2E Manifest `0.1`继续定义`194`个case；活动E2E Report `0.2`定义`388`个attempt的最终聚合，历史Report `0.1`只保留只读兼容；本文只封闭Report形成前的11类attempt JSON，不建立第二个Manifest或Report。
+本文是历史 `0.1` Attempt Artifact 的执行级设计。活动 E2E Runner 的机器契约已由 `docs/design/opm-dev-canvas-06-e2e-profile-assets-and-digest-closure-design.md` 和 `opm-dev-canvas-06-e2e-attempt-artifact-v02.schema.json/0.2` 后继；本文件的 `0.1` bytes、字段和反例只保留只读兼容，不得作为活动 producer/verifier 的第二套口径。活动 E2E Report `0.2`仍定义`388`个attempt的最终聚合。
 
-本设计冻结：文件名、Schema identity、producer/consumer、字段、可空性、枚举、排序、JCS/SHA、跨 artifact join、Report 投影和失败边界。它不实现 Runner、Materializer、driver、fault port、collector、Reporter 或 verifier，也不构成真实 `194/388`、Gate、发布或 ISO 证据。
+Fault Plan 的字段、Schema和摘要继续由本历史设计承接；Launcher配置、握手、Plan raw identity、Spring装配、注入层、一次性状态机和错误码已由 [E2E Fault Launcher设计](opm-dev-canvas-06-e2e-fault-launcher-design.md) `v1.1`后继。两者冲突时，Launcher执行语义以该后继设计为准，历史`0.1`机器bytes不得改写。
+
+本历史设计冻结：文件名、Schema identity、producer/consumer、字段、可空性、枚举、排序、JCS/SHA、跨 artifact join、Report 投影和失败边界。它不实现 Runner、Materializer、driver、fault port、collector、Reporter 或 verifier，也不构成真实 `194/388`、Gate、发布或 ISO 证据。
 
 ## 2. 版本与公共编码
 
@@ -99,7 +101,7 @@ plan_sha256 = sha256(UTF8(JCS({
 | `E2E-CANVAS-007.READONLY` | `READONLY` | `PROJECT_STORAGE_READ_ONLY` | 1 |
 | 其余 191 个 case | `NONE` | `NONE` | 0 |
 
-`REVISION_CONFLICT/STALE_OPTION/STALE_TOKEN/MISMATCHED_TOKEN` 必须由正式 UI/API 前序动作产生，不允许映射为 fault plan。`ASSET_MISSING` 只移除 attempt-local Symbol Catalog raw copy且不重算 ref；`PERSISTENCE_FAILED` 在 validation 通过、Revision insert 前触发一次；`READONLY` 在 Runtime 打开 storage 前设置受控只读状态。普通生产启动、case/nonce/target 不匹配或第二次触发必须拒绝。
+`REVISION_CONFLICT/STALE_OPTION/STALE_TOKEN/MISMATCHED_TOKEN` 必须由正式 UI/API 前序动作产生，不允许映射为 fault plan。三类fault的活动执行语义唯一采用Fault Launcher设计`v1.1`：`ASSET_MISSING`在`ProfilePackageAssembler`调用Symbol loader前注入且不修改资产，`PERSISTENCE_FAILED`在SQLite事务内第一条Revision INSERT前注入并回滚，`READONLY`只投影本次真实Head为`writable=false`且不修改SQLite。旧版“移除资产副本”“Runtime打开storage前设置只读”仅为已废止的设计草案，不得实现。普通生产启动、case/nonce/target不匹配或第二次触发必须按后继设计稳定拒绝。
 
 Fault Plan 必须在 Materializer、Runtime、Web 和 Browser 启动前以 single-link regular file 原子发布并完成固定文件名/Schema/payload验证。Materializer CLI只接受`--fault-plan <same-attempt-root/fault-plan.json>`，不接受`--attempt-ordinal`。Fault Plan缺失、partial、值与Manifest schedule/root不一致时固定为`E2E_INPUT_INVALID/2`，且不得产生SQLite或后续artifact。attempt root目录名只允许用于定位和containment，不是identity来源。
 
@@ -311,13 +313,13 @@ Schema/path/identity/index、Fault Plan缺失或ordinal/schedule/path不一致�
 
 设计验收必须证明：11个root Schema正例、缺字段/extra/identity/条件/枚举/计数反例、fault三项映射、Fault Plan ordinal唯一来源、Family Catalog与178 -> 2 fixture集合/deep join、Family/Common materialization、Projection Digest `0.1`的4正/9负向量与Node/Java parity、两个attempt nondeterminism边界、10个必需index kind、raw body边界和Report投影。
 
-当前事实：E2E Manifest Builder及Runner Node基础预检/事务/聚合切片已有局部实现；Family Catalog尚未进入Handoff/Evidence Bundle/Manifest，Builder/Runner/Java Materializer尚未适配；Java executable mirror/ref、完整source set、fault/driver/collector/verifier和真实`194/388`未闭合。本设计`v1.3`已关闭attempt artifact格式、Projection浮点摘要、Report工具链身份、Family Project来源及attempt ordinal来源歧义，不提升实现或发布状态。
+当前事实：E2E Manifest Builder及Runner Node基础预检/事务/聚合切片已有局部实现；Family Catalog已在`clean-37c5412a9c12`的exact Evidence Bundle、安装后的fixed Handoff和活动Manifest中闭合，Family Java Materializer可进入实现；Java executable mirror/ref、完整source set、fault/driver/collector/verifier和真实`194/388`仍未闭合。本设计`v1.3`已关闭attempt artifact格式、Projection浮点摘要、Report工具链身份、Family Project来源及attempt ordinal来源歧义，不提升实现或发布状态。
 
 ## 16. 事实与设计决定
 
 ### 16.1 事实
 
-1. E2E Manifest保持`0.1`；历史Report `0.1`保持只读，活动Report为`0.2`，Report attempt仍只保存聚合投影；
+1. 本历史设计绑定 E2E Manifest/Attempt Artifact `0.1`；活动 Manifest/Attempt Artifact 已由 Profile/Digest closure 后继为 `0.2`，历史 Report `0.1`保持只读，活动 Report 为`0.2`，Report attempt仍只保存聚合投影；
 2. 现有 Runner规格列出了11类JSON和`additionalProperties=false`要求，但仓库此前没有其机器Schema；
 3. 现有Node基础层不生成最终Report，Java Materializer、fault port、driver和collector尚未完成。
 

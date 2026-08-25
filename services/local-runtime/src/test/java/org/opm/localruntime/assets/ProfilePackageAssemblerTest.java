@@ -1,14 +1,23 @@
 package org.opm.localruntime.assets;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.opm.localruntime.semantic.SemanticRevision;
 import org.opm.localruntime.semantic.SemanticRevisionReader;
 import org.opm.localruntime.text.OplGenerationResult;
 import org.opm.localruntime.text.OplTextGenerationService;
 import org.opm.localruntime.text.OplToken;
 import org.opm.localruntime.text.TextGenerationAssets;
+import org.opm.localruntime.command.CandidateRevisionCommand;
+import org.opm.localruntime.command.RevisionCommitRepository;
+import org.opm.localruntime.releaseevidence.fault.E2EFaultContext;
+import org.opm.localruntime.releaseevidence.fault.E2EFaultPort;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.LinkedHashSet;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -20,6 +29,9 @@ class ProfilePackageAssemblerTest {
     private static final String PROFILE_VERSION = "0.2.0";
     private static final String PACKAGE_DIGEST = "5287d3ceb77c4c664b88c6e34a3a5d1c34f85c36037ab2f587705f9d607f899c";
     private static final String BINDING_DIGEST = "93805d6e2fdb3ea73c4ddfc0a995d662fbf13dee2d8a6f24fc20c79ecff65d1d";
+
+    @TempDir
+    Path temporaryDirectory;
 
     @Test
     void assemblesExactProfileAssetsAndCapabilityIndexes() {
@@ -47,6 +59,51 @@ class ProfilePackageAssemblerTest {
                 () -> new ProfilePackageAssembler(new FileProfilePackageLoader(profileRoot())).assemble(tampered));
 
         assertEquals(ProfilePackageAssemblyException.Code.PROFILE_BINDING_DIGEST_MISMATCH, exception.code());
+    }
+
+    @Test
+    void invokesE2eAssetHookBeforeTheSymbolCatalogIsLoaded() {
+        AtomicInteger calls = new AtomicInteger();
+        E2EFaultPort faultPort = new E2EFaultPort() {
+            @Override public E2EFaultContext contextFor(CandidateRevisionCommand command) { return E2EFaultContext.Disabled.INSTANCE; }
+            @Override public void beforeSymbolAssetLoad(E2EFaultContext context, ProfilePackageDescriptor.RequiredAsset asset) {
+                calls.incrementAndGet();
+                assertEquals("SYMBOL_ASSET", asset.role());
+                throw new ProfilePackageAssemblyException(ProfilePackageAssemblyException.Code.PROFILE_ASSET_MISSING, "E2E asset fault");
+            }
+            @Override public void beforeRevisionInsert(E2EFaultContext context) { }
+            @Override public RevisionCommitRepository.Head projectCurrentHead(E2EFaultContext context, RevisionCommitRepository.Head head) { return head; }
+        };
+
+        ProfilePackageAssemblyException exception = assertThrows(ProfilePackageAssemblyException.class,
+                () -> new ProfilePackageAssembler(new FileProfilePackageLoader(profileRoot()), faultPort)
+                        .assemble(binding(), new E2EFaultContext.Active("E2E-CANVAS-007.ASSET_MISSING", 1, "project.001", "model.001",
+                                "revision.001", "revision.002", "command.001", PROFILE_ID, PROFILE_VERSION, "a".repeat(64))));
+
+        assertEquals(ProfilePackageAssemblyException.Code.PROFILE_ASSET_MISSING, exception.code());
+        assertEquals(1, calls.get());
+    }
+
+    @Test
+    void assemblesOnlyVerifiedDirectProfileRootWithoutHierarchicalFallback() throws Exception {
+        Path source = profileRoot().resolve(PROFILE_ID).resolve(PROFILE_VERSION);
+        Path directRoot = temporaryDirectory.resolve("profile/assets");
+        Set<FileProfilePackageLoader.DirectPackageFile> verified = new LinkedHashSet<>();
+        for (String relative : Set.of("profile.json", "rules/representative-rule-set.json", "symbols/representative-symbol-catalog.json",
+                "grammar/representative-opl-grammar.json", "normalization/representative-normalization.json")) {
+            Path target = directRoot.resolve(relative);
+            Files.createDirectories(target.getParent());
+            Files.copy(source.resolve(relative), target);
+            verified.add(new FileProfilePackageLoader.DirectPackageFile(kind(relative), relative, Files.size(target), sha256(Files.readAllBytes(target))));
+        }
+
+        TextGenerationAssets assets = new ProfilePackageAssembler(
+                FileProfilePackageLoader.forVerifiedDirectPackageRoot(directRoot, verified)).assemble(binding());
+
+        assertEquals(BINDING_DIGEST, assets.bindingDigest());
+        Files.writeString(directRoot.resolve("unexpected.json"), "{};");
+        assertThrows(ProfilePackageAssemblyException.class,
+                () -> new ProfilePackageAssembler(FileProfilePackageLoader.forVerifiedDirectPackageRoot(directRoot, verified)).assemble(binding()));
     }
 
     @Test
@@ -119,5 +176,16 @@ class ProfilePackageAssemblerTest {
         } catch (java.security.NoSuchAlgorithmException exception) {
             throw new IllegalStateException(exception);
         }
+    }
+
+    private String kind(String relative) {
+        return switch (relative) {
+            case "profile.json" -> "PROFILE_PACKAGE";
+            case "rules/representative-rule-set.json" -> "RULE_SET";
+            case "symbols/representative-symbol-catalog.json" -> "SYMBOL_ASSET";
+            case "grammar/representative-opl-grammar.json" -> "GRAMMAR_ASSET";
+            case "normalization/representative-normalization.json" -> "NORMALIZATION_DATA";
+            default -> throw new IllegalArgumentException(relative);
+        };
     }
 }

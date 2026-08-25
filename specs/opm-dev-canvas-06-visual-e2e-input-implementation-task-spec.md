@@ -2,7 +2,7 @@
 
 > 文档状态：`HISTORICAL/SUPERSEDED`。
 >
-> 本规格只保留 Common Fixture 首轮实现快照。Visual/E2E 合并 builder 及 Visual Manifest `0.1` 输出目标已被 `specs/opm-dev-canvas-06-visual-e2e-input-correction-bugfix-task-spec.md` 取代，不得继续作为活动开发入口、完成未勾选 builder 项或生成 production Manifest。当前 Visual builder 只能输出 `0.2/0.2.0`；E2E 由独立入口保持 `0.1/0.1.0`。
+> 本规格只保留 Common Fixture 首轮实现快照。Visual/E2E 合并 builder 及 Visual Manifest `0.1` 输出目标已被 `specs/opm-dev-canvas-06-visual-e2e-input-correction-bugfix-task-spec.md` 取代，不得继续作为活动开发入口、完成未勾选 builder 项或生成 production Manifest。当前 Visual builder只能输出`0.2/0.2.0`；历史E2E v01由独立入口只读保留，活动E2E只允许按Manifest v02 producer/verifier规格输出`0.2/0.2.0`。
 
 ## Task Type
 

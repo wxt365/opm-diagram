@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:opm:contract:dev-canvas-06-token-digest-parity-vectors:0.1",
+  "title": "OPM DEV-CANVAS-06 Token Digest Parity Vectors 0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "catalog_id", "catalog_version", "preimage_schema_ref", "positive_vectors", "negative_vectors", "catalog_payload_sha256"],
+  "properties": {
+    "schema_id": {"const": "OPM-DEV-CANVAS-06-TOKEN-DIGEST-PARITY-VECTORS-001"},
+    "schema_version": {"const": "0.1"},
+    "catalog_id": {"const": "dev-canvas-06.token-digest-v01-parity"},
+    "catalog_version": {"const": "0.1.0"},
+    "preimage_schema_ref": {"const": "urn:opm:contract:dev-canvas-06-token-digest-preimage:0.1"},
+    "positive_vectors": {"type": "array", "minItems": 3, "maxItems": 3, "prefixItems": [{"$ref": "#/$defs/positive"}, {"$ref": "#/$defs/positive"}, {"$ref": "#/$defs/positive"}], "items": false},
+    "negative_vectors": {"type": "array", "minItems": 4, "maxItems": 4, "prefixItems": [{"$ref": "#/$defs/negative"}, {"$ref": "#/$defs/negative"}, {"$ref": "#/$defs/negative"}, {"$ref": "#/$defs/negative"}], "items": false},
+    "catalog_payload_sha256": {"$ref": "#/$defs/digest"}
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "sourceRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_kind", "stable_id"],
+      "properties": {
+        "source_kind": {"enum": ["FACT", "CAPABILITY", "ENDPOINT", "ELEMENT", "FEATURE", "STATE", "MODIFIER", "OCCURRENCE", "TEMPLATE", "GRAMMAR", "RULE", "LEGACY"]},
+        "stable_id": {"type": "string", "minLength": 1},
+        "field_path": {"type": "string", "minLength": 1},
+        "endpoint_ordinal": {"type": "integer", "minimum": 0},
+        "sentence_slot": {"type": "string", "minLength": 1}
+      }
+    },
+    "token": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["token_id", "sentence_id", "ordinal", "text", "kind", "start_utf8_byte", "end_utf8_byte", "source_refs"],
+      "properties": {
+        "token_id": {"type": "string", "minLength": 1},
+        "sentence_id": {"type": "string", "minLength": 1},
+        "ordinal": {"type": "integer", "minimum": 0, "maximum": 9007199254740991},
+        "text": {"type": "string", "minLength": 1},
+        "kind": {"enum": ["ENTITY", "STATE", "RELATION_VERB", "CONTROL_KEYWORD", "LIST_SEPARATOR", "PUNCTUATION", "WHITESPACE", "KEYWORD", "PROCESS", "OBJECT"]},
+        "start_utf8_byte": {"type": "integer", "minimum": 0, "maximum": 9007199254740991},
+        "end_utf8_byte": {"type": "integer", "minimum": 1, "maximum": 9007199254740991},
+        "source_refs": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/sourceRef"}}
+      }
+    },
+    "preimage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_id", "schema_version", "revision_id", "tokens"],
+      "properties": {
+        "schema_id": {"const": "OPM-DEV-CANVAS-06-TOKEN-DIGEST-PREIMAGE-001"},
+        "schema_version": {"const": "0.1"},
+        "revision_id": {"type": "string", "minLength": 1},
+        "tokens": {"type": "array", "items": {"$ref": "#/$defs/token"}}
+      }
+    },
+    "positive": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["vector_id", "input_revision_id", "input_tokens", "expected_preimage", "expected_canonical_utf8_hex", "expected_token_sha256"],
+      "properties": {
+        "vector_id": {"type": "string", "minLength": 1},
+        "input_revision_id": {"type": "string", "minLength": 1},
+        "input_tokens": {"type": "array", "items": {"$ref": "#/$defs/token"}},
+        "expected_preimage": {"$ref": "#/$defs/preimage"},
+        "expected_canonical_utf8_hex": {"type": "string", "pattern": "^(?:[0-9a-f]{2})+$"},
+        "expected_token_sha256": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "negative": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["vector_id", "base_positive_vector_id", "mutation", "expected_error_code", "expected_error_pointer"],
+      "properties": {
+        "vector_id": {"type": "string", "minLength": 1},
+        "base_positive_vector_id": {"enum": ["TOKV01-EMPTY", "TOKV01-ASCII", "TOKV01-UNICODE-SOURCES"]},
+        "mutation": {"type": "object", "additionalProperties": false, "required": ["operation", "json_pointer", "value_token"], "properties": {"operation": {"enum": ["SET_NON_NFC_STRING", "SET_RANGE_INVALID", "SET_UNSAFE_INTEGER", "SET_UNKNOWN_KIND"]}, "json_pointer": {"type": "string", "pattern": "^/tokens(?:/[0-9]+)(?:/[^/~]*(?:~[01][^/~]*)*)?$"}, "value_token": {"enum": ["NON_NFC_E\u0301", "END_BEFORE_START", "NUMBER:9007199254740992", "UNKNOWN_KIND"]}}},
+        "expected_error_code": {"enum": ["TOKEN_DIGEST_UNICODE_INVALID", "TOKEN_DIGEST_RANGE_INVALID", "TOKEN_DIGEST_NUMBER_DOMAIN_INVALID", "TOKEN_DIGEST_ENUM_INVALID"]},
+        "expected_error_pointer": {"type": "string", "pattern": "^/tokens(?:/[0-9]+)(?:/[^/~]*(?:~[01][^/~]*)*)?$"}
+      }
+    }
+  }
+}

@@ -3,6 +3,9 @@ package org.opm.localruntime.command;
 import org.junit.jupiter.api.Test;
 import org.opm.localruntime.semantic.SemanticRevision;
 import org.opm.localruntime.semantic.SemanticRevisionReader;
+import org.opm.localruntime.releaseevidence.fault.E2EFaultContext;
+import org.opm.localruntime.releaseevidence.fault.E2EFaultPort;
+import org.opm.localruntime.assets.ProfilePackageDescriptor;
 import org.opm.localruntime.text.OplGrammar;
 
 import java.lang.reflect.Constructor;
@@ -85,6 +88,29 @@ class CandidateRevisionCommitterTest {
         assertRejected(ruleResult, CommitFailureCode.RULE_VERSION_CONFLICT);
         assertEquals("PROFILE_MIGRATION_REQUIRED", ((CommitResult.Rejected) ruleResult).message());
         assertEquals(0, ruleRepository.commitCount);
+    }
+
+    @Test
+    void projectsTheRealHeadAsReadOnlyOnlyThroughTheExplicitE2eContext() {
+        SemanticRevision base = base();
+        RecordingRepository repository = new RecordingRepository(base);
+        E2EFaultPort faultPort = new E2EFaultPort() {
+            @Override public E2EFaultContext contextFor(CandidateRevisionCommand command) {
+                return new E2EFaultContext.Active("E2E-CANVAS-007.READONLY", 1, command.projectId(), command.modelId(), command.baseRevisionId(),
+                        command.candidateRevision().revisionId(), command.commandId(), "profile", "0.2", "a".repeat(64));
+            }
+            @Override public void beforeSymbolAssetLoad(E2EFaultContext context, ProfilePackageDescriptor.RequiredAsset asset) { }
+            @Override public void beforeRevisionInsert(E2EFaultContext context) { }
+            @Override public RevisionCommitRepository.Head projectCurrentHead(E2EFaultContext context, RevisionCommitRepository.Head head) {
+                return new RevisionCommitRepository.Head(head.revisionId(), head.revisionSequence(), false);
+            }
+        };
+
+        CommitResult result = new CandidateRevisionCommitter(repository, null, faultPort)
+                .commit(command(base, candidate(base), "command.e2e.readonly", "digest-e2e-readonly"));
+
+        assertRejected(result, CommitFailureCode.READ_ONLY_REVISION);
+        assertEquals(0, repository.commitCount);
     }
 
     @Test
@@ -184,6 +210,11 @@ class CandidateRevisionCommitterTest {
         }
 
         @Override public Optional<Head> currentHead(String modelId) { return Optional.of(head); }
+
+        @Override public Optional<Head> currentHead(String modelId, E2EFaultContext context) {
+            return currentHead(modelId).map(value -> context instanceof E2EFaultContext.Active
+                    ? new Head(value.revisionId(), value.revisionSequence(), false) : value);
+        }
 
         @Override public Optional<Receipt> receipt(String operationId, String aggregateId, String commandId) {
             return Optional.ofNullable(receipts.get(commandId));

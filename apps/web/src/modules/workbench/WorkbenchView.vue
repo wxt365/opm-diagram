@@ -93,15 +93,15 @@
             <fieldset class="state-role-group"><legend>角色</legend><label v-for="role in stateRoles" :key="role"><input v-model="store.stateCandidate.roles" type="checkbox" :value="role">{{ role }}</label></fieldset>
             <div class="state-editor__actions"><button class="button button--secondary" type="button" @click="store.cancelStateCandidate">取消</button><button class="button" type="submit" :disabled="store.workbench.commandState === 'submitting'">创建</button></div>
           </form>
-          <template v-else-if="store.selectedNode?.kind === 'state'">
+          <section v-else-if="store.selectedNode?.kind === 'state'" data-testid="p03-state-inspector">
             <div class="form-readonly"><span>State ID</span><code>{{ store.selectedNode.id }}</code></div>
             <div class="form-readonly"><span>Owner</span><code>{{ store.selectedNode.ownerId }}</code></div>
-            <label class="form-field"><span>名称</span><input v-model="store.stateEditor.name" maxlength="256"></label>
+            <label class="form-field"><span>名称</span><input v-model="store.stateEditor.name" data-testid="p03-state-inspector-name" maxlength="256"></label>
             <fieldset class="state-role-group"><legend>角色</legend><label v-for="role in stateRoles" :key="role"><input v-model="store.stateEditor.roles" type="checkbox" :value="role">{{ role }}</label></fieldset>
             <div class="state-editor__actions"><button class="button" type="button" @click="store.saveSelectedState">保存 State</button></div>
             <div class="state-presentation-actions"><button class="button button--secondary" type="button" @click="store.changeStatePresentation(store.selectedNode.explicitness === 'SUPPRESSED' ? 'STATE_EXPLICIT' : 'STATE_SUPPRESS')">{{ store.selectedNode.explicitness === 'SUPPRESSED' ? '显式' : '抑制' }}</button><button class="button button--secondary" type="button" @click="store.changeStatePresentation(store.selectedNode.foldState === 'FOLDED' ? 'UNFOLD' : 'FOLD')">{{ store.selectedNode.foldState === 'FOLDED' ? '展开' : '折叠' }}</button></div>
             <div v-if="store.stateDeleteOption" class="impact-callout" data-testid="p03-state-delete-impact"><strong>删除影响</strong><span>构造 {{ store.stateDeleteOption.impact_summary?.affected_construct_count ?? 0 }} · Context {{ store.stateDeleteOption.impact_summary?.affected_context_count ?? 0 }} · 文本 {{ store.stateDeleteOption.impact_summary?.affected_sentence_count ?? 0 }}</span><button class="button button--danger" type="button" :disabled="!store.stateDeleteOption.enabled" @click="store.deleteSelectedState">{{ store.stateDeleteOption.enabled ? '删除 State' : 'State 被 Fact 引用，不能删除' }}</button></div>
-          </template>
+          </section>
           <template v-else-if="store.selectedNode">
             <div class="form-readonly"><span>名称</span><strong>{{ store.selectedNode.label }}</strong></div>
             <div class="form-readonly"><span>稳定标识</span><code>{{ store.selectedNode.id }}</code></div>
@@ -114,6 +114,7 @@
             <div v-for="endpoint in store.selectedRelation.endpoints ?? []" :key="`${endpoint.ordinal}-${endpoint.role}`" class="form-readonly"><span>{{ endpoint.role }}</span><code>{{ endpoint.targetId }}</code></div>
             <div v-if="store.selectedRelation.duration" class="form-readonly"><span>duration</span><code>{{ store.selectedRelation.duration }}</code></div>
             <div v-if="store.selectedRelation.controlCapability" class="form-readonly"><span>Control</span><code>{{ store.selectedRelation.controlCapability }}</code></div>
+            <div v-if="store.factDeleteOption" class="impact-callout" data-testid="p03-fact-delete-impact"><strong>删除影响</strong><span>构造 {{ store.factDeleteOption.impact_summary?.affected_construct_count ?? 0 }} · Context {{ store.factDeleteOption.impact_summary?.affected_context_count ?? 0 }} · 文本 {{ store.factDeleteOption.impact_summary?.affected_sentence_count ?? 0 }}</span><button class="button button--danger" type="button" :disabled="!store.factDeleteOption.enabled || !store.factDeleteOption.impact_token" @click="store.deleteSelectedFact">删除关系</button></div>
             <form v-if="store.structuralUpdateCandidate.phase === 'editing'" class="state-editor" data-testid="p03-structural-update" @submit.prevent="store.submitStructuralUpdate">
               <div class="form-readonly"><span>关系</span><strong>{{ store.structuralUpdateCandidate.option?.display_name }}</strong></div>
               <label v-for="(_, slot) in store.structuralUpdateCandidate.labels" :key="slot" class="form-field"><span>{{ slot }}</span><input v-model="store.structuralUpdateCandidate.labels[slot]" :data-testid="`p03-structural-update-label-${slot}`" maxlength="256"></label>

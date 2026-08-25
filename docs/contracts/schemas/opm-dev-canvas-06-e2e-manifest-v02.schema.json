@@ -1,0 +1,1203 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:opm:contract:dev-canvas-06-e2e-manifest:0.2",
+  "title": "OPM DEV-CANVAS-06 E2E Manifest 0.2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_id",
+    "schema_version",
+    "manifest_id",
+    "manifest_version",
+    "generated_at",
+    "generator_identity",
+    "intake_report_ref",
+    "handoff_ref",
+    "upstream_source_build",
+    "source_build",
+    "upstream_input_refs",
+    "input_materialization",
+    "common_fixture_catalog_ref",
+    "environment_policy",
+    "fixture_refs",
+    "driver_catalog",
+    "suite_catalog",
+    "coverage_summary",
+    "transaction_policy",
+    "cases",
+    "summary",
+    "profile_asset_tree_ref",
+    "profile_asset_refs"
+  ],
+  "properties": {
+    "schema_id": {
+      "const": "OPM-DEV-CANVAS-06-E2E-MANIFEST-001"
+    },
+    "schema_version": {
+      "const": "0.2"
+    },
+    "manifest_id": {
+      "pattern": "^dev-canvas-06\\.e2e\\.[a-f0-9]{12}\\.[a-f0-9]{12}$"
+    },
+    "manifest_version": {
+      "const": "0.2.0"
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "generator_identity": {
+      "$ref": "#/$defs/identity"
+    },
+    "intake_report_ref": {
+      "$ref": "#/$defs/fileRef"
+    },
+    "handoff_ref": {
+      "$ref": "#/$defs/fileRef"
+    },
+    "upstream_source_build": {
+      "$ref": "#/$defs/upstreamBuild"
+    },
+    "source_build": {
+      "$ref": "#/$defs/sourceBuild"
+    },
+    "upstream_input_refs": {
+      "$ref": "#/$defs/upstreamInputs"
+    },
+    "input_materialization": {
+      "$ref": "#/$defs/inputMaterialization"
+    },
+    "common_fixture_catalog_ref": {
+      "$ref": "#/$defs/fileRef"
+    },
+    "environment_policy": {
+      "$ref": "#/$defs/environmentPolicy"
+    },
+    "fixture_refs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/inputRef"
+      }
+    },
+    "driver_catalog": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "prefixItems": [
+        {
+          "$ref": "#/$defs/proceduralDriver"
+        },
+        {
+          "$ref": "#/$defs/controlDriver"
+        },
+        {
+          "$ref": "#/$defs/structuralDriver"
+        },
+        {
+          "$ref": "#/$defs/commonDriver"
+        }
+      ],
+      "items": false
+    },
+    "suite_catalog": {
+      "type": "array",
+      "minItems": 7,
+      "maxItems": 7,
+      "prefixItems": [
+        {
+          "$ref": "#/$defs/suite001"
+        },
+        {
+          "$ref": "#/$defs/suite002"
+        },
+        {
+          "$ref": "#/$defs/suite003"
+        },
+        {
+          "$ref": "#/$defs/suite004"
+        },
+        {
+          "$ref": "#/$defs/suite005"
+        },
+        {
+          "$ref": "#/$defs/suite006"
+        },
+        {
+          "$ref": "#/$defs/suite007"
+        }
+      ],
+      "items": false
+    },
+    "coverage_summary": {
+      "$ref": "#/$defs/coverageSummary"
+    },
+    "transaction_policy": {
+      "$ref": "#/$defs/policy"
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 194,
+      "maxItems": 194,
+      "items": {
+        "$ref": "#/$defs/case"
+      }
+    },
+    "summary": {
+      "$ref": "#/$defs/summary"
+    },
+    "profile_asset_tree_ref": {
+      "$ref": "#/$defs/profileAssetTreeRef"
+    },
+    "profile_asset_refs": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "prefixItems": [
+        {
+          "$ref": "#/$defs/grammarAssetRef"
+        },
+        {
+          "$ref": "#/$defs/normalizationDataRef"
+        },
+        {
+          "$ref": "#/$defs/profilePackageRef"
+        },
+        {
+          "$ref": "#/$defs/ruleSetRef"
+        },
+        {
+          "$ref": "#/$defs/symbolAssetRef"
+        }
+      ],
+      "items": false
+    }
+  },
+  "allOf": [
+    {
+      "properties": {
+        "cases": {
+          "contains": {
+            "required": [
+              "capability_id"
+            ]
+          },
+          "minContains": 178,
+          "maxContains": 178
+        }
+      }
+    },
+    {
+      "properties": {
+        "cases": {
+          "contains": {
+            "not": {
+              "required": [
+                "capability_id"
+              ]
+            }
+          },
+          "minContains": 16,
+          "maxContains": 16
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "path": {
+      "type": "string",
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$"
+    },
+    "fileRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "path",
+        "byte_length",
+        "sha256"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "minLength": 1
+        },
+        "path": {
+          "$ref": "#/$defs/path"
+        },
+        "byte_length": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sha256": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "archiveEntryRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "byte_length",
+        "sha256",
+        "bundle_sha256",
+        "archive_entry_path"
+      ],
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/path"
+        },
+        "byte_length": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "bundle_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "archive_entry_path": {
+          "$ref": "#/$defs/path"
+        }
+      }
+    },
+    "inputRef": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/fileRef"
+        },
+        {
+          "$ref": "#/$defs/archiveEntryRef"
+        }
+      ]
+    },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "runner_version",
+        "source_commit",
+        "node_version",
+        "playwright_version",
+        "chromium_version",
+        "os",
+        "command",
+        "runner_source_sha256"
+      ],
+      "properties": {
+        "runner_version": {
+          "const": "0.2.0"
+        },
+        "source_commit": {
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "node_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "playwright_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "chromium_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "os": {
+          "type": "string",
+          "minLength": 1
+        },
+        "command": {
+          "type": "string",
+          "minLength": 1
+        },
+        "runner_source_sha256": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "upstreamBuild": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_commit",
+        "dirty_before_build",
+        "evidence_output_root",
+        "java_version",
+        "node_version",
+        "os",
+        "build_command",
+        "lockfile_sha256",
+        "pom_sha256"
+      ],
+      "properties": {
+        "source_commit": {
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "dirty_before_build": {
+          "const": false
+        },
+        "evidence_output_root": {
+          "$ref": "#/$defs/path"
+        },
+        "java_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "node_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "os": {
+          "type": "string",
+          "minLength": 1
+        },
+        "build_command": {
+          "type": "string",
+          "minLength": 1
+        },
+        "lockfile_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "pom_sha256": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "sourceBuild": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_commit",
+        "dirty_before_build",
+        "build_command",
+        "node_version",
+        "lockfile_sha256",
+        "web_dist",
+        "local_runtime_jar"
+      ],
+      "properties": {
+        "source_commit": {
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "dirty_before_build": {
+          "const": false
+        },
+        "build_command": {
+          "type": "string",
+          "minLength": 1
+        },
+        "node_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "lockfile_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "web_dist": {
+          "$ref": "#/$defs/fileRef"
+        },
+        "local_runtime_jar": {
+          "$ref": "#/$defs/fileRef"
+        }
+      }
+    },
+    "upstreamInputs": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "prefixItems": [
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/inputItem"
+            },
+            {
+              "properties": {
+                "input_kind": {
+                  "const": "COVERAGE_CATALOG"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/inputItem"
+            },
+            {
+              "properties": {
+                "input_kind": {
+                  "const": "GOLDEN_MANIFEST"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/inputItem"
+            },
+            {
+              "properties": {
+                "input_kind": {
+                  "const": "GOLDEN_REPLAY_REPORT"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/inputItem"
+            },
+            {
+              "properties": {
+                "input_kind": {
+                  "const": "SYMBOL_CATALOG"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/inputItem"
+            },
+            {
+              "properties": {
+                "input_kind": {
+                  "const": "HANDOFF_EVIDENCE_BUNDLE"
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "items": false
+    },
+    "inputItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "input_kind",
+        "ref"
+      ],
+      "properties": {
+        "input_kind": {
+          "enum": [
+            "COVERAGE_CATALOG",
+            "GOLDEN_MANIFEST",
+            "GOLDEN_REPLAY_REPORT",
+            "SYMBOL_CATALOG",
+            "HANDOFF_EVIDENCE_BUNDLE"
+          ]
+        },
+        "ref": {
+          "$ref": "#/$defs/inputRef"
+        }
+      }
+    },
+    "inputMaterialization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "bundle_ref",
+        "java_version",
+        "entry_allowlist",
+        "materialized_count",
+        "aggregate_sha256",
+        "temporary_directory_cleaned"
+      ],
+      "properties": {
+        "bundle_ref": {
+          "$ref": "#/$defs/fileRef"
+        },
+        "java_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "entry_allowlist": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/path"
+          }
+        },
+        "materialized_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "aggregate_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "temporary_directory_cleaned": {
+          "const": true
+        }
+      }
+    },
+    "environmentPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "locale",
+        "timezone",
+        "color_scheme",
+        "reduced_motion",
+        "device_scale_factor"
+      ],
+      "properties": {
+        "locale": {
+          "const": "zh-CN"
+        },
+        "timezone": {
+          "const": "Asia/Shanghai"
+        },
+        "color_scheme": {
+          "const": "light"
+        },
+        "reduced_motion": {
+          "const": "reduce"
+        },
+        "device_scale_factor": {
+          "const": 1
+        }
+      }
+    },
+    "driver": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "driver_id",
+        "source_ref"
+      ],
+      "properties": {
+        "driver_id": {
+          "enum": [
+            "DRIVER-PROCEDURAL",
+            "DRIVER-CONTROL",
+            "DRIVER-STRUCTURAL",
+            "DRIVER-COMMON"
+          ]
+        },
+        "source_ref": {
+          "$ref": "#/$defs/fileRef"
+        }
+      }
+    },
+    "proceduralDriver": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/driver"
+        },
+        {
+          "properties": {
+            "driver_id": {
+              "const": "DRIVER-PROCEDURAL"
+            },
+            "source_ref": {
+              "allOf": [
+                { "$ref": "#/$defs/fileRef" },
+                { "properties": { "kind": { "const": "E2E_DRIVER_SOURCE" }, "path": { "const": "inputs/drivers/procedural-driver.mjs" } } }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "controlDriver": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/driver"
+        },
+        {
+          "properties": {
+            "driver_id": {
+              "const": "DRIVER-CONTROL"
+            },
+            "source_ref": {
+              "allOf": [
+                { "$ref": "#/$defs/fileRef" },
+                { "properties": { "kind": { "const": "E2E_DRIVER_SOURCE" }, "path": { "const": "inputs/drivers/control-driver.mjs" } } }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "structuralDriver": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/driver"
+        },
+        {
+          "properties": {
+            "driver_id": {
+              "const": "DRIVER-STRUCTURAL"
+            },
+            "source_ref": {
+              "allOf": [
+                { "$ref": "#/$defs/fileRef" },
+                { "properties": { "kind": { "const": "E2E_DRIVER_SOURCE" }, "path": { "const": "inputs/drivers/structural-driver.mjs" } } }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "commonDriver": {
+      "allOf": [
+        { "$ref": "#/$defs/driver" },
+        {
+          "properties": {
+            "driver_id": { "const": "DRIVER-COMMON" },
+            "source_ref": {
+              "allOf": [
+                { "$ref": "#/$defs/fileRef" },
+                { "properties": { "kind": { "const": "E2E_DRIVER_SOURCE" }, "path": { "const": "inputs/drivers/common-driver.mjs" } } }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "suite": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "suite_id"
+      ],
+      "properties": {
+        "suite_id": {
+          "enum": [
+            "E2E-CANVAS-001",
+            "E2E-CANVAS-002",
+            "E2E-CANVAS-003",
+            "E2E-CANVAS-004",
+            "E2E-CANVAS-005",
+            "E2E-CANVAS-006",
+            "E2E-CANVAS-007"
+          ]
+        }
+      }
+    },
+    "suite001": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/suite"
+        },
+        {
+          "properties": {
+            "suite_id": {
+              "const": "E2E-CANVAS-001"
+            }
+          }
+        }
+      ]
+    },
+    "suite002": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/suite"
+        },
+        {
+          "properties": {
+            "suite_id": {
+              "const": "E2E-CANVAS-002"
+            }
+          }
+        }
+      ]
+    },
+    "suite003": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/suite"
+        },
+        {
+          "properties": {
+            "suite_id": {
+              "const": "E2E-CANVAS-003"
+            }
+          }
+        }
+      ]
+    },
+    "suite004": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/suite"
+        },
+        {
+          "properties": {
+            "suite_id": {
+              "const": "E2E-CANVAS-004"
+            }
+          }
+        }
+      ]
+    },
+    "suite005": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/suite"
+        },
+        {
+          "properties": {
+            "suite_id": {
+              "const": "E2E-CANVAS-005"
+            }
+          }
+        }
+      ]
+    },
+    "suite006": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/suite"
+        },
+        {
+          "properties": {
+            "suite_id": {
+              "const": "E2E-CANVAS-006"
+            }
+          }
+        }
+      ]
+    },
+    "suite007": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/suite"
+        },
+        {
+          "properties": {
+            "suite_id": {
+              "const": "E2E-CANVAS-007"
+            }
+          }
+        }
+      ]
+    },
+    "coverageSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "family_case_count",
+        "pass_expectation_count",
+        "blocked_expectation_count",
+        "common_case_count"
+      ],
+      "properties": {
+        "family_case_count": {
+          "const": 178
+        },
+        "pass_expectation_count": {
+          "const": 130
+        },
+        "blocked_expectation_count": {
+          "const": 48
+        },
+        "common_case_count": {
+          "const": 16
+        }
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "policy_id",
+        "policy_version"
+      ],
+      "properties": {
+        "policy_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "policy_version": {
+          "const": "0.1"
+        }
+      }
+    },
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "suite_id",
+        "expectation",
+        "viewport_id",
+        "zoom_id",
+        "fixture_ref",
+        "input_ref",
+        "driver_id",
+        "expected_transaction",
+        "assertion_ids"
+      ],
+      "properties": {
+        "case_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "suite_id": {
+          "enum": [
+            "E2E-CANVAS-001",
+            "E2E-CANVAS-002",
+            "E2E-CANVAS-003",
+            "E2E-CANVAS-004",
+            "E2E-CANVAS-005",
+            "E2E-CANVAS-006",
+            "E2E-CANVAS-007"
+          ]
+        },
+        "capability_id": {
+          "pattern": "^CAP-ISO-(PROC|CTRL|STRUCT)-\\d{3}$"
+        },
+        "coverage_key": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expectation": {
+          "enum": [
+            "PASS",
+            "BLOCKED"
+          ]
+        },
+        "viewport_id": {
+          "enum": [
+            "VP-1440X900",
+            "VP-1280X800",
+            "VP-390X844"
+          ]
+        },
+        "zoom_id": {
+          "const": "Z-100"
+        },
+        "fixture_ref": {
+          "$ref": "#/$defs/inputRef"
+        },
+        "input_ref": {
+          "$ref": "#/$defs/inputRef"
+        },
+        "driver_id": {
+          "enum": [
+            "DRIVER-PROCEDURAL",
+            "DRIVER-CONTROL",
+            "DRIVER-STRUCTURAL",
+            "DRIVER-COMMON"
+          ]
+        },
+        "expected_transaction": {
+          "$ref": "#/$defs/transaction"
+        },
+        "assertion_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "capability_id"
+            ]
+          },
+          "then": {
+            "required": [
+              "coverage_key"
+            ],
+            "properties": {
+              "suite_id": {
+                "enum": [
+                  "E2E-CANVAS-002",
+                  "E2E-CANVAS-003",
+                  "E2E-CANVAS-004"
+                ]
+              },
+              "driver_id": {
+                "enum": [
+                  "DRIVER-PROCEDURAL",
+                  "DRIVER-CONTROL",
+                  "DRIVER-STRUCTURAL"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "not": {
+              "required": [
+                "capability_id"
+              ]
+            }
+          },
+          "then": {
+            "not": {
+              "required": [
+                "coverage_key"
+              ]
+            },
+            "properties": {
+              "suite_id": {
+                "enum": [
+                  "E2E-CANVAS-001",
+                  "E2E-CANVAS-005",
+                  "E2E-CANVAS-006",
+                  "E2E-CANVAS-007"
+                ]
+              },
+              "driver_id": {
+                "const": "DRIVER-COMMON"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "transaction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "revision_delta",
+        "revision_parent_delta",
+        "text_artifact_delta",
+        "text_trace_delta",
+        "finding_delta",
+        "operation_delta",
+        "receipt_delta",
+        "draft_head_changed"
+      ],
+      "properties": {
+        "revision_delta": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "revision_parent_delta": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "text_artifact_delta": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "text_trace_delta": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "finding_delta": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "operation_delta": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "receipt_delta": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "draft_head_changed": {
+          "type": "boolean"
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_count",
+        "family_case_count",
+        "family_pass_expectation_count",
+        "family_blocked_expectation_count",
+        "common_case_count",
+        "attempt_count",
+        "pass_matched_count",
+        "blocked_matched_count",
+        "failed_count",
+        "skipped_count",
+        "retry_count"
+      ],
+      "properties": {
+        "case_count": {
+          "const": 194
+        },
+        "family_case_count": {
+          "const": 178
+        },
+        "family_pass_expectation_count": {
+          "const": 130
+        },
+        "family_blocked_expectation_count": {
+          "const": 48
+        },
+        "common_case_count": {
+          "const": 16
+        },
+        "attempt_count": {
+          "const": 388
+        },
+        "pass_matched_count": {
+          "const": 0
+        },
+        "blocked_matched_count": {
+          "const": 0
+        },
+        "failed_count": {
+          "const": 0
+        },
+        "skipped_count": {
+          "const": 0
+        },
+        "retry_count": {
+          "const": 0
+        }
+      }
+    },
+    "profileAssetTreeRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "path",
+        "byte_length",
+        "sha256"
+      ],
+      "properties": {
+        "kind": {
+          "const": "PROFILE_ASSET_TREE"
+        },
+        "path": {
+          "$ref": "#/$defs/path"
+        },
+        "byte_length": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sha256": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "profileAssetRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "path",
+        "byte_length",
+        "sha256"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "PROFILE_PACKAGE",
+            "RULE_SET",
+            "SYMBOL_ASSET",
+            "GRAMMAR_ASSET",
+            "NORMALIZATION_DATA"
+          ]
+        },
+        "path": {
+          "$ref": "#/$defs/path"
+        },
+        "byte_length": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sha256": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "profilePackageRef": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/profileAssetRef"
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "PROFILE_PACKAGE"
+            },
+            "path": {
+              "pattern": "(?:^|/)profile.json$"
+            }
+          }
+        }
+      ]
+    },
+    "ruleSetRef": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/profileAssetRef"
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "RULE_SET"
+            }
+          }
+        }
+      ]
+    },
+    "symbolAssetRef": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/profileAssetRef"
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "SYMBOL_ASSET"
+            }
+          }
+        }
+      ]
+    },
+    "grammarAssetRef": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/profileAssetRef"
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "GRAMMAR_ASSET"
+            }
+          }
+        }
+      ]
+    },
+    "normalizationDataRef": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/profileAssetRef"
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "NORMALIZATION_DATA"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

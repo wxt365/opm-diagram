@@ -1,6 +1,6 @@
 # DEV-CANVAS-06 Versioned Handoff Report Ref Closure Bugfix Checklist
 
-状态：`DESIGN_FROZEN_AFTER_ALLOWLIST_MODE_CORRECTION / IMPLEMENTATION_NOT_STARTED / INSTALLATION_BLOCKED`
+状态：`SOURCE_AND_RELEASE_ROOT_COMPLETE / PRODUCTION_PREVERIFY_PASSED / FIXED_SWITCH_BLOCKED_BY_POSTVERIFY_SUCCESSOR`
 
 ## Task Type
 
@@ -39,8 +39,9 @@
 - [x] 冻结production Manifest临时versioned Handoff fixture构造与非release evidence边界。
 - [x] immutable base的`loadReadyTrustChain()`调用闭包恰为6处，14项已覆盖全部base调用点及测试；晚于base的E2E Report verifier明确不进入本source delta。
 - [x] 同步全局设计状态入口。
-- [ ] 在隔离source worktree执行实现。
-- [ ] 生成、安装并重验新版本根。
+- [x] 在隔离source worktree执行实现。
+- [x] 生成、安装并重验新版本根。
+- [x] 复现fixed path不能替代Intake锁定versioned path，转入独立postverify后继规格。
 
 ## Design Freeze
 
@@ -53,49 +54,50 @@
 - [x] 固定布局冻结为`17+43+exact Manifest tree`。
 - [x] STAGING和INSTALLED解析模式、禁止fallback规则已冻结。
 - [x] trust API mode必填且无默认值；production调用点显式`INSTALLED`，controlled helper显式`CONTROLLED`。
-- [x] 版本根安装、安装后重验、固定JSON原子替换和postverify顺序已冻结。
+- [x] 版本根安装与固定JSON原子替换边界已冻结；冲突的postverify步骤已由独立后继规格替代。
 - [x] fixed switch失败的旧raw bytes原子恢复边界已冻结。
 
 ## Implementation
 
-- [ ] 新增唯一owner `scripts/dev-canvas-05-versioned-handoff-refs.mjs`。
-- [ ] Release Builder写版本根`handoff/reports/**`并拒绝固定alias。
-- [ ] Handoff Generator只从同一版本根读取descriptor和reports。
-- [ ] Validator支持显式STAGING/INSTALLED模式并复用owner。
-- [ ] Intake复用owner和显式解析模式。
-- [ ] E2E production trust复用owner并拒绝mutable/跨版本ref。
-- [ ] E2E production builder调用点显式传`mode: 'INSTALLED'`。
-- [ ] E2E production verifier调用点显式传`mode: 'INSTALLED'`。
-- [ ] controlled trust helper显式传`mode: 'CONTROLLED'`且不进入版本化物理resolver。
-- [ ] package scripts和4个既有测试已按规格更新。
-- [ ] 新owner定向测试已实现。
+- [x] 新增唯一owner `scripts/dev-canvas-05-versioned-handoff-refs.mjs`。
+- [x] Release Builder写版本根`handoff/reports/**`并拒绝固定alias。
+- [x] Handoff Generator只从同一版本根读取descriptor和reports。
+- [x] Validator支持显式STAGING/INSTALLED模式并复用owner。
+- [x] Intake复用owner和显式解析模式。
+- [x] E2E production trust复用owner并拒绝mutable/跨版本ref。
+- [x] E2E production builder调用点显式传`mode: 'INSTALLED'`。
+- [x] E2E production verifier调用点显式传`mode: 'INSTALLED'`。
+- [x] controlled trust helper显式传`mode: 'CONTROLLED'`且不进入版本化物理resolver。
+- [x] package scripts和4个既有测试已按规格更新。
+- [x] 新owner定向测试已实现。
 
 ## Source Commit
 
-- [ ] isolated source worktree从exact base创建且初始clean。
-- [ ] 测试import、production call和raw-read闭包复核未超出14文件allowlist。
-- [ ] base..source精确为`14=12 M+2 A`。
-- [ ] 新source单parent、非merge且不同于base。
-- [ ] `source_delta_patch_sha256`已按raw `git show` bytes记录。
-- [ ] 新`source12`与release root/handoff_id/descriptor逐项一致。
+- [x] isolated source worktree从exact base创建且当前clean。
+- [x] 测试import、production call和raw-read闭包复核未超出14文件allowlist。
+- [x] base..source精确为`14=12 M+2 A`。
+- [x] 新source单parent、非merge且不同于base。
+- [x] `source_delta_patch_sha256`已按raw `git show` bytes记录。
+- [x] 新`source12`与release root/handoff_id/descriptor逐项一致。
 
 ## Release Root
 
 - [ ] 新final/staging basename在执行前均不存在。
-- [ ] 5个root文件完整且为普通单链接文件。
-- [ ] `handoff/reports/**`恰为12个冻结文件。
-- [ ] Common root恰43文件且tree digest闭合。
-- [ ] Manifest tree与production预验输入逐byte相等。
-- [ ] staging总文件公式为`17+43+manifest_tree_entry_count`且无额外root entry。
+- [x] 5个root文件完整且为普通单链接文件。
+- [x] `handoff/reports/**`恰为12个冻结文件。
+- [x] Common root恰43文件且tree digest闭合。
+- [x] Manifest tree与production预验输入逐byte相等。
+- [x] staging总文件公式为`17+43+manifest_tree_entry_count`且无额外root entry。
 - [ ] `clean-a36a7f1fd709`安装前后tree digest相等。
 
 ## Verify
 
-- [ ] `node --test scripts/dev-canvas-05-versioned-handoff-refs.test.mjs`
-- [ ] `node --test scripts/validate-dev-canvas-05-handoff.test.mjs`
-- [ ] `node --test scripts/release-canvas06-intake.test.mjs`
-- [ ] `node --test scripts/canvas06-e2e-manifest-v01-trust.test.mjs`
-- [ ] `node --test scripts/release-canvas06-e2e-manifest-v01.test.mjs`
+- [x] Node `v24.19.0`定向集合通过`13/13`，覆盖以下5个测试文件。
+- [x] `node --test scripts/dev-canvas-05-versioned-handoff-refs.test.mjs`
+- [x] `node --test scripts/validate-dev-canvas-05-handoff.test.mjs`
+- [x] `node --test scripts/release-canvas06-intake.test.mjs`
+- [x] `node --test scripts/canvas06-e2e-manifest-v01-trust.test.mjs`
+- [x] `node --test scripts/release-canvas06-e2e-manifest-v01.test.mjs`
 - [ ] mutable `reports/**`、跨版本ref、source12/handoff_id drift反例通过。
 - [ ] report缺/多/重复/link/SHA/length反例通过。
 - [ ] staging extra/path escape/mode混用/fallback反例通过。
@@ -103,20 +105,20 @@
 - [ ] Intake/E2E trust均拒绝旧mutable report ref。
 - [ ] production builder/verifier缺少mode、错误mode和trust默认mode反例通过。
 - [ ] controlled helper缺少`CONTROLLED`或进入物理resolver反例通过。
-- [ ] production integration test按HEAD派生临时versioned root并重算12个report及全部direct ref。
-- [ ] production integration seed严格来自三个`CANVAS06_TEST_*`输入和clean tracked report root，禁止治理工作树扫描或其他release root fallback。
-- [ ] production integration test不读取固定Handoff、不硬编码旧`clean-*`且临时fixture零release evidence输出。
+- [x] production integration test按HEAD派生临时versioned root并重算12个report及全部direct ref。
+- [x] production integration seed严格来自三个`CANVAS06_TEST_*`输入和clean tracked report root，禁止治理工作树扫描或其他release root fallback。
+- [x] production integration test不读取固定Handoff、不硬编码旧`clean-*`且临时fixture零release evidence输出。
 
 ## Install And Reverify
 
-- [ ] STAGING模式完整校验通过。
-- [ ] 同父atomic rename安装新版本根并fsync父目录。
-- [ ] INSTALLED模式重验Candidate Handoff/Intake/direct refs通过。
-- [ ] production Manifest安装后`--require-production`重验通过。
+- [x] STAGING模式完整校验通过。
+- [x] 同父atomic rename安装新版本根并fsync父目录。
+- [x] INSTALLED模式重验Candidate Handoff/Intake/direct refs通过。
+- [x] production Manifest安装后`--require-production`重验通过；2026-08-20使用Node`v24.19.0`和Java 21只读复验成功。
 - [ ] 固定Handoff只原子替换JSON，未写固定reports/release alias。
 - [ ] 固定Handoff SHA等于版本根Candidate SHA。
 - [ ] fixed Handoff direct raw ref全部指向本轮已安装版本根。
-- [ ] fixed Handoff postverify和production Manifest postverify通过。
+- [ ] 独立fixed Handoff postverify、production Manifest子验证和live guard通过；由后继规格承接。
 
 ## Failure And Rollback
 
@@ -130,22 +132,22 @@
 
 ```text
 base_source_commit=a36a7f1fd709b72e66c57e5aea634da525c9c515
-new_source_commit=NOT_EXECUTED
-source_delta_count=NOT_EXECUTED
-source_delta_patch_sha256=NOT_EXECUTED
-new_release_root=NOT_EXECUTED
+new_source_commit=37c5412a9c12c1b3ae06d6f7abe734804fa53c7b
+source_delta_count=14=12 M+2 A
+source_delta_patch_sha256=8680d7f1253d445207055e4eacf831278c04919f7b5574b1b0ce624d81fa4bfe
+new_release_root=releases/clean-37c5412a9c12
 new_release_tree_sha256=NOT_EXECUTED
 report_tree_sha256=NOT_EXECUTED
 common_tree_sha256=NOT_EXECUTED
 manifest_tree_sha256=NOT_EXECUTED
-candidate_handoff_sha256=NOT_EXECUTED
-intake_sha256=NOT_EXECUTED
+candidate_handoff_sha256=4088e449ebb04cb6cf94fe5393db4b72ee34cc96dd950cabfc1ad596b4afb3d2
+intake_sha256=6f601a3f8e2d7efa6bb1be13f95a4fdd5ca911ec097b92b90fa3e386d049593a
 fixed_handoff_before_sha256=0778d77f75a68b4fb447fd26614d71885af88982dba5f2e7e1e9bd70d98b1326
 fixed_handoff_after_sha256=NOT_EXECUTED
 clean_a36_tree_before_sha256=NOT_EXECUTED
 clean_a36_tree_after_sha256=NOT_EXECUTED
-production_preverify=NOT_EXECUTED
-production_postverify=NOT_EXECUTED
+production_preverify=PASSED_2026-08-20_NODE_24_JAVA_21
+production_postverify=BLOCKED_BY_FIXED_HANDOFF_POSTVERIFY_SUCCESSOR
 ```
 
 ## Release Boundary
@@ -158,4 +160,4 @@ production_postverify=NOT_EXECUTED
 
 ## Current Conclusion
 
-12文件allowlist冲突已经通过`14=12 M+2 A`及显式mode/fixture契约关闭，设计输入重新冻结，可按本规格进入独立source实现。Family production installation、固定Handoff切换和production Manifest安装后重验继续保持`VERSIONED_HANDOFF_REPORT_REF_CLOSURE_REQUIRED`，直到本Checklist全部执行项和证据槽位闭合。
+Versioned Handoff source`37c5412a9c12...`、`clean-37c5412a9c12`、READY Handoff/Intake和production Manifest已形成，Node 24定向测试`13/13`及安装后production verifier只读复验通过。fixed Handoff仍为旧SHA；原规格把fixed path与Intake versioned path交给同一production verifier的冲突已转交Fixed Handoff Postverify Closure后继规格。在后继真实READY Report与live guard闭合前，不得执行fixed switch或继续Family Materializer和production E2E Report。

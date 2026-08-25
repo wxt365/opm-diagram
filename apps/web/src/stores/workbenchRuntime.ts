@@ -35,6 +35,7 @@ export const useWorkbenchRuntimeStore = defineStore("workbench-runtime", () => {
   const allowedCommands = ref<string[]>([]);
   const stateCreateOption = ref<ApiEdtCommandCapabilityOption | null>(null);
   const stateDeleteOption = ref<ApiEdtCommandCapabilityOption | null>(null);
+  const factDeleteOption = ref<ApiEdtCommandCapabilityOption | null>(null);
   const stateCandidate = reactive({ phase: "idle" as "idle" | "placing" | "editing", ownerId: "", name: "", roles: ["INITIAL"] as ApiEdtStateRole[], x: 0, y: 0 });
   const stateEditor = reactive({ name: "", roles: [] as ApiEdtStateRole[] });
   const relationCandidate = reactive({ phase: "idle" as "idle" | "selecting-target" | "choosing", sourceId: "", targetId: "", endpointIds: [] as string[], options: [] as ApiEdtCommandCapabilityOption[], selectedOption: null as ApiEdtCommandCapabilityOption | null, duration: "PT5M", labels: {} as Record<string, string>, collectionCompleteness: "" as "" | "COMPLETE" | "INCOMPLETE", direction: "DIRECTED" as "DIRECTED" | "BIDIRECTIONAL" });
@@ -100,7 +101,7 @@ export const useWorkbenchRuntimeStore = defineStore("workbench-runtime", () => {
       workbench.resourceState = "ready";
       workbench.lastAction = `已打开 ${activeContext.value?.label ?? contextId}`;
       const initialObject = workbench.nodes.find((node) => node.id === workbench.selectedId && node.kind === "object");
-      if (initialObject) void refreshStateCreateOption(initialObject.id);
+      if (initialObject) await refreshStateCreateOption(initialObject.id);
     } catch (error) {
       if (sequence !== loadSequence) return;
       workbench.resourceState = "error";
@@ -131,6 +132,9 @@ export const useWorkbenchRuntimeStore = defineStore("workbench-runtime", () => {
     } else {
       stateDeleteOption.value = null;
     }
+    const relation = workbench.relations.find((item) => item.id === id);
+    if (relation) await refreshFactDeleteOption(relation.id);
+    else factDeleteOption.value = null;
   }
 
   function setBottomTab(tab: BottomTab) {
@@ -465,6 +469,13 @@ export const useWorkbenchRuntimeStore = defineStore("workbench-runtime", () => {
     await execute({ commandType: "DELETE_CONSTRUCT", payload: { construct_kind: "STATE", construct_id: state.id, impact_token: option.impact_token } });
   }
 
+  async function deleteSelectedFact() {
+    const fact = selectedRelation.value;
+    const option = factDeleteOption.value;
+    if (!fact || !option?.enabled || !option.impact_token) return;
+    await execute({ commandType: "DELETE_CONSTRUCT", payload: { construct_kind: "FACT", construct_id: fact.id, impact_token: option.impact_token } });
+  }
+
   async function runValidation() {
     if (!projectId.value || !modelId.value || !workbench.revision) return;
     workbench.validationState = "running";
@@ -554,7 +565,18 @@ export const useWorkbenchRuntimeStore = defineStore("workbench-runtime", () => {
     }
   }
 
-  return { projectId, modelId, projectName, modelName, profileLabel, contexts, textLines, revisions, workbench, isReadonly, selectedNode, selectedRelation, stateCreateOption, stateDeleteOption, stateCandidate, stateEditor, relationCandidate, controlCandidate, structuralUpdateCandidate, load, selectContext, selectConstruct, setBottomTab, setViewportZoom, addElement, addFeature, addConsumption, armRelationCreation, cancelRelationCandidate, resolveRelationCandidates, submitRelationCandidate, chooseRelationCandidate, armControlUpdate, cancelControlCandidate, submitControlCandidate, armStructuralUpdate, cancelStructuralUpdate, submitStructuralUpdate, armStateCreation, placeState, cancelStateCandidate, submitStateCandidate, saveSelectedState, changeStatePresentation, deleteSelectedState, runValidation, locateText, unavailable };
+  async function refreshFactDeleteOption(selectionId: string) {
+    if (!projectId.value || !modelId.value || !workbench.revision || !workbench.activeContextId) return;
+    try {
+      const capabilities = await localRuntimeApi.commandCapabilities(projectId.value, modelId.value, workbench.activeContextId, workbench.revision, selectionId, "DELETE_CONSTRUCT");
+      factDeleteOption.value = capabilities.data.options.find((option) => option.command_type === "DELETE_CONSTRUCT") ?? null;
+    } catch (error) {
+      factDeleteOption.value = null;
+      workbench.commandFeedback = message(error);
+    }
+  }
+
+  return { projectId, modelId, projectName, modelName, profileLabel, contexts, textLines, revisions, workbench, isReadonly, selectedNode, selectedRelation, stateCreateOption, stateDeleteOption, factDeleteOption, stateCandidate, stateEditor, relationCandidate, controlCandidate, structuralUpdateCandidate, load, selectContext, selectConstruct, setBottomTab, setViewportZoom, addElement, addFeature, addConsumption, armRelationCreation, cancelRelationCandidate, resolveRelationCandidates, submitRelationCandidate, chooseRelationCandidate, armControlUpdate, cancelControlCandidate, submitControlCandidate, armStructuralUpdate, cancelStructuralUpdate, submitStructuralUpdate, armStateCreation, placeState, cancelStateCandidate, submitStateCandidate, saveSelectedState, changeStatePresentation, deleteSelectedState, deleteSelectedFact, runValidation, locateText, unavailable };
 });
 
 function toContexts(data: { process_tree: NavigationNodeWire[]; object_forest: NavigationNodeWire[]; views: NavigationNodeWire[] }, fallbackId: string): RuntimeContext[] {

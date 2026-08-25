@@ -1,10 +1,10 @@
 # Spec: DEV-CANVAS-06 Versioned Handoff Report Ref Closure
 
-文档状态：`FROZEN_FOR_IMPLEMENTATION`
+文档状态：`FROZEN_WITH_POSTVERIFY_SUCCESSOR`
 
-执行状态：`NOT_STARTED`
+执行状态：`SOURCE_AND_RELEASE_ROOT_COMPLETE / FIXED_SWITCH_BLOCKED`
 
-设计修订：`2026-08-18 ALLOWLIST_MODE_CALLSITE_CLOSURE`
+设计修订：`2026-08-20 FIXED_HANDOFF_POSTVERIFY_SUCCESSOR`
 
 ## Task Type
 
@@ -158,6 +158,19 @@ git grep -n "loadReadyTrustChain(" a36a7f1fd709b72e66c57e5aea634da525c9c515 -- s
 ```
 
 `scripts/canvas06-e2e-manifest-v01-trust.mjs`、其test及两个Manifest production调用文件均已在14项allowlist中。当前治理工作树中晚于base出现的E2E Report verifier不属于本次source tree或delta，不得从治理工作树复制进入isolated source；其未来mode迁移由所属E2E Runner实现规格承接。
+
+### 5.4 已执行 source
+
+本规格source实现已在隔离clean worktree形成并完成精确delta校验：
+
+```text
+source_commit=37c5412a9c12c1b3ae06d6f7abe734804fa53c7b
+parent=a36a7f1fd709b72e66c57e5aea634da525c9c515
+source_delta=14=12 M+2 A
+source_delta_patch_sha256=8680d7f1253d445207055e4eacf831278c04919f7b5574b1b0ce624d81fa4bfe
+```
+
+对应`clean-37c5412a9c12`版本根已经形成。该执行结果不改变第10章后继postverify阻断，也不授权fixed Handoff切换。
 
 ## 6. 唯一 Ref Owner
 
@@ -328,24 +341,29 @@ releases/.clean-<source12>.tmp-<32 lowercase hex>
 
 ## 10. 固定 Handoff 原子切换
 
-唯一允许改变的固定入口是：
+本章原第7、8步把fixed path等价验证与installed Intake production trust合并为同一verifier输入，无法同时满足完整ref路径相等，已由后继规格替代：
+
+```text
+specs/opm-dev-canvas-06-fixed-handoff-postverify-closure-bugfix-task-spec.md
+```
+
+唯一允许改变的固定入口仍为：
 
 ```text
 handoff/dev-canvas-05-handoff.json
 ```
 
-切换必须：
+切换前6步、backup marker和旧raw SHA恢复边界保持不变；切换后的唯一验证顺序改为：
 
-1. 保存旧固定 Handoff raw bytes、SHA 和普通文件属性；
-2. 将已安装版本根内 Candidate Handoff bytes 复制到同目录 fresh temp；
-3. 复算 temp SHA，必须等于版本根 Candidate SHA；
-4. fsync temp；
-5. 一次 atomic rename 替换固定 JSON；
-6. fsync handoff 根目录；
-7. 从固定路径以 `INSTALLED` 模式重验其全部 raw ref；
-8. 以 exact fixed Handoff 重新执行 production Manifest verifier `--require-production`。
+1. 独立postverify runner读取fixed Handoff并证明其raw bytes与Intake锁定的versioned Handoff相等；
+2. 同一runner证明Manifest内Handoff副本raw bytes相等；
+3. production Manifest verifier继续以installed Intake和versioned Handoff执行`--require-production`；
+4. runner生成`READY_FOR_SWITCH_FINALIZATION` Report后，按后继规格完成backup marker删除与live guard；
+5. 任一失败恢复旧fixed exact SHA，BLOCKED/孤立READY Report不得作为当前active证据。
 
 禁止同时复制或替换固定 `handoff/reports/**`、`handoff/release/**`、Common、Manifest 或其他 alias。固定 Handoff bytes 中每个直接 raw ref 必须指向已安装的新版本根；任何 ref 指向 `reports/**`、`clean-a36a7f1fd709` 或其他版本根均阻断。
+
+禁止修改Intake、构造fixed Intake、放宽`sameRef()`、让production verifier读取fixed path或增加任何路径fallback。
 
 ## 11. 首错、失败与回滚
 
@@ -362,7 +380,7 @@ ARGUMENT -> SOURCE_IDENTITY -> RELEASE_PATH -> REPORT_SET -> REF_SHAPE -> REF_BY
 - install 后、fixed switch 前失败：保留新 final root为未激活只读证据，固定 Handoff不变；
 - fixed switch 后失败：用保存的旧 raw bytes经同目录 temp+fsync+atomic rename恢复，验证旧 SHA精确相等；新版本根保留且不得覆盖；
 - 任一阶段不得删除、改写或以同名重建 `clean-a36a7f1fd709`；
-- 重跑必须修正 source、产生新的 source commit和新的版本根，禁止复用失败版本 basename。
+- source/build/install缺陷重跑必须产生新的source commit和版本根；独立postverify工具或attempt失败可在subject bytes完全不变时按后继规格使用新tool commit或新attempt ID重跑，禁止修改既有版本根。
 
 ## 12. 测试与验收
 
@@ -409,7 +427,8 @@ package.json 必须提供覆盖同一集合的稳定入口；不得改变既有 
 - 版本根安装前切换固定 Handoff；
 - 尝试覆盖既有 final root，尤其 `clean-a36a7f1fd709`；
 - Intake 或 E2E production trust 接受 mutable report ref；
-- fixed switch 后 postverify 失败但未恢复旧 SHA。
+- fixed switch 后独立postverify失败但未恢复旧 SHA；
+- 只凭postverify READY Report、未同时验证live fixed SHA和无pending marker即继续下游。
 
 ### 12.4 正例完成条件
 
@@ -419,7 +438,7 @@ package.json 必须提供覆盖同一集合的稳定入口；不得改变既有 
 2. 新版本根 basename 与新 source SHA闭合且不同于 `clean-a36a7f1fd709`；
 3. staging/final 均满足 `17+43+manifest tree` 固定布局；
 4. Candidate Handoff READY、Intake READY，全部 direct raw ref指向同一已安装版本根；
-5. production Manifest 预验、安装后重验和固定 Handoff postverify全部通过；
+5. production Manifest 预验、安装后重验和后继独立fixed Handoff postverify全部通过；
 6. 固定 Handoff SHA等于版本根 Candidate SHA；
 7. `clean-a36a7f1fd709` 前后tree digest相等；
 8. 未生成任何下游 READY Report/Candidate/Activation，Capability保持disabled。
@@ -429,14 +448,14 @@ package.json 必须提供覆盖同一集合的稳定入口；不得改变既有 
 冻结本规格时必须同步：
 
 - `docs/README.md`；
-- `docs/design/opm-design-freeze-baseline.md` 升至 `1.26`；
-- `docs/design/opm-development-execution-pack.md` 升至 `v1.17`；
-- `docs/design/opm-test-strategy.md` 升至 `v1.17`；
+- `docs/design/opm-design-freeze-baseline.md` 由后继修正升至 `1.27`；
+- `docs/design/opm-development-execution-pack.md` 由后继修正升至 `v1.18`；
+- `docs/design/opm-test-strategy.md` 由后继修正升至 `v1.18`；
 - Family Production Input checklist 记录安装失败已由本后继规格承接；
-- E2E Manifest Builder checklist 改为 `VERSIONED_HANDOFF_REPORT_REF_CLOSURE_REQUIRED`；
-- 新增本规格对应 Checklist，冻结 Spec Mapping、执行命令、证据槽位和发布边界。
+- E2E Manifest Builder checklist在本规格执行完成后改为`FIXED_HANDOFF_POSTVERIFY_CLOSURE_REQUIRED`；
+- 本规格Checklist记录已执行source/release证据，独立postverify后继规格与Checklist冻结剩余输入、Report和live guard。
 
-全局 32 项设计责任不新增、不转为 `BLOCKED`；本问题属于 `DFR-018/019` 内部实现输入修正。全局开发门仍为 `READY_FOR_DEVELOPMENT`，但 Family production installation/fixed Handoff activation 在本规格执行完成前保持阻断。
+全局 32 项设计责任不新增、不转为 `BLOCKED`；本问题属于 `DFR-018/019` 内部实现输入修正。全局开发门仍为 `READY_FOR_DEVELOPMENT`，但fixed Handoff切换、Family Materializer和production E2E Report在后继postverify真实闭合前保持阻断。
 
 ## 14. 回滚
 
@@ -451,12 +470,12 @@ package.json 必须提供覆盖同一集合的稳定入口；不得改变既有 
 1. `clean-a36a7f1fd709` 已存在且其 source commit为完整 `a36a7f1fd709b72e66c57e5aea634da525c9c515`；
 2. 该 Candidate Handoff 的 build artifact 已版本化，但直接报告引用仍为 `reports/**`；
 3. 固定 Handoff切换已因Report length/SHA不一致回滚，当前固定 Handoff SHA为第4章值；
-4. 当前未生成或激活新的Candidate/Activation，未启用Capability；
-5. 本规格只修改设计文档，不执行 source/build/install。
+4. source commit`37c5412a9c12...`、新版本根、READY Handoff/Intake和production Manifest已经形成；
+5. 当前fixed Handoff仍为旧SHA，未生成或激活Release Candidate/Activation，未启用Capability；
+6. exact fixed Handoff不能直接替代Intake锁定的versioned path作为production verifier输入。
 
 ### 15.2 待执行验证
 
-1. 14文件source delta的最终import/production call/raw-read闭包必须在isolated source worktree复核；
-2. 新source SHA、patch SHA、版本根/tree SHA只能在执行后回填；
-3. 原子rename、fsync和postverify必须在真实handoff文件系统执行后才能成为release证据；
-4. 本规格冻结不证明production Manifest、E2E Report、Gate-06、Candidate、Activation或ISO符合性。
+1. 独立postverify tool的`4=1 M+3 A` source、测试和Report尚未实现；
+2. fixed原子rename、四方join、backup marker收尾和live guard尚未执行；
+3. 本规格及后继设计冻结不证明E2E Report、Gate-06、Candidate、Activation、Capability、production或ISO符合性。

@@ -148,6 +148,41 @@ describe("WorkbenchView", () => {
     expect(api.executeP0Command).toHaveBeenLastCalledWith("project.1", "model.1", "context.root", "revision.1", { commandType: "DELETE_CONSTRUCT", payload: { construct_kind: "STATE", construct_id: "state.material.ready", impact_token: "impact.runtime.token.001" } });
   });
 
+  it("State inspector 提供冻结的根与名称定位标识", async () => {
+    const { wrapper } = await mountWorkbench();
+
+    await wrapper.get('[data-testid="p03-canvas-select-state"]').trigger("click");
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="p03-state-inspector"]').exists()).toBe(true);
+    expect(wrapper.get('[data-testid="p03-state-inspector-name"]').element.tagName).toBe("INPUT");
+  });
+
+  it("Fact 删除仅使用Runtime返回的enabled impact token", async () => {
+    const { wrapper } = await mountWorkbench();
+    api.commandCapabilities.mockResolvedValueOnce({ data: { allowed: ["DELETE_CONSTRUCT"], forbidden: [], capability_query_id: "query.delete.fact.1", options: [{ capability_query_id: "query.delete.fact.1", option_id: "option.delete.fact.1", command_type: "DELETE_CONSTRUCT", capability_ref: { capability_id: "CAP-ISO-PROC-001" }, display_name: "删除关系", group_path: ["Fact"], normalized_endpoints: [], required_fields: [], allowed_modifiers: [], symbol_descriptor: { id: "symbol.fact", version: "0.1.0", digest: "digest" }, template_family: { id: "grammar", version: "0.1.0", digest: "digest" }, rule_refs: [], enabled: true, reason_codes: [], expires_with_revision: "revision.1", impact_summary: { affected_construct_count: 1, affected_context_count: 1, affected_sentence_count: 1, affected_finding_count: 0 }, impact_token: "impact.runtime.token.fact.001" }] } });
+
+    await wrapper.get('[data-testid="p03-canvas-select-consumption"]').trigger("click");
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="p03-fact-delete-impact"]').text()).toContain("构造 1");
+    await wrapper.get('[data-testid="p03-fact-delete-impact"] button').trigger("click");
+    await flushPromises();
+    expect(api.executeP0Command).toHaveBeenLastCalledWith("project.1", "model.1", "context.root", "revision.1", { commandType: "DELETE_CONSTRUCT", payload: { construct_kind: "FACT", construct_id: "fact.consumption", impact_token: "impact.runtime.token.fact.001" } });
+  });
+
+  it("Fact 删除在Runtime未启用或未返回impact token时不能提交", async () => {
+    const { wrapper } = await mountWorkbench();
+    api.commandCapabilities.mockResolvedValueOnce({ data: { allowed: ["DELETE_CONSTRUCT"], forbidden: [], capability_query_id: "query.delete.fact.disabled", options: [{ capability_query_id: "query.delete.fact.disabled", option_id: "option.delete.fact.disabled", command_type: "DELETE_CONSTRUCT", capability_ref: { capability_id: "CAP-ISO-PROC-001" }, display_name: "删除关系", group_path: ["Fact"], normalized_endpoints: [], required_fields: [], allowed_modifiers: [], symbol_descriptor: { id: "symbol.fact", version: "0.1.0", digest: "digest" }, template_family: { id: "grammar", version: "0.1.0", digest: "digest" }, rule_refs: [], enabled: false, reason_codes: ["READ_ONLY_REVISION"], expires_with_revision: "revision.1", impact_summary: { affected_construct_count: 1, affected_context_count: 1, affected_sentence_count: 1, affected_finding_count: 0 } }] } });
+
+    await wrapper.get('[data-testid="p03-canvas-select-consumption"]').trigger("click");
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="p03-fact-delete-impact"] button').attributes("disabled")).toBeDefined();
+    await wrapper.get('[data-testid="p03-fact-delete-impact"] button').trigger("click");
+    expect(api.executeP0Command).not.toHaveBeenCalled();
+  });
+
   it("过程关系等待用户从 Runtime 候选中明确选择后才提交", async () => {
     api.commandCapabilities.mockImplementation((...args: unknown[]) => {
       const endpointIds = args[6] as string[] | undefined;

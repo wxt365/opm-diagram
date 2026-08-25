@@ -1,0 +1,287 @@
+{
+  "schema_id": "MS-REV-001",
+  "schema_version": "0.2",
+  "revision_id": "revision.golden.proc.001.endpoints.reversed",
+  "model_id": "model.golden.proc",
+  "revision_sequence": 2,
+  "profile_binding": {
+    "profile": {
+      "id": "profile.iso19450.2024.draft",
+      "version": "0.2.0",
+      "digest": {
+        "algorithm": "sha256",
+        "digest": "5287d3ceb77c4c664b88c6e34a3a5d1c34f85c36037ab2f587705f9d607f899c"
+      }
+    },
+    "rule_set": {
+      "id": "rules.iso19450.2024.draft",
+      "version": "0.1.0",
+      "digest": {
+        "algorithm": "sha256",
+        "digest": "4293cb22cf2e2e92fe212ed3c31119992509c8a675daa554c64a2ccf10457d64"
+      }
+    },
+    "text_grammar": {
+      "id": "grammar.opl.iso19450.2024.draft",
+      "version": "0.2.0",
+      "digest": {
+        "algorithm": "sha256",
+        "digest": "c88e672bd9db7f0405a7ef3fc464043f15cae844931192e3412c94ce05339e7d"
+      }
+    },
+    "symbol_catalog": {
+      "id": "symbols.iso19450.2024.draft",
+      "version": "0.1.0",
+      "digest": {
+        "algorithm": "sha256",
+        "digest": "511dbaec2adb6f49ed6a4d28844e69d1310eb7a67f213e4a30b0ddfc21ef6098"
+      }
+    },
+    "normalization_adapter": {
+      "id": "normalization.iso19450.2024.draft",
+      "version": "0.1.0",
+      "digest": {
+        "algorithm": "sha256",
+        "digest": "6401336ad4b63127047ccd5d50cc418554f0c8490547a6024939b4da5774194c"
+      }
+    },
+    "binding_digest": {
+      "algorithm": "sha256",
+      "digest": "93805d6e2fdb3ea73c4ddfc0a995d662fbf13dee2d8a6f24fc20c79ecff65d1d"
+    }
+  },
+  "model_header": {
+    "model_id": "model.golden.proc",
+    "identity_namespace": {
+      "namespace": "urn:opm:golden",
+      "local_name": "golden-proc"
+    },
+    "name": "Golden Processing",
+    "description": "Versioned OPL golden fixture.",
+    "root_context_id": "context.sd.root"
+  },
+  "elements": [
+    {
+      "element_id": "element.raw.material",
+      "core_kind": "OBJECT",
+      "capability_ref": {
+        "capability_id": "CAP-OBJECT-001",
+        "profile_id": "profile.iso19450.2024.draft",
+        "profile_version": "0.2.0"
+      },
+      "name": {
+        "namespace": "urn:opm:golden",
+        "local_name": "Raw Material"
+      },
+      "feature_ids": [],
+      "state_ids": [
+        "state.raw.available"
+      ],
+      "source": {
+        "source_profile_id": "profile.iso19450.2024.draft",
+        "source_profile_version": "0.2.0",
+        "source_kind": "Object",
+        "source_entity_id": "profile.entity.object"
+      },
+      "normalization": {
+        "level": "CORE"
+      }
+    },
+    {
+      "element_id": "element.processing",
+      "core_kind": "PROCESS",
+      "capability_ref": {
+        "capability_id": "CAP-PROCESS-001",
+        "profile_id": "profile.iso19450.2024.draft",
+        "profile_version": "0.2.0"
+      },
+      "name": {
+        "namespace": "urn:opm:golden",
+        "local_name": "Processing"
+      },
+      "feature_ids": [],
+      "state_ids": [],
+      "source": {
+        "source_profile_id": "profile.iso19450.2024.draft",
+        "source_profile_version": "0.2.0",
+        "source_kind": "Process",
+        "source_entity_id": "profile.entity.process"
+      },
+      "normalization": {
+        "level": "CORE"
+      }
+    }
+  ],
+  "features": [],
+  "states": [
+    {
+      "state_id": "state.raw.available",
+      "owner_element_id": "element.raw.material",
+      "capability_ref": {
+        "capability_id": "CAP-STATE-001",
+        "profile_id": "profile.iso19450.2024.draft",
+        "profile_version": "0.2.0"
+      },
+      "name": {
+        "namespace": "urn:opm:golden",
+        "local_name": "available"
+      },
+      "state_roles": [
+        "INITIAL"
+      ],
+      "source": {
+        "source_profile_id": "profile.iso19450.2024.draft",
+        "source_profile_version": "0.2.0",
+        "source_kind": "State",
+        "source_entity_id": "profile.entity.state"
+      },
+      "normalization": {
+        "level": "CORE"
+      }
+    }
+  ],
+  "facts": [
+    {
+      "fact_id": "fact.golden.proc.001.endpoints.reversed",
+      "fact_family": "TRANSFORMATION",
+      "capability_ref": {
+        "capability_id": "CAP-ISO-PROC-001",
+        "profile_id": "profile.iso19450.2024.draft",
+        "profile_version": "0.2.0"
+      },
+      "endpoints": [
+        {
+          "endpoint_id": "endpoint.consumed",
+          "role": "CONSUMED_OBJECT",
+          "target_kind": "ELEMENT",
+          "target_id": "element.processing",
+          "ordinal": 0
+        },
+        {
+          "endpoint_id": "endpoint.process",
+          "role": "CONSUMING_PROCESS",
+          "target_kind": "ELEMENT",
+          "target_id": "element.raw.material",
+          "ordinal": 1
+        }
+      ],
+      "direction": "DIRECTED",
+      "source": {
+        "source_profile_id": "profile.iso19450.2024.draft",
+        "source_profile_version": "0.2.0",
+        "source_kind": "GoldenFixture",
+        "source_entity_id": "profile.fact.proc.001.endpoints.reversed"
+      },
+      "normalization": {
+        "level": "CORE"
+      }
+    }
+  ],
+  "contexts": [
+    {
+      "context_id": "context.sd.root",
+      "context_kind": "SYSTEM_DIAGRAM",
+      "capability_ref": {
+        "capability_id": "CAP-CONTEXT-001",
+        "profile_id": "profile.iso19450.2024.draft",
+        "profile_version": "0.2.0"
+      },
+      "name": {
+        "namespace": "urn:opm:golden",
+        "local_name": "SD"
+      },
+      "occurrence_ids": [
+        "occurrence.raw",
+        "occurrence.process",
+        "occurrence.state",
+        "occurrence.fact"
+      ],
+      "source": {
+        "source_profile_id": "profile.iso19450.2024.draft",
+        "source_profile_version": "0.2.0",
+        "source_kind": "SystemDiagram",
+        "source_entity_id": "profile.context.system.diagram"
+      }
+    }
+  ],
+  "occurrences": [
+    {
+      "occurrence_id": "occurrence.raw",
+      "context_id": "context.sd.root",
+      "target_kind": "ELEMENT",
+      "target_id": "element.raw.material",
+      "ownership": "OWNED",
+      "construct_role": "OBJECT_NODE",
+      "layout_id": "layout.raw"
+    },
+    {
+      "occurrence_id": "occurrence.process",
+      "context_id": "context.sd.root",
+      "target_kind": "ELEMENT",
+      "target_id": "element.processing",
+      "ownership": "OWNED",
+      "construct_role": "PROCESS_NODE",
+      "layout_id": "layout.process"
+    },
+    {
+      "occurrence_id": "occurrence.state",
+      "context_id": "context.sd.root",
+      "target_kind": "STATE",
+      "target_id": "state.raw.available",
+      "ownership": "OWNED",
+      "construct_role": "STATE_NODE",
+      "layout_id": "layout.state"
+    },
+    {
+      "occurrence_id": "occurrence.fact",
+      "context_id": "context.sd.root",
+      "target_kind": "FACT",
+      "target_id": "fact.golden.proc.001.endpoints.reversed",
+      "ownership": "OWNED",
+      "construct_role": "PROCEDURAL_LINK",
+      "layout_id": "layout.fact"
+    }
+  ],
+  "layouts": [
+    {
+      "layout_id": "layout.raw",
+      "x": 0,
+      "y": 0,
+      "width": 160,
+      "height": 72,
+      "z_order": 1
+    },
+    {
+      "layout_id": "layout.process",
+      "x": 200,
+      "y": 0,
+      "width": 168,
+      "height": 84,
+      "z_order": 1
+    },
+    {
+      "layout_id": "layout.state",
+      "x": 20,
+      "y": 20,
+      "width": 88,
+      "height": 28,
+      "z_order": 2
+    },
+    {
+      "layout_id": "layout.fact",
+      "x": 0,
+      "y": 0,
+      "width": 1,
+      "height": 1,
+      "z_order": 0
+    }
+  ],
+  "state_presentations": [],
+  "schema_set_ref": {
+    "core_metamodel_version": "0.2",
+    "profile_schema_version": "0.2",
+    "rule_schema_version": "0.1",
+    "storage_schema_version": "1.0"
+  },
+  "parent_revision_id": "revision.base.golden.proc.001"
+}
