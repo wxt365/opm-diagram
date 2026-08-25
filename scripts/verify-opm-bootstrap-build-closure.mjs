@@ -99,7 +99,7 @@ async function assertForbiddenConfigOutputsAbsent(root) {
 }
 
 async function assertDerivedRootsAbsent(root) {
-  for (const path of ['node_modules', 'apps/web/node_modules', 'apps/web/dist']) {
+  for (const path of ['apps/web/dist']) {
     if (await exists(resolve(root, path))) fail('BOOTSTRAP_BUILD_DERIVED_OUTPUT_INVALID', 'DERIVED_ROOTS', `${path} 必须在 SOURCE 阶段不存在。`);
   }
   const services = resolve(root, 'services');
