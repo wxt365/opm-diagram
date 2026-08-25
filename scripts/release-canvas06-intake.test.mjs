@@ -39,6 +39,18 @@ test('incorrect handoff digest produces a schema-valid BLOCKED report', async ()
   } finally { await rm(directory, { recursive: true, force: true }); }
 });
 
+test('production Intake rejects historical Handoff 0.1', async () => {
+  const directory = await mkdtemp(resolve(tmpdir(), 'opm-canvas06-intake-'));
+  try {
+    const output = resolve(directory, 'intake.json');
+    const result = spawnSync(process.execPath, [runner, '--handoff-root', handoffRoot, '--handoff', handoff, '--handoff-sha256', digest, '--out', output, '--require-production'], { cwd: root, encoding: 'utf8' });
+    assert.equal(result.status, 3, result.stderr);
+    const report = JSON.parse(await readFile(output, 'utf8'));
+    assert.equal(report.intake_status, 'BLOCKED');
+    assert.ok(report.blockers.some(item => item.code === 'CANVAS06_HANDOFF_NOT_READY'));
+  } finally { await rm(directory, { recursive: true, force: true }); }
+});
+
 function run(output, handoffDigest) {
   return spawnSync(process.execPath, [runner, '--handoff-root', handoffRoot, '--handoff', handoff, '--handoff-sha256', handoffDigest, '--out', output], { cwd: root, encoding: 'utf8' });
 }

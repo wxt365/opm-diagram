@@ -6,18 +6,21 @@ import addFormats from 'ajv-formats';
 
 import { E2eManifestInputError } from './canvas06-e2e-manifest-v01-input.mjs';
 import { verifyControlledInputBundle } from './verify-canvas06-controlled-input-bundle.mjs';
+import { assertArtifactOrder, assertTreeRef } from './canvas06-unified-production-input.mjs';
 
 const schemas = await Promise.all(['opm-dev-canvas-06-intake-report.schema.json', 'opm-dev-canvas-05-handoff.schema.json'].map(async name => JSON.parse(await readFile(new URL(`../docs/contracts/schemas/${name}`, import.meta.url), 'utf8'))));
 const ajv = new Ajv2020({ allErrors: true, strict: false });
 addFormats(ajv);
 const [validateIntake, validateHandoff] = schemas.map(schema => ajv.compile(schema));
+const handoffV02Schema = JSON.parse(await readFile(new URL('../docs/contracts/schemas/opm-dev-canvas-05-handoff-v02.schema.json', import.meta.url), 'utf8'));
+const validateHandoffV02 = ajv.compile(handoffV02Schema);
 
 export async function loadReadyTrustChain({ root, intakePath, handoffPath }) {
   const base = resolve(root);
   const intake = await readJsonRef(base, intakePath, 'INTAKE_REPORT');
   const handoff = await readJsonRef(base, handoffPath, 'HANDOFF');
   if (!validateIntake(intake.value) || intake.value.intake_status !== 'READY_FOR_RELEASE_VALIDATION') fail('E2E_MANIFEST_INTAKE_INVALID', 'READY Intake Report is required.');
-  if (!validateHandoff(handoff.value) || handoff.value.handoff_status !== 'READY_FOR_DEV_CANVAS_06' || handoff.value.blockers.length !== 0) fail('E2E_MANIFEST_INTAKE_INVALID', 'READY Handoff is required.');
+  if (!validHandoff(handoff.value) || handoff.value.handoff_status !== 'READY_FOR_DEV_CANVAS_06' || handoff.value.blockers.length !== 0) fail('E2E_MANIFEST_INTAKE_INVALID', 'READY Handoff is required.');
   if (!sameRef(intake.value.handoff_ref, handoff.ref)) fail('E2E_MANIFEST_HANDOFF_MISMATCH', 'Intake handoff ref differs from supplied Handoff bytes.');
   return { intake, handoff };
 }
@@ -34,6 +37,20 @@ export async function loadControlledReadyTrustChain({ bundleRoot }) {
   return { bundle, ...(await loadReadyTrustChain({ root: bundle.root, intakePath, handoffPath })) };
 }
 
+// 供后继 Manifest v02 读取；不改变历史 v01 composer 的信任语义。
+export async function loadProductionReadyTrustChain({ root, intakePath, handoffPath }) {
+  const chain = await loadReadyTrustChain({ root, intakePath, handoffPath });
+  const handoff = chain.handoff.value;
+  if (!validateHandoffV02(handoff) || handoff.schema_version !== '0.2') fail('E2E_MANIFEST_INTAKE_INVALID', 'Production chain requires Handoff 0.2.');
+  try {
+    assertArtifactOrder(handoff, handoff.source_build.source_commit.slice(0, 12));
+    await assertTreeRef(resolve(root), handoff.build_artifacts[2], 'CANVAS06_UNIFIED_WEB_TREE_INVALID');
+  } catch (error) {
+    fail('E2E_MANIFEST_INTAKE_INVALID', error.message);
+  }
+  return chain;
+}
+
 export async function readJsonRef(root, path, kind) {
   const file = resolveInside(root, path);
   await assertRegularFile(file);
@@ -44,6 +61,7 @@ export async function readJsonRef(root, path, kind) {
 }
 
 function sameRef(left, right) { return left?.path === right?.path && left?.byte_length === right?.byte_length && left?.sha256 === right?.sha256; }
+function validHandoff(value) { return value?.schema_version === '0.2' ? validateHandoffV02(value) : validateHandoff(value); }
 function resolveInside(root, path) { const output = resolve(root, path); const rel = relative(root, output); if (!path || path.startsWith('/') || path.includes('\\') || !rel || rel === '..' || rel.startsWith(`..${sep}`)) fail('E2E_MANIFEST_INPUT_REF_MISMATCH', 'Input ref escapes root.'); return output; }
 async function assertRegularFile(path) { try { const info = await lstat(path); if (info.isSymbolicLink() || !info.isFile() || info.nlink !== 1) throw new Error(); } catch { fail('E2E_MANIFEST_INPUT_REF_MISMATCH', 'Input ref must be a non-linked regular file.'); } }
 function sha(bytes) { return createHash('sha256').update(bytes).digest('hex'); }
