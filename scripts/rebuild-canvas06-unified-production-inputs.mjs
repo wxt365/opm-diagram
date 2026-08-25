@@ -27,7 +27,9 @@ async function rebuild(options) {
   for (const path of ['node_modules', 'apps/web/dist', 'services/local-runtime/target']) await absent(resolve(sourceRoot, path), 'CANVAS06_UNIFIED_SOURCE_DIRTY', 'ABSENT_IGNORED_OUTPUTS');
   try {
     run(sourceRoot, 'npm', ['ci', '--ignore-scripts']);
+    runBootstrapClosure(sourceRoot, 'SOURCE');
     run(sourceRoot, process.execPath, [resolve(sourceRoot, 'scripts/build-dev-canvas-05-release.mjs'), '--release-root', stagingRoot, '--logical-release-root', options.out]);
+    runBootstrapClosure(sourceRoot, 'POST');
     run(sourceRoot, process.execPath, [resolve(sourceRoot, 'scripts/generate-dev-canvas-05-handoff.mjs'), '--output', resolve(stagingRoot, 'dev-canvas-05-handoff.json'), '--release-build', resolve(stagingRoot, 'dev-canvas-05-release-build.json'), '--report-root', resolve(stagingRoot, 'handoff/reports'), '--logical-root', options.out]);
     await mkdir(dirname(finalRoot), { recursive: true });
     await rename(stagingRoot, finalRoot);
@@ -49,6 +51,7 @@ function assertSource(sourceRoot, options) {
 }
 async function absent(path, code, stage) { try { await lstat(path); fail(code, stage, `路径已存在：${path}`); } catch (error) { if (error.code !== 'ENOENT') throw error; } }
 function run(cwd, file, args) { const result = spawnSync(file, args, { cwd, encoding: 'utf8', env: process.env }); if (result.status !== 0) fail('CANVAS06_UNIFIED_BUILD_FAILED', 'BUILD', `${file} 失败：${result.stderr || result.stdout}`); }
+function runBootstrapClosure(cwd, phase) { run(cwd, process.execPath, [resolve(cwd, 'scripts/verify-opm-bootstrap-build-closure.mjs'), '--phase', phase]); }
 function command(cwd, args) { return execFileSync('git', args, { cwd, encoding: 'utf8' }); }
 function commitEpoch(cwd, commit) { return command(cwd, ['show', '-s', '--format=%ct', commit]).trim(); }
 function sha(cwd, path) { return execFileSync('shasum', ['-a', '256', path], { cwd, encoding: 'utf8' }).trim().split(/\s+/)[0]; }

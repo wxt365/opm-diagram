@@ -30,8 +30,6 @@ run('npm', ['run', 'golden:replay']);
 run('npm', ['run', 'compatibility:replay']);
 run('npm', ['run', 'handoff:evidence']);
 run('./mvnw', ['-o', '-pl', 'services/local-runtime', 'package', '-DskipTests']);
-// vue-tsc 会为 vite.config.ts 产生未跟踪声明文件，不能进入 Handoff 的 source identity。
-await rm(resolve('apps/web/vite.config.d.ts'), { force: true });
 
 const jar = resolve('services/local-runtime/target/local-runtime-0.1.0-SNAPSHOT.jar');
 await stat(jar);
