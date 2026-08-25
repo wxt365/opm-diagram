@@ -24,7 +24,6 @@ if (versionedRoot && !/^releases\/clean-[a-f0-9]{12}$/.test(versionedRoot)) thro
 
 const sourceCommit = command(['rev-parse', 'HEAD']).trim();
 const commandText = 'npm run build && npm run golden:coverage && npm run golden:replay && npm run compatibility:replay && npm run handoff:evidence && ./mvnw -o -pl services/local-runtime package -DskipTests';
-run('npm', ['run', 'build']);
 run('npm', ['run', 'golden:coverage']);
 run('npm', ['run', 'golden:replay']);
 run('npm', ['run', 'compatibility:replay']);

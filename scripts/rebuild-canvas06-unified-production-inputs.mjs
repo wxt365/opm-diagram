@@ -28,8 +28,9 @@ async function rebuild(options) {
   try {
     run(sourceRoot, 'npm', ['ci', '--ignore-scripts']);
     runBootstrapClosure(sourceRoot, 'SOURCE');
-    run(sourceRoot, process.execPath, [resolve(sourceRoot, 'scripts/build-dev-canvas-05-release.mjs'), '--release-root', stagingRoot, '--logical-release-root', options.out]);
+    run(sourceRoot, 'npm', ['run', 'build']);
     runBootstrapClosure(sourceRoot, 'POST');
+    run(sourceRoot, process.execPath, [resolve(sourceRoot, 'scripts/build-dev-canvas-05-release.mjs'), '--release-root', stagingRoot, '--logical-release-root', options.out]);
     run(sourceRoot, process.execPath, [resolve(sourceRoot, 'scripts/generate-dev-canvas-05-handoff.mjs'), '--output', resolve(stagingRoot, 'dev-canvas-05-handoff.json'), '--release-build', resolve(stagingRoot, 'dev-canvas-05-release-build.json'), '--report-root', resolve(stagingRoot, 'handoff/reports'), '--logical-root', options.out]);
     await mkdir(dirname(finalRoot), { recursive: true });
     await rename(stagingRoot, finalRoot);
