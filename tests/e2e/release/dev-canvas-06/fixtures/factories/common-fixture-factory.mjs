@@ -16,6 +16,18 @@ export const e2eCases = [
   'E2E-CANVAS-007.PERSISTENCE_FAILED', 'E2E-CANVAS-007.READONLY'
 ];
 
+const blockedCommonCases = Object.freeze({
+  'E2E-CANVAS-005.AMBIGUOUS_OPTIONS_NOT_AUTOCOMMITTED': undefined,
+  'E2E-CANVAS-005.STALE_OPTION_BLOCKED': 'DOMAIN_REJECTED',
+  'E2E-CANVAS-006.STALE_TOKEN_BLOCKED': 'REVISION_CONFLICT',
+  'E2E-CANVAS-006.MISMATCHED_TOKEN_BLOCKED': 'DOMAIN_REJECTED',
+  'E2E-CANVAS-007.ASSET_MISSING': 'TEXT_GENERATION_BLOCKED',
+  'E2E-CANVAS-007.TEXT_BLOCKED': 'DOMAIN_REJECTED',
+  'E2E-CANVAS-007.REVISION_CONFLICT': 'REVISION_CONFLICT',
+  'E2E-CANVAS-007.PERSISTENCE_FAILED': 'PERSISTENCE_FAILED',
+  'E2E-CANVAS-007.READONLY': 'READ_ONLY_REVISION'
+});
+
 export function visualFixture(subjectId) {
   return {
     fixture_id: `fixture.visual.${subjectId.toLowerCase()}`,
@@ -147,7 +159,9 @@ function projectionFor(subjectId, slug, revision, shared, setup) {
 function by(key) { return (left, right) => left[key].localeCompare(right[key]); }
 
 export function e2eFixture(caseId) {
-  const blocked = /AMBIGUOUS|STALE|MISMATCHED|ASSET_MISSING|TEXT_BLOCKED|CONFLICT|PERSISTENCE_FAILED|READONLY/.test(caseId);
+  if (!e2eCases.includes(caseId)) throw new TypeError(`Unknown Common E2E case: ${caseId}`);
+  const blocked = Object.hasOwn(blockedCommonCases, caseId);
+  const errorCode = blockedCommonCases[caseId];
   return {
     fixture_id: `fixture.e2e.${caseId.toLowerCase()}`,
     case_id: caseId,
@@ -157,7 +171,7 @@ export function e2eFixture(caseId) {
     action: {
       action_id: 'action.001',
       expected_status: blocked ? 'BLOCKED_MATCHED' : 'PASS_MATCHED',
-      ...(blocked ? { expected_error_code: 'DOMAIN_REJECTED' } : {}),
+      ...(errorCode ? { expected_error_code: errorCode } : {}),
       expected_transaction: transaction(blocked),
       reopen_checkpoint: { expected_head_changed: !blocked, projection_matches: true, text_trace_matches: true }
     }
