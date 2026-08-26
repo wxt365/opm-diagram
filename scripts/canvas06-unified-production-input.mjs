@@ -2,14 +2,11 @@ import { createHash } from 'node:crypto';
 import { constants } from 'node:fs';
 import { link, lstat, mkdir, open, readdir, readFile, unlink } from 'node:fs/promises';
 import { isAbsolute, relative, resolve, sep } from 'node:path';
-import Ajv2020 from 'ajv/dist/2020.js';
 
 import { jcs } from './canvas06-e2e-manifest-v01-support.mjs';
 
-const QUARANTINE_SCHEMA = JSON.parse(await readFile(new URL('../docs/contracts/schemas/opm-dev-canvas-06-unified-source-quarantine-marker.schema.json', import.meta.url), 'utf8'));
-const validateQuarantineMarker = new Ajv2020({ allErrors: true, strict: false }).compile(QUARANTINE_SCHEMA);
-const QUARANTINE_FAILURE_CODES = new Set(QUARANTINE_SCHEMA.properties.failure_code.enum);
-const QUARANTINE_FAILURE_STAGES = new Set(QUARANTINE_SCHEMA.properties.failure_stage.enum);
+const QUARANTINE_FAILURE_CODES = new Set(['CANVAS06_UNIFIED_HANDOFF_INVALID', 'CANVAS06_UNIFIED_INTAKE_INVALID', 'CANVAS06_UNIFIED_WEB_TREE_INVALID', 'CANVAS06_UNIFIED_COMMON_INVALID', 'CANVAS06_UNIFIED_JOIN_MISMATCH', 'CANVAS06_UNIFIED_TRANSACTION_FAILED']);
+const QUARANTINE_FAILURE_STAGES = new Set(['FSYNC_RELEASES_PARENT', 'SPAWN_INDEPENDENT_INSTALLED_VERIFIER', 'INSTALLED_REVERIFY_HANDOFF_INTAKE_WEB_COMMON']);
 
 export const BASE_SOURCE_COMMIT = 'daf383df6d7faad866b84fceac0a2c9111a8c926';
 export const SOURCE_PATHS = Object.freeze({
@@ -154,7 +151,7 @@ export async function writeQuarantineMarker({ handoffRoot, sourceCommit, inputRo
     schema_id: 'OPM-DEV-CANVAS-06-UNIFIED-SOURCE-QUARANTINE-MARKER-001', schema_version: '0.1', status: 'QUARANTINED', input_root: inputRoot,
     source_commit: sourceCommit, pre_quarantine_tree_sha256: treeSha256, failure_code: failureCode, failure_stage: failureStage
   };
-  if (!validateQuarantineMarker(value)) fail('CANVAS06_UNIFIED_TRANSACTION_FAILED', 'QUARANTINE_MARKER_SCHEMA', JSON.stringify(validateQuarantineMarker.errors));
+  if (!validQuarantineMarker(value)) fail('CANVAS06_UNIFIED_TRANSACTION_FAILED', 'QUARANTINE_MARKER_SCHEMA', 'quarantine marker 不符合冻结 Schema。');
   const bytes = Buffer.from(`${JSON.stringify(value, null, 2)}\n`, 'utf8');
   const paths = quarantinePaths(handoffRoot, sourceCommit);
   try {
@@ -170,7 +167,7 @@ export async function writeQuarantineMarker({ handoffRoot, sourceCommit, inputRo
     try { await handle.writeFile(bytes); await handle.sync(); } finally { await handle.close(); }
     const reread = await readFile(paths.temporary);
     const parsed = JSON.parse(reread.toString('utf8'));
-    if (!reread.equals(bytes) || !validateQuarantineMarker(parsed) || JSON.stringify(parsed) !== JSON.stringify(value)) fail('CANVAS06_UNIFIED_TRANSACTION_FAILED', 'REREAD_RAW_AND_SCHEMA_SEMANTIC_VERIFY', 'quarantine marker 回读不匹配。');
+    if (!reread.equals(bytes) || !validQuarantineMarker(parsed) || JSON.stringify(parsed) !== JSON.stringify(value)) fail('CANVAS06_UNIFIED_TRANSACTION_FAILED', 'REREAD_RAW_AND_SCHEMA_SEMANTIC_VERIFY', 'quarantine marker 回读不匹配。');
     await link(paths.temporary, paths.marker);
     await unlink(paths.temporary);
     await syncDirectory(paths.quarantine);
@@ -230,3 +227,10 @@ async function directory(path, code) {
 async function existing(path) { try { return await lstat(path); } catch (error) { if (error?.code === 'ENOENT') return undefined; fail('CANVAS06_UNIFIED_TRANSACTION_FAILED', 'EXACT_QUARANTINE_SIDECAR_GUARD', error.message); } }
 async function existingDirectory(path) { const info = await existing(path); if (!info) return false; if (!info.isDirectory() || info.isSymbolicLink()) fail('CANVAS06_UNIFIED_TRANSACTION_FAILED', 'EXACT_QUARANTINE_SIDECAR_GUARD', 'quarantine 目录不安全。'); return true; }
 async function syncDirectory(path) { const handle = await open(path, constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW); try { await handle.sync(); } finally { await handle.close(); } }
+function validQuarantineMarker(value) {
+  const keys = ['schema_id', 'schema_version', 'status', 'input_root', 'source_commit', 'pre_quarantine_tree_sha256', 'failure_code', 'failure_stage'];
+  return value && typeof value === 'object' && !Array.isArray(value) && JSON.stringify(Object.keys(value)) === JSON.stringify(keys)
+    && value.schema_id === 'OPM-DEV-CANVAS-06-UNIFIED-SOURCE-QUARANTINE-MARKER-001' && value.schema_version === '0.1' && value.status === 'QUARANTINED'
+    && /^releases\/clean-[a-f0-9]{12}$/.test(value.input_root) && /^[a-f0-9]{40}$/.test(value.source_commit) && value.input_root === `releases/clean-${value.source_commit.slice(0, 12)}`
+    && /^[a-f0-9]{64}$/.test(value.pre_quarantine_tree_sha256) && QUARANTINE_FAILURE_CODES.has(value.failure_code) && QUARANTINE_FAILURE_STAGES.has(value.failure_stage);
+}
