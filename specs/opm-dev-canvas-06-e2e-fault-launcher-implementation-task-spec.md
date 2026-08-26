@@ -1,12 +1,12 @@
 # Spec: DEV-CANVAS-06 E2E Fault Launcher 实现
 
-文档状态：`FROZEN_FOR_IMPLEMENTATION`
+文档状态：`FROZEN_FOR_IMPLEMENTATION/BLOCKED_BY_PREFLIGHT_DESCRIPTOR_CONTRACT_IMPLEMENTATION`
 
-实现状态：`IN_PROGRESS`
+实现状态：`BASELINE_IMPLEMENTED/CONTROLLED_PLAYWRIGHT_NOT_STARTED`
 
-Build准入：`READY_FOR_BUILD`
+Build准入：`BLOCKED_BY_PREFLIGHT_DESCRIPTOR_CONTRACT_IMPLEMENTATION`
 
-受控source commit准入：`BLOCKED_BY_BASE_INTAKE`
+受控source commit准入：`ORIGIN_BASE_READY/CONTRACT_CLEAN_BASE_NOT_CREATED/2A_COMMIT_NOT_CREATED`
 
 ## Task Type
 
@@ -20,17 +20,19 @@ Build准入：`READY_FOR_BUILD`
 
 ## 1. 目标
 
-实现 `docs/design/opm-dev-canvas-06-e2e-fault-launcher-design.md v1.1`，使三个 Common 故障 case 的 `INITIAL` cycle 在 exact Runtime JAR 中通过 test-only、fail-closed 的 Spring 装配产生真实产品错误，同时保证普通启动、191个 `NONE` INITIAL 和全部194个 `REOPEN` 永远只装配 NOOP。
+实现 `docs/design/opm-dev-canvas-06-e2e-fault-launcher-design.md v1.2`，使三个 Common 故障 case 的 `INITIAL` cycle 在 exact Runtime JAR 中通过 test-only、fail-closed 的 Spring 装配产生真实产品错误，同时保证普通启动、191个 `NONE` INITIAL 和全部194个 `REOPEN` 永远只装配 NOOP。
 
 本实现包只关闭 Fault Launcher、三个产品 hook、错误映射、Common 故障输入及受控验证，不生成 production `194/388` Report，不提升 `GATE-06-03`、Candidate、Activation、Capability 或 ISO 状态。
 
 ## 2. 权威输入
 
-1. Fault Launcher 唯一语义输入：`docs/design/opm-dev-canvas-06-e2e-fault-launcher-design.md v1.1`；
+1. Fault Launcher 唯一语义输入：`docs/design/opm-dev-canvas-06-e2e-fault-launcher-design.md v1.2`；
 2. Fault Plan 唯一机器输入：`OPM-DEV-CANVAS-06-E2E-FAULT-PLAN-001/0.2`，由活动 Attempt Artifact `0.2` union Schema承接；
 3. Runner、Manifest、Profile asset、JAR identity和Attempt输出继续受 E2E Runner规格、Profile/Digest closure及既有Schema约束；
 4. Common活动输入由 `tests/e2e/release/dev-canvas-06/fixtures/factories/common-fixture-factory.mjs` 唯一生成，活动Catalog版本仍为`0.2.0`；
-5. Spring Boot版本固定为根POM锁定的`3.5.10`，EnvironmentPostProcessor注册采用该版本实际支持的`META-INF/spring.factories`。
+5. Spring Boot版本固定为根POM锁定的`3.5.10`，EnvironmentPostProcessor注册采用该版本实际支持的`META-INF/spring.factories`；
+6. `0dcaa27...`、36项只读raw ref和唯一`2 A`逻辑范围由Clean Base闭包规格冻结；Bundle `0.2`、Descriptor/JarIT/Gate Observation `0.1`、D10A/D10B和当前Build阻断以后继Preflight Descriptor/Gate Observation闭包规格为活动覆盖输入；
+7. 后继contract包必须先形成新clean base intake，2A final commit以该commit为唯一parent。新base未形成前禁止创建、amend或cherry-pick 2A commit。
 
 ## 3. 非目标与硬禁止
 
@@ -55,11 +57,11 @@ Build准入：`READY_FOR_BUILD`
 
 ## 4. 精确 Source Delta Allowlist
 
-实现提交只允许修改或新增以下路径。未列文件一律禁止进入source commit。
+旧38路径集合不再是可修改allowlist。活动实现边界固定为`36 READ_ONLY_BASELINE + 2 A`：第4.1至4.4节及第4.5节前12项均为只读基线，只有第4.5节最后两个controlled Playwright路径允许新增。未列文件以及36项基线一律禁止进入2A source commit。
 
-非文档source delta固定为38个精确逻辑路径；第4.1至4.5节逐项集合必须与该集合相等。Common factory及其测试改由Common Driver实现规格唯一拥有，不得同时进入Fault Launcher delta。`M/A`分类只允许相对于第4.7节接纳后的exact clean base commit计算，不能按当前工作树文件是否存在推断。
+origin base固定为`0dcaa27a92693feaf28b731ebed2f81a9ccea02c`。该base中旧38路径恰为36项存在、2项不存在；36项完整`path/byte_length/sha256`和有序集合摘要`69491a6226cd98b9a5028fec31457e885c86020dbab4e57c381b75f4389b411e`由Clean Base闭包规格第6章唯一冻结。后继contract包必须以该origin base为唯一parent形成新clean base；最终2A commit再以新base为唯一parent，且相对新base的delta逐项等于两个`A`。Common factory及其测试仍由Common Driver实现规格唯一拥有。
 
-### 4.1 生产Java与构建文件：`7 paths`
+### 4.1 生产Java与构建文件：`7 READ_ONLY_BASELINE`
 
 1. `services/local-runtime/pom.xml`
 2. `services/local-runtime/src/main/java/org/opm/localruntime/LocalRuntimeApplication.java`
@@ -69,11 +71,11 @@ Build准入：`READY_FOR_BUILD`
 6. `services/local-runtime/src/main/java/org/opm/localruntime/assets/ProfilePackageAssembler.java`
 7. `services/local-runtime/src/main/java/org/opm/localruntime/storage/SqliteRevisionCommitRepository.java`
 
-`services/local-runtime/pom.xml`只允许新增一个resource映射：从`../../docs/contracts/schemas`选择`opm-dev-canvas-06-e2e-attempt-artifact-v02.schema.json`，以原始bytes写入JAR路径`releaseevidence/schema/opm-dev-canvas-06-e2e-attempt-artifact-v02.schema.json`。不得改依赖、插件版本或其他resource。
+上述bytes已进入base，本2A包不得修改。既有`services/local-runtime/pom.xml`资源映射只允许从`../../docs/contracts/schemas`选择`opm-dev-canvas-06-e2e-attempt-artifact-v02.schema.json`，并以原始bytes写入JAR路径`releaseevidence/schema/opm-dev-canvas-06-e2e-attempt-artifact-v02.schema.json`；后继独立bugfix若需修复，也不得改依赖、插件版本或其他resource。
 
 该活动Schema raw SHA-256固定为`3508290bf1d1d5f7d297ea48e69fdb4e1ebaf4f907b936b30cd4b769d6a916b4`。实现把该值写为`E2EFaultPlanVerifier.EXPECTED_SCHEMA_SHA256`常量；Schema bytes或常量任一变化都必须先升级本规格，不得运行时读取checkout补齐。
 
-### 4.2 新增Fault Launcher Java：`10 paths`
+### 4.2 Fault Launcher Java：`10 READ_ONLY_BASELINE`
 
 固定包：`services/local-runtime/src/main/java/org/opm/localruntime/releaseevidence/fault/`
 
@@ -90,7 +92,7 @@ Build准入：`READY_FOR_BUILD`
 
 不得增加第二个fault包、通用插件框架、公共SPI或预留扩展点。
 
-### 4.3 Spring注册资源：`1 path`
+### 4.3 Spring注册资源：`1 READ_ONLY_BASELINE`
 
 `services/local-runtime/src/main/resources/META-INF/spring.factories`
 
@@ -103,7 +105,7 @@ org.opm.localruntime.releaseevidence.fault.E2EFaultLauncherEnvironmentPostProces
 
 不得使用不存在的EnvironmentPostProcessor `.imports`约定，不得注册ApplicationListener、FailureAnalyzer或production auto-configuration。
 
-### 4.4 Runner source：`6 paths`
+### 4.4 Runner source：`6 READ_ONLY_BASELINE`
 
 1. `scripts/release-canvas06-e2e-run.mjs`
 2. `scripts/release-canvas06-e2e-run.test.mjs`
@@ -113,9 +115,9 @@ org.opm.localruntime.releaseevidence.fault.E2EFaultLauncherEnvironmentPostProces
 6. `scripts/verify-canvas06-e2e-report.test.mjs`
 Common factory及16项映射只按Common Driver实现规格修改。Runner只允许增加challenge、raw SHA、命令组装、READY等待、INITIAL/REOPEN分支和进程证据；不得在本切片修改Report聚合、failure precedence或source set 23项Schema。
 
-### 4.5 Java与受控E2E测试：`14 paths`
+### 4.5 Java测试基线与受控E2E新增：`12 READ_ONLY_BASELINE + 2 A`
 
-新增：
+只读基线：
 
 1. `services/local-runtime/src/test/java/org/opm/localruntime/releaseevidence/fault/E2EFaultLauncherArgumentsTest.java`
 2. `services/local-runtime/src/test/java/org/opm/localruntime/releaseevidence/fault/E2EFaultPlanVerifierTest.java`
@@ -124,16 +126,17 @@ Common factory及16项映射只按Common Driver实现规格修改。Runner只允
 5. `services/local-runtime/src/test/java/org/opm/localruntime/releaseevidence/fault/E2EFaultLauncherJarIT.java`
 6. `services/local-runtime/src/test/java/org/opm/localruntime/releaseevidence/fault/E2EFaultHookIntegrationTest.java`
 7. `services/local-runtime/src/test/java/org/opm/localruntime/releaseevidence/fault/E2EFaultRecoveryIsolationTest.java`
-8. `tests/e2e/release/dev-canvas-06/fault-launcher.controlled.spec.ts`
-9. `scripts/canvas06-e2e-fault-launcher-controlled.test.mjs`
+8. `services/local-runtime/src/test/java/org/opm/localruntime/LocalRuntimeApplicationTest.java`
+9. `services/local-runtime/src/test/java/org/opm/localruntime/application/LocalApiServiceTest.java`
+10. `services/local-runtime/src/test/java/org/opm/localruntime/command/CandidateRevisionCommitterTest.java`
+11. `services/local-runtime/src/test/java/org/opm/localruntime/assets/ProfilePackageAssemblerTest.java`
+12. `services/local-runtime/src/test/java/org/opm/localruntime/storage/SqliteRevisionCommitRepositoryTest.java`
 
-允许同步既有回归测试：
+唯一允许新增：
 
-1. `services/local-runtime/src/test/java/org/opm/localruntime/LocalRuntimeApplicationTest.java`
-2. `services/local-runtime/src/test/java/org/opm/localruntime/application/LocalApiServiceTest.java`
-3. `services/local-runtime/src/test/java/org/opm/localruntime/command/CandidateRevisionCommitterTest.java`
-4. `services/local-runtime/src/test/java/org/opm/localruntime/assets/ProfilePackageAssemblerTest.java`
-5. `services/local-runtime/src/test/java/org/opm/localruntime/storage/SqliteRevisionCommitRepositoryTest.java`
+1. `tests/e2e/release/dev-canvas-06/fault-launcher.controlled.spec.ts`
+2. `scripts/canvas06-e2e-fault-launcher-controlled.test.mjs`
+
 受控test/spec不进入Runner Source Set、不复制进production Report root，也不能冒充production evidence。
 
 ### 4.6 文档状态文件
@@ -142,19 +145,25 @@ Common factory及16项映射只按Common Driver实现规格修改。Runner只允
 
 ### 4.7 Clean Base Intake
 
-本地Build可以按前述38路径开始；形成受控source commit前必须先生成并验证一份base intake，至少记录：
+base intake已接纳为：
 
 ```text
-base_source_commit=<40 lowerhex>
+base_source_commit=0dcaa27a92693feaf28b731ebed2f81a9ccea02c
+base_parent_commit=e598b305a44ebb9c9845c1f5563bc36c3a89a2b4
+base_tree=ed8a3093e37a858a1a26f40c2c549ded9de8c4b8
+base_committer_epoch=1787730276
+base_patch_sha256=28d64b7cd68a1cd67a94086d61b1853f5fec3b14f37e5cc68ebd61e5ccd09ed9
 base_worktree_clean=true
 active_manifest_schema=0.2
 active_attempt_schema=0.2
 runner_input_owner=scripts/canvas06-e2e-run-input.mjs
 runner_source_set=OPM-DEV-CANVAS-06-E2E-RUNNER-SOURCE-SET-001/0.1
-profile_digest_closure=v1.4
+profile_digest_closure=v1.5
+baseline_raw_refs_sha256=69491a6226cd98b9a5028fec31457e885c86020dbab4e57c381b75f4389b411e
+base_intake_status=READY
 ```
 
-该commit必须已经包含Profile/Digest closure及E2E Runner前置切片的活动Schema、shared owner和测试，且这些文件在Fault Launcher delta之外保持只读。当前`HEAD=68ea1521d735dcd55b8ce243c2e575521cb72075`与已安装source`37c5412a9c12c1b3ae06d6f7abe734804fa53c7b`均不包含完整活动输入，不能作为该base。base intake未闭合时禁止创建/amend Fault Launcher source commit、计算patch SHA或进入第7.3节重建；不得把当前脏工作树整体提交为base。
+实施必须从该commit的fresh detached worktree或fresh branch checkout开始，修改前`git status --porcelain=v1 --untracked-files=all`必须为空。最终commit只允许两个`A`，不得amend base、修改36项、把当前dirty main整体提交或从其他checkout补bytes。若新增测试发现36项存在代码缺陷，必须输出`FAULT_LAUNCHER_BASELINE_DEFECT_DETECTED`并停止本包；只能新建独立bugfix规格/checklist，显式扩展allowlist、冻结新base和回归证据后修复，禁止mock、skip、动态patch或fallback绕过。
 
 ## 5. Spring启动与失败传播
 
@@ -272,7 +281,7 @@ Catalog固定为`<COMMON_ROOT>/dev-canvas-06-common-fixture-catalog.json`；它�
 
 ### 7.3 原子顺序
 
-1. 第4.7节base intake READY后，在该clean source worktree只修改第4.1至4.5节38路径allowlist；Common factory映射必须已由上游Common Driver source commit闭合；
+1. 从第4.7节exact base的fresh clean worktree开始，只新增第4.5节两个`A`；36项raw ref必须逐项保持不变，Common factory映射必须已由上游Common Driver source commit闭合；
 2. 运行第8章全部单元、slice、集成、forked-JAR和Node测试；
 3. 形成新的clean source commit并记录exact source SHA/patch SHA；
 4. 按既有Clean Handoff与Versioned Handoff重建规格，从该commit生成新的Runtime JAR、Evidence Bundle、versioned Handoff和READY Intake；
@@ -308,7 +317,8 @@ Jar IT必须从`target/local-runtime-0.1.0-SNAPSHOT.jar`启动JDK21 child，证�
 ### 8.3 Common/Runner Node验证
 
 ```text
-node --test tests/e2e/release/dev-canvas-06/fixtures/factories/common-fixture-factory.test.mjs scripts/canvas06-e2e-common-fixtures.test.mjs scripts/release-canvas06-e2e-run.test.mjs scripts/verify-canvas06-e2e-report.test.mjs scripts/canvas06-e2e-fault-launcher-controlled.test.mjs
+node --test scripts/canvas06-e2e-fault-launcher-controlled.test.mjs
+node --test tests/e2e/release/dev-canvas-06/fixtures/factories/common-fixture-factory.test.mjs scripts/canvas06-e2e-common-fixtures.test.mjs scripts/release-canvas06-e2e-run.test.mjs scripts/verify-canvas06-e2e-report.test.mjs
 npm run release:canvas06:common-visual:test
 npm run release:canvas06:e2e:runner:test
 npm run release:canvas06:visual-e2e-schema:test
@@ -318,10 +328,22 @@ npm run contract:validate
 ### 8.4 Controlled E2E
 
 ```text
-npx playwright test tests/e2e/release/dev-canvas-06/fault-launcher.controlled.spec.ts --config=tests/e2e/release/dev-canvas-06/playwright.release.config.ts --workers=1 --retries=0
+node scripts/canvas06-e2e-fault-launcher-controlled.test.mjs \
+  --mode=preflight \
+  --source-root=<exact clean 2A source root> \
+  --candidate-source-commit=<40 lowerhex> \
+  --manifest=<exact Manifest v02 final> \
+  --controlled-bundle=<exact controlled bundle descriptor> \
+  --runtime-jar=<attempt-local exact Runtime JAR> \
+  --web-root=<production Web root> \
+  --browser-root=<exact Playwright browser root> \
+  --fixed-handoff=<absolute current fixed Handoff JSON> \
+  --production-activation-root=<absolute read-only activation input root> \
+  --attempt-parent=<fresh attempt parent> \
+  --control-parent=<fresh control parent>
 ```
 
-只允许消费受控bundle、exact built Runtime JAR、production Web和fresh attempt root。缺少上游Runner/Web/driver能力时，本命令状态必须明确为`BLOCKED_BY_DEPENDENCY`，实现包不得宣称完整完成。
+preflight必须先验证Bundle `0.2`和Preflight Descriptor `0.1`，再按活动闭包规格`FLCP-D01~D09、FLCP-D10A-GATE-PREFLIGHT`固定顺序验证十项依赖。任一依赖非READY时，stdout唯一为`RFC8785_JCS(report)+LF`，`status=BLOCKED_BY_DEPENDENCY`、`playwright_command=null`、exit=`3`，stderr首行为`E2E_FAULT_LAUNCHER_CONTROLLED_BLOCKED\tDEPENDENCY_PREFLIGHT`；且零Runtime/Web/Browser子进程、零SQLite、零attempt/control目录及零Manifest/Report/release写入。十项全READY时，report为`READY_TO_RUN`并给出唯一token数组：`node node_modules/@playwright/test/cli.js test tests/e2e/release/dev-canvas-06/fault-launcher.controlled.spec.ts --config=tests/e2e/release/dev-canvas-06/playwright.release.config.ts --workers=1 --retries=0`。READY只授权父Runner执行，不等于测试通过。Playwright还必须生成D10B的`1+12+1=14`项Gate Observation Artifact，任一漂移立即失败并停止后续cycle。
 
 ### 8.5 正反例矩阵
 
@@ -351,7 +373,7 @@ npx playwright test tests/e2e/release/dev-canvas-06/fault-launcher.controlled.sp
 
 同时满足以下条件，才能把实现状态记为`IMPLEMENTED/CONTROLLED_VALIDATED`：
 
-1. 第4章source delta精确，无extra文件；
+1. 第4章source delta逐项等于两个`A`，36项raw ref及集合摘要不变，无extra文件；
 2. 第8.1~8.4所有非依赖阻断命令通过；controlled E2E不得跳过；
 3. 三类产品错误、协议错误、一次性和零增量均有机器测试；
 4. 普通/NONE/REOPEN与Recovery回归通过；
@@ -363,7 +385,7 @@ npx playwright test tests/e2e/release/dev-canvas-06/fault-launcher.controlled.sp
 
 ## 10. 回滚
 
-1. 代码回滚只回退第4章source delta；
+1. 代码回滚只回退第4章两个新增文件，不改写36项base；
 2. 新版本根已安装但未切fixed Handoff时，保持隔离且不激活；
 3. fixed切换失败按Postverify既有backup恢复旧JSON；
 4. 不删除、覆盖或改写任何旧`clean-*`、用户SQLite、Handoff evidence或Schema；
@@ -371,8 +393,8 @@ npx playwright test tests/e2e/release/dev-canvas-06/fault-launcher.controlled.sp
 
 ## 11. 事实与非结论
 
-事实：本文已冻结38个Fault Launcher精确逻辑路径、Spring注册/顺序、verified-state传递、封闭Fault Plan validator、显式context构造链、Recovery隔离、三个hook、Common/Catalog/Manifest生成布局、重建顺序和分层验收；Common factory及其测试由独立Common Driver实现规格拥有。
+事实：本文已冻结旧38个Fault Launcher逻辑路径的活动分类：36项为`0dcaa27...`中的只读raw-ref基线，只有两个controlled Playwright路径允许新增；Spring注册/顺序、verified-state传递、封闭Fault Plan validator、显式context构造链、Recovery隔离、三个hook、Common/Catalog/Manifest生成布局、重建顺序和分层验收均由base及活动设计承接。Common factory及其测试由独立Common Driver实现规格拥有。
 
-事实：本文创建时实现尚未开始；Fault Launcher Java Build为`READY_FOR_BUILD/NOT_STARTED`。当前没有包含完整活动前置输入的exact clean base commit，受控source commit为`BLOCKED_BY_BASE_INTAKE`；活动Manifest v02 producer/verifier、12个修正fixture、Catalog/Manifest ref、新Runtime JAR和controlled E2E证据均不存在。
+事实：origin base已固定为`0dcaa27a92693feaf28b731ebed2f81a9ccea02c`，36项基线存在且只读；Preflight Descriptor contract实现和新clean base均未形成，因此2A Build为`BLOCKED_BY_PREFLIGHT_DESCRIPTOR_CONTRACT_IMPLEMENTATION`。四份新Schema、producer/verifier、新base、两个2A文件、2A final commit/patch SHA、真实preflight与Gate Observation、controlled Playwright结果均不存在；活动Manifest v02生产输入、真实`194/388` Report和`GATE-06-03` READY证据也未由本设计任务生成。
 
 非结论：`FROZEN_FOR_IMPLEMENTATION`不等于Java代码、Spring装配、真实UI/API、production Report、Gate、发布或ISO完成。

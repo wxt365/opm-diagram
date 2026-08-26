@@ -1,6 +1,6 @@
 # DEV-CANVAS-06 E2E Common Driver 与受控编排设计
 
-文档版本：`v1.2`
+文档版本：`v1.4`
 
 文档状态：`FROZEN_FOR_IMPLEMENTATION`
 
@@ -13,6 +13,8 @@
 1. `DRIVER-COMMON` 对16个Common case的初始状态、页面动作、selector、API与错误码映射；
 2. controlled bundle、活动Manifest、exact Runtime JAR、production Web dist与fresh attempt root之间的唯一信任和复制关系；
 3. `INITIAL -> REOPEN`的进程、storage、事务基线和证据采集顺序。
+
+同时关闭production编排owner与Runner Source Set的身份冲突：编排实现只能收敛到Source Set `0.1`已列入的Runner入口，不允许新增Source Set外production helper。
 
 本设计不生成Manifest、Report、Gate、Candidate、Activation或Capability证据，不修改公共HTTP wire、SQLite DDL、产品默认配置或Recovery协议。
 
@@ -59,6 +61,26 @@ READONLY                            -> READ_ONLY_REVISION
 ```
 
 `AMBIGUOUS_OPTIONS_NOT_AUTOCOMMITTED`的`expected_error_code`必须省略；其余八个BLOCKED case必须与上表逐字相等。该决定取代Fault Launcher实现规格中“除三个fault case外其他Common业务字段不变”的旧限制；只允许按本表修正错误码/空码，不改变case ID、case顺序和事务模板。
+
+### 2.4 Runner Source Set身份冲突
+
+历史`v1.2`实现规格要求新增独立`canvas06-e2e-controlled-orchestration.mjs`，但活动Runner Source Set `0.1/0.1.0`固定23项并以`ALL_PATHS_NOT_IN_ENTRIES`排除该文件。独立实现会使实际编排逻辑无法进入Report `0.2`的`runner_source_sha256`，因此禁止继续采用。
+
+唯一修正如下：
+
+1. `prepareControlledAttempt()`及本设计第6章全部production编排唯一实现在`scripts/release-canvas06-e2e-run.mjs`；
+2. 编排单元与契约测试唯一收敛到`scripts/release-canvas06-e2e-run.test.mjs`，浏览器验收由`common-driver.controlled.spec.ts`承接；
+3. 禁止新增独立production orchestration文件、第二CLI或动态加载Source Set外helper；
+4. Runner Source Set保持`0.1/0.1.0`、23项不变，E2E Report保持`0.2`和`runner_version=0.2.0`不变；
+5. Runner入口、input owner、artifact owner和release Playwright config的实际bytes继续由既有Source Set raw ref及aggregate承接；测试源继续属于排除集。
+
+该决定不改变第3至5章的Common动作语义，也不授权重复修改已经存在的Common Driver、三个selector、Fact删除入口、store或factory。
+
+### 2.5 Manifest/Runner跨commit身份冲突
+
+External Store与Common编排分别形成source commit时，即使两个commit线性相邻，也无法同时满足Manifest source、Runner clean HEAD与Report runner identity逐字符相等。唯一活动source方案固定为：以`e598b305a44ebb9c9845c1f5563bc36c3a89a2b4`为base，在同一fresh clean worktree中联合实现External Store `9=7 M+2 A`与Common编排`8=7 M+1 A`，联合验证后一次提交为`17=14 M+3 A`。两个子集不得分别形成可消费commit，Git祖先关系不得替代身份相等。
+
+该final commit必须同时等于Handoff source、Intake解析后的Handoff source、Manifest `source_build.source_commit`、Runner source HEAD和Report `runner_identity.source_commit`。唯一实施和production重建顺序由Common编排与External Store集成Source闭包规格承接。
 
 ## 3. Driver机器常量
 
@@ -194,7 +216,7 @@ p03-fact-delete-impact
 
 ### 6.1 唯一入口
 
-Runner内部新增纯编排owner：
+Runner内部编排owner固定在`scripts/release-canvas06-e2e-run.mjs`，不得新建独立production helper。该owner提供：
 
 ```text
 prepareControlledAttempt({
@@ -289,7 +311,9 @@ Web server只能从attempt-local exact `web-dist`提供静态/SPA内容并同源
 
 本设计冻结后：
 
-- Common Driver与controlled orchestration语义：`DESIGN_READY`；
+- Common Driver与controlled orchestration语义：`DESIGN_READY/v1.4`；
+- Common Driver、三个selector、Fact删除入口与factory：`EXISTING_READ_ONLY_PREREQUISITE`；
+- controlled orchestration：`EMBEDDED_IN_17_PATH_SOURCE/NOT_STARTED`，`8=7 M+1 A`仅为职责子集，唯一可消费source delta为`17=14 M+3 A`；
+- Runner Source Set：`0.1/0.1.0/23 entries`，未升级；E2E Report：`0.2/runner_version 0.2.0`，未升级；
 - Manifest v02 producer/verifier：等待独立实现规格执行；
-- 缺失UI selector：`BLOCKED_BY_UI_SELECTOR`，只阻断Common driver受控成功路径；
 - production `194/388`、E2E Report、`GATE-06-03`、Candidate、Activation、Capability、production与ISO证据：`NOT_RUN/NOT_ENABLED`。

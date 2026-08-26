@@ -45,11 +45,11 @@ report_id=dev-canvas-06.e2e-report.<manifest-raw-sha256前12位>.<runner-source-
 4. `source_date_epoch`只由Materializer对Manifest原始`generated_at`执行`parseUtcWholeSecond`派生；Runner不新增时间参数、不读取当前时钟，也不规范化Manifest；
 5. 本活动输入尚未被现有 CLI/Materializer/Artifact verifier 实现消费；在实现包完成前不得生成成功 Report、194/388 证据或 Gate 证据。
 
-Fault Launcher 的活动执行输入唯一为 `specs/opm-dev-canvas-06-e2e-fault-launcher-design-closure-bugfix-task-spec.md` 与 `docs/design/opm-dev-canvas-06-e2e-fault-launcher-design.md v1.1`。Fault Plan `0.2` Schema和既有摘要不变；实现必须使用后继设计的九项命令行配置、raw nonce/challenge/HMAC、Plan raw SHA、Spring fail-closed装配、三个精确hook和协议错误码，不得从本规格旧文字发明第二套launcher语义。
+Fault Launcher 的活动执行输入唯一为 `specs/opm-dev-canvas-06-e2e-fault-launcher-design-closure-bugfix-task-spec.md`、`docs/design/opm-dev-canvas-06-e2e-fault-launcher-design.md v1.2`及Preflight Descriptor/Gate Observation闭包规格。Fault Plan `0.2` Schema和既有摘要不变；实现必须使用后继设计的九项命令行配置、raw nonce/challenge/HMAC、Plan raw SHA、Spring fail-closed装配、三个精确hook和协议错误码，并以Bundle `0.2`/Descriptor `0.1`承接D10A/D10B，不得从本规格旧文字发明第二套launcher语义。
 
-Fault Launcher代码切片只允许按`specs/opm-dev-canvas-06-e2e-fault-launcher-implementation-task-spec.md`的精确source delta、重建顺序和验收矩阵实施；本Runner规格不额外授权修改Java、Spring资源、Common fixture或release root。
+Fault Launcher代码切片只允许按`specs/opm-dev-canvas-06-e2e-fault-launcher-implementation-task-spec.md`的精确source delta、重建顺序和验收矩阵实施；前置contract包按Preflight Descriptor/Gate Observation闭包规格的`12=4 M+8 A`实施。新contract clean base未接纳前2A保持阻断；本Runner规格不额外授权修改Java、Spring资源、Common fixture或release root。
 
-Common Driver的16项动作、selector、有序API/error、SETUP baseline和controlled JAR/Web/attempt编排唯一由`docs/design/opm-dev-canvas-06-e2e-common-driver-controlled-orchestration-design.md v1.2`及其实现规格承接。Manifest v02 producer/verifier、第四driver和活动Report `137/57`修正唯一由`opm-dev-canvas-06-e2e-manifest-v02-builder-verifier-implementation-task-spec.md`承接；本规格不得保留第二套映射或旧`146/48`算法。
+Common Driver的16项动作、selector、有序API/error、SETUP baseline和controlled JAR/Web/attempt编排唯一由`docs/design/opm-dev-canvas-06-e2e-common-driver-controlled-orchestration-design.md v1.4`及其实现规格承接。`prepareControlledAttempt()`与production编排必须收敛在Runner Source Set第1项`scripts/release-canvas06-e2e-run.mjs`，禁止新增Source Set外production helper；Source Set保持`0.1/0.1.0/23`，Report保持`0.2/runner_version 0.2.0`。Manifest v02 producer/verifier、第四driver和活动Report `137/57`修正唯一由`opm-dev-canvas-06-e2e-manifest-v02-builder-verifier-implementation-task-spec.md`承接；本规格不得保留第二套映射或旧`146/48`算法。Common编排的`8=7 M+1 A`只保留为职责子集，必须与Unified External Store的`9=7 M+2 A`在同一`e598...`clean worktree中联合实现并一次提交为`17=14 M+3 A`，不得形成独立可消费commit。
 
 ## 2. 权威输入与前置条件
 
@@ -62,8 +62,10 @@ Common Driver的16项动作、selector、有序API/error、SETUP baseline和cont
 7. Manifest final root必须完整包含exact `local-runtime.jar`、production `web-dist/**`、Intake/Handoff/Evidence Bundle raw copy、Family Identity Catalog、上游fixture、Common Fixture/Factory、Profile五资产和四个driver；
 8. Playwright固定`1.57.0`，Chromium固定`143.0.7499.4`，`workers=1`、`retries=0`；
 9. locale=`zh-CN`、timezone=`Asia/Shanghai`、color scheme=`light`、reduced motion=`reduce`、device scale factor=`1`；
-10. production run的source checkout必须clean，HEAD等于Manifest `source_build.source_commit`；Runtime JAR和Web dist只从Manifest final root读取，不从checkout重建；
+10. production run的source checkout必须clean；Handoff source、Intake解析后的Handoff source、Manifest `source_build.source_commit`、source checkout HEAD、Report `runner_identity.source_commit`与Common/External集成final commit必须六方逐字符相等；Runtime JAR和Web dist只从Manifest final root读取，不从checkout重建；
 11. production gate在运行前、中、后均保持`DISABLED + []`。
+
+Common/External source身份、17项composite allowlist、single-parent commit和production重建顺序唯一由`specs/opm-dev-canvas-06-common-orchestration-integrated-source-closure-bugfix-task-spec.md`承接。Runner不得接受独立9项或8项commit，也不得以祖先关系替代上述逐字符相等。
 
 缺 production Manifest、浏览器实体或 clean environment 不阻断代码和受控测试，但阻断 production Report 与 `GATE-06-03`。
 
@@ -71,7 +73,7 @@ Common Driver的16项动作、selector、有序API/error、SETUP baseline和cont
 
 | Owner | 唯一职责 | 禁止职责 |
 | --- | --- | --- |
-| `scripts/release-canvas06-e2e-run.mjs` | CLI、信任预检、attempt 编排、原子提交和 Report writer | 修改 Manifest/fixture、启动 dev server、提升 Gate |
+| `scripts/release-canvas06-e2e-run.mjs` | CLI、信任预检、`prepareControlledAttempt()`及全部attempt编排、原子提交和 Report writer | Source Set外production helper、修改 Manifest/fixture、启动 dev server、提升 Gate |
 | `scripts/verify-canvas06-e2e-report.mjs` | 通过必填 `--scope REPORT/ATTEMPT` 分别校验完整Report或单Attempt；按活动 Profile/Digest closure、Attempt Artifact `0.2`、Family Identity Catalog和Report `0.2`校验filename/schema identity、Profile/Java/source ref、Projection/OPL/Trace/Token Digest、`10+1+5` Index、聚合和tree digest | 自动推断scope、修复/补写证据、执行case、生成Candidate |
 | `scripts/canvas06-e2e-attempt-artifacts.mjs` | 既有23项Source Set内的Attempt writer/verifier公共owner与Node Token canonical writer | 放宽JCS、复制Java OPL/Trace writer、产生第二摘要公式 |
 | `scripts/canvas06-projection-digest-v01.mjs` | 按Projection Digest `0.1`把正式response data规范化为safe-integer JCS preimage并计算SHA | 修改Projection、放宽JCS值域、排序array、提供float策略 |
@@ -82,7 +84,7 @@ Common Driver的16项动作、selector、有序API/error、SETUP baseline和cont
 | E2E Fixture Materializer CLI | 在 fresh attempt storage 中物化 exact Family base 或确定性 Common 空模型 | Web/API 暴露、非空 storage 写入、生产默认装配 |
 | E2E test launcher/fault port | 只在受控启动 guard 下安装 Common fault plan | 公共 route、普通生产启动生效、持久化测试开关 |
 
-允许未来实现修改：上述 owner、其共享 helper/定向测试、为 non-web materializer/test launcher 所需的最小 Java 代码、`package.json` 的四个 E2E release 命令和对应状态文档。
+允许未来实现修改：上述 owner、已由各后继规格精确列出的共享helper/定向测试、为non-web materializer/test launcher所需的最小Java代码、`package.json`的四个E2E release命令和对应状态文档。Common controlled orchestration的`8=7 M+1 A`仅是17项集成包内的职责子集；唯一可消费source delta为`17=14 M+3 A`，不得据本段扩大allowlist或单独提交该8项。
 
 禁止修改：历史 E2E Manifest/Attempt Artifact `0.1`、活动 Manifest/Attempt Artifact `0.2`、Report `0.2`、Runner Source Set `0.1`、Common/Visual Schema，OpenAPI/公共HTTP wire，SQLite DDL/migration，Profile/Rule/Grammar/Symbol/Handoff，Vue业务行为和production gate默认值。不得复制`GoldenFixtureSeedRepository`语义写入逻辑；应抽取或复用同一受控seed kernel。
 
@@ -571,4 +573,4 @@ git diff --check
 
 事实：E2E Manifest builder/verifier已完成活动Common Catalog `0.2.0` 43文件root和Family Identity Catalog适配并完成版本化 Handoff/Manifest 输入重验；活动 Manifest `0.2`、Attempt Artifact `0.2`、Profile asset tree/raw ref 和 Token parity 设计已冻结，但现有 builder/verifier/Materializer/Runner 尚未消费这些活动 Schema。Java Materializer、Profile raw producer、Token writer、完整 artifact verifier 和真实 production Report 尚未闭合或执行。
 
-本规格的设计输入已闭合，但Family Materializer实现必须等待新Catalog进入clean Handoff/Evidence Bundle和活动Manifest后才能继续；这不构成 implementation完成、production `194/388`通过、`GATE-06-03` handoff、Candidate、Activation、Capability enablement、生产发布或 ISO 19450:2024 符合性证明。
+本规格的设计输入已闭合，但Common编排与External Store source Build必须先按17项集成规格形成同一final commit，并从该commit重建Handoff、Intake、Runtime、Web、Common和Manifest后，Runner才允许执行production路径。该final commit与上述生产资产当前均未生成；这不构成implementation完成、production `194/388`通过、`GATE-06-03` handoff、Candidate、Activation、Capability enablement、生产发布或ISO 19450:2024符合性证明。

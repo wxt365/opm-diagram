@@ -1,0 +1,28 @@
+{
+  "fixture_id": "fixture.e2e.e2e-canvas-007.readonly",
+  "case_id": "E2E-CANVAS-007.READONLY",
+  "project_name": "Release E2E E2E-CANVAS-007.READONLY",
+  "model_name": "Release E2E E2E-CANVAS-007.READONLY",
+  "initial_revision": "revision.e2e.e2e-canvas-007.readonly",
+  "action": {
+    "action_id": "action.001",
+    "expected_status": "BLOCKED_MATCHED",
+    "expected_error_code": "READ_ONLY_REVISION",
+    "expected_transaction": {
+      "revision_delta": 0,
+      "revision_parent_delta": 0,
+      "text_artifact_delta": 0,
+      "text_trace_delta": 0,
+      "finding_delta": 0,
+      "operation_delta": 0,
+      "receipt_delta": 0,
+      "draft_head_changed": false
+    },
+    "reopen_checkpoint": {
+      "expected_head_changed": false,
+      "projection_matches": true,
+      "text_trace_matches": true
+    }
+  },
+  "fixture_kind": "INPUT"
+}

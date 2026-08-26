@@ -2,9 +2,11 @@
 
 文档状态：`FROZEN_FOR_IMPLEMENTATION`
 
-实现状态：`READY_FOR_BUILD/NOT_STARTED`
+实现状态：`IMPLEMENTED/REBUILD_COMPLETE`
 
-生产重建状态：`BLOCKED_BY_EXACT_CLEAN_FACTORY`
+生产重建状态：`IMPLEMENTED/COMMON_ROOT_SELF_VERIFIED`
+
+统一生产链状态：`BLOCKED_BY_UNIFIED_SOURCE_PRODUCTION_INPUT_REBUILD`
 
 ## Task Type
 
@@ -53,7 +55,7 @@ Builder 和 Verifier 必须静态绑定同一逻辑 factory owner，分别按固
 4. 目标 root 及其 staging sibling 不存在；
 5. 历史 `0.1.0` Catalog、BASE/INPUT 和既有 release root 保持只读。
 
-任一前置不满足时只能继续实现/测试工具，生产重建保持 `BLOCKED_BY_EXACT_CLEAN_FACTORY`，不得使用脏工作树 SHA 代替 clean identity。
+任一前置不满足时只能继续实现/测试工具；首次生产重建不得使用脏工作树 SHA 代替 clean identity。当前root的自身验证事实见第12章，后继统一source重建必须重新执行全部前置。
 
 ## 4. 精确修改边界
 
@@ -248,9 +250,9 @@ git diff --check
 
 ### 10.2 重建完成
 
-exact clean factory 输入门通过，fresh root 原子生成，正反例和完整 verifier 通过，执行 checklist 记录全部身份与摘要后，才可标记 `IMPLEMENTED/COMMON_INPUT_READY_FOR_MANIFEST_V02`。
+exact clean factory 输入门通过，fresh root 原子生成，正反例和完整 verifier 通过，执行 checklist 记录全部身份与摘要后，才可标记 `IMPLEMENTED/COMMON_ROOT_SELF_VERIFIED`。
 
-该状态只解除 Manifest v02 的 Common input 前置，不等于 Manifest v02 producer/verifier完成，不等于 `194/388`、`137/57` Report、GATE-06-03、Candidate、Activation、Capability、production release 或 ISO 符合性。
+该状态只证明当前43文件Common root自身闭合。由于其构建时消费的Handoff/Intake与后继统一source生产链尚未重建，它不能单独解除Manifest v02 production输入门；必须由`opm-dev-canvas-06-unified-source-production-input-rebuild-bugfix-task-spec.md`从新的`unified_source_commit`重新生成并闭合。该状态不等于Manifest v02 producer/verifier完成，不等于`194/388`、`137/57` Report、GATE-06-03、Candidate、Activation、Capability、production release或ISO符合性。
 
 ## 11. 回滚
 
@@ -268,4 +270,4 @@ exact clean factory 输入门通过，fresh root 原子生成，正反例和完�
 
 ### 12.2 假设/待执行输入
 
-尚无可冻结的 clean factory source commit和raw SHA；它们必须由Common Driver实现完成后的clean source提供，并在本规格checklist执行阶段记录。不得从当前脏工作树推断。
+clean factory source已在`daf383df6d7faad866b84fceac0a2c9111a8c926`记录；factory raw SHA为`4cabb5b86932f338f9bf546be7fd7ec226743b5796f1d1d712036ca532cebd82`。完整执行身份、fresh root和独立Verifier结果以本规格checklist的2026-08-25执行记录为准；这些事实不替代后继统一source commit上的再次重建。

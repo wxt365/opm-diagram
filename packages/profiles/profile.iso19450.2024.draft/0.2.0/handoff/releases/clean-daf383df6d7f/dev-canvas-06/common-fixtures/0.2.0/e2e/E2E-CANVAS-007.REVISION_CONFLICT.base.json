@@ -1,0 +1,28 @@
+{
+  "fixture_id": "fixture.e2e.e2e-canvas-007.revision_conflict",
+  "case_id": "E2E-CANVAS-007.REVISION_CONFLICT",
+  "project_name": "Release E2E E2E-CANVAS-007.REVISION_CONFLICT",
+  "model_name": "Release E2E E2E-CANVAS-007.REVISION_CONFLICT",
+  "initial_revision": "revision.e2e.e2e-canvas-007.revision_conflict",
+  "action": {
+    "action_id": "action.001",
+    "expected_status": "BLOCKED_MATCHED",
+    "expected_error_code": "REVISION_CONFLICT",
+    "expected_transaction": {
+      "revision_delta": 0,
+      "revision_parent_delta": 0,
+      "text_artifact_delta": 0,
+      "text_trace_delta": 0,
+      "finding_delta": 0,
+      "operation_delta": 0,
+      "receipt_delta": 0,
+      "draft_head_changed": false
+    },
+    "reopen_checkpoint": {
+      "expected_head_changed": false,
+      "projection_matches": true,
+      "text_trace_matches": true
+    }
+  },
+  "fixture_kind": "BASE"
+}

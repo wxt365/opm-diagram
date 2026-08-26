@@ -1,10 +1,10 @@
 # DEV-CANVAS-06 E2E Fault Launcher 设计
 
-文档版本：`v1.1`
+文档版本：`v1.2`
 
 文档状态：`FROZEN_INCLUDED`
 
-更新时间：2026-08-24
+更新时间：2026-08-26
 
 ## 1. 定位
 
@@ -13,6 +13,8 @@
 本文后继并收紧历史 Attempt Artifact `v1.3`第5章和 E2E Runner 实现规格第7、8.3节。发生冲突时，以本文为活动 launcher 口径。
 
 后继代码实现唯一入口为`specs/opm-dev-canvas-06-e2e-fault-launcher-implementation-task-spec.md`及对应implementation checklist。该规格已冻结精确source delta、Spring Boot注册、显式context、Recovery隔离、Common重建和分层测试；不得继续从本文自行选择文件集合。
+
+受控执行输入与 Gate 时序由`specs/opm-dev-canvas-06-e2e-fault-launcher-preflight-descriptor-and-gate-observation-closure-bugfix-task-spec.md`后继修正：Fault Launcher lane只接受Controlled Bundle `0.2`对Preflight Descriptor `0.1`的不可变raw ref，原D10拆为preflight `D10A`和Playwright执行期`D10B`。本文的child/port产品语义不变。
 
 ## 2. 设计原则
 
@@ -346,4 +348,4 @@ stderr第一行固定：
 
 ## 13. 发布边界
 
-本设计及后继实现规格冻结后，`DEV-CANVAS-06-E2E-FAULT-LAUNCHER-01`的Java Build状态为`READY_FOR_BUILD/NOT_STARTED`；受控source commit在exact clean base intake形成前为`BLOCKED_BY_BASE_INTAKE`。活动Manifest v02 producer/verifier仍是后续release重建依赖，不阻断Fault Launcher Java Build，禁止以历史v01替代。只有后继实现、受控测试、production `194/388`和E2E Report分别完成，才能按Gate规格判断`GATE-06-03`；设计、Schema或局部测试均不能提升Gate、Candidate、Activation、Capability或ISO状态。
+Java launcher/port的36项产品基线已进入`0dcaa27...`且保持只读。受控Playwright的逻辑delta仍为`2 A`，但其Build状态为`BLOCKED_BY_PREFLIGHT_DESCRIPTOR_CONTRACT_IMPLEMENTATION`：必须先实现Bundle `0.2`、Descriptor/JarIT/Gate Observation `0.1`及producer/verifier，并接纳新的clean base intake。活动Manifest v02 producer/verifier仍是后续release重建依赖，禁止以历史v01替代。只有contract、2A、受控测试、production `194/388`和E2E Report分别完成，才能按Gate规格判断`GATE-06-03`；设计、Schema或局部测试均不能提升Gate、Candidate、Activation、Capability或ISO状态。

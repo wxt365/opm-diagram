@@ -30,10 +30,10 @@
 - [x] C03 Builder/Verifier各自每case调用exact factory一次并缓存，不维护第二规则源。
 - [x] C04 禁止修改Runner测试、放宽Schema/Verifier或复用旧SHA。
 - [x] C05 READY Handoff与active binding为唯一binding输入。
-- [ ] C06 exact clean source commit已记录。
-- [ ] C07 factory raw byte length/SHA和定向测试结果已记录。
-- [ ] C08 Handoff SHA、binding digest、epoch和fresh root已记录。
-- [ ] C09 历史0.1.0与既有release root只读证明已记录。
+- [x] C06 exact clean source commit为`daf383df6d7faad866b84fceac0a2c9111a8c926`。
+- [x] C07 factory为`20945` bytes、SHA-256=`4cabb5b86932f338f9bf546be7fd7ec226743b5796f1d1d712036ca532cebd82`，定向测试`3/3`通过。
+- [x] C08 Handoff SHA-256=`4088e449ebb04cb6cf94fe5393db4b72ee34cc96dd950cabfc1ad596b4afb3d2`，binding=`93805d6e2fdb3ea73c4ddfc0a995d662fbf13dee2d8a6f24fc20c79ecff65d1d`，epoch=`1782864000`，fresh root与tree digest已记录。
+- [x] C09 历史`clean-a36a7f1fd709`与`clean-37c5412a9c12` release roots无工作树差异。
 - [x] C10 非文档source delta只允许3个路径。
 - [x] C11 factory及factory测试不在本包allowlist。
 - [x] C12 historical author、Runner/测试、Schema、API、SQLite、Java、Vue和生产配置禁止修改。
@@ -63,17 +63,18 @@
 - [x] C36 临时build/verify与Manifest v02定向回归通过，后者`29/29`。
 - [x] C37 `contract:validate`和`git diff --check`通过。
 - [x] C38 当前仅标记`IMPLEMENTED/REBUILD_NOT_RUN`。
-- [ ] C39 clean factory生产重建完成后才标记`COMMON_INPUT_READY_FOR_MANIFEST_V02`。
+- [x] C39 clean factory生产重建完成，标记`COMMON_ROOT_SELF_VERIFIED`。
 - [x] C40 本设计冻结不提升Manifest/194/388/Report/Gate/Candidate/Activation/Capability/ISO状态。
 - [x] C41 回滚不覆盖或删除历史、既有release root和用户数据。
-- [x] C42 clean factory commit/SHA当前为待执行输入，不从脏工作树推断。
+- [x] C42 clean factory commit/SHA已按执行记录冻结，不从脏工作树推断。
 
 ## 当前门状态
 
 - 设计：`FROZEN_FOR_IMPLEMENTATION`。
-- 工具Build：`IMPLEMENTED/REBUILD_NOT_RUN`。
-- 生产重建：`BLOCKED_BY_EXACT_CLEAN_FACTORY`。
-- Manifest v02 Common输入：`NOT_READY`。
+- 工具Build：`IMPLEMENTED/REBUILD_COMPLETE`。
+- 生产重建：`IMPLEMENTED/COMMON_ROOT_SELF_VERIFIED`。
+- Manifest v02 Common子输入自身：`READY`。
+- Manifest v02统一production输入：`BLOCKED_BY_UNIFIED_SOURCE_PRODUCTION_INPUT_REBUILD`。
 - `GATE-06-03`：`NOT_RUN`。
 
 ## 本轮验证（2026-08-25）
@@ -83,6 +84,9 @@
 - `npm run contract:validate`：通过。
 - `git diff --check`：通过。
 - 受控故障注入覆盖rename前staging清理与parent fsync后的quarantine隔离；临时根中的额外文件、符号链接和硬链接均被拒绝。
+- clean factory定向测试：`3/3`通过；正式Builder与独立Verifier均通过。
+- source commit：`daf383df6d7faad866b84fceac0a2c9111a8c926`；factory raw：`20945/4cabb5b86932f338f9bf546be7fd7ec226743b5796f1d1d712036ca532cebd82`；Handoff raw：`4088e449ebb04cb6cf94fe5393db4b72ee34cc96dd950cabfc1ad596b4afb3d2`。
+- binding：`93805d6e2fdb3ea73c4ddfc0a995d662fbf13dee2d8a6f24fc20c79ecff65d1d`；epoch：`1782864000`；fresh root：`packages/profiles/profile.iso19450.2024.draft/0.2.0/handoff/releases/clean-daf383df6d7f/dev-canvas-06/common-fixtures/0.2.0`；`43` files；tree digest：`c8c9b460c27cffbc0e5dbe446accb3d4a08b802eb85a7dc503a7c2be364be702`。
 
 ## Pre-build 诊断基线（2026-08-24）
 

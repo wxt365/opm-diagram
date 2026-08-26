@@ -6,7 +6,7 @@
 
 Build准入：`READY_FOR_BUILD`
 
-Production重建准入：`BLOCKED_BY_EXACT_CLEAN_BASE_COMMON_DRIVER_AND_COMMON_INPUT_REBUILD`
+Production重建准入：`BLOCKED_BY_17_PATH_INTEGRATED_SOURCE_IMPLEMENTATION`
 
 ## Task Type
 
@@ -47,12 +47,14 @@ Production重建准入：`BLOCKED_BY_EXACT_CLEAN_BASE_COMMON_DRIVER_AND_COMMON_I
 ## 3. 权威输入
 
 1. `docs/contracts/schemas/opm-dev-canvas-06-e2e-manifest-v02.schema.json`；
-2. `docs/design/opm-dev-canvas-06-e2e-profile-assets-and-digest-closure-design.md v1.4`；
-3. `docs/design/opm-dev-canvas-06-e2e-common-driver-controlled-orchestration-design.md v1.2`；
+2. `docs/design/opm-dev-canvas-06-e2e-profile-assets-and-digest-closure-design.md v1.5`；
+3. `docs/design/opm-dev-canvas-06-e2e-common-driver-controlled-orchestration-design.md v1.4`；
 4. Family Fixture Identity Catalog `0.1/0.1.0`与活动Common Catalog `0.2.0`；
-5. Versioned Handoff/Fixed Handoff Postverify的exact READY Intake链；
+5. 由统一Source生产输入重建规格形成的Handoff `0.2`、exact READY Intake、Runtime JAR和Web dist tree；
 6. 活动Report Schema `opm-dev-canvas-06-e2e-report-v02.schema.json/0.2`。
-7. 已通过独立Common E2E输入重建Verifier的活动`0.2.0` 43文件root；其factory source必须与第四`DRIVER-COMMON`所属clean source commit中的factory raw bytes相等。
+7. 已通过独立Common E2E输入重建Verifier的活动`0.2.0` 43文件root；其factory source必须与第四`DRIVER-COMMON`所属clean source commit中的factory raw bytes相等；
+8. `specs/opm-dev-canvas-06-unified-source-production-input-rebuild-bugfix-task-spec.md`冻结的source-root固定路径、Handoff/Web tree和exact join；
+9. `specs/opm-dev-canvas-06-common-orchestration-integrated-source-closure-bugfix-task-spec.md`冻结的`e598...`base、`17=14 M+3 A`唯一final commit、六方source join和production重建顺序。
 
 冲突时本规格只覆盖Manifest v02 producer/verifier、第四driver与137/57聚合修正；不重解释Profile摘要、Fixture、Fault或Runner Artifact语义。
 
@@ -79,6 +81,18 @@ Production重建准入：`BLOCKED_BY_EXACT_CLEAN_BASE_COMMON_DRIVER_AND_COMMON_I
 15. `scripts/verify-canvas06-e2e-report.mjs`
 16. `scripts/verify-canvas06-e2e-report.test.mjs`
 17. `package.json`
+
+Profile Asset Staging修正只能由上述17项中的以下`7`个owner实现，不得借机修改Profile业务helper、Schema或其他入口：
+
+1. `package.json`
+2. `scripts/canvas06-e2e-manifest-v02-input.mjs`
+3. `scripts/canvas06-e2e-manifest-v02-invariants.test.mjs`
+4. `scripts/release-canvas06-e2e-manifest-v02.mjs`
+5. `scripts/release-canvas06-e2e-manifest-v02.test.mjs`
+6. `scripts/verify-canvas06-e2e-manifest-v02.mjs`
+7. `scripts/verify-canvas06-e2e-manifest-v02.test.mjs`
+
+其中`canvas06-e2e-manifest-v02-input.mjs`唯一拥有五个source路径、source-to-logical映射、Staging隔离/fresh守卫和逐byte materialize纯函数；Producer只编排该owner，Verifier只调用其只读source/final复算路径。`canvas06-e2e-manifest-v02-profile.mjs`现有任意direct root五文件/tree/package/binding校验能力保持只读复用，不因物理root变化修改。`M/A`仍按完整17项实现source delta在exact clean base上计算；本7项是该修正的精确owner子集，不把17项错误改写为7项总delta。
 
 文档只允许同步本规格checklist、Common Driver设计/规格/checklist、Runner/Fault Launcher规格与checklist、测试策略、开发执行包、冻结基线、Toolchain checklist和`docs/README.md`。
 
@@ -149,7 +163,7 @@ npm run release:canvas06:e2e:manifest:v02 -- \
   --source-root <clean target source> \
   --source-date-epoch <非负十进制UTC整秒> \
   --common-fixture-root <已验证活动0.2.0的43文件root> \
-  --profile-asset-root <source内exact五资产package root> \
+  --profile-asset-root <fresh且不存在的Profile Asset Staging Root绝对路径> \
   --output-root <release root> \
   --out dev-canvas-06/e2e/manifests/<manifest-id>/dev-canvas-06-e2e-manifest.json \
   --require-production
@@ -160,7 +174,7 @@ npm run release:canvas06:e2e:manifest:v02 -- \
   --source-root <clean target source> \
   --source-date-epoch <非负十进制UTC整秒> \
   --common-fixture-root <已验证活动0.2.0的43文件root> \
-  --profile-asset-root <source内exact五资产package root> \
+  --profile-asset-root <fresh且不存在的Profile Asset Staging Root绝对路径> \
   --output-root <fresh controlled output> \
   --out dev-canvas-06/e2e/manifests/<manifest-id>/dev-canvas-06-e2e-manifest.json
 ```
@@ -172,6 +186,7 @@ npm run release:canvas06:e2e:manifest:v02:verify -- \
   --input-mode PRODUCTION_HANDOFF \
   --handoff-root <只读版本化handoff root> \
   --intake-report <root内READY intake相对路径> \
+  --source-root <clean target source> \
   --manifest-root <final manifest root> \
   --manifest dev-canvas-06-e2e-manifest.json \
   --profile-asset-root <manifest-root/inputs/upstream/profile-assets> \
@@ -180,12 +195,13 @@ npm run release:canvas06:e2e:manifest:v02:verify -- \
 npm run release:canvas06:e2e:manifest:v02:verify -- \
   --input-mode CONTROLLED_TEST \
   --controlled-bundle-root <只读controlled root> \
+  --source-root <clean target source> \
   --manifest-root <final manifest root> \
   --manifest dev-canvas-06-e2e-manifest.json \
   --profile-asset-root <manifest-root/inputs/upstream/profile-assets>
 ```
 
-每个参数恰好一次；拒绝未知、重复、空值、`--x=y`、位置参数、mode互用、production缺`--require-production`和controlled携带该flag。参数失败在任何staging、SQLite或Runtime前退出`2`。
+每个参数恰好一次；拒绝未知、重复、空值、`--x=y`、位置参数、mode互用、production缺`--require-production`和controlled携带该flag。Producer的`--profile-asset-root`是由本次调用创建的Staging target，启动时必须不存在；Verifier的同名参数必须逐字符解析为`<manifest-root>/inputs/upstream/profile-assets`既有final root。两者都不得位于`--source-root`内，Producer root还不得位于Handoff、Common、output、Manifest final/staging root内。参数/path失败在任何Staging、SQLite或Runtime前退出`2`。
 
 ## 7. Final Root布局
 
@@ -208,18 +224,69 @@ npm run release:canvas06:e2e:manifest:v02:verify -- \
     drivers/common-driver.mjs
 ```
 
-`profile_asset_tree_ref.path=inputs/upstream/profile-assets`。tree SHA按Profile/Digest设计的JCS inventory公式计算，五项raw ref按UTF-8 path升序；剥离root prefix后与`profile.json.manifest.entries[]`、Handoff active binding逐项闭合。
+`profile_asset_tree_ref.path=inputs/upstream/profile-assets`。Producer先从clean source五个固定分散路径逐byte物化独立Profile Asset Staging Root，再从该只读root复制到final；不要求也不允许Staging物理位于source-root。tree SHA按Profile/Digest设计`v1.5`的同一逻辑root JCS inventory公式计算，五项raw ref按UTF-8 path升序；source/staging/final五项raw ref与tree identity三方相等，剥离root prefix后再与`profile.json.manifest.entries[]`、Handoff active binding逐项闭合。
 
 Runtime JAR为single-link普通文件raw ref；Web dist为封闭tree ref且不得含link、source map中的checkout绝对路径、Vite/HMR或额外文件。四个driver逐byte复制自clean source中固定路径，Common source必须等于Common Driver实现规格冻结的活动bytes。
+
+### 7.1 Production source-root唯一映射
+
+production模式不得由实现者配置或扫描构建产物路径；`--source-root`内固定映射为：
+
+```text
+services/local-runtime/target/local-runtime-0.1.0-SNAPSHOT.jar
+apps/web/dist
+tests/e2e/release/dev-canvas-06/drivers/procedural-driver.mjs
+tests/e2e/release/dev-canvas-06/drivers/control-driver.mjs
+tests/e2e/release/dev-canvas-06/drivers/structural-driver.mjs
+tests/e2e/release/dev-canvas-06/drivers/common-driver.mjs
+```
+
+Profile Source Set不是单一source内package root，固定为：
+
+```text
+packages/profiles/profile.iso19450.2024.draft/0.2.0/profile.json
+packages/profiles/profile.iso19450.2024.draft/0.2.0/rules/representative-rule-set.json
+packages/profiles/profile.iso19450.2024.draft/0.2.0/grammar/representative-opl-grammar.json
+packages/profiles/profile.iso19450.2024.draft/0.2.0/symbols/representative-symbol-catalog.json
+packages/profiles/profile.iso19450.2024.draft/0.2.0/normalization/representative-normalization.json
+```
+
+Producer把五个source path按Profile/Digest设计`v1.5`固定映射到`--profile-asset-root`下的`profile.json`、`rules/**`、`grammar/**`、`symbols/**`、`normalization/**`；禁止复制整个Profile package目录、改变业务bytes或把source父目录直接传给Profile loader。Verifier用显式`--source-root`独立复算source/final映射，不读取Producer staging root。
+
+`git rev-parse --verify HEAD`必须逐字符等于Handoff `0.2.source_build.source_commit`和统一重建记录的`unified_source_commit`，且source-root在Producer启动时为clean。production `--source-date-epoch`必须等于该commit的committer epoch和统一重建记录值；不得由调用者另选时间。Runtime与Web必须先分别和Handoff `LOCAL_RUNTIME_JAR` raw ref、`WEB_DIST_TREE` tree ref相等，再复制到final root并复核三方相等；四driver不进入Handoff artifact数组，只允许以同一source commit、固定路径和Manifest final raw ref闭合。
+
+### 7.2 Web tree与Handoff exact join
+
+Handoff Web ref路径固定为`releases/clean-<source12>/web-dist`，Manifest final ref路径固定为`inputs/build/web-dist`；两者路径不同，但inventory、总`byte_length`和`sha256`必须相等。tree摘要复用统一重建规格第6.3节公式：普通单链接文件inventory按UTF-8 path排序，`sha256=SHA-256(UTF8(JCS(inventory)))`。禁止使用目录mtime、ZIP SHA、locale排序或只比较文件数。
+
+production校验顺序固定为：exact quarantine sidecar guard -> READY Intake raw ref -> Handoff `0.2` Schema/READY -> unified source commit -> Handoff Runtime/Web refs -> source-root Runtime/Web -> 四driver -> Common 43/factory/binding -> final copy。任一前项失败时不得创建staging。
+
+### 7.3 Unified Source Quarantine Sidecar Guard
+
+production Producer和Verifier在读取版本根内READY Intake、Handoff或任一artifact前，必须从显式`--handoff-root` basename `clean-<source12>`构造并`lstat`以下两个exact sibling path：
+
+```text
+<handoff-root-parent>/quarantine/clean-<source12>.json
+<handoff-root-parent>/quarantine/.clean-<source12>.json.tmp
+```
+
+final marker或temp residual任一实体存在即返回`E2E_MANIFEST_INPUT_QUARANTINED/3`，link、directory、截断或Schema-invalid marker也不得读取后放行；`lstat`本身I/O失败返回`E2E_MANIFEST_IO_FAILED/4`。只有二者均明确`ENOENT`，才允许读取目标版本根；读取Handoff后还必须证明完整`source_commit`前12位等于路径source12。该guard只使用显式目标构造exact path，禁止扫描`quarantine/`、枚举`clean-*`、读取latest、跟随link、按mtime选择、自动删除/移动marker或以同source identity覆盖重建。
+
+Marker Schema、八字段、原子写入和恢复权限唯一由统一Source重建规格第10.1~10.2节及`opm-dev-canvas-06-unified-source-quarantine-marker.schema.json`承接。Manifest Producer/Verifier只做fail-closed拒绝，不执行恢复。controlled mode不读取production quarantine目录。
 
 ## 8. Producer唯一顺序
 
 ```text
-ARGS -> MODE -> EXTERNAL_TRUST -> SOURCE_CLEAN_HEAD -> LOCKFILE
+ARGS -> MODE -> EXACT_QUARANTINE_SIDECAR_GUARD -> EXTERNAL_TRUST -> SOURCE_CLEAN_HEAD -> LOCKFILE
+-> HANDOFF_0.2_RUNTIME_WEB_JOIN -> SOURCE_ROOT_FIXED_PATHS
 -> COMMON_0.2.0_43_VERIFY -> FAMILY_IDENTITY_DEEP_JOIN
--> PROFILE_5_RAW -> PROFILE_TREE -> PACKAGE_DIGEST -> BINDING_JOIN
+-> SOURCE_PROFILE_5_RAW -> SOURCE_PROFILE_PACKAGE_BINDING
 -> RUNTIME_JAR -> WEB_DIST -> FOUR_DRIVERS -> OUTPUT_FRESH
+-> PROFILE_STAGING_ROOT_ABSENT_ISOLATED -> MATERIALIZE_PROFILE_5
+-> PROFILE_STAGING_FSYNC_REVERIFY -> PROFILE_TREE -> PACKAGE_DIGEST -> BINDING_JOIN
 -> CREATE_STAGING -> COPY_ALL_INPUTS -> REVERIFY_COPIES
+-> REVERIFY_SOURCE_PROFILE_STAGING_FINAL_THREE_WAY_JOIN
+-> REMOVE_PROFILE_STAGING_AND_FSYNC_PARENT
 -> DERIVE_178_FAMILY -> DERIVE_16_COMMON -> ASSERT_7_9
 -> COMPOSE_0.2 -> SCHEMA_VERIFY -> INTERNAL_SEMANTIC_VERIFY
 -> FSYNC_TREE -> ATOMIC_RENAME -> PARENT_FSYNC
@@ -232,10 +299,11 @@ rename前失败删除本次staging且final root不存在；crash residual不自�
 ## 9. Verifier唯一顺序
 
 ```text
-ARGS -> MODE -> ROOT_TYPE -> TREE_DIGEST_BEFORE -> MANIFEST_RAW
+ARGS -> MODE -> EXACT_QUARANTINE_SIDECAR_GUARD -> ROOT_TYPE -> TREE_DIGEST_BEFORE -> MANIFEST_RAW
 -> SCHEMA_0.2 -> ID/PATH -> EXTERNAL_TRUST -> RAW_COPIES
 -> SOURCE_BUILD/JAR/WEB -> FOUR_DRIVER_REFS -> COMMON_43
--> FAMILY_IDENTITY -> PROFILE_5/TREE/PACKAGE/BINDING
+-> FAMILY_IDENTITY -> SOURCE_PROFILE_5 -> FINAL_PROFILE_5/TREE/PACKAGE/BINDING
+-> SOURCE_FINAL_PROFILE_RAW_AND_TREE_JOIN
 -> CASE_ORDER/COUNT/EXPECTATION/DRIVER -> FIXTURE_REFS
 -> SUMMARY/TRANSACTION -> EXACT_TREE -> TREE_DIGEST_AFTER
 ```
@@ -249,6 +317,7 @@ verifier前后tree digest必须相等。production verifier要求READY Intake ex
 ```text
 E2E_MANIFEST_ARGUMENT_INVALID
 E2E_MANIFEST_INPUT_CLASS_INVALID
+E2E_MANIFEST_INPUT_QUARANTINED
 E2E_MANIFEST_INTAKE_INVALID
 E2E_MANIFEST_SOURCE_BUILD_INVALID
 E2E_MANIFEST_COMMON_FIXTURE_INVALID
@@ -261,7 +330,7 @@ E2E_MANIFEST_TRANSACTION_INVALID
 E2E_MANIFEST_IO_FAILED
 ```
 
-`2`为参数/path/schema/class，`3`为semantic/ref/join，`4`为I/O/fsync/internal。stderr第一行固定`<CODE>\t<STAGE>`；成功stdout只输出final Manifest绝对路径与raw SHA。
+Profile source/raw/tree/package/binding或source-staging-final映射漂移使用`E2E_MANIFEST_PROFILE_ASSET_INVALID/3`；exact quarantine marker或temp residual存在使用`E2E_MANIFEST_INPUT_QUARANTINED/3`；Staging target已存在、root重叠或非fresh使用`E2E_MANIFEST_TRANSACTION_INVALID/3`；materialize/copy/read/remove/fsync/lstat失败使用`E2E_MANIFEST_IO_FAILED/4`。Profile Staging删除在final rename前完成，删除或parent fsync失败必须零final且不得声明成功。其余`2`为参数/path/schema/class，`3`为semantic/ref/join，`4`为I/O/fsync/internal。stderr第一行固定`<CODE>\t<STAGE>`；成功stdout只输出final Manifest绝对路径与raw SHA。
 
 ## 11. 测试与验收
 
@@ -275,14 +344,14 @@ E2E_MANIFEST_IO_FAILED
 
 - controlled与production各一套完整194 case Manifest；
 - `178/16`、Family `130/48`、Common `7/9`、四driverexact；
-- Profile五raw/tree/package/binding闭包；
+- Profile source/staging/final五raw/tree三方相等，package/binding闭包；
 - exact JAR/Web tree和43 Common tree；
 - 同输入两次生成Manifest raw bytes相同；
 - verifier只读且前后tree digest相等。
 
 ### 11.3 反例
 
-覆盖参数/mode互用、v01输入、driver缺失/extra/reorder/SHA漂移、Common case引用Family driver、Profile缺/extra/link/path/SHA/tree/package/binding drift、Common历史0.1.0、43 tree drift、Family 178->2 join drift、JAR/Web link/extra/SHA、dirty/wrong source、错误case数/顺序/7-9 expectation、146/48旧常量、staging/final/residual、rename/fsync和verifier写入。
+覆盖参数/mode互用、v01输入、driver缺失/extra/reorder/SHA漂移、Common case引用Family driver、Profile source缺项/extra/link/hardlink/固定路径漂移、Staging预存在/位于source或output内、复制前后source漂移、Staging/final缺/extra/link/path/SHA/tree/package/binding drift、Verifier不带source-root或使用不同source、Common历史0.1.0、43 tree drift、Family 178->2 join drift、JAR/Web link/extra/SHA、dirty/wrong source、错误case数/顺序/7-9 expectation、146/48旧常量、staging/final/residual、rename/fsync和verifier写入；production还必须覆盖exact marker/temp存在、marker为link/directory/截断/Schema-invalid、lstat失败、其他source12 marker隔离、禁止scan/cleanup/覆盖，以及controlled mode不读取production quarantine目录。
 
 ### 11.4 必跑命令
 
@@ -302,4 +371,4 @@ git diff --check
 
 ## 13. 状态边界
 
-本规格完成仅表示Manifest v02 producer/verifier和活动137/57机器口径可实现。production重建仍等待exact clean base、Common driver活动bytes、UI selector切片和新的版本化Handoff/Intake；不得据此宣称E2E Report、`GATE-06-03`、Candidate、Activation、Capability、production发布或ISO 19450:2024符合性。
+本规格完成仅表示Manifest v02 producer/verifier和活动137/57机器口径可实现。`e598b305...`已完成历史source集成，但其旧统一Builder/Verifier仍绑定source内installed root和untracked例外，正确触发本规格clean/root守卫。production正例必须等待17项集成Source包完成：以`e598...`为唯一parent一次提交`17=14 M+3 A`，从该final commit在独立source/release store拓扑中重建external统一输入，并完成新进程Unified Verifier、外层staging与两个Manifest Verifier；独立9项或8项commit均不得消费。不得据此宣称E2E Report、`GATE-06-03`、Candidate、Activation、Capability、production发布或ISO 19450:2024符合性。

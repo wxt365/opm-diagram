@@ -2,11 +2,11 @@
 
 文档状态：`FROZEN_FOR_IMPLEMENTATION`
 
-实现状态：`NOT_STARTED`
+实现状态：`DRIVER_UI_FACTORY_EXISTING/ORCHESTRATION_NOT_STARTED/EMBEDDED_IN_17_PATH_SOURCE`
 
-Build准入：`READY_FOR_BUILD`
+Build准入：`BLOCKED_BY_17_PATH_INTEGRATED_SOURCE_IMPLEMENTATION`
 
-受控194/388准入：`BLOCKED_BY_MANIFEST_V02_AND_EXACT_CLEAN_BASE`
+受控194/388准入：`BLOCKED_BY_MANIFEST_V02_EXACT_CLEAN_BASE_FAULT_LAUNCHER_AND_ORCHESTRATION`
 
 ## Task Type
 
@@ -15,16 +15,15 @@ Build准入：`READY_FOR_BUILD`
 ## Active Playbooks
 
 - `design-module-docs (primary)`
-- `frontend-vue`
 - `testing`
 
 ## 1. 目标
 
-实现Common Driver与controlled attempt编排，使16个Common case严格按`docs/design/opm-dev-canvas-06-e2e-common-driver-controlled-orchestration-design.md v1.2`执行，并补齐三个稳定UI selector和Fact删除入口。该实现只提供Runner可消费的真实UI/API动作及受控进程编排，不写Manifest/Report READY、不提升Gate。
+只实现尚缺的controlled attempt编排，使现有Common Driver的16个Common case严格按`docs/design/opm-dev-canvas-06-e2e-common-driver-controlled-orchestration-design.md v1.4`执行。Common Driver、三个稳定UI selector、Fact删除入口、store与factory均作为只读前置消费；本包不重复实现。该实现只提供Runner可消费的受控进程编排与真实UI/API执行，不写Manifest/Report READY、不提升Gate。
 
 ## 2. 权威输入
 
-1. Common Driver/Orchestration设计`v1.2`；
+1. Common Driver/Orchestration设计`v1.4`；
 2. E2E Runner实现规格的Manifest `0.2`、Attempt Artifact `0.2`、Report `0.2`边界；
 3. Fault Launcher设计`v1.1`及后继实现规格；
 4. OpenAPI `API-EDT-001/002`现有wire与当前Runtime首错顺序；
@@ -32,71 +31,44 @@ Build准入：`READY_FOR_BUILD`
 
 ## 3. 精确修改边界
 
-### 3.1 非文档allowlist：`18 paths`
-
-1. `tests/e2e/release/dev-canvas-06/drivers/common-driver.mjs`
-2. `tests/e2e/release/dev-canvas-06/drivers/common-driver.test.mjs`
-3. `scripts/canvas06-e2e-controlled-orchestration.mjs`
-4. `scripts/canvas06-e2e-controlled-orchestration.test.mjs`
-5. `scripts/release-canvas06-e2e-run.mjs`
-6. `scripts/release-canvas06-e2e-run.test.mjs`
-7. `scripts/canvas06-e2e-run-input.mjs`
-8. `scripts/canvas06-e2e-run-input.test.mjs`
-9. `scripts/canvas06-e2e-attempt-artifacts.mjs`
-10. `scripts/canvas06-e2e-attempt-artifacts.test.mjs`
-11. `tests/e2e/release/dev-canvas-06/playwright.release.config.ts`
-12. `tests/e2e/release/dev-canvas-06/common-driver.controlled.spec.ts`
-13. `apps/web/src/modules/workbench/WorkbenchView.vue`
-14. `apps/web/src/modules/workbench/WorkbenchView.spec.ts`
-15. `apps/web/src/stores/workbenchRuntime.ts`
-16. `apps/web/src/stores/workbenchRuntime.spec.ts`
-17. `tests/e2e/release/dev-canvas-06/fixtures/factories/common-fixture-factory.mjs`
-18. `tests/e2e/release/dev-canvas-06/fixtures/factories/common-fixture-factory.test.mjs`
-
-`M/A`只在exact clean base形成后计算。文档只同步本规格checklist、Manifest v02规格/checklist、Runner/Fault checklist、测试策略、执行包、冻结基线和README。
-
-### 3.2 允许的产品前端变化
-
-仅允许：
-
-1. 为State inspector name输入增加`data-testid=p03-state-inspector-name`；
-2. 为State inspector根增加`data-testid=p03-state-inspector`；
-3. 基于现有`DELETE_CONSTRUCT` capability/impact token，为已选Fact增加`data-testid=p03-fact-delete-impact`的影响摘要与“删除关系”按钮；
-4. 请求、错误、保存状态继续使用现有`LocalRuntimeApi`与store状态机。
-
-禁止新增API、修改DTO、改SQLite、增加test-only DOM控制、把driver注入生产bundle或改变非测试业务语义。
-
-## 4. Driver实现
-
-1. exports、CommonCase shape、16项顺序、初始状态、八类step、selector及有序`expected_apis[]`完全等于主设计；
-2. `COMMON_CASES`在module初始化后递归freeze；
-3. driver拒绝未知/缺/extra/reorder case，拒绝Manifest expectation、transaction或Catalog错误码与常量不等；
-4. 任何动作通过Playwright locator或封闭`precondition_client`执行，不访问Vue store、window内部对象、SQLite或checkout；
-5. `REPLACE_OPTION_ID/REPLACE_IMPACT_TOKEN`只在request发出前对当前case的单次API-EDT-002 body做受控替换，原body、实际body、response均进入artifact；其他请求或第二次触发立即失败；
-6. `ADVANCE_HEAD`执行一个正式、可复核的API-EDT-002 no-op-independent写命令，完成后重新采集subject baseline；旧页面保留旧base/token，预期首错为`REVISION_CONFLICT`；
-7. `SUBMIT_READONLY_COMMAND`从已验证Projection和binding构造与UI Consumption相同的正式request，证明Runtime返回409；UI同时必须显示readonly banner且工具禁用。
-
-## 5. Common输入重建
-
-factory只允许更新九个BLOCKED case的`expected_error_code`：
+### 3.1 非文档allowlist：`8=7 M+1 A`
 
 ```text
-AMBIGUOUS -> 字段省略
-STALE_OPTION -> DOMAIN_REJECTED
-STALE_TOKEN -> REVISION_CONFLICT
-MISMATCHED_TOKEN -> DOMAIN_REJECTED
-ASSET_MISSING -> TEXT_GENERATION_BLOCKED
-TEXT_BLOCKED -> DOMAIN_REJECTED
-REVISION_CONFLICT -> REVISION_CONFLICT
-PERSISTENCE_FAILED -> PERSISTENCE_FAILED
-READONLY -> READ_ONLY_REVISION
+M scripts/release-canvas06-e2e-run.mjs
+M scripts/release-canvas06-e2e-run.test.mjs
+M scripts/canvas06-e2e-run-input.mjs
+M scripts/canvas06-e2e-run-input.test.mjs
+M scripts/canvas06-e2e-attempt-artifacts.mjs
+M scripts/canvas06-e2e-attempt-artifacts.test.mjs
+M tests/e2e/release/dev-canvas-06/playwright.release.config.ts
+A tests/e2e/release/dev-canvas-06/common-driver.controlled.spec.ts
 ```
 
-7个PASS与9个BLOCKED的事务分别使用`TX_COMMIT_1/TX_NO_COMMIT`。重建32个BASE/INPUT与Catalog refs属于后续release输出，不进入本source delta；唯一后继入口为`specs/opm-dev-canvas-06-common-e2e-input-rebuild-implementation-task-spec.md`及其checklist。历史0.1.0 bytes不得改写。
+七个`M`必须在exact clean base中已跟踪，唯一`A`必须不存在。四个production文件已属于Runner Source Set `0.1`的23项；四个测试文件继续属于Source Set排除集。不得修改Source Set Schema或Report Schema，不得新增Source Set外production helper。
+
+### 3.2 只读前置
+
+以下路径不进入本source delta：
+
+1. `tests/e2e/release/dev-canvas-06/drivers/common-driver.mjs`及其测试；
+2. `apps/web/src/modules/workbench/WorkbenchView.vue`及其现有测试；
+3. `apps/web/src/stores/workbenchRuntime.ts`；
+4. `tests/e2e/release/dev-canvas-06/fixtures/factories/common-fixture-factory.mjs`及其测试；
+5. Runner Source Set `0.1`与E2E Report `0.2` Schema。
+
+现有三个selector和Fact删除入口只做回归验证。禁止新增不存在的`workbenchRuntime.spec.ts`来扩大本包，也禁止借本包修改API、DTO、SQLite、产品前端业务语义或factory输出。
+
+## 4. Driver只读契约
+
+现有driver的exports、16项顺序、八类step、selector、有序`expected_apis[]`、一次性precondition、`ADVANCE_HEAD`、READONLY与递归freeze必须继续完全等于主设计。Runner只能导入并执行，不得复制常量、修正expectation、从路径推断case或把driver逻辑搬入编排owner。任何不一致使controlled case失败并回流原owner，不授权在本包修改driver。
+
+## 5. Common输入只读边界
+
+Common factory的`7 PASS/9 BLOCKED`、九项错误/空码和`TX_COMMIT_1/TX_NO_COMMIT`已经实现；活动43文件root已由独立Common E2E输入重建包生成并自验证。本包只读消费Manifest锁定的final bytes，不修改factory、32个BASE/INPUT、Catalog ref或历史`0.1.0` bytes，也不把self-verified root解释为production Manifest、Report或Gate证据。
 
 ## 6. Controlled Orchestration实现
 
-1. 实现主设计`prepareControlledAttempt()`签名，不增加Runtime/Web override CLI；
+1. 在`scripts/release-canvas06-e2e-run.mjs`内实现主设计`prepareControlledAttempt()`签名，不增加独立orchestration文件、第二CLI或Runtime/Web override CLI；
 2. Runtime JAR、Web dist、Profile assets和四个driver只从已验证Manifest final root复制到fresh attempt；
 3. copy前后分别验证source与destination single-link/type/length/SHA或tree digest；
 4. attempt root排他创建且此前不存在；任何residual、link、跨report或duplicate ordinal拒绝；
@@ -129,17 +101,19 @@ E2E_ORCHESTRATION_PORT_NOT_RELEASED
 
 ### 8.1 Unit
 
-- 16项exact constant、递归freeze、case顺序、7/9、有序API数组、错误码和事务恒等式；
+- 现有16项exact constant、递归freeze、case顺序、7/9、有序API数组、错误码和事务恒等式回归；
 - selector只允许T/X/R，拒绝class/XPath/坐标/nth/sleep；
 - 五种precondition一次性、case限制、raw before/after artifact；
 - fresh path、copy/ref/tree、same storage/different process identity。
 
-### 8.2 Vue
+### 8.2 既有Vue回归
 
 - 三个test id唯一存在；
 - Fact delete只在能力enabled且有impact token时可提交；
 - blocked/readonly/error不改变head，成功删除刷新Projection/Text/Revision；
 - 不改变State、Relation、Control既有回归。
+
+不得修改Vue或store；缺少既有selector/Fact删除行为时，本包失败并回流产品owner。
 
 ### 8.3 Controlled integration
 
@@ -155,8 +129,8 @@ E2E_ORCHESTRATION_PORT_NOT_RELEASED
 ## 9. 必跑命令
 
 ```text
-npm run test -- --run apps/web/src/modules/workbench/WorkbenchView.spec.ts apps/web/src/stores/workbenchRuntime.spec.ts
-node --test tests/e2e/release/dev-canvas-06/drivers/common-driver.test.mjs scripts/canvas06-e2e-controlled-orchestration.test.mjs
+npm run test -- --run apps/web/src/modules/workbench/WorkbenchView.spec.ts
+node --test tests/e2e/release/dev-canvas-06/drivers/common-driver.test.mjs scripts/release-canvas06-e2e-run.test.mjs scripts/canvas06-e2e-run-input.test.mjs scripts/canvas06-e2e-attempt-artifacts.test.mjs
 npm run release:canvas06:e2e:runner:test
 npm run lint
 npm run typecheck
@@ -168,6 +142,6 @@ forked-JAR/controlled browser只在exact Runtime/Manifest输入可用时执行�
 
 ## 10. 回滚与状态
 
-回滚删除新增driver/orchestration/spec，移除三个test id和Fact删除UI增量，恢复factory source；不删除已存在release root或用户数据。错误生成资产只能整体隔离。
+回滚只回退本包八路径的编排实现与测试，将切片恢复为`BLOCKED_BY_ORCHESTRATION_NOT_IMPLEMENTED`；不得删除或回退只读Common Driver、selector、Fact删除入口、store、factory、既有release root或用户数据。错误生成资产只能整体隔离。
 
-本规格已具备Build输入；受控全量仍等待Manifest v02 producer/verifier、exact clean base与Fault Launcher实现。Capability保持未启用，`GATE-06-03=NOT_RUN`。
+本规格的实现语义与8路径职责子集已闭合，但不得独立形成source commit。唯一Build入口为`opm-dev-canvas-06-common-orchestration-integrated-source-closure-bugfix-task-spec.md`：以`e598...`为base，将本8项与External Store 9项联合实现、测试并一次提交为`17=14 M+3 A`，再从同一commit重建Manifest并运行Runner。Source Set保持`0.1/0.1.0/23`，Report保持`0.2/runner_version 0.2.0`。受控全量仍等待17项commit、Manifest v02 production输入与Fault Launcher实现；Capability保持未启用，`GATE-06-03=NOT_RUN`。
