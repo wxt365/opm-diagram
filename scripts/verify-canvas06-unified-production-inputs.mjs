@@ -2,7 +2,7 @@ import { lstat, readFile } from 'node:fs/promises';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { isAbsolute, relative, resolve, sep } from 'node:path';
 
-import { UnifiedInputError, assertArtifactOrder, assertSourcePaths, assertTreeRef, fail, parseOptions, sameRef, treeRef } from './canvas06-unified-production-input.mjs';
+import { UnifiedInputError, assertArtifactOrder, assertExactQuarantineGuard, assertSourcePaths, assertTreeRef, fail, parseOptions, sameRef, treeRef } from './canvas06-unified-production-input.mjs';
 
 if (import.meta.url === new URL(process.argv[1], 'file:').href) {
   runCli();
@@ -22,6 +22,7 @@ async function runCli() {
 export async function verify(options) {
   const sourceRoot = options['source-root'];
   const handoffRoot = options['handoff-root'];
+  await assertExactQuarantineGuard(handoffRoot, options['source-commit']);
   assertInstalledSourceIdentity(sourceRoot, handoffRoot, options);
   await assertSourcePaths(sourceRoot);
   const input = resolve(handoffRoot, options.input);

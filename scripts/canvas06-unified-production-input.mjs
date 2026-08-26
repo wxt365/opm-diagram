@@ -1,8 +1,15 @@
 import { createHash } from 'node:crypto';
-import { lstat, readdir, readFile } from 'node:fs/promises';
+import { constants } from 'node:fs';
+import { link, lstat, mkdir, open, readdir, readFile, unlink } from 'node:fs/promises';
 import { isAbsolute, relative, resolve, sep } from 'node:path';
+import Ajv2020 from 'ajv/dist/2020.js';
 
 import { jcs } from './canvas06-e2e-manifest-v01-support.mjs';
+
+const QUARANTINE_SCHEMA = JSON.parse(await readFile(new URL('../docs/contracts/schemas/opm-dev-canvas-06-unified-source-quarantine-marker.schema.json', import.meta.url), 'utf8'));
+const validateQuarantineMarker = new Ajv2020({ allErrors: true, strict: false }).compile(QUARANTINE_SCHEMA);
+const QUARANTINE_FAILURE_CODES = new Set(QUARANTINE_SCHEMA.properties.failure_code.enum);
+const QUARANTINE_FAILURE_STAGES = new Set(QUARANTINE_SCHEMA.properties.failure_stage.enum);
 
 export const BASE_SOURCE_COMMIT = 'daf383df6d7faad866b84fceac0a2c9111a8c926';
 export const SOURCE_PATHS = Object.freeze({
@@ -116,6 +123,64 @@ export function assertArtifactOrder(handoff, source12) {
 export function sameRef(left, right) { return left?.kind === right?.kind && left?.path === right?.path && left?.byte_length === right?.byte_length && left?.sha256 === right?.sha256; }
 export function sha256(value) { return createHash('sha256').update(value).digest('hex'); }
 
+export function quarantinePaths(handoffRoot, sourceCommit) {
+  const source12 = sourceCommit.slice(0, 12);
+  const quarantine = resolve(handoffRoot, 'releases/quarantine');
+  return Object.freeze({ quarantine, marker: resolve(quarantine, `clean-${source12}.json`), temporary: resolve(quarantine, `.clean-${source12}.json.tmp`) });
+}
+
+export async function assertExactQuarantineGuard(handoffRoot, sourceCommit) {
+  const paths = quarantinePaths(handoffRoot, sourceCommit);
+  await directory(resolve(handoffRoot), 'CANVAS06_UNIFIED_TRANSACTION_FAILED', 'EXACT_QUARANTINE_SIDECAR_GUARD');
+  const releases = await existingDirectory(resolve(handoffRoot, 'releases'));
+  if (!releases) return paths;
+  const quarantine = await existingDirectory(paths.quarantine);
+  if (!quarantine) return paths;
+  const final = await existing(paths.marker);
+  if (final) {
+    if (!final.isFile() || final.isSymbolicLink() || final.nlink !== 1) fail('CANVAS06_UNIFIED_TRANSACTION_FAILED', 'EXACT_QUARANTINE_SIDECAR_GUARD', 'quarantine marker 不是安全普通文件。');
+    fail('CANVAS06_UNIFIED_QUARANTINED', 'EXACT_QUARANTINE_SIDECAR_GUARD', '目标版本根存在 quarantine marker。');
+  }
+  const temporary = await existing(paths.temporary);
+  if (temporary) fail('CANVAS06_UNIFIED_TRANSACTION_FAILED', 'EXACT_QUARANTINE_SIDECAR_GUARD', 'quarantine marker 临时文件残留。');
+  return paths;
+}
+
+export async function writeQuarantineMarker({ handoffRoot, sourceCommit, inputRoot, treeSha256, failureCode, failureStage }) {
+  if (inputRoot !== `releases/clean-${sourceCommit.slice(0, 12)}` || !/^[a-f0-9]{64}$/.test(treeSha256) || !QUARANTINE_FAILURE_CODES.has(failureCode) || !QUARANTINE_FAILURE_STAGES.has(failureStage)) {
+    fail('CANVAS06_UNIFIED_TRANSACTION_FAILED', 'QUARANTINE_MARKER_CONTENT', 'quarantine marker 参数不满足冻结契约。');
+  }
+  const value = {
+    schema_id: 'OPM-DEV-CANVAS-06-UNIFIED-SOURCE-QUARANTINE-MARKER-001', schema_version: '0.1', status: 'QUARANTINED', input_root: inputRoot,
+    source_commit: sourceCommit, pre_quarantine_tree_sha256: treeSha256, failure_code: failureCode, failure_stage: failureStage
+  };
+  if (!validateQuarantineMarker(value)) fail('CANVAS06_UNIFIED_TRANSACTION_FAILED', 'QUARANTINE_MARKER_SCHEMA', JSON.stringify(validateQuarantineMarker.errors));
+  const bytes = Buffer.from(`${JSON.stringify(value, null, 2)}\n`, 'utf8');
+  const paths = quarantinePaths(handoffRoot, sourceCommit);
+  try {
+    await directory(resolve(handoffRoot), 'CANVAS06_UNIFIED_TRANSACTION_FAILED', 'ENSURE_OR_CREATE_QUARANTINE_DIRECTORY_NOFOLLOW');
+    await directory(resolve(handoffRoot, 'releases'), 'CANVAS06_UNIFIED_TRANSACTION_FAILED', 'ENSURE_OR_CREATE_QUARANTINE_DIRECTORY_NOFOLLOW');
+    if (!await existingDirectory(paths.quarantine)) {
+      await mkdir(paths.quarantine);
+      await syncDirectory(resolve(handoffRoot, 'releases'));
+    }
+    await directory(paths.quarantine, 'CANVAS06_UNIFIED_TRANSACTION_FAILED', 'ENSURE_OR_CREATE_QUARANTINE_DIRECTORY_NOFOLLOW');
+    if (await existing(paths.marker) || await existing(paths.temporary)) fail('CANVAS06_UNIFIED_TRANSACTION_FAILED', 'ASSERT_FINAL_MARKER_AND_EXACT_TEMP_ABSENT', 'quarantine marker 或临时文件已存在。');
+    const handle = await open(paths.temporary, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600);
+    try { await handle.writeFile(bytes); await handle.sync(); } finally { await handle.close(); }
+    const reread = await readFile(paths.temporary);
+    const parsed = JSON.parse(reread.toString('utf8'));
+    if (!reread.equals(bytes) || !validateQuarantineMarker(parsed) || JSON.stringify(parsed) !== JSON.stringify(value)) fail('CANVAS06_UNIFIED_TRANSACTION_FAILED', 'REREAD_RAW_AND_SCHEMA_SEMANTIC_VERIFY', 'quarantine marker 回读不匹配。');
+    await link(paths.temporary, paths.marker);
+    await unlink(paths.temporary);
+    await syncDirectory(paths.quarantine);
+    return Object.freeze({ path: paths.marker, bytes, sha256: sha256(bytes) });
+  } catch (error) {
+    if (error instanceof UnifiedInputError) throw error;
+    fail('CANVAS06_UNIFIED_TRANSACTION_FAILED', 'QUARANTINE_MARKER_WRITE', error.message);
+  }
+}
+
 export function inside(root, path, code = 'CANVAS06_UNIFIED_ARGUMENT_INVALID') {
   if (!safePath(path)) fail(code, 'PATH', '路径必须为安全相对路径。');
   const output = resolve(root, path);
@@ -161,3 +226,7 @@ async function directory(path, code) {
     if (info.isSymbolicLink() || !info.isDirectory()) throw new Error('unsafe');
   } catch { fail(code, 'SOURCE_PATHS', '必须是非链接目录。'); }
 }
+
+async function existing(path) { try { return await lstat(path); } catch (error) { if (error?.code === 'ENOENT') return undefined; fail('CANVAS06_UNIFIED_TRANSACTION_FAILED', 'EXACT_QUARANTINE_SIDECAR_GUARD', error.message); } }
+async function existingDirectory(path) { const info = await existing(path); if (!info) return false; if (!info.isDirectory() || info.isSymbolicLink()) fail('CANVAS06_UNIFIED_TRANSACTION_FAILED', 'EXACT_QUARANTINE_SIDECAR_GUARD', 'quarantine 目录不安全。'); return true; }
+async function syncDirectory(path) { const handle = await open(path, constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW); try { await handle.sync(); } finally { await handle.close(); } }

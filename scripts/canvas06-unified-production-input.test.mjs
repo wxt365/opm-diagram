@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import test from 'node:test';
 
-import { BASE_SOURCE_COMMIT, UnifiedInputError, assertArtifactOrder, parseOptions, sourceEpoch, treeRef } from './canvas06-unified-production-input.mjs';
+import { BASE_SOURCE_COMMIT, UnifiedInputError, assertArtifactOrder, assertExactQuarantineGuard, parseOptions, sourceEpoch, treeRef, writeQuarantineMarker } from './canvas06-unified-production-input.mjs';
 
 const commit = 'a'.repeat(40);
 const root = resolve(tmpdir(), 'canvas06-unified-input-test-root');
@@ -34,5 +34,20 @@ test('Web tree 使用 UTF-8 inventory JCS，拒绝 Vite client', async () => {
     await assert.rejects(() => treeRef(work, 'dist'), error => error.code === 'CANVAS06_UNIFIED_WEB_TREE_INVALID');
   } finally {
     await rm(work, { recursive: true, force: true });
+  }
+});
+
+test('quarantine sidecar 只隔离精确 source12，且保持固定 UTF-8 bytes', async () => {
+  const handoff = await mkdtemp(resolve(tmpdir(), 'canvas06-quarantine-'));
+  try {
+    await mkdir(resolve(handoff, 'releases'));
+    const sourceCommit = 'b'.repeat(40);
+    await assertExactQuarantineGuard(handoff, sourceCommit);
+    const marker = await writeQuarantineMarker({ handoffRoot: handoff, sourceCommit, inputRoot: 'releases/clean-bbbbbbbbbbbb', treeSha256: 'c'.repeat(64), failureCode: 'CANVAS06_UNIFIED_JOIN_MISMATCH', failureStage: 'INSTALLED_REVERIFY_HANDOFF_INTAKE_WEB_COMMON' });
+    assert.match((await readFile(marker.path, 'utf8')), /\n$/);
+    await assert.rejects(() => assertExactQuarantineGuard(handoff, sourceCommit), error => error.code === 'CANVAS06_UNIFIED_QUARANTINED');
+    await assertExactQuarantineGuard(handoff, 'd'.repeat(40));
+  } finally {
+    await rm(handoff, { recursive: true, force: true });
   }
 });
