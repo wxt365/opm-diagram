@@ -4,44 +4,31 @@ import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import test from 'node:test';
 
-import { BASE_SOURCE_COMMIT, EXPECTED_DELTA, UnifiedInputError, assertArtifactOrder, assertExactQuarantineGuard, assertExternalTopology, deriveExternalPaths, openExternalPaths, parseOptions, sourceEpoch, treeRef, writeQuarantineMarker } from './canvas06-unified-production-input.mjs';
+import { FAULT_2A_CUMULATIVE_DELTA, FAULT_2A_DELTA, FAULT_CONTRACT_DELTA, FINAL_RUNNER_CUMULATIVE_DELTA, ORIGIN_SOURCE_COMMIT, UnifiedInputError, assertArtifactOrder, assertExactQuarantineGuard, assertExternalTopology, deriveExternalPaths, openExternalPaths, parseOptions, sourceEpoch, sourceChainArgs, treeRef, writeQuarantineMarker } from './canvas06-unified-production-input.mjs';
 
 const commit = 'a'.repeat(40);
-const argv = ['--input-mode', 'EXTERNAL_RELEASE_STORE', '--source-root', '/source', '--release-store-root', '/release-store', '--base-source-commit', BASE_SOURCE_COMMIT, '--source-commit', commit, '--require-production'];
+const argv = ['--input-mode', 'EXTERNAL_RELEASE_STORE', '--source-root', '/source', '--release-store-root', '/release-store', '--source-chain-target', 'FINAL_RUNNER', '--origin-source-commit', ORIGIN_SOURCE_COMMIT, '--fault-contract-source-commit', 'b'.repeat(40), '--schema-conformance-source-commit', 'c'.repeat(40), '--fault-2a-source-commit', 'd'.repeat(40), '--runner-source-commit', commit, '--source-commit', commit, '--require-production'];
 
-test('集成 source delta 精确锁定 17 个路径', () => {
-  assert.deepEqual(EXPECTED_DELTA, [
-    ['M', 'package.json'],
-    ['M', 'scripts/canvas06-e2e-attempt-artifacts.mjs'],
-    ['M', 'scripts/canvas06-e2e-attempt-artifacts.test.mjs'],
-    ['M', 'scripts/canvas06-e2e-run-input.mjs'],
-    ['M', 'scripts/canvas06-e2e-run-input.test.mjs'],
-    ['M', 'scripts/canvas06-unified-production-input.mjs'],
-    ['M', 'scripts/canvas06-unified-production-input.test.mjs'],
-    ['A', 'scripts/rebuild-canvas06-manifest-v02-production.mjs'],
-    ['A', 'scripts/rebuild-canvas06-manifest-v02-production.test.mjs'],
-    ['M', 'scripts/rebuild-canvas06-unified-production-inputs.mjs'],
-    ['M', 'scripts/rebuild-canvas06-unified-production-inputs.test.mjs'],
-    ['M', 'scripts/release-canvas06-e2e-run.mjs'],
-    ['M', 'scripts/release-canvas06-e2e-run.test.mjs'],
-    ['M', 'scripts/verify-canvas06-unified-production-inputs.mjs'],
-    ['M', 'scripts/verify-canvas06-unified-production-inputs.test.mjs'],
-    ['A', 'tests/e2e/release/dev-canvas-06/common-driver.controlled.spec.ts'],
-    ['M', 'tests/e2e/release/dev-canvas-06/playwright.release.config.ts']
-  ]);
+test('source chain 精确锁定 C=20、A=4、Fault累计24与最终累计28个路径', () => {
+  assert.equal(FAULT_CONTRACT_DELTA.length, 20);
+  assert.equal(FAULT_2A_DELTA.length, 4);
+  assert.equal(FAULT_2A_CUMULATIVE_DELTA.length, 24);
+  assert.equal(FINAL_RUNNER_CUMULATIVE_DELTA.length, 28);
 });
 
 test('旧两项 Handoff 不能满足活动三 artifact 契约', () => {
   assert.throws(() => assertArtifactOrder({ build_artifacts: [] }, commit.slice(0, 12)), error => error instanceof UnifiedInputError && error.code === 'CANVAS06_UNIFIED_HANDOFF_INVALID');
 });
 
-test('CLI 只接受唯一 EXTERNAL_RELEASE_STORE production 模式', () => {
+test('CLI 只接受唯一 EXTERNAL_RELEASE_STORE production source chain', () => {
   const options = parseOptions(argv);
   const paths = deriveExternalPaths(options);
   assert.equal(paths.inputRelative, 'releases/clean-aaaaaaaaaaaa');
   assert.match(paths.versionedInputRoot, /profiles\/profile\.iso19450\.2024\.draft\/0\.2\.0\/handoff\/releases\/clean-aaaaaaaaaaaa$/);
   assert.throws(() => parseOptions(argv.map(value => value === 'EXTERNAL_RELEASE_STORE' ? 'LEGACY' : value)), error => error.code === 'CANVAS06_UNIFIED_ARGUMENT_INVALID');
   assert.throws(() => parseOptions([...argv, '--out', 'releases/clean-aaaaaaaaaaaa']), error => error.code === 'CANVAS06_UNIFIED_ARGUMENT_INVALID');
+  assert.throws(() => parseOptions(argv.filter(value => value !== '--runner-source-commit' && value !== commit)), error => error.code === 'CANVAS06_UNIFIED_ARGUMENT_INVALID');
+  assert.deepEqual(sourceChainArgs(options).slice(0, 2), ['--source-chain-target', 'FINAL_RUNNER']);
   assert.equal(sourceEpoch('1787619828'), '2026-08-25T01:03:48Z');
 });
 

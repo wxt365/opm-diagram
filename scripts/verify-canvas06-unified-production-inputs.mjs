@@ -19,7 +19,7 @@ async function runCli() {
 export async function verify(options) {
   const paths = await openExternalPaths(options);
   await assertExactQuarantineGuard(paths);
-  assertSourceClean(paths.sourceRoot, options['source-commit']);
+  assertSourceClean(paths.sourceRoot, options);
   await assertSourcePaths(paths.sourceRoot);
   await regular(resolve(paths.versionedInputRoot, 'dev-canvas-05-handoff.json'));
   await regular(resolve(paths.versionedInputRoot, 'dev-canvas-06-intake-report.json'));
@@ -32,10 +32,10 @@ export async function verify(options) {
   if (intake.intake_status !== 'READY_FOR_RELEASE_VALIDATION' || !sameRef(intake.handoff_ref, handoffRef)) fail('CANVAS06_UNIFIED_INTAKE_INVALID', 'INTAKE', 'Intake 未锁定 Handoff raw bytes。');
   await regular(resolve(paths.versionedInputRoot, 'dev-canvas-06/common-fixtures/0.2.0/dev-canvas-06-common-fixture-catalog.json'));
   const before = await treeRef(paths.handoffRoot, paths.inputRelative, 'INPUT_TREE', 'CANVAS06_UNIFIED_JOIN_MISMATCH');
-  assertSourceClean(paths.sourceRoot, options['source-commit']);
+  assertSourceClean(paths.sourceRoot, options);
   const after = await treeRef(paths.handoffRoot, paths.inputRelative, 'INPUT_TREE', 'CANVAS06_UNIFIED_JOIN_MISMATCH');
   if (before.sha256 !== after.sha256) fail('CANVAS06_UNIFIED_JOIN_MISMATCH', 'TREE_DIGEST_AFTER', 'Verifier 观察到已安装输入变化。');
-  assertSourceClean(paths.sourceRoot, options['source-commit']);
+  assertSourceClean(paths.sourceRoot, options);
   return Object.freeze({ path: paths.versionedInputRoot, sourceCommit: options['source-commit'], treeSha256: after.sha256 });
 }
 

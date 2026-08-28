@@ -8,9 +8,10 @@ import { jcs } from './canvas06-e2e-manifest-v01-support.mjs';
 
 export { jcs };
 
-export const BASE_SOURCE_COMMIT = 'e598b305a44ebb9c9845c1f5563bc36c3a89a2b4';
+export const ORIGIN_PARENT_COMMIT = 'e598b305a44ebb9c9845c1f5563bc36c3a89a2b4';
+export const ORIGIN_SOURCE_COMMIT = '9048bb355aff18d5c00fbbaeb1660b979f4e6daa';
 const PROFILE_RELATIVE_ROOT = 'profiles/profile.iso19450.2024.draft/0.2.0';
-export const EXPECTED_DELTA = Object.freeze([
+export const ORIGIN_DELTA = Object.freeze([
   ['M', 'package.json'],
   ['M', 'scripts/canvas06-e2e-attempt-artifacts.mjs'],
   ['M', 'scripts/canvas06-e2e-attempt-artifacts.test.mjs'],
@@ -28,6 +29,63 @@ export const EXPECTED_DELTA = Object.freeze([
   ['M', 'scripts/verify-canvas06-unified-production-inputs.test.mjs'],
   ['A', 'tests/e2e/release/dev-canvas-06/common-driver.controlled.spec.ts'],
   ['M', 'tests/e2e/release/dev-canvas-06/playwright.release.config.ts']
+]);
+export const FAULT_CONTRACT_DELTA = Object.freeze([
+  ['A', 'docs/contracts/schemas/opm-dev-canvas-06-controlled-input-bundle-v02.schema.json'],
+  ['A', 'docs/contracts/schemas/opm-dev-canvas-06-e2e-fault-launcher-gate-observation.schema.json'],
+  ['A', 'docs/contracts/schemas/opm-dev-canvas-06-e2e-fault-launcher-jarit-report.schema.json'],
+  ['A', 'docs/contracts/schemas/opm-dev-canvas-06-e2e-fault-launcher-preflight-descriptor.schema.json'],
+  ['M', 'package.json'],
+  ['M', 'scripts/canvas06-unified-production-input.mjs'],
+  ['M', 'scripts/canvas06-unified-production-input.test.mjs'],
+  ['M', 'scripts/rebuild-canvas06-manifest-v02-production.mjs'],
+  ['M', 'scripts/rebuild-canvas06-manifest-v02-production.test.mjs'],
+  ['M', 'scripts/rebuild-canvas06-unified-production-inputs.mjs'],
+  ['M', 'scripts/rebuild-canvas06-unified-production-inputs.test.mjs'],
+  ['A', 'scripts/release-canvas06-e2e-fault-launcher-preflight-input.mjs'],
+  ['A', 'scripts/release-canvas06-e2e-fault-launcher-preflight-input.test.mjs'],
+  ['M', 'scripts/validate-canvas06-controlled-input-bundle-schema.test.mjs'],
+  ['M', 'scripts/verify-canvas06-controlled-input-bundle.mjs'],
+  ['M', 'scripts/verify-canvas06-controlled-input-bundle.test.mjs'],
+  ['A', 'scripts/verify-canvas06-e2e-fault-launcher-preflight-input.mjs'],
+  ['A', 'scripts/verify-canvas06-e2e-fault-launcher-preflight-input.test.mjs'],
+  ['M', 'scripts/verify-canvas06-unified-production-inputs.mjs'],
+  ['M', 'scripts/verify-canvas06-unified-production-inputs.test.mjs']
+]);
+export const SCHEMA_CONFORMANCE_DELTA = Object.freeze([
+  ['M', 'docs/contracts/schemas/opm-dev-canvas-06-e2e-fault-launcher-gate-observation.schema.json'],
+  ['M', 'scripts/release-canvas06-e2e-fault-launcher-preflight-input.test.mjs']
+]);
+export const FAULT_2A_DELTA = Object.freeze([
+  ['A', 'scripts/canvas06-e2e-fault-launcher-controlled.test.mjs'],
+  ['M', 'scripts/release-canvas06-e2e-run.mjs'],
+  ['M', 'scripts/release-canvas06-e2e-run.test.mjs'],
+  ['A', 'tests/e2e/release/dev-canvas-06/fault-launcher.controlled.release.spec.ts']
+]);
+export const RUNNER_DELTA = Object.freeze([
+  ['M', 'package.json'],
+  ['M', 'scripts/release-canvas06-e2e-run.mjs'],
+  ['M', 'scripts/release-canvas06-e2e-run.test.mjs'],
+  ['M', 'scripts/canvas06-e2e-run-preflight.mjs'],
+  ['M', 'scripts/canvas06-e2e-run-preflight.test.mjs'],
+  ['M', 'scripts/canvas06-e2e-run-report.mjs'],
+  ['M', 'scripts/canvas06-e2e-run-report.test.mjs']
+]);
+export const FAULT_2A_CUMULATIVE_DELTA = Object.freeze([
+  ...FAULT_CONTRACT_DELTA.slice(0, 5),
+  ...FAULT_2A_DELTA.slice(0, 1),
+  ...FAULT_CONTRACT_DELTA.slice(5, 13),
+  ...FAULT_2A_DELTA.slice(1, 3),
+  ...FAULT_CONTRACT_DELTA.slice(13),
+  ...FAULT_2A_DELTA.slice(3)
+]);
+export const FINAL_RUNNER_CUMULATIVE_DELTA = Object.freeze([
+  ...FAULT_2A_CUMULATIVE_DELTA.slice(0, 6),
+  ['M', 'scripts/canvas06-e2e-run-preflight.mjs'],
+  ['M', 'scripts/canvas06-e2e-run-preflight.test.mjs'],
+  ['M', 'scripts/canvas06-e2e-run-report.mjs'],
+  ['M', 'scripts/canvas06-e2e-run-report.test.mjs'],
+  ...FAULT_2A_CUMULATIVE_DELTA.slice(6)
 ]);
 const QUARANTINE_FAILURE_CODES = new Set(['CANVAS06_UNIFIED_HANDOFF_INVALID', 'CANVAS06_UNIFIED_INTAKE_INVALID', 'CANVAS06_UNIFIED_WEB_TREE_INVALID', 'CANVAS06_UNIFIED_COMMON_INVALID', 'CANVAS06_UNIFIED_JOIN_MISMATCH', 'CANVAS06_UNIFIED_TRANSACTION_FAILED']);
 const QUARANTINE_FAILURE_STAGES = new Set(['FSYNC_RELEASES_PARENT', 'SPAWN_INDEPENDENT_INSTALLED_VERIFIER', 'INSTALLED_REVERIFY_HANDOFF_INTAKE_WEB_COMMON']);
@@ -62,11 +120,12 @@ export function fail(code, stage, message) { throw new UnifiedInputError(code, s
 
 /** production 只接受外置 release store，不保留旧 handoff/out/input 兼容入口。 */
 export function parseOptions(argv) {
-  const required = ['input-mode', 'source-root', 'release-store-root', 'base-source-commit', 'source-commit', 'require-production'];
+  const common = ['input-mode', 'source-root', 'release-store-root', 'source-chain-target', 'origin-source-commit', 'fault-contract-source-commit', 'schema-conformance-source-commit', 'fault-2a-source-commit', 'source-commit', 'require-production'];
+  const all = [...common, 'runner-source-commit'];
   const values = new Map();
   for (let index = 0; index < argv.length; index += 1) {
     const flag = argv[index];
-    if (typeof flag !== 'string' || !flag.startsWith('--') || flag.includes('=') || !required.includes(flag.slice(2)) || values.has(flag.slice(2))) {
+    if (typeof flag !== 'string' || !flag.startsWith('--') || flag.includes('=') || !all.includes(flag.slice(2)) || values.has(flag.slice(2))) {
       fail('CANVAS06_UNIFIED_ARGUMENT_INVALID', 'ARGS', '参数未知、重复或格式错误。');
     }
     const key = flag.slice(2);
@@ -75,14 +134,21 @@ export function parseOptions(argv) {
     if (typeof value !== 'string' || value.length === 0 || value.startsWith('--')) fail('CANVAS06_UNIFIED_ARGUMENT_INVALID', 'ARGS', '参数值缺失。');
     values.set(key, value);
   }
-  if (values.size !== required.length || values.get('require-production') !== true || values.get('input-mode') !== 'EXTERNAL_RELEASE_STORE') {
+  const target = values.get('source-chain-target');
+  const expectedCount = target === 'FINAL_RUNNER' ? common.length + 1 : target === 'FAULT_2A' ? common.length : -1;
+  if (values.size !== expectedCount || values.get('require-production') !== true || values.get('input-mode') !== 'EXTERNAL_RELEASE_STORE') {
     fail('CANVAS06_UNIFIED_ARGUMENT_INVALID', 'ARGS', '缺少 production 参数或 input-mode 非 EXTERNAL_RELEASE_STORE。');
   }
   for (const key of ['source-root', 'release-store-root']) if (!isAbsolute(values.get(key))) fail('CANVAS06_UNIFIED_ARGUMENT_INVALID', 'ARGS', `${key} 必须是绝对路径。`);
-  if (values.get('base-source-commit') !== BASE_SOURCE_COMMIT || !/^[a-f0-9]{40}$/.test(values.get('source-commit'))) {
-    fail('CANVAS06_UNIFIED_BASE_INVALID', 'BASE_COMMIT_ANCESTRY', 'base 或 source commit 非法。');
-  }
+  if (values.get('origin-source-commit') !== ORIGIN_SOURCE_COMMIT || [...values.entries()].some(([key, value]) => key.endsWith('-commit') && !/^[a-f0-9]{40}$/.test(value))) fail('CANVAS06_UNIFIED_ARGUMENT_INVALID', 'ARGS', 'source chain commit 非法。');
+  if ((target === 'FAULT_2A' && values.get('source-commit') !== values.get('fault-2a-source-commit')) || (target === 'FINAL_RUNNER' && values.get('source-commit') !== values.get('runner-source-commit'))) fail('CANVAS06_UNIFIED_ARGUMENT_INVALID', 'ARGS', 'source-commit 必须等于 target HEAD。');
   return Object.freeze(Object.fromEntries(values));
+}
+
+export function sourceChainArgs(options) {
+  const keys = ['source-chain-target', 'origin-source-commit', 'fault-contract-source-commit', 'schema-conformance-source-commit', 'fault-2a-source-commit'];
+  if (options['source-chain-target'] === 'FINAL_RUNNER') keys.push('runner-source-commit');
+  return keys.flatMap(key => [`--${key}`, options[key]]);
 }
 
 export function deriveExternalPaths(options) {
@@ -140,12 +206,38 @@ export async function assertExternalTopology(paths) {
   return Object.freeze({ sourceReal, storeReal });
 }
 
-export function assertSourceClean(sourceRoot, sourceCommit) {
-  if (git(sourceRoot, ['rev-parse', 'HEAD']).trim() !== sourceCommit) fail('CANVAS06_UNIFIED_SOURCE_DIRTY', 'SOURCE_CLEAN_HEAD', 'source-root HEAD 不等于 source-commit。');
+export function assertSourceClean(sourceRoot, options) {
+  const sourceCommit = options['source-commit'];
+  if (git(sourceRoot, ['--no-replace-objects', 'rev-parse', 'HEAD']).trim() !== sourceCommit) fail('CANVAS06_UNIFIED_SOURCE_DIRTY', 'SOURCE_CLEAN_HEAD', 'source-root HEAD 不等于 source-commit。');
   if (git(sourceRoot, ['status', '--porcelain=v1', '--untracked-files=all']) !== '') fail('CANVAS06_UNIFIED_SOURCE_DIRTY', 'SOURCE_CLEAN_HEAD', 'source-root 必须完全干净。');
-  if (git(sourceRoot, ['rev-list', '--parents', '-n', '1', sourceCommit]).trim() !== `${sourceCommit} ${BASE_SOURCE_COMMIT}`) fail('CANVAS06_UNIFIED_BASE_INVALID', 'SINGLE_PARENT', 'source-commit 必须以冻结 base 为唯一 parent。');
-  const delta = git(sourceRoot, ['diff', '--name-status', BASE_SOURCE_COMMIT, sourceCommit]).trim().split('\n').filter(Boolean).map(line => line.split('\t'));
-  if (JSON.stringify(delta) !== JSON.stringify(EXPECTED_DELTA)) fail('CANVAS06_UNIFIED_BASE_INVALID', 'EXACT_SOURCE_DELTA', 'source delta 必须恰为冻结的 17 项。');
+  const origin = options['origin-source-commit'];
+  const contract = options['fault-contract-source-commit'];
+  const schema = options['schema-conformance-source-commit'];
+  const fault = options['fault-2a-source-commit'];
+  assertSingleParent(sourceRoot, origin, ORIGIN_PARENT_COMMIT, 'ORIGIN_PARENT');
+  assertDelta(sourceRoot, ORIGIN_PARENT_COMMIT, origin, ORIGIN_DELTA, 'ORIGIN_DELTA');
+  assertSingleParent(sourceRoot, contract, origin, 'FAULT_CONTRACT_PARENT');
+  assertDelta(sourceRoot, origin, contract, FAULT_CONTRACT_DELTA, 'FAULT_CONTRACT_DELTA');
+  assertSingleParent(sourceRoot, schema, contract, 'SCHEMA_CONFORMANCE_PARENT');
+  assertDelta(sourceRoot, contract, schema, SCHEMA_CONFORMANCE_DELTA, 'SCHEMA_CONFORMANCE_DELTA');
+  assertSingleParent(sourceRoot, fault, schema, 'FAULT_2A_PARENT');
+  assertDelta(sourceRoot, schema, fault, FAULT_2A_DELTA, 'FAULT_2A_DELTA');
+  if (options['source-chain-target'] === 'FAULT_2A') {
+    assertDelta(sourceRoot, origin, fault, FAULT_2A_CUMULATIVE_DELTA, 'FAULT_2A_CUMULATIVE_DELTA');
+    return;
+  }
+  const runner = options['runner-source-commit'];
+  assertSingleParent(sourceRoot, runner, fault, 'RUNNER_PARENT');
+  assertDelta(sourceRoot, fault, runner, RUNNER_DELTA, 'RUNNER_DELTA');
+  assertDelta(sourceRoot, origin, runner, FINAL_RUNNER_CUMULATIVE_DELTA, 'FINAL_RUNNER_CUMULATIVE_DELTA');
+}
+
+function assertSingleParent(sourceRoot, commit, parent, stage) {
+  if (git(sourceRoot, ['--no-replace-objects', 'rev-list', '--parents', '-n', '1', commit]).trim() !== `${commit} ${parent}`) fail('CANVAS06_UNIFIED_BASE_INVALID', stage, 'source chain parent 不符合冻结关系。');
+}
+function assertDelta(sourceRoot, from, to, expected, stage) {
+  const actual = git(sourceRoot, ['--no-replace-objects', 'diff', '--no-renames', '--name-status', `${from}..${to}`]).trim().split('\n').filter(Boolean).map(line => line.split('\t'));
+  if (JSON.stringify(actual) !== JSON.stringify(expected)) fail('CANVAS06_UNIFIED_BASE_INVALID', stage, 'source chain delta 不符合冻结 allowlist。');
 }
 
 export async function assertTargetAbsent(paths) {

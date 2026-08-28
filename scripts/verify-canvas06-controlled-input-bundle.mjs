@@ -3,9 +3,11 @@ import { lstat, readFile } from 'node:fs/promises';
 import { basename, resolve } from 'node:path';
 import Ajv2020 from 'ajv/dist/2020.js';
 
-const schemaPath = new URL('../docs/contracts/schemas/opm-dev-canvas-06-controlled-input-bundle.schema.json', import.meta.url);
-const schema = JSON.parse(await readFile(schemaPath, 'utf8'));
-const validate = new Ajv2020({ allErrors: true, strict: false }).compile(schema);
+const schemaV01Path = new URL('../docs/contracts/schemas/opm-dev-canvas-06-controlled-input-bundle.schema.json', import.meta.url);
+const schemaV02Path = new URL('../docs/contracts/schemas/opm-dev-canvas-06-controlled-input-bundle-v02.schema.json', import.meta.url);
+const ajv = new Ajv2020({ allErrors: true, strict: false });
+const validateV01 = ajv.compile(JSON.parse(await readFile(schemaV01Path, 'utf8')));
+const validateV02 = ajv.compile(JSON.parse(await readFile(schemaV02Path, 'utf8')));
 
 export class ControlledInputBundleError extends Error {
   constructor(message) {
@@ -17,7 +19,7 @@ export class ControlledInputBundleError extends Error {
 }
 
 export async function verifyControlledInputBundle({ bundleRoot, consumer }) {
-  if (!['VISUAL', 'E2E'].includes(consumer)) fail('Consumer must be VISUAL or E2E.');
+  if (!['VISUAL', 'E2E', 'FAULT_LAUNCHER'].includes(consumer)) fail('Consumer must be VISUAL, E2E, or FAULT_LAUNCHER.');
   const root = resolve(bundleRoot);
   await assertDirectory(root, 'Controlled bundle root');
   const rootId = basename(root);
@@ -26,6 +28,7 @@ export async function verifyControlledInputBundle({ bundleRoot, consumer }) {
   const descriptorPath = resolveInside(root, 'controlled-bundle.json');
   await assertRegularFile(descriptorPath, 'Controlled descriptor');
   const descriptor = await parseDescriptor(descriptorPath);
+  const validate = consumer === 'FAULT_LAUNCHER' ? validateV02 : validateV01;
   if (!validate(descriptor)) fail(`Controlled descriptor schema validation failed: ${JSON.stringify(validate.errors)}`);
 
   const identity = shaText(jcs(identityPayload(descriptor)));
@@ -42,6 +45,12 @@ export async function verifyControlledInputBundle({ bundleRoot, consumer }) {
   if (consumer === 'E2E') {
     if (descriptor.approved_version_ref !== null) fail('E2E controlled bundle requires approved_version_ref=null.');
     return { root, descriptor, references };
+  }
+
+  if (consumer === 'FAULT_LAUNCHER') {
+    if (descriptor.approved_version_ref !== null) fail('Fault Launcher controlled bundle requires approved_version_ref=null.');
+    const preflight_descriptor = await verifyRawRef(root, descriptor.preflight_descriptor_ref, 'Preflight descriptor');
+    return { root, descriptor, references, preflight_descriptor };
   }
 
   const approved = descriptor.approved_version_ref;
@@ -99,13 +108,15 @@ async function assertRegularFile(path, label) {
 }
 
 function identityPayload(descriptor) {
-  return {
+  const value = {
     bundle_class: descriptor.bundle_class,
     handoff_ref: descriptor.handoff_ref,
     intake_report_ref: descriptor.intake_report_ref,
     evidence_bundle_ref: descriptor.evidence_bundle_ref,
     approved_version_ref: descriptor.approved_version_ref
   };
+  if (descriptor.schema_version === '0.2') value.preflight_descriptor_ref = descriptor.preflight_descriptor_ref;
+  return value;
 }
 
 function resolveInside(root, path) {

@@ -8,7 +8,7 @@ import { parseOptions } from './rebuild-canvas06-manifest-v02-production.mjs';
 const root = resolve('.');
 const runner = resolve('scripts/rebuild-canvas06-manifest-v02-production.mjs');
 const commit = 'a'.repeat(40);
-const argv = ['--source-root', '/source', '--release-store-root', '/release-store', '--base-source-commit', 'e598b305a44ebb9c9845c1f5563bc36c3a89a2b4', '--source-commit', commit, '--require-production'];
+const argv = ['--source-root', '/source', '--release-store-root', '/release-store', '--source-chain-target', 'FINAL_RUNNER', '--origin-source-commit', '9048bb355aff18d5c00fbbaeb1660b979f4e6daa', '--fault-contract-source-commit', 'b'.repeat(40), '--schema-conformance-source-commit', 'c'.repeat(40), '--fault-2a-source-commit', 'd'.repeat(40), '--runner-source-commit', commit, '--source-commit', commit, '--require-production'];
 
 test('外层 orchestrator 在缺失参数时零输出拒绝', () => {
   const result = spawnSync(process.execPath, [runner], { cwd: root, encoding: 'utf8' });

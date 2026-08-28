@@ -5,9 +5,7 @@ import { readFileSync } from 'node:fs';
 import { lstat, mkdir, open, readFile, readdir, rename, rm } from 'node:fs/promises';
 import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 
-import { assertExactQuarantineGuard, assertSourceClean, jcs, openExternalPaths, sha256 } from './canvas06-unified-production-input.mjs';
-
-const BASE_SOURCE_COMMIT = 'e598b305a44ebb9c9845c1f5563bc36c3a89a2b4';
+import { assertExactQuarantineGuard, assertSourceClean, jcs, openExternalPaths, sha256, sourceChainArgs } from './canvas06-unified-production-input.mjs';
 
 class OrchestratorError extends Error {
   constructor(code, stage, message) {
@@ -31,7 +29,7 @@ async function runCli() {
 
 export async function rebuild(options, dependencies = {}) {
   const unified = await externalPaths({ ...options, 'input-mode': 'EXTERNAL_RELEASE_STORE' });
-  sourceClean(unified.sourceRoot, options['source-commit']);
+  sourceClean(unified.sourceRoot, options);
   try { await assertExactQuarantineGuard(unified); }
   catch (error) { fail('CANVAS06_MANIFEST_ORCHESTRATOR_INPUT_FAILED', error.stage || 'EXACT_QUARANTINE_GUARD', error.message); }
   await absent(unified.versionedInputRoot, 'CANVAS06_MANIFEST_ORCHESTRATOR_ROOT_INVALID', 'INPUT_FINAL');
@@ -39,11 +37,11 @@ export async function rebuild(options, dependencies = {}) {
   const sourceDateEpoch = git(unified.sourceRoot, ['show', '-s', '--format=%ct', options['source-commit']]).trim();
   const source12 = unified.source12;
   const builder = await child(unified.sourceRoot, 'rebuild-canvas06-unified-production-inputs.mjs');
-  const unifiedResult = invoke(unified.sourceRoot, builder, ['--input-mode', 'EXTERNAL_RELEASE_STORE', '--source-root', unified.sourceRoot, '--release-store-root', unified.releaseStoreRoot, '--base-source-commit', options['base-source-commit'], '--source-commit', options['source-commit'], '--require-production'], dependencies);
+  const unifiedResult = invoke(unified.sourceRoot, builder, ['--input-mode', 'EXTERNAL_RELEASE_STORE', '--source-root', unified.sourceRoot, '--release-store-root', unified.releaseStoreRoot, ...sourceChainArgs(options), '--source-commit', options['source-commit'], '--require-production'], dependencies);
   assertChildStable(builder);
   if (unifiedResult.status !== 0) fail('CANVAS06_MANIFEST_ORCHESTRATOR_INPUT_FAILED', 'RUN_UNIFIED_BUILDER_EXTERNAL_MODE', unifiedResult.stderr || unifiedResult.stdout || 'Unified Builder 失败。');
   const unifiedTriple = parseUnifiedTriple(unifiedResult.stdout, unified, options['source-commit']);
-  sourceClean(unified.sourceRoot, options['source-commit']);
+  sourceClean(unified.sourceRoot, options);
   const intakeBytes = await readSingle(resolve(unified.versionedInputRoot, 'dev-canvas-06-intake-report.json'));
   const intake12 = sha256(intakeBytes).slice(0, 12);
   const manifestId = `dev-canvas-06.e2e.${source12}.${intake12}`;
@@ -74,7 +72,7 @@ export async function rebuild(options, dependencies = {}) {
     if (!/^([^\t\n]+)\t[a-f0-9]{64}\n$/.test(stagingResult.stdout)) fail('CANVAS06_MANIFEST_ORCHESTRATOR_STAGING_VERIFY_FAILED', 'STAGING_VERIFIER_STDOUT', 'staging Verifier stdout 非冻结格式。');
     const stagingAfter = await transactionDigest(outerStaging);
     if (stagingBefore !== stagingAfter) fail('CANVAS06_MANIFEST_ORCHESTRATOR_TRANSACTION_FAILED', 'STAGING_TREE_DRIFT', 'staging verifier 改变了 transaction tree。');
-    sourceClean(unified.sourceRoot, options['source-commit']);
+    sourceClean(unified.sourceRoot, options);
     await fsyncTree(outerStaging);
     await rename(outerStaging, releaseRoot);
     renamed = true;
@@ -87,7 +85,7 @@ export async function rebuild(options, dependencies = {}) {
     if (!/^([^\t\n]+)\t[a-f0-9]{64}\n$/.test(installedResult.stdout)) fail('CANVAS06_MANIFEST_ORCHESTRATOR_INSTALLED_VERIFY_FAILED', 'INSTALLED_VERIFIER_STDOUT', 'installed Verifier stdout 非冻结格式。');
     const installedAfter = await transactionDigest(releaseRoot);
     if (stagingAfter !== installedBefore || installedBefore !== installedAfter) fail('CANVAS06_MANIFEST_ORCHESTRATOR_TRANSACTION_FAILED', 'INSTALLED_TREE_DRIFT', 'rename 或 installed verifier 改变了 transaction tree。');
-    sourceClean(unified.sourceRoot, options['source-commit']);
+    sourceClean(unified.sourceRoot, options);
     const manifestSha256 = sha256(await readSingle(resolve(installedManifestRoot, 'dev-canvas-06-e2e-manifest.json')));
     return Object.freeze({ manifestRoot: installedManifestRoot, manifestSha256, treeSha256: installedAfter, unifiedTriple });
   } catch (error) {
@@ -97,24 +95,28 @@ export async function rebuild(options, dependencies = {}) {
 }
 
 export function parseOptions(argv) {
-  const required = ['source-root', 'release-store-root', 'base-source-commit', 'source-commit', 'require-production'];
+  const common = ['source-root', 'release-store-root', 'source-chain-target', 'origin-source-commit', 'fault-contract-source-commit', 'schema-conformance-source-commit', 'fault-2a-source-commit', 'source-commit', 'require-production'];
+  const all = [...common, 'runner-source-commit'];
   const values = new Map();
   for (let index = 0; index < argv.length; index += 1) {
     const flag = argv[index];
-    if (!flag?.startsWith('--') || flag.includes('=') || !required.includes(flag.slice(2)) || values.has(flag.slice(2))) fail('CANVAS06_MANIFEST_ORCHESTRATOR_ARGUMENT_INVALID', 'ARGS', '参数未知、重复或格式错误。');
+    if (!flag?.startsWith('--') || flag.includes('=') || !all.includes(flag.slice(2)) || values.has(flag.slice(2))) fail('CANVAS06_MANIFEST_ORCHESTRATOR_ARGUMENT_INVALID', 'ARGS', '参数未知、重复或格式错误。');
     const key = flag.slice(2);
     if (key === 'require-production') { values.set(key, true); continue; }
     const value = argv[++index];
     if (!value || value.startsWith('--')) fail('CANVAS06_MANIFEST_ORCHESTRATOR_ARGUMENT_INVALID', 'ARGS', '参数值缺失。');
     values.set(key, value);
   }
-  if (values.size !== required.length || values.get('require-production') !== true || values.get('base-source-commit') !== BASE_SOURCE_COMMIT || !/^[a-f0-9]{40}$/.test(values.get('source-commit'))) fail('CANVAS06_MANIFEST_ORCHESTRATOR_ARGUMENT_INVALID', 'ARGS', '缺少 production guard 或提交身份无效。');
+  const target = values.get('source-chain-target');
+  const expectedCount = target === 'FINAL_RUNNER' ? common.length + 1 : target === 'FAULT_2A' ? common.length : -1;
+  if (values.size !== expectedCount || values.get('require-production') !== true || [...values.entries()].some(([key, value]) => key.endsWith('-commit') && !/^[a-f0-9]{40}$/.test(value))) fail('CANVAS06_MANIFEST_ORCHESTRATOR_ARGUMENT_INVALID', 'ARGS', '缺少 production guard 或提交身份无效。');
+  if ((target === 'FAULT_2A' && values.get('source-commit') !== values.get('fault-2a-source-commit')) || (target === 'FINAL_RUNNER' && values.get('source-commit') !== values.get('runner-source-commit'))) fail('CANVAS06_MANIFEST_ORCHESTRATOR_ARGUMENT_INVALID', 'ARGS', 'source-commit 必须等于 target HEAD。');
   for (const key of ['source-root', 'release-store-root']) if (!isAbsolute(values.get(key))) fail('CANVAS06_MANIFEST_ORCHESTRATOR_ARGUMENT_INVALID', 'ARGS', `${key} 必须是绝对路径。`);
   return Object.freeze(Object.fromEntries(values));
 }
 
 async function externalPaths(options) { try { return await openExternalPaths(options); } catch (error) { fail('CANVAS06_MANIFEST_ORCHESTRATOR_ROOT_INVALID', error.stage || 'ROOT_TOPOLOGY', error.message); } }
-function sourceClean(root, commit) { try { assertSourceClean(root, commit); } catch (error) { fail(error.code === 'CANVAS06_UNIFIED_BASE_INVALID' ? 'CANVAS06_MANIFEST_ORCHESTRATOR_SOURCE_INVALID' : 'CANVAS06_MANIFEST_ORCHESTRATOR_SOURCE_DIRTY', error.stage || 'SOURCE_CLEAN_HEAD', error.message); } }
+function sourceClean(root, options) { try { assertSourceClean(root, options); } catch (error) { fail(error.code === 'CANVAS06_UNIFIED_BASE_INVALID' ? 'CANVAS06_MANIFEST_ORCHESTRATOR_SOURCE_INVALID' : 'CANVAS06_MANIFEST_ORCHESTRATOR_SOURCE_DIRTY', error.stage || 'SOURCE_CLEAN_HEAD', error.message); } }
 async function assertManifestPaths(paths, staging, final, profileStaging) { for (const path of [staging, final, profileStaging]) await absent(path, 'CANVAS06_MANIFEST_ORCHESTRATOR_ROOT_INVALID', 'MANIFEST_TARGET'); if (!nested(staging, paths.manifestReleaseParent) || !nested(final, paths.manifestReleaseParent) || !nested(profileStaging, paths.profileStagingParent)) fail('CANVAS06_MANIFEST_ORCHESTRATOR_ROOT_INVALID', 'MANIFEST_PATHS', 'Manifest 路径必须由 external store 唯一派生。'); }
 async function createOwnedStaging(path) { await mkdir(path); const info = await lstat(path); if (!info.isDirectory() || info.isSymbolicLink()) fail('CANVAS06_MANIFEST_ORCHESTRATOR_TRANSACTION_FAILED', 'OUTER_STAGING_CREATE', 'outer staging 必须是普通目录。'); return Object.freeze({ dev: info.dev, ino: info.ino }); }
 async function removeOwnedStaging(path, identity) { try { const info = await lstat(path); if (info.isDirectory() && !info.isSymbolicLink() && info.dev === identity.dev && info.ino === identity.ino) { await rm(path, { recursive: true, force: false }); await fsyncDirectory(dirname(path)); } } catch (error) { if (error?.code !== 'ENOENT') throw error; } }

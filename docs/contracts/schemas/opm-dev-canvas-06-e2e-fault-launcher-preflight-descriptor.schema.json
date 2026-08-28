@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:opm:contract:dev-canvas-06:e2e-fault-launcher-preflight-descriptor:0.1",
+  "title": "OPM DEV-CANVAS-06 E2E Fault Launcher Preflight Descriptor",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "descriptor_id", "generated_at", "source_commit", "runtime_jar_ref", "jarit_report_ref", "golden_environment_ref", "browser_executable_ref", "fault_attempt_schedule", "port_allocations", "gate_preflight_snapshot", "descriptor_payload_sha256"],
+  "properties": {
+    "schema_id": {"const": "OPM-DEV-CANVAS-06-E2E-FAULT-LAUNCHER-PREFLIGHT-DESCRIPTOR-001"},
+    "schema_version": {"const": "0.1"},
+    "descriptor_id": {"pattern": "^dev-canvas-06\\.fault-launcher-preflight\\.[a-f0-9]{12}$"},
+    "generated_at": {"type": "string", "format": "date-time"},
+    "source_commit": {"$ref": "#/$defs/digest40"},
+    "runtime_jar_ref": {"allOf": [{"$ref": "#/$defs/fileRef"}, {"properties": {"kind": {"const": "LOCAL_RUNTIME_JAR"}, "path": {"const": "fault-launcher/inputs/build/local-runtime.jar"}}}]},
+    "jarit_report_ref": {"allOf": [{"$ref": "#/$defs/fileRef"}, {"properties": {"kind": {"const": "FAULT_LAUNCHER_JARIT_REPORT"}, "path": {"const": "fault-launcher/reports/jarit-report.json"}}}]},
+    "golden_environment_ref": {"allOf": [{"$ref": "#/$defs/fileRef"}, {"properties": {"kind": {"const": "GOLDEN_ENVIRONMENT"}, "path": {"const": "fault-launcher/environment/golden-environment.json"}}}]},
+    "browser_executable_ref": {"$ref": "#/$defs/executableRef"},
+    "fault_attempt_schedule": {"type": "array", "minItems": 6, "maxItems": 6, "items": {"$ref": "#/$defs/schedule"}},
+    "port_allocations": {"type": "array", "minItems": 6, "maxItems": 6, "items": {"$ref": "#/$defs/portAllocation"}},
+    "gate_preflight_snapshot": {"$ref": "#/$defs/gateSnapshot"},
+    "descriptor_payload_sha256": {"$ref": "#/$defs/digest"}
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "digest40": {"type": "string", "pattern": "^[a-f0-9]{40}$"},
+    "safeRelativePath": {"type": "string", "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))[A-Za-z0-9][A-Za-z0-9._-]*(?:/[A-Za-z0-9][A-Za-z0-9._-]*)*$"},
+    "fileRef": {"type": "object", "additionalProperties": false, "required": ["kind", "path", "byte_length", "sha256"], "properties": {"kind": {"type": "string", "minLength": 1}, "path": {"$ref": "#/$defs/safeRelativePath"}, "byte_length": {"type": "integer", "minimum": 1}, "sha256": {"$ref": "#/$defs/digest"}}},
+    "executableRef": {"type": "object", "additionalProperties": false, "required": ["realpath", "byte_length", "sha256"], "properties": {"realpath": {"type": "string", "minLength": 1}, "byte_length": {"type": "integer", "minimum": 1}, "sha256": {"$ref": "#/$defs/digest"}}},
+    "schedule": {"type": "object", "additionalProperties": false, "required": ["schedule_id", "case_id", "fault_kind", "attempt_ordinal", "process_cycles", "port_allocation_id"], "properties": {"schedule_id": {"pattern": "^FL-SCH-0[1-6]$"}, "case_id": {"enum": ["E2E-CANVAS-007.ASSET_MISSING", "E2E-CANVAS-007.PERSISTENCE_FAILED", "E2E-CANVAS-007.READONLY"]}, "fault_kind": {"enum": ["ASSET_MISSING", "PERSISTENCE_FAILED", "READONLY"]}, "attempt_ordinal": {"enum": [1, 2]}, "process_cycles": {"type": "array", "prefixItems": [{"const": "INITIAL"}, {"const": "REOPEN"}], "items": false}, "port_allocation_id": {"pattern": "^FL-PORT-0[1-6]$"}}},
+    "portAllocation": {"type": "object", "additionalProperties": false, "required": ["allocation_id", "schedule_id", "host", "runtime_port", "web_port"], "properties": {"allocation_id": {"pattern": "^FL-PORT-0[1-6]$"}, "schedule_id": {"pattern": "^FL-SCH-0[1-6]$"}, "host": {"const": "127.0.0.1"}, "runtime_port": {"type": "integer", "minimum": 1024, "maximum": 65535}, "web_port": {"type": "integer", "minimum": 1024, "maximum": 65535}}},
+    "gateSnapshot": {"type": "object", "additionalProperties": false, "required": ["observed_at", "state", "enabled_capability_ids", "candidate_loader_status", "fixed_handoff_ref", "fixed_handoff_realpath", "activation_input_root_realpath", "activation_input_refs", "activation_input_set_sha256", "snapshot_payload_sha256"], "properties": {"observed_at": {"type": "string", "format": "date-time"}, "state": {"const": "DISABLED"}, "enabled_capability_ids": {"type": "array", "maxItems": 0}, "candidate_loader_status": {"const": "NOT_ACTIVE"}, "fixed_handoff_ref": {"$ref": "#/$defs/fileRef"}, "fixed_handoff_realpath": {"type": "string", "minLength": 1}, "activation_input_root_realpath": {"type": "string", "minLength": 1}, "activation_input_refs": {"type": "array", "maxItems": 0, "items": {"$ref": "#/$defs/fileRef"}}, "activation_input_set_sha256": {"const": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}, "snapshot_payload_sha256": {"$ref": "#/$defs/digest"}}}
+  }
+}

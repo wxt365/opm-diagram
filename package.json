@@ -51,6 +51,7 @@
     "release:canvas06:visual-e2e-schema:test": "node --test scripts/validate-canvas06-visual-e2e-schemas.test.mjs",
     "release:canvas06:controlled-input-bundle-schema:test": "node --test scripts/validate-canvas06-controlled-input-bundle-schema.test.mjs",
     "release:canvas06:controlled-input-bundle-verifier:test": "node --test scripts/verify-canvas06-controlled-input-bundle.test.mjs",
+    "release:canvas06:fault-launcher-preflight-input:test": "node --test scripts/release-canvas06-e2e-fault-launcher-preflight-input.test.mjs scripts/verify-canvas06-e2e-fault-launcher-preflight-input.test.mjs",
     "release:canvas06:e2e:manifest": "node scripts/release-canvas06-e2e-manifest-v01.mjs",
     "release:canvas06:e2e:manifest:verify": "node scripts/verify-canvas06-e2e-manifest-v01.mjs",
     "release:canvas06:e2e:verify": "node scripts/verify-canvas06-e2e-report.mjs",
