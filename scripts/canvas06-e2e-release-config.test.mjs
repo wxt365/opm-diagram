@@ -20,12 +20,16 @@ test('release Playwright config fixes the browser context and never bootstraps a
   ]) assert.match(source, new RegExp(escapeRegExp(argument)));
   assert.doesNotMatch(source, /\bwebServer\b|reuseExistingServer|npm run dev|vite/i);
 
-  const loaded = spawnSync(resolve(root, 'node_modules/.bin/playwright'), ['test', '--config', config, '--list'], {
+  const loaded = spawnSync(process.execPath, [resolve(root, 'node_modules/@playwright/test/cli.js'), 'test', '--config', config, '--list'], {
     cwd: root,
     encoding: 'utf8'
   });
-  assert.equal(loaded.status, 1);
-  assert.match(loaded.stdout + loaded.stderr, /No tests found/);
+  const output = loaded.stdout + loaded.stderr;
+  assert.equal(loaded.status, 0, output);
+  const discovered = output.split('\n').filter(line => /^  \S+\.release\.spec\.ts:\d+:\d+ › /.test(line));
+  assert.equal(discovered.length, 1, output);
+  assert.match(discovered[0], /^  fault-launcher\.controlled\.release\.spec\.ts:\d+:\d+ › 受控 Fault Launcher 只经 Runner 生命周期接口执行$/);
+  assert.match(output, /Total: 1 test in 1 file/);
 });
 
 function escapeRegExp(value) {

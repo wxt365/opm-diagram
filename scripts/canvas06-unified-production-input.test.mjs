@@ -9,11 +9,24 @@ import { FAULT_2A_CUMULATIVE_DELTA, FAULT_2A_DELTA, FAULT_CONTRACT_DELTA, FINAL_
 const commit = 'a'.repeat(40);
 const argv = ['--input-mode', 'EXTERNAL_RELEASE_STORE', '--source-root', '/source', '--release-store-root', '/release-store', '--source-chain-target', 'FINAL_RUNNER', '--origin-source-commit', ORIGIN_SOURCE_COMMIT, '--fault-contract-source-commit', 'b'.repeat(40), '--schema-conformance-source-commit', 'c'.repeat(40), '--fault-2a-source-commit', 'd'.repeat(40), '--runner-source-commit', commit, '--source-commit', commit, '--require-production'];
 
-test('source chain 精确锁定 C=20、A=4、Fault累计24与最终累计28个路径', () => {
+test('source chain 精确锁定 C=20、A=7、Fault累计25与最终累计42个路径', () => {
   assert.equal(FAULT_CONTRACT_DELTA.length, 20);
-  assert.equal(FAULT_2A_DELTA.length, 4);
-  assert.equal(FAULT_2A_CUMULATIVE_DELTA.length, 24);
-  assert.equal(FINAL_RUNNER_CUMULATIVE_DELTA.length, 28);
+  assert.equal(FAULT_2A_DELTA.length, 7);
+  assert.equal(FAULT_2A_CUMULATIVE_DELTA.length, 25);
+  assert.equal(FINAL_RUNNER_CUMULATIVE_DELTA.length, 42);
+  assert.deepEqual(FAULT_2A_DELTA, [
+    ['A', 'scripts/canvas06-e2e-fault-launcher-controlled.test.mjs'],
+    ['M', 'scripts/canvas06-e2e-release-config.test.mjs'],
+    ['M', 'scripts/canvas06-unified-production-input.mjs'],
+    ['M', 'scripts/canvas06-unified-production-input.test.mjs'],
+    ['M', 'scripts/release-canvas06-e2e-run.mjs'],
+    ['M', 'scripts/release-canvas06-e2e-run.test.mjs'],
+    ['A', 'tests/e2e/release/dev-canvas-06/fault-launcher.controlled.release.spec.ts']
+  ]);
+  for (const delta of [FAULT_2A_CUMULATIVE_DELTA, FINAL_RUNNER_CUMULATIVE_DELTA]) {
+    assert.equal(new Set(delta.map(([, path]) => path)).size, delta.length);
+    assert.deepEqual(delta.map(([, path]) => path), delta.map(([, path]) => path).toSorted((left, right) => Buffer.compare(Buffer.from(left), Buffer.from(right))));
+  }
 });
 
 test('旧两项 Handoff 不能满足活动三 artifact 契约', () => {

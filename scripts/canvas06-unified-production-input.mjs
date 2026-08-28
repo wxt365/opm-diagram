@@ -58,37 +58,45 @@ export const SCHEMA_CONFORMANCE_DELTA = Object.freeze([
 ]);
 export const FAULT_2A_DELTA = Object.freeze([
   ['A', 'scripts/canvas06-e2e-fault-launcher-controlled.test.mjs'],
+  ['M', 'scripts/canvas06-e2e-release-config.test.mjs'],
+  ['M', 'scripts/canvas06-unified-production-input.mjs'],
+  ['M', 'scripts/canvas06-unified-production-input.test.mjs'],
   ['M', 'scripts/release-canvas06-e2e-run.mjs'],
   ['M', 'scripts/release-canvas06-e2e-run.test.mjs'],
   ['A', 'tests/e2e/release/dev-canvas-06/fault-launcher.controlled.release.spec.ts']
 ]);
 export const RUNNER_DELTA = Object.freeze([
+  ['M', 'docs/contracts/openapi/opm-local-api-v1.yaml'],
+  ['A', 'docs/contracts/schemas/opm-dev-canvas-06-e2e-controlled-invocation-context.schema.json'],
+  ['M', 'docs/contracts/schemas/opm-dev-canvas-06-e2e-runner-source-set.schema.json'],
   ['M', 'package.json'],
-  ['M', 'scripts/release-canvas06-e2e-run.mjs'],
-  ['M', 'scripts/release-canvas06-e2e-run.test.mjs'],
-  ['M', 'scripts/canvas06-e2e-run-preflight.mjs'],
-  ['M', 'scripts/canvas06-e2e-run-preflight.test.mjs'],
-  ['M', 'scripts/canvas06-e2e-run-report.mjs'],
-  ['M', 'scripts/canvas06-e2e-run-report.test.mjs']
-]);
-export const FAULT_2A_CUMULATIVE_DELTA = Object.freeze([
-  ...FAULT_CONTRACT_DELTA.slice(0, 5),
-  ...FAULT_2A_DELTA.slice(0, 1),
-  ...FAULT_CONTRACT_DELTA.slice(5, 13),
-  ...FAULT_2A_DELTA.slice(1, 3),
-  ...FAULT_CONTRACT_DELTA.slice(13),
-  ...FAULT_2A_DELTA.slice(3)
-]);
-export const FINAL_RUNNER_CUMULATIVE_DELTA = Object.freeze([
-  ...FAULT_2A_CUMULATIVE_DELTA.slice(0, 6),
   ['M', 'scripts/canvas06-e2e-run-preflight.mjs'],
   ['M', 'scripts/canvas06-e2e-run-preflight.test.mjs'],
   ['M', 'scripts/canvas06-e2e-run-report.mjs'],
   ['M', 'scripts/canvas06-e2e-run-report.test.mjs'],
-  ...FAULT_2A_CUMULATIVE_DELTA.slice(6)
+  ['M', 'scripts/canvas06-e2e-run-stage.mjs'],
+  ['M', 'scripts/canvas06-e2e-run-stage.test.mjs'],
+  ['M', 'scripts/release-canvas06-e2e-run.mjs'],
+  ['M', 'scripts/release-canvas06-e2e-run.test.mjs'],
+  ['M', 'scripts/validate-canvas06-visual-e2e-schemas.test.mjs'],
+  ['M', 'scripts/validate-contracts.mjs'],
+  ['M', 'services/local-runtime/src/main/java/org/opm/localruntime/application/LocalApiService.java'],
+  ['M', 'services/local-runtime/src/test/java/org/opm/localruntime/api/LocalApiControllerTest.java'],
+  ['M', 'tests/e2e/release/dev-canvas-06/drivers/control-driver.mjs'],
+  ['M', 'tests/e2e/release/dev-canvas-06/drivers/procedural-driver.mjs'],
+  ['M', 'tests/e2e/release/dev-canvas-06/drivers/structural-driver.mjs'],
+  ['A', 'tests/e2e/release/dev-canvas-06/family.controlled.release.spec.ts']
 ]);
+export const FAULT_2A_CUMULATIVE_DELTA = mergeDelta(FAULT_CONTRACT_DELTA, FAULT_2A_DELTA);
+export const FINAL_RUNNER_CUMULATIVE_DELTA = mergeDelta(FAULT_2A_CUMULATIVE_DELTA, RUNNER_DELTA);
 const QUARANTINE_FAILURE_CODES = new Set(['CANVAS06_UNIFIED_HANDOFF_INVALID', 'CANVAS06_UNIFIED_INTAKE_INVALID', 'CANVAS06_UNIFIED_WEB_TREE_INVALID', 'CANVAS06_UNIFIED_COMMON_INVALID', 'CANVAS06_UNIFIED_JOIN_MISMATCH', 'CANVAS06_UNIFIED_TRANSACTION_FAILED']);
 const QUARANTINE_FAILURE_STAGES = new Set(['FSYNC_RELEASES_PARENT', 'SPAWN_INDEPENDENT_INSTALLED_VERIFIER', 'INSTALLED_REVERIFY_HANDOFF_INTAKE_WEB_COMMON']);
+
+function mergeDelta(...deltas) {
+  const byPath = new Map();
+  for (const delta of deltas) for (const [status, path] of delta) byPath.set(path, [status, path]);
+  return Object.freeze([...byPath.values()].sort((left, right) => Buffer.compare(Buffer.from(left[1], 'utf8'), Buffer.from(right[1], 'utf8'))));
+}
 
 export const SOURCE_PATHS = Object.freeze({
   runtimeJar: 'services/local-runtime/target/local-runtime-0.1.0-SNAPSHOT.jar',

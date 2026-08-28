@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
 import { createHash, createHmac } from 'node:crypto';
 import { EventEmitter } from 'node:events';
-import { cp, lstat, mkdir, mkdtemp, readFile, readdir, writeFile } from 'node:fs/promises';
+import { chmod, cp, lstat, mkdir, mkdtemp, readFile, readdir, writeFile } from 'node:fs/promises';
+import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
-import { dirname, resolve } from 'node:path';
+import { basename, dirname, resolve } from 'node:path';
 import { PassThrough } from 'node:stream';
 import test from 'node:test';
 
@@ -12,6 +13,8 @@ import { canonicalizeJcs } from './canvas06-rfc8785.mjs';
 import {
   buildRuntimeLaunchCommand,
   faultLauncherReadyLine,
+  assertControlledInvocationContext,
+  runControlledLifecycleSession,
   prepareControlledAttempt,
   prepareCaseFaultLaunches,
   prepareCaseFaultPlans,
@@ -223,6 +226,20 @@ test('prepares an exact Common attempt from the controlled bundle and active Man
   await assert.rejects(() => prepareControlledAttempt(input), error => error.code === 'E2E_ORCHESTRATION_ATTEMPT_NOT_FRESH');
 });
 
+test('Runner owner 拒绝不完整或错误调度的 Invocation Context', () => {
+  const context = {
+      controlled_bundle_root_realpath: '/controlled/bundle',
+      manifest_root_realpath: '/controlled/manifest',
+      profile_asset_root_realpath: '/controlled/manifest/inputs/upstream/profile-assets',
+      manifest_ref: { path: 'manifest.json' },
+      java_executable_ref: { path: '/controlled/java' },
+      browser_executable_ref: { path: '/controlled/chromium' },
+      execution_schedule: [{ schedule_id: 'FL-SCH-01', case_id: 'E2E-CANVAS-007.ASSET_MISSING', attempt_ordinal: 1, process_cycle: 'INITIAL', runtime_port: 43101, web_port: 43102 }]
+  };
+  assert.equal(assertControlledInvocationContext(context, 'FL-SCH-01').case_id, 'E2E-CANVAS-007.ASSET_MISSING');
+  assert.throws(() => assertControlledInvocationContext({ execution_schedule: [] }, 'FL-SCH-01'), error => error.code === 'E2E_ORCHESTRATION_INPUT_INVALID');
+});
+
 test('rejects a controlled-bundle trust mismatch before creating an attempt output', async () => {
   const fixture = await createControlledAttemptFixture();
   const caseEntry = fixture.manifest.cases.find(entry => entry.case_id === 'E2E-CANVAS-001.STATE_CREATE_RENAME_ROLES');
@@ -246,6 +263,49 @@ test('rejects a controlled-bundle trust mismatch before creating an attempt outp
   assert.deepEqual(await readdir(fixture.reportRoot), []);
 });
 
+test('lifecycle owner 串行完成 12 cycle、接纳 Browser proof 并按端口去重', async () => {
+  const session = await createLifecycleSession();
+  const { fixture, context, descriptor, handlers, evidence } = session;
+  const result = await runControlledLifecycleSession({ invocation_context: context, manifest: fixture.manifest, preflight_descriptor: descriptor, cycle_handlers: handlers });
+  const observation = JSON.parse(await readFile(resolve(evidence, 'fault-launcher/gate-observation.json'), 'utf8'));
+  assert.equal(result.status, 'PASS_MATCHED', JSON.stringify(observation));
+  assert.equal(result.completed_cycle_count, 12);
+  assert.deepEqual(result.completed_schedule_ids, ['FL-SCH-01', 'FL-SCH-02', 'FL-SCH-03', 'FL-SCH-04', 'FL-SCH-05', 'FL-SCH-06']);
+  assert.equal(result.cleanup.released_port_count, 12);
+  assert.equal(result.cleanup.runtime_started_count, 12);
+  assert.equal(result.cleanup.web_terminated_count, 12);
+  assert.equal(observation.during.length, 12);
+});
+
+test('lifecycle owner 对 Browser proof 缺口和 confirm 后事件 fail-closed', async t => {
+  const scenarios = [
+    ['缺失 attach', missingAttachHandler],
+    ['handler 抛错且缺失关闭证明', throwWithoutProofHandler],
+    ['错误确认对象', wrongConfirmHandler],
+    ['pending 请求', pendingRequestHandler],
+    ['confirm 后继续业务采样', postConfirmSamplingHandler],
+    ['confirm 后迟到事件', lateEventHandler]
+  ];
+  for (const [name, invalidHandler] of scenarios) await t.test(name, async () => {
+    const session = await createLifecycleSession({ handlerFactory: ({ schedule_id, process_cycle }) => schedule_id === 'FL-SCH-01' && process_cycle === 'INITIAL' ? invalidHandler() : browserHandler(422) });
+    await assert.rejects(
+      () => runControlledLifecycleSession({ invocation_context: session.context, manifest: session.fixture.manifest, preflight_descriptor: session.descriptor, cycle_handlers: session.handlers }),
+      error => error.code === 'E2E_ORCHESTRATION_BROWSER_PROOF_INVALID'
+    );
+    await assert.rejects(() => lstat(resolve(session.evidence, 'fault-launcher/gate-observation.json')), { code: 'ENOENT' });
+  });
+});
+
+test('lifecycle owner 在 Browser proof 完整时提交业务失败的真实前缀', async () => {
+  const session = await createLifecycleSession({ handlerFactory: ({ schedule_id, process_cycle }) => schedule_id === 'FL-SCH-01' && process_cycle === 'INITIAL' ? throwAfterProofHandler() : browserHandler(422) });
+  const result = await runControlledLifecycleSession({ invocation_context: session.context, manifest: session.fixture.manifest, preflight_descriptor: session.descriptor, cycle_handlers: session.handlers });
+  const observation = JSON.parse(await readFile(resolve(session.evidence, 'fault-launcher/gate-observation.json'), 'utf8'));
+  assert.equal(result.status, 'FAILED');
+  assert.equal(result.completed_cycle_count, 0);
+  assert.equal(observation.during.length, 0);
+  assert.deepEqual(observation.failures.map(item => item.code), ['CONTROLLED_PLAYWRIGHT_EXECUTION_FAILED']);
+});
+
 function manifest(...caseIds) {
   return { cases: caseIds.map(case_id => ({ case_id, suite_id: 'E2E-CANVAS-007' })) };
 }
@@ -255,6 +315,156 @@ function fakeChild() {
   child.stdout = new PassThrough();
   return child;
 }
+
+function browserHandler(status) {
+  return async ({ origin, observation_sink }) => {
+    const browser = new EventEmitter();
+    const context = new EventEmitter(); context.browser = () => browser;
+    const page = new EventEmitter(); page.context = () => context; page.url = () => 'about:blank'; page.isClosed = () => false;
+    observation_sink.attachBrowserPage(page);
+    const request = { method: () => 'POST' };
+    page.emit('request', request);
+    page.emit('response', { request: () => request, url: () => `${origin}/api/v1/commands`, status: () => status });
+    await observation_sink.waitForApi({ method: 'POST', expected_http_status: status });
+    await observation_sink.waitForProjectionRefresh();
+    page.emit('close'); context.emit('close'); browser.emit('disconnected');
+    await observation_sink.confirmBrowserClosed({ browser, context, page });
+    return undefined;
+  };
+}
+
+function missingAttachHandler() { return async () => undefined; }
+
+function throwWithoutProofHandler() {
+  return async () => {
+    throw new Error('controlled handler failed before Browser proof');
+  };
+}
+
+function wrongConfirmHandler() {
+  return async ({ observation_sink }) => {
+    const { browser, context, page } = browserTree();
+    observation_sink.attachBrowserPage(page);
+    closeBrowserTree({ browser, context, page });
+    await observation_sink.confirmBrowserClosed({ browser: new EventEmitter(), context, page });
+  };
+}
+
+function pendingRequestHandler() {
+  return async ({ observation_sink }) => {
+    const { browser, context, page } = browserTree();
+    observation_sink.attachBrowserPage(page);
+    page.emit('request', { method: () => 'POST' });
+    closeBrowserTree({ browser, context, page });
+    await observation_sink.confirmBrowserClosed({ browser, context, page });
+  };
+}
+
+function postConfirmSamplingHandler() {
+  return async ({ origin, observation_sink }) => {
+    const { browser, context, page } = browserTree();
+    observation_sink.attachBrowserPage(page);
+    emitResponse({ page, origin, status: 422 });
+    await observation_sink.waitForApi({ method: 'POST', expected_http_status: 422 });
+    closeBrowserTree({ browser, context, page });
+    await observation_sink.confirmBrowserClosed({ browser, context, page });
+    await observation_sink.waitForProjectionRefresh();
+  };
+}
+
+function lateEventHandler() {
+  return async ({ origin, observation_sink }) => {
+    const { browser, context, page } = browserTree();
+    observation_sink.attachBrowserPage(page);
+    emitResponse({ page, origin, status: 422 });
+    await observation_sink.waitForApi({ method: 'POST', expected_http_status: 422 });
+    closeBrowserTree({ browser, context, page });
+    await observation_sink.confirmBrowserClosed({ browser, context, page });
+    page.emit('request', { method: () => 'POST' });
+  };
+}
+
+function throwAfterProofHandler() {
+  return async input => {
+    await browserHandler(422)(input);
+    throw new Error('controlled handler business failure');
+  };
+}
+
+function browserTree() {
+  const browser = new EventEmitter();
+  const context = new EventEmitter(); context.browser = () => browser;
+  const page = new EventEmitter(); page.context = () => context; page.url = () => 'about:blank'; page.isClosed = () => false;
+  return { browser, context, page };
+}
+
+function emitResponse({ page, origin, status }) {
+  const request = { method: () => 'POST' };
+  page.emit('request', request);
+  page.emit('response', { request: () => request, url: () => `${origin}/api/v1/commands`, status: () => status });
+}
+
+function closeBrowserTree({ browser, context, page }) { page.emit('close'); context.emit('close'); browser.emit('disconnected'); }
+
+async function createLifecycleSession({ handlerFactory = () => browserHandler(422) } = {}) {
+  const fixture = await createControlledAttemptFixture();
+  const ports = await Promise.all(Array.from({ length: 12 }, () => freePort()));
+  assert.equal(new Set(ports).size, 12);
+  const java = resolve(fixture.manifestRoot, 'fake-java.mjs');
+  await writeFakeJava(java);
+  const fixedHandoff = resolve(fixture.manifestRoot, 'fixed-handoff.json');
+  await writeFile(fixedHandoff, `${canonicalizeJcs({ handoff: 'fixed' })}\n`);
+  const activation = resolve(fixture.manifestRoot, 'activation');
+  const control = resolve(fixture.manifestRoot, 'control');
+  const evidence = resolve(fixture.manifestRoot, 'evidence');
+  await Promise.all([mkdir(activation), mkdir(control), mkdir(evidence)]);
+  const schedule = faultSchedule(ports);
+  const fixedRef = rawRef('FIXED_HANDOFF', fixedHandoff, await readFile(fixedHandoff));
+  const gate = gateSnapshot({ fixedRef, fixedHandoff, activation });
+  const descriptorSchedules = schedule.filter(item => item.process_cycle === 'INITIAL');
+  const descriptor = { fault_attempt_schedule: descriptorSchedules.map(item => ({ schedule_id: item.schedule_id, case_id: item.case_id, attempt_ordinal: item.attempt_ordinal })), port_allocations: descriptorSchedules.map(item => ({ schedule_id: item.schedule_id, runtime_port: item.runtime_port, web_port: item.web_port })), gate_preflight_snapshot: gate };
+  const descriptorPath = resolve(fixture.bundleRoot, 'fault-launcher/preflight-descriptor.json');
+  await mkdir(dirname(descriptorPath), { recursive: true });
+  await writeFile(descriptorPath, `${canonicalizeJcs(descriptor)}\n`);
+  const descriptorBytes = await readFile(descriptorPath);
+  const descriptorRef = { bundle_id: basename(fixture.bundleRoot), bundle_identity_sha256: basename(fixture.bundleRoot).slice('canvas06-controlled-'.length), path: 'fault-launcher/preflight-descriptor.json', byte_length: descriptorBytes.length, sha256: digest(descriptorBytes) };
+  const manifestPath = resolve(fixture.manifestRoot, 'manifest.json');
+  await writeFile(manifestPath, `${canonicalizeJcs(fixture.manifest)}\n`);
+  const manifestRef = rawRef('E2E_MANIFEST', 'manifest.json', await readFile(manifestPath));
+  const preflightPath = resolve(evidence, 'fault-launcher/preflight-report.json');
+  await mkdir(dirname(preflightPath), { recursive: true });
+  await writeFile(preflightPath, `${canonicalizeJcs({ preflight: 'ready' })}\n`);
+  const preflightRef = rawRef('FAULT_LAUNCHER_PREFLIGHT_REPORT', 'fault-launcher/preflight-report.json', await readFile(preflightPath));
+  const context = {
+    source_root_realpath: resolve('.'), controlled_bundle_root_realpath: fixture.bundleRoot, manifest_root_realpath: fixture.manifestRoot, manifest_ref: manifestRef,
+    profile_asset_root_realpath: resolve(fixture.manifestRoot, 'inputs/upstream/profile-assets'), java_executable_ref: rawRef('JAVA_EXECUTABLE', java, await readFile(java)),
+    browser_executable_ref: rawRef('BROWSER_EXECUTABLE', java, await readFile(java)), fixed_handoff_ref: fixedRef, activation_input_root_realpath: activation,
+    attempt_parent_realpath: fixture.reportRoot, process_control_parent_realpath: control, evidence_staging_root_realpath: evidence,
+    preflight_descriptor_ref: descriptorRef, preflight_report_ref: preflightRef, execution_schedule: schedule, context_payload_sha256: 'a'.repeat(64)
+  };
+  const handlers = Object.freeze(Object.fromEntries([...new Set(schedule.map(item => item.schedule_id))].map(id => Object.freeze([id, Object.freeze({
+    INITIAL: handlerFactory({ schedule_id: id, process_cycle: 'INITIAL' }), REOPEN: handlerFactory({ schedule_id: id, process_cycle: 'REOPEN' })
+  })]))));
+  return { fixture, context, descriptor, handlers, evidence };
+}
+
+function faultSchedule(ports) {
+  const cases = ['E2E-CANVAS-007.ASSET_MISSING', 'E2E-CANVAS-007.ASSET_MISSING', 'E2E-CANVAS-007.PERSISTENCE_FAILED', 'E2E-CANVAS-007.PERSISTENCE_FAILED', 'E2E-CANVAS-007.READONLY', 'E2E-CANVAS-007.READONLY'];
+  const values = [];
+  for (const [index, case_id] of cases.entries()) for (const process_cycle of ['INITIAL', 'REOPEN']) values.push({ ordinal: values.length + 1, schedule_id: `FL-SCH-0${index + 1}`, case_id, attempt_ordinal: index % 2 + 1, process_cycle, runtime_port: ports[index * 2], web_port: ports[index * 2 + 1] });
+  return values;
+}
+
+function gateSnapshot({ fixedRef, fixedHandoff, activation }) {
+  const value = { observed_at: '2026-08-28T00:00:00Z', state: 'DISABLED', enabled_capability_ids: [], candidate_loader_status: 'NOT_ACTIVE', fixed_handoff_ref: { ...fixedRef, path: basename(fixedHandoff) }, fixed_handoff_realpath: fixedHandoff, activation_input_root_realpath: activation, activation_input_refs: [], activation_input_set_sha256: '4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945', snapshot_payload_sha256: '' };
+  const payload = { ...value }; delete payload.snapshot_payload_sha256;
+  value.snapshot_payload_sha256 = digest(Buffer.from(canonicalizeJcs(payload), 'utf8'));
+  return value;
+}
+
+function rawRef(kind, path, bytes) { return { kind, path, byte_length: bytes.length, sha256: digest(bytes) }; }
+function freePort() { return new Promise((resolvePort, rejectPort) => { const server = createServer(); server.once('error', rejectPort); server.listen({ host: '127.0.0.1', port: 0 }, () => { const address = server.address(); server.close(error => error ? rejectPort(error) : resolvePort(address.port)); }); }); }
+async function writeFakeJava(path) { await writeFile(path, `#!/usr/bin/env node\nimport http from 'node:http';const a=process.argv.slice(2);const p=Number(a.find(x=>x.startsWith('--server.port='))?.slice(14));const g=k=>a.find(x=>x.startsWith(k))?.slice(k.length);if(a.includes('--spring.profiles.active=release-e2e-fault'))console.log(['E2E_FAULT_LAUNCHER_READY',g('--opm.release.e2e.case-id='),g('--opm.release.e2e.attempt-ordinal='),g('--opm.release.e2e.plan-raw-sha256=')].join('\\t'));const s=http.createServer((q,r)=>{r.writeHead(200,{'content-type':'application/json'});r.end(q.url==='/actuator/health'?'{"status":"UP"}':'{}')});s.listen(p,'127.0.0.1');process.on('SIGTERM',()=>s.close(()=>process.exit(0)));\n`); await chmod(path, 0o755); }
 
 async function createControlledAttemptFixture() {
   const root = await mkdtemp(resolve(tmpdir(), 'canvas06-e2e-controlled-attempt-'));
