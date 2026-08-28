@@ -1,65 +1,85 @@
 import { execFileSync, spawnSync } from 'node:child_process';
-import { lstat, mkdir, open, rename, rm } from 'node:fs/promises';
-import { basename, dirname, resolve } from 'node:path';
+import { lstat, mkdir, rename, rm } from 'node:fs/promises';
+import { dirname, resolve } from 'node:path';
 
-import { UnifiedInputError, assertExactQuarantineGuard, assertSourcePaths, fail, parseOptions, treeRef, writeQuarantineMarker } from './canvas06-unified-production-input.mjs';
+import { UnifiedInputError, assertExactQuarantineGuard, assertSourceClean, assertTargetAbsent, fail, openExternalPaths, parseOptions, syncPath, treeRef, writeQuarantineMarker } from './canvas06-unified-production-input.mjs';
 
-const root = resolve('.');
+if (import.meta.url === new URL(process.argv[1], 'file:').href) runCli();
 
-try {
-  const options = parseOptions(process.argv.slice(2), 'rebuild');
-  await rebuild(options);
-} catch (error) {
-  const value = error instanceof UnifiedInputError ? error : new UnifiedInputError('CANVAS06_UNIFIED_BUILD_FAILED', 'BUILD', error.message);
-  process.stderr.write(`${value.code}\t${value.stage}\n${value.message}\n`);
-  process.exitCode = value.exitCode;
+async function runCli() {
+  try {
+    const result = await rebuild(parseOptions(process.argv.slice(2)));
+    process.stdout.write(`${result.path}\t${result.sourceCommit}\t${result.treeSha256}\n`);
+  } catch (error) {
+    const value = normalize(error);
+    process.stderr.write(`${value.code}\t${value.stage}\n${value.message}\n`);
+    process.exitCode = value.exitCode;
+  }
 }
 
-async function rebuild(options) {
-  const sourceRoot = options['source-root'];
-  const handoffRoot = options['handoff-root'];
-  const finalRoot = resolve(handoffRoot, options.out);
-  const stagingRoot = resolve(handoffRoot, `.staging-${basename(options.out)}-${process.pid}`);
-  if (!process.versions.node.startsWith('22.')) fail('CANVAS06_UNIFIED_BUILD_FAILED', 'NPM_CI', 'production 重建要求 Node 22.x。');
-  await assertExactQuarantineGuard(handoffRoot, options['source-commit']);
-  assertSource(sourceRoot, options);
-  await absent(finalRoot, 'CANVAS06_UNIFIED_TRANSACTION_FAILED', 'FINAL');
-  await absent(stagingRoot, 'CANVAS06_UNIFIED_TRANSACTION_FAILED', 'STAGING');
-  for (const path of ['node_modules', 'apps/web/dist', 'services/local-runtime/target']) await absent(resolve(sourceRoot, path), 'CANVAS06_UNIFIED_SOURCE_DIRTY', 'ABSENT_IGNORED_OUTPUTS');
+export async function rebuild(options, dependencies = {}) {
+  const paths = await openExternalPaths(options);
+  await assertExactQuarantineGuard(paths);
+  await assertTargetAbsent(paths);
+  assertSourceClean(paths.sourceRoot, options['source-commit']);
+  if (!process.versions.node.startsWith('22.')) fail('CANVAS06_UNIFIED_BUILD_FAILED', 'NODE_22', 'production 重建要求 Node 22.x。');
+  for (const path of ['node_modules', 'apps/web/dist', 'services/local-runtime/target']) await absent(resolve(paths.sourceRoot, path), 'ABSENT_IGNORED_OUTPUTS');
   let renamed = false;
   try {
-    run(sourceRoot, 'npm', ['ci', '--ignore-scripts']);
-    runBootstrapClosure(sourceRoot, 'SOURCE');
-    run(sourceRoot, 'npm', ['run', 'build']);
-    runBootstrapClosure(sourceRoot, 'POST');
-    run(sourceRoot, process.execPath, [resolve(sourceRoot, 'scripts/build-dev-canvas-05-release.mjs'), '--release-root', stagingRoot, '--logical-release-root', options.out]);
-    run(sourceRoot, process.execPath, [resolve(sourceRoot, 'scripts/generate-dev-canvas-05-handoff.mjs'), '--output', resolve(stagingRoot, 'dev-canvas-05-handoff.json'), '--release-build', resolve(stagingRoot, 'dev-canvas-05-release-build.json'), '--report-root', resolve(stagingRoot, 'handoff/reports'), '--logical-root', options.out]);
-    await mkdir(dirname(finalRoot), { recursive: true });
-    await rename(stagingRoot, finalRoot);
+    await mkdir(dirname(paths.stagingRoot), { recursive: true });
+    run(paths.sourceRoot, 'npm', ['ci', '--ignore-scripts'], dependencies);
+    runBootstrapClosure(paths.sourceRoot, 'SOURCE', dependencies);
+    run(paths.sourceRoot, 'npm', ['run', 'build'], dependencies);
+    runBootstrapClosure(paths.sourceRoot, 'POST', dependencies);
+    run(paths.sourceRoot, process.execPath, [resolve(paths.sourceRoot, 'scripts/build-dev-canvas-05-release.mjs'), '--release-root', paths.stagingRoot, '--logical-release-root', paths.inputRelative], dependencies);
+    run(paths.sourceRoot, process.execPath, [resolve(paths.sourceRoot, 'scripts/generate-dev-canvas-05-handoff.mjs'), '--output', resolve(paths.stagingRoot, 'dev-canvas-05-handoff.json'), '--release-build', resolve(paths.stagingRoot, 'dev-canvas-05-release-build.json'), '--report-root', resolve(paths.stagingRoot, 'handoff/reports'), '--logical-root', paths.inputRelative], dependencies);
+    assertSourceClean(paths.sourceRoot, options['source-commit']);
+    await rename(paths.stagingRoot, paths.versionedInputRoot);
     renamed = true;
-    await syncFinalParent(dirname(finalRoot));
-    run(sourceRoot, process.execPath, [resolve(sourceRoot, 'scripts/release-canvas06-intake.mjs'), '--handoff-root', handoffRoot, '--handoff', `${options.out}/dev-canvas-05-handoff.json`, '--handoff-sha256', sha(sourceRoot, resolve(finalRoot, 'dev-canvas-05-handoff.json')), '--out', resolve(finalRoot, 'dev-canvas-06-intake-report.json'), '--require-production']);
-    run(sourceRoot, process.execPath, [resolve(sourceRoot, 'scripts/build-canvas06-common-visual-fixtures.mjs'), '--handoff', resolve(finalRoot, 'dev-canvas-05-handoff.json'), '--fixture-root', resolve(finalRoot, 'dev-canvas-06/common-fixtures/0.2.0'), '--source-date-epoch', commitEpoch(sourceRoot, options['source-commit'])]);
-    run(sourceRoot, process.execPath, [resolve(sourceRoot, 'scripts/verify-canvas06-unified-production-inputs.mjs'), '--source-root', sourceRoot, '--handoff-root', handoffRoot, '--base-source-commit', options['base-source-commit'], '--source-commit', options['source-commit'], '--input', options.out, '--require-production']);
-    const digest = await treeRef(handoffRoot, options.out, 'INPUT_TREE', 'CANVAS06_UNIFIED_JOIN_MISMATCH');
-    process.stdout.write(`${finalRoot}\n${options['source-commit']}\n${digest.sha256}\n`);
+    await syncPath(paths.releasesRoot);
+    run(paths.sourceRoot, process.execPath, [resolve(paths.sourceRoot, 'scripts/release-canvas06-intake.mjs'), '--handoff-root', paths.handoffRoot, '--handoff', `${paths.inputRelative}/dev-canvas-05-handoff.json`, '--handoff-sha256', sha(resolve(paths.versionedInputRoot, 'dev-canvas-05-handoff.json')), '--out', resolve(paths.versionedInputRoot, 'dev-canvas-06-intake-report.json'), '--require-production'], dependencies);
+    run(paths.sourceRoot, process.execPath, [resolve(paths.sourceRoot, 'scripts/build-canvas06-common-visual-fixtures.mjs'), '--handoff', resolve(paths.versionedInputRoot, 'dev-canvas-05-handoff.json'), '--fixture-root', resolve(paths.versionedInputRoot, 'dev-canvas-06/common-fixtures/0.2.0'), '--source-date-epoch', commitEpoch(paths.sourceRoot, options['source-commit'])], dependencies);
+    const triple = await installedVerifier(paths, options, dependencies);
+    assertSourceClean(paths.sourceRoot, options['source-commit']);
+    return Object.freeze({ path: paths.versionedInputRoot, sourceCommit: options['source-commit'], treeSha256: triple.treeSha256 });
   } catch (error) {
-    if (!renamed) await rm(stagingRoot, { recursive: true, force: true });
-    else await writeQuarantineMarker({ handoffRoot, sourceCommit: options['source-commit'], inputRoot: options.out, treeSha256: (await treeRef(handoffRoot, options.out, 'INPUT_TREE', 'CANVAS06_UNIFIED_JOIN_MISMATCH')).sha256, ...quarantineFailure(error) });
+    if (!renamed) await rm(paths.stagingRoot, { recursive: true, force: true });
+    else await quarantine(paths, options, error);
     throw error;
   }
 }
 
-function assertSource(sourceRoot, options) {
-  if (command(sourceRoot, ['rev-parse', 'HEAD']).trim() !== options['source-commit']) fail('CANVAS06_UNIFIED_SOURCE_DIRTY', 'UNIFIED_SOURCE_CLEAN', 'source-root HEAD 不等于 source-commit。');
-  if (command(sourceRoot, ['status', '--porcelain=v1', '--untracked-files=all']).trim()) fail('CANVAS06_UNIFIED_SOURCE_DIRTY', 'UNIFIED_SOURCE_CLEAN', 'source-root 必须干净。');
-  if (spawnSync('git', ['merge-base', '--is-ancestor', options['base-source-commit'], options['source-commit']], { cwd: sourceRoot }).status !== 0) fail('CANVAS06_UNIFIED_BASE_INVALID', 'BASE_COMMIT_ANCESTRY', 'source-commit 不以 base 为祖先。');
+async function installedVerifier(paths, options, dependencies) {
+  const args = [resolve(paths.sourceRoot, 'scripts/verify-canvas06-unified-production-inputs.mjs'), '--input-mode', 'EXTERNAL_RELEASE_STORE', '--source-root', paths.sourceRoot, '--release-store-root', paths.releaseStoreRoot, '--base-source-commit', options['base-source-commit'], '--source-commit', options['source-commit'], '--require-production'];
+  const result = runResult(paths.sourceRoot, process.execPath, args, dependencies);
+  if (result.status !== 0) fail('CANVAS06_UNIFIED_JOIN_MISMATCH', 'SPAWN_INDEPENDENT_INSTALLED_VERIFIER', result.stderr || result.stdout || '独立 Unified Verifier 失败。');
+  return parseTriple(result.stdout, paths, options['source-commit']);
 }
-async function absent(path, code, stage) { try { await lstat(path); fail(code, stage, `路径已存在：${path}`); } catch (error) { if (error.code !== 'ENOENT') throw error; } }
-function run(cwd, file, args) { const result = spawnSync(file, args, { cwd, encoding: 'utf8', env: process.env }); if (result.status !== 0) fail('CANVAS06_UNIFIED_BUILD_FAILED', 'BUILD', `${file} 失败：${result.stderr || result.stdout}`); }
-function runBootstrapClosure(cwd, phase) { run(cwd, process.execPath, [resolve(cwd, 'scripts/verify-opm-bootstrap-build-closure.mjs'), '--phase', phase]); }
-async function syncFinalParent(path) { try { const handle = await open(path, 'r'); try { await handle.sync(); } finally { await handle.close(); } } catch (error) { throw new UnifiedInputError('CANVAS06_UNIFIED_TRANSACTION_FAILED', 'FSYNC_RELEASES_PARENT', error.message); } }
-function quarantineFailure(error) { return { failureCode: ['CANVAS06_UNIFIED_HANDOFF_INVALID', 'CANVAS06_UNIFIED_INTAKE_INVALID', 'CANVAS06_UNIFIED_WEB_TREE_INVALID', 'CANVAS06_UNIFIED_COMMON_INVALID', 'CANVAS06_UNIFIED_JOIN_MISMATCH'].includes(error?.code) ? error.code : 'CANVAS06_UNIFIED_TRANSACTION_FAILED', failureStage: error?.stage === 'FSYNC_RELEASES_PARENT' ? 'FSYNC_RELEASES_PARENT' : 'INSTALLED_REVERIFY_HANDOFF_INTAKE_WEB_COMMON' }; }
-function command(cwd, args) { return execFileSync('git', args, { cwd, encoding: 'utf8' }); }
-function commitEpoch(cwd, commit) { return command(cwd, ['show', '-s', '--format=%ct', commit]).trim(); }
-function sha(cwd, path) { return execFileSync('shasum', ['-a', '256', path], { cwd, encoding: 'utf8' }).trim().split(/\s+/)[0]; }
+
+async function quarantine(paths, options, error) {
+  try {
+    const digest = await treeRef(paths.handoffRoot, paths.inputRelative, 'INPUT_TREE', 'CANVAS06_UNIFIED_JOIN_MISMATCH');
+    await writeQuarantineMarker({ paths, sourceCommit: options['source-commit'], treeSha256: digest.sha256, failureCode: classify(error), failureStage: error?.stage === 'FSYNC_RELEASES_PARENT' ? 'FSYNC_RELEASES_PARENT' : 'INSTALLED_REVERIFY_HANDOFF_INTAKE_WEB_COMMON' });
+  } catch (markerError) { throw normalize(markerError); }
+}
+
+function run(cwd, file, args, dependencies) {
+  const result = runResult(cwd, file, args, dependencies);
+  if (result.status !== 0) fail('CANVAS06_UNIFIED_BUILD_FAILED', 'BUILD', `${file} 失败：${result.stderr || result.stdout || ''}`);
+}
+
+function runResult(cwd, file, args, dependencies) { return (dependencies.spawnSync ?? spawnSync)(file, args, { cwd, encoding: 'utf8', env: controlledEnv() }); }
+function runBootstrapClosure(cwd, phase, dependencies) { run(cwd, process.execPath, [resolve(cwd, 'scripts/verify-opm-bootstrap-build-closure.mjs'), '--phase', phase], dependencies); }
+function controlledEnv() {
+  if (!process.env.JAVA_HOME || !resolve(process.env.JAVA_HOME).startsWith('/')) fail('CANVAS06_UNIFIED_BUILD_FAILED', 'JAVA_HOME', 'production 重建要求受控绝对 JAVA_HOME。');
+  const javaHome = resolve(process.env.JAVA_HOME);
+  const version = spawnSync(resolve(javaHome, 'bin/java'), ['-version'], { encoding: 'utf8' });
+  if (version.status !== 0 || !/version\s+"21(?:[.\"])/.test(`${version.stdout}${version.stderr}`)) fail('CANVAS06_UNIFIED_BUILD_FAILED', 'JAVA_21', 'production 重建要求 JDK 21。');
+  return { ...process.env, JAVA_HOME: javaHome };
+}
+async function absent(path, stage) { try { await lstat(path); fail('CANVAS06_UNIFIED_SOURCE_DIRTY', stage, '构建前派生产物必须不存在。'); } catch (error) { if (error instanceof UnifiedInputError) throw error; if (error?.code !== 'ENOENT') throw error; } }
+function parseTriple(stdout, paths, sourceCommit) { const match = /^([^\t\n]+)\t([a-f0-9]{40})\t([a-f0-9]{64})\n$/.exec(stdout); if (!match || match[1] !== paths.versionedInputRoot || match[2] !== sourceCommit) fail('CANVAS06_UNIFIED_JOIN_MISMATCH', 'VERIFIER_STDOUT', 'Unified Verifier stdout 不符合冻结三元组。'); return { path: match[1], sourceCommit: match[2], treeSha256: match[3] }; }
+function commitEpoch(cwd, commit) { return execFileSync('git', ['-C', cwd, 'show', '-s', '--format=%ct', commit], { encoding: 'utf8' }).trim(); }
+function sha(path) { return execFileSync('shasum', ['-a', '256', path], { encoding: 'utf8' }).trim().split(/\s+/)[0]; }
+function classify(error) { return ['CANVAS06_UNIFIED_HANDOFF_INVALID', 'CANVAS06_UNIFIED_INTAKE_INVALID', 'CANVAS06_UNIFIED_WEB_TREE_INVALID', 'CANVAS06_UNIFIED_COMMON_INVALID', 'CANVAS06_UNIFIED_JOIN_MISMATCH'].includes(error?.code) ? error.code : 'CANVAS06_UNIFIED_TRANSACTION_FAILED'; }
+function normalize(error) { return error instanceof UnifiedInputError ? error : new UnifiedInputError('CANVAS06_UNIFIED_BUILD_FAILED', 'BUILD', error.message); }

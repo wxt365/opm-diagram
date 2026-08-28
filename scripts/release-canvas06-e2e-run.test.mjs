@@ -1,16 +1,18 @@
 import assert from 'node:assert/strict';
-import { createHmac } from 'node:crypto';
+import { createHash, createHmac } from 'node:crypto';
 import { EventEmitter } from 'node:events';
-import { lstat, mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
+import { cp, lstat, mkdir, mkdtemp, readFile, readdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { PassThrough } from 'node:stream';
 import test from 'node:test';
 
 import { writeFaultPlan } from './canvas06-e2e-attempt-artifacts.mjs';
+import { canonicalizeJcs } from './canvas06-rfc8785.mjs';
 import {
   buildRuntimeLaunchCommand,
   faultLauncherReadyLine,
+  prepareControlledAttempt,
   prepareCaseFaultLaunches,
   prepareCaseFaultPlans,
   removeFaultChallenge,
@@ -192,6 +194,58 @@ test('permits browser work only after the exact fault launcher READY line', asyn
   await assert.rejects(beforeReady, error => error.code === 'E2E_RUN_RUNTIME_PROTOCOL_INVALID');
 });
 
+test('prepares an exact Common attempt from the controlled bundle and active Manifest only once', async () => {
+  const fixture = await createControlledAttemptFixture();
+  const caseEntry = fixture.manifest.cases.find(entry => entry.case_id === 'E2E-CANVAS-001.STATE_CREATE_RENAME_ROLES');
+  const input = {
+    controlled_bundle_root: fixture.bundleRoot,
+    manifest_root: fixture.manifestRoot,
+    manifest_path: 'manifest.json',
+    profile_asset_root: resolve(fixture.manifestRoot, 'inputs/upstream/profile-assets'),
+    report_staging_root: fixture.reportRoot,
+    case_entry: caseEntry,
+    attempt_ordinal: 1,
+    java_executable: '/controlled/java',
+    browser_executable: '/controlled/chromium',
+    runtime_port: 17850,
+    web_port: 5176
+  };
+  const prepared = await prepareControlledAttempt(input);
+
+  assert.equal(prepared.attempt_root, resolve(fixture.reportRoot, 'attempts', caseEntry.case_id, '1'));
+  assert.equal(prepared.runtime_jar, resolve(prepared.attempt_root, 'inputs/build/local-runtime.jar'));
+  assert.equal(prepared.web_dist, resolve(prepared.attempt_root, 'inputs/build/web-dist'));
+  assert.equal(prepared.profile_assets, resolve(prepared.attempt_root, 'profile/assets'));
+  assert.equal(prepared.driver_source, resolve(prepared.attempt_root, 'inputs/drivers/common-driver.mjs'));
+  assert.deepEqual(await readFile(prepared.runtime_jar), await readFile(resolve(fixture.manifestRoot, fixture.manifest.source_build.local_runtime_jar.path)));
+  assert.deepEqual(await readFile(prepared.driver_source), await readFile(resolve(fixture.manifestRoot, 'inputs/drivers/common-driver.mjs')));
+  assert.equal((await lstat(resolve(prepared.profile_assets, 'profile.json'))).nlink, 1);
+  await assert.rejects(() => prepareControlledAttempt(input), error => error.code === 'E2E_ORCHESTRATION_ATTEMPT_NOT_FRESH');
+});
+
+test('rejects a controlled-bundle trust mismatch before creating an attempt output', async () => {
+  const fixture = await createControlledAttemptFixture();
+  const caseEntry = fixture.manifest.cases.find(entry => entry.case_id === 'E2E-CANVAS-001.STATE_CREATE_RENAME_ROLES');
+  await writeFile(resolve(fixture.bundleRoot, 'controlled-bundle.json'), '{"tampered":true}\n');
+  await assert.rejects(
+    () => prepareControlledAttempt({
+      controlled_bundle_root: fixture.bundleRoot,
+      manifest_root: fixture.manifestRoot,
+      manifest_path: 'manifest.json',
+      profile_asset_root: resolve(fixture.manifestRoot, 'inputs/upstream/profile-assets'),
+      report_staging_root: fixture.reportRoot,
+      case_entry: caseEntry,
+      attempt_ordinal: 1,
+      java_executable: '/controlled/java',
+      browser_executable: '/controlled/chromium',
+      runtime_port: 17850,
+      web_port: 5176
+    }),
+    error => error.code === 'E2E_ORCHESTRATION_INPUT_INVALID'
+  );
+  assert.deepEqual(await readdir(fixture.reportRoot), []);
+});
+
 function manifest(...caseIds) {
   return { cases: caseIds.map(case_id => ({ case_id, suite_id: 'E2E-CANVAS-007' })) };
 }
@@ -200,4 +254,104 @@ function fakeChild() {
   const child = new EventEmitter();
   child.stdout = new PassThrough();
   return child;
+}
+
+async function createControlledAttemptFixture() {
+  const root = await mkdtemp(resolve(tmpdir(), 'canvas06-e2e-controlled-attempt-'));
+  const sourceRoot = resolve('packages/profiles/profile.iso19450.2024.draft/0.2.0/handoff/releases/clean-37c5412a9c12/dev-canvas-06/e2e/manifests/dev-canvas-06.e2e.37c5412a9c12.6f601a3f8e2d');
+  const manifestRoot = resolve(root, 'manifest');
+  const reportRoot = resolve(root, 'report');
+  await mkdir(manifestRoot, { recursive: true });
+  await mkdir(reportRoot);
+  const manifest = JSON.parse(await readFile(resolve(sourceRoot, 'dev-canvas-06-e2e-manifest.json'), 'utf8'));
+  await copyRequiredManifestInputs({ sourceRoot, manifestRoot, manifest });
+  manifest.schema_version = '0.2';
+  manifest.manifest_version = '0.2.0';
+  manifest.generated_at = '2026-07-01T00:00:00Z';
+  manifest.generator_identity = { ...manifest.generator_identity, runner_version: '0.2.0' };
+  manifest.driver_catalog = await writeFourDrivers(manifestRoot);
+  await refreshProfileReferences(manifestRoot, manifest);
+  await writeFile(resolve(manifestRoot, 'manifest.json'), `${JSON.stringify(manifest)}\n`);
+  return { manifestRoot, reportRoot, bundleRoot: await createControlledBundle({ root, manifestRoot, manifest }), manifest };
+}
+
+async function copyRequiredManifestInputs({ sourceRoot, manifestRoot, manifest }) {
+  await cp(resolve(sourceRoot, manifest.source_build.local_runtime_jar.path), resolve(manifestRoot, manifest.source_build.local_runtime_jar.path));
+  await cp(resolve(sourceRoot, manifest.source_build.web_dist.path), resolve(manifestRoot, manifest.source_build.web_dist.path), { recursive: true });
+  for (const reference of [manifest.intake_report_ref, manifest.handoff_ref, manifest.input_materialization.bundle_ref]) {
+    const target = resolve(manifestRoot, reference.path);
+    await mkdir(dirname(target), { recursive: true });
+    await cp(resolve(sourceRoot, reference.path), target);
+  }
+  const profileSource = resolve('packages/profiles/profile.iso19450.2024.draft/0.2.0');
+  await cp(profileSource, resolve(manifestRoot, 'inputs/upstream/profile-assets'), { recursive: true, filter: path => !path.includes('/handoff/') && !path.includes('/golden/') });
+}
+
+async function refreshProfileReferences(manifestRoot, manifest) {
+  const prefix = 'inputs/upstream/profile-assets';
+  const refs = [];
+  for (const [kind, path] of [
+    ['GRAMMAR_ASSET', 'grammar/representative-opl-grammar.json'],
+    ['NORMALIZATION_DATA', 'normalization/representative-normalization.json'],
+    ['PROFILE_PACKAGE', 'profile.json'],
+    ['RULE_SET', 'rules/representative-rule-set.json'],
+    ['SYMBOL_ASSET', 'symbols/representative-symbol-catalog.json']
+  ]) {
+    const bytes = await readFile(resolve(manifestRoot, prefix, path));
+    refs.push({ kind, path: `${prefix}/${path}`, byte_length: bytes.length, sha256: digest(bytes) });
+  }
+  manifest.profile_asset_refs = refs;
+  manifest.profile_asset_tree_ref = {
+    kind: 'PROFILE_ASSET_TREE', path: prefix,
+    byte_length: refs.reduce((total, ref) => total + ref.byte_length, 0),
+    sha256: digest(Buffer.from(canonicalizeJcs({
+      schema_id: 'OPM-DEV-CANVAS-06-PROFILE-ASSET-TREE-001', schema_version: '0.1', root_path: prefix, entries: refs
+    }), 'utf8'))
+  };
+}
+
+async function writeFourDrivers(manifestRoot) {
+  const drivers = [];
+  for (const [driver_id, filename] of [
+    ['DRIVER-PROCEDURAL', 'procedural-driver.mjs'],
+    ['DRIVER-CONTROL', 'control-driver.mjs'],
+    ['DRIVER-STRUCTURAL', 'structural-driver.mjs'],
+    ['DRIVER-COMMON', 'common-driver.mjs']
+  ]) {
+    const bytes = await readFile(resolve('tests/e2e/release/dev-canvas-06/drivers', filename));
+    const path = `inputs/drivers/${filename}`;
+    await mkdir(resolve(manifestRoot, 'inputs/drivers'), { recursive: true });
+    await writeFile(resolve(manifestRoot, path), bytes);
+    drivers.push({ driver_id, source_ref: { kind: 'E2E_DRIVER_SOURCE', path, byte_length: bytes.length, sha256: digest(bytes) } });
+  }
+  return drivers;
+}
+
+async function createControlledBundle({ root, manifestRoot, manifest }) {
+  const staging = resolve(root, 'bundle-staging');
+  await mkdir(staging);
+  const refs = {};
+  for (const [field, source] of [
+    ['handoff_ref', manifest.handoff_ref],
+    ['intake_report_ref', manifest.intake_report_ref],
+    ['evidence_bundle_ref', manifest.input_materialization.bundle_ref]
+  ]) {
+    const path = `raw/${field}.bin`;
+    const bytes = await readFile(resolve(manifestRoot, source.path));
+    await mkdir(dirname(resolve(staging, path)), { recursive: true });
+    await writeFile(resolve(staging, path), bytes);
+    refs[field] = { kind: source.kind, path, byte_length: bytes.length, sha256: digest(bytes) };
+  }
+  const identity = digest(Buffer.from(canonicalizeJcs({ bundle_class: 'CONTROLLED_TEST', ...refs, approved_version_ref: null }), 'utf8'));
+  const bundleRoot = resolve(root, `canvas06-controlled-${identity}`);
+  await cp(staging, bundleRoot, { recursive: true });
+  await writeFile(resolve(bundleRoot, 'controlled-bundle.json'), JSON.stringify({
+    schema_id: 'OPM-DEV-CANVAS-06-CONTROLLED-INPUT-BUNDLE-001', schema_version: '0.1', bundle_class: 'CONTROLLED_TEST',
+    bundle_id: `canvas06-controlled-${identity}`, bundle_identity_sha256: identity, ...refs, approved_version_ref: null
+  }));
+  return bundleRoot;
+}
+
+function digest(value) {
+  return createHash('sha256').update(value).digest('hex');
 }

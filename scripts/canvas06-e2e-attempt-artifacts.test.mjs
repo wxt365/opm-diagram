@@ -4,10 +4,16 @@ import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import test from 'node:test';
 
-import { createFaultPlan, TokenDigestError, tokenDigestCanonicalBytes, tokenDigestPreimage, tokenDigestSha256, writeArtifactIndex, writeAttemptArtifact, writeFaultPlan } from './canvas06-e2e-attempt-artifacts.mjs';
+import { attemptRelativeRoot, createFaultPlan, TokenDigestError, tokenDigestCanonicalBytes, tokenDigestPreimage, tokenDigestSha256, writeArtifactIndex, writeAttemptArtifact, writeFaultPlan } from './canvas06-e2e-attempt-artifacts.mjs';
 import { sha256Jcs } from './canvas06-rfc8785.mjs';
 
 const CASE_ID = 'E2E-CANVAS-007.ASSET_MISSING';
+
+test('uses one percent-encoded path mapping for Runner and Attempt artifacts', () => {
+  assert.equal(attemptRelativeRoot('E2E-CANVAS-001.STATE_CREATE_RENAME_ROLES', 1), 'attempts/E2E-CANVAS-001.STATE_CREATE_RENAME_ROLES/1');
+  assert.equal(attemptRelativeRoot('E2E-CANVAS-007.TEXT_BLOCKED/REOPEN', 2), 'attempts/E2E-CANVAS-007.TEXT_BLOCKED%2FREOPEN/2');
+  assert.throws(() => attemptRelativeRoot(CASE_ID, 3), error => error.code === 'E2E_INPUT_INVALID');
+});
 
 test('builds and atomically writes the frozen fault plan mapping', async () => {
   const root = await mkdtemp(resolve(tmpdir(), 'canvas06-e2e-artifact-'));

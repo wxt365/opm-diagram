@@ -225,7 +225,9 @@ function assertAttemptIdentity(caseId, attemptOrdinal) {
   }
 }
 
-function attemptRelativeRoot(caseId, attemptOrdinal) {
+/** Attempt artifact 与 Runner 共用的冻结路径映射。 */
+export function attemptRelativeRoot(caseId, attemptOrdinal) {
+  assertAttemptIdentity(caseId, attemptOrdinal);
   return `attempts/${encodeCaseId(caseId)}/${attemptOrdinal}`;
 }
 

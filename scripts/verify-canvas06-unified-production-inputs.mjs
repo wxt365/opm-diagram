@@ -1,60 +1,48 @@
 import { lstat, readFile } from 'node:fs/promises';
-import { execFileSync, spawnSync } from 'node:child_process';
-import { isAbsolute, relative, resolve, sep } from 'node:path';
+import { resolve } from 'node:path';
 
-import { UnifiedInputError, assertArtifactOrder, assertExactQuarantineGuard, assertSourcePaths, assertTreeRef, fail, parseOptions, sameRef, treeRef } from './canvas06-unified-production-input.mjs';
+import { UnifiedInputError, assertArtifactOrder, assertExactQuarantineGuard, assertSourceClean, assertSourcePaths, fileRef, openExternalPaths, parseOptions, sameRef, treeRef } from './canvas06-unified-production-input.mjs';
 
-if (import.meta.url === new URL(process.argv[1], 'file:').href) {
-  runCli();
-}
+if (import.meta.url === new URL(process.argv[1], 'file:').href) runCli();
 
 async function runCli() {
   try {
-  const options = parseOptions(process.argv.slice(2), 'verify');
-  await verify(options);
+    const result = await verify(parseOptions(process.argv.slice(2)));
+    process.stdout.write(`${result.path}\t${result.sourceCommit}\t${result.treeSha256}\n`);
   } catch (error) {
-    const value = error instanceof UnifiedInputError ? error : new UnifiedInputError('CANVAS06_UNIFIED_JOIN_MISMATCH', 'VERIFY', error.message);
+    const value = normalize(error);
     process.stderr.write(`${value.code}\t${value.stage}\n${value.message}\n`);
     process.exitCode = value.exitCode;
   }
 }
 
 export async function verify(options) {
-  const sourceRoot = options['source-root'];
-  const handoffRoot = options['handoff-root'];
-  await assertExactQuarantineGuard(handoffRoot, options['source-commit']);
-  assertInstalledSourceIdentity(sourceRoot, handoffRoot, options);
-  await assertSourcePaths(sourceRoot);
-  const input = resolve(handoffRoot, options.input);
-  const handoffPath = resolve(input, 'dev-canvas-05-handoff.json');
-  const intakePath = resolve(input, 'dev-canvas-06-intake-report.json');
-  await regular(handoffPath);
-  await regular(intakePath);
-  const handoff = JSON.parse(await readFile(handoffPath, 'utf8'));
-  const intake = JSON.parse(await readFile(intakePath, 'utf8'));
+  const paths = await openExternalPaths(options);
+  await assertExactQuarantineGuard(paths);
+  assertSourceClean(paths.sourceRoot, options['source-commit']);
+  await assertSourcePaths(paths.sourceRoot);
+  await regular(resolve(paths.versionedInputRoot, 'dev-canvas-05-handoff.json'));
+  await regular(resolve(paths.versionedInputRoot, 'dev-canvas-06-intake-report.json'));
+  const handoff = JSON.parse(await readFile(resolve(paths.versionedInputRoot, 'dev-canvas-05-handoff.json'), 'utf8'));
+  const intake = JSON.parse(await readFile(resolve(paths.versionedInputRoot, 'dev-canvas-06-intake-report.json'), 'utf8'));
   if (handoff.schema_version !== '0.2' || handoff.handoff_status !== 'READY_FOR_DEV_CANVAS_06') fail('CANVAS06_UNIFIED_HANDOFF_INVALID', 'HANDOFF_0.2', '需要 READY Handoff 0.2。');
-  assertArtifactOrder(handoff, options['source-commit'].slice(0, 12));
-  await assertTreeRef(handoffRoot, handoff.build_artifacts[2]);
-  if (intake.intake_status !== 'READY_FOR_RELEASE_VALIDATION' || !sameRef(intake.handoff_ref, await ref(handoffRoot, `${options.input}/dev-canvas-05-handoff.json`, 'HANDOFF'))) fail('CANVAS06_UNIFIED_INTAKE_INVALID', 'INTAKE', 'Intake 未锁定 Handoff raw bytes。');
-  await regular(resolve(input, 'dev-canvas-06/common-fixtures/0.2.0/dev-canvas-06-common-fixture-catalog.json'));
-  const digest = await treeRef(handoffRoot, options.input, 'INPUT_TREE', 'CANVAS06_UNIFIED_JOIN_MISMATCH');
-  process.stdout.write(`${input}\n${options['source-commit']}\n${digest.sha256}\n`);
+  assertArtifactOrder(handoff, paths.source12);
+  await assertTreeRef(paths.handoffRoot, handoff.build_artifacts[2]);
+  const handoffRef = await fileRef(paths.handoffRoot, `${paths.inputRelative}/dev-canvas-05-handoff.json`, 'HANDOFF');
+  if (intake.intake_status !== 'READY_FOR_RELEASE_VALIDATION' || !sameRef(intake.handoff_ref, handoffRef)) fail('CANVAS06_UNIFIED_INTAKE_INVALID', 'INTAKE', 'Intake 未锁定 Handoff raw bytes。');
+  await regular(resolve(paths.versionedInputRoot, 'dev-canvas-06/common-fixtures/0.2.0/dev-canvas-06-common-fixture-catalog.json'));
+  const before = await treeRef(paths.handoffRoot, paths.inputRelative, 'INPUT_TREE', 'CANVAS06_UNIFIED_JOIN_MISMATCH');
+  assertSourceClean(paths.sourceRoot, options['source-commit']);
+  const after = await treeRef(paths.handoffRoot, paths.inputRelative, 'INPUT_TREE', 'CANVAS06_UNIFIED_JOIN_MISMATCH');
+  if (before.sha256 !== after.sha256) fail('CANVAS06_UNIFIED_JOIN_MISMATCH', 'TREE_DIGEST_AFTER', 'Verifier 观察到已安装输入变化。');
+  assertSourceClean(paths.sourceRoot, options['source-commit']);
+  return Object.freeze({ path: paths.versionedInputRoot, sourceCommit: options['source-commit'], treeSha256: after.sha256 });
 }
 
-export function assertInstalledSourceIdentity(sourceRoot, handoffRoot, options) {
-  if (git(sourceRoot, ['rev-parse', 'HEAD']).trim() !== options['source-commit']) fail('CANVAS06_UNIFIED_SOURCE_DIRTY', 'SOURCE_ROOT_IDENTITY', 'source-root HEAD 不匹配。');
-  if (spawnSync('git', ['merge-base', '--is-ancestor', options['base-source-commit'], options['source-commit']], { cwd: sourceRoot }).status !== 0) fail('CANVAS06_UNIFIED_BASE_INVALID', 'BASE_COMMIT_ANCESTRY', 'base ancestry 无效。');
-  const finalRoot = relative(resolve(sourceRoot), resolve(handoffRoot, options.input));
-  if (!finalRoot || finalRoot === '..' || finalRoot.startsWith(`..${sep}`) || isAbsolute(finalRoot)) fail('CANVAS06_UNIFIED_SOURCE_DIRTY', 'SOURCE_ROOT_IDENTITY', '最终输入根必须位于 source-root 内。');
-  for (const item of git(sourceRoot, ['status', '--porcelain=v1', '-z', '--untracked-files=all']).split('\0').filter(Boolean)) {
-    const status = item.slice(0, 3);
-    const path = item.slice(3);
-    if (status !== '?? ' || !(path === finalRoot || path.startsWith(`${finalRoot}/`))) {
-      fail('CANVAS06_UNIFIED_SOURCE_DIRTY', 'SOURCE_ROOT_IDENTITY', 'source-root 存在最终输入根以外的漂移。');
-    }
-  }
+async function assertTreeRef(root, reference) {
+  const actual = await treeRef(root, reference.path, reference.kind, 'CANVAS06_UNIFIED_WEB_TREE_INVALID');
+  if (actual.byte_length !== reference.byte_length || actual.sha256 !== reference.sha256) throw new UnifiedInputError('CANVAS06_UNIFIED_WEB_TREE_INVALID', 'WEB_TREE', 'Web tree 摘要不匹配。');
 }
-
-async function regular(path) { const info = await lstat(path); if (!info.isFile() || info.isSymbolicLink() || info.nlink !== 1) fail('CANVAS06_UNIFIED_JOIN_MISMATCH', 'VERIFY', `不是单链接普通文件：${path}`); }
-async function ref(root, path, kind) { const target = resolve(root, path); const bytes = await readFile(target); return { kind, path, byte_length: bytes.length, sha256: (await import('node:crypto')).createHash('sha256').update(bytes).digest('hex') }; }
-function git(cwd, args) { return execFileSync('git', args, { cwd, encoding: 'utf8' }); }
+async function regular(path) { const info = await lstat(path); if (!info.isFile() || info.isSymbolicLink() || info.nlink !== 1) throw new UnifiedInputError('CANVAS06_UNIFIED_JOIN_MISMATCH', 'VERIFY', `不是单链接普通文件：${path}`); }
+function fail(code, stage, message) { throw new UnifiedInputError(code, stage, message); }
+function normalize(error) { return error instanceof UnifiedInputError ? error : new UnifiedInputError('CANVAS06_UNIFIED_JOIN_MISMATCH', 'VERIFY', error.message); }

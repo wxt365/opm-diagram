@@ -13,10 +13,12 @@ addFormats(activeManifestAjv);
 const validateActiveManifest = activeManifestAjv.compile(ACTIVE_MANIFEST_SCHEMA);
 
 const RUN_VALUE_OPTIONS = [
-  'input-mode', 'manifest-root', 'manifest', 'source-root', 'java-home', 'browser-executable',
+  'input-mode', 'manifest-root', 'manifest', 'profile-asset-root', 'source-root', 'java-home', 'browser-executable',
   'runtime-port', 'web-port', 'output-root', 'out'
 ];
-const VERIFY_VALUE_OPTIONS = ['scope', 'input-mode', 'evidence-root', 'report'];
+const VERIFY_VALUE_OPTIONS = [
+  'scope', 'input-mode', 'evidence-root', 'manifest-root', 'manifest', 'profile-asset-root', 'report'
+];
 const ATTEMPT_VERIFY_VALUE_OPTIONS = ['scope', 'manifest-root', 'manifest', 'profile-asset-root', 'attempt-root', 'report-root'];
 const PRODUCTION_VALUE_OPTIONS = ['handoff-root', 'intake-report'];
 const CONTROLLED_VALUE_OPTIONS = ['controlled-bundle-root'];
@@ -88,6 +90,49 @@ export async function loadActiveAttemptManifest({ manifestRoot, manifest, profil
     profileRoot,
     sourceDateEpoch,
     ...profileAssets
+  });
+}
+
+/**
+ * 从已验证的活动 Manifest 选择一个 Common attempt 的唯一输入集合。
+ * 此处不读取 checkout，也不为缺失项推断默认路径。
+ */
+export function selectCommonAttemptInputs({ manifestInput, caseEntry }) {
+  if (!manifestInput?.manifest || !manifestInput.manifestRoot || !manifestInput.profileRoot || !caseEntry?.case_id) {
+    fail('E2E_ORCHESTRATION_INPUT_INVALID', 'Controlled attempt requires a verified Manifest input and case entry.');
+  }
+  const manifest = manifestInput.manifest;
+  const manifestCase = manifest.cases?.filter(entry => entry?.case_id === caseEntry.case_id) ?? [];
+  if (manifestCase.length !== 1 || manifestCase[0].driver_id !== 'DRIVER-COMMON'
+      || canonicalizeJcs(caseEntry) !== canonicalizeJcs(manifestCase[0])) {
+    fail('E2E_ORCHESTRATION_INPUT_INVALID', 'Controlled attempt case must be exactly one Common Manifest entry.');
+  }
+  const sourceBuild = manifest.source_build;
+  if (sourceBuild?.local_runtime_jar?.kind !== 'LOCAL_RUNTIME_JAR'
+      || sourceBuild.local_runtime_jar.path !== 'inputs/build/local-runtime.jar'
+      || sourceBuild?.web_dist?.kind !== 'WEB_DIST_TREE'
+      || sourceBuild.web_dist.path !== 'inputs/build/web-dist') {
+    fail('E2E_ORCHESTRATION_REF_MISMATCH', 'Manifest build references do not match the frozen attempt layout.', 3);
+  }
+  const expectedDrivers = [
+    ['DRIVER-PROCEDURAL', 'inputs/drivers/procedural-driver.mjs'],
+    ['DRIVER-CONTROL', 'inputs/drivers/control-driver.mjs'],
+    ['DRIVER-STRUCTURAL', 'inputs/drivers/structural-driver.mjs'],
+    ['DRIVER-COMMON', 'inputs/drivers/common-driver.mjs']
+  ];
+  const drivers = manifest.driver_catalog;
+  if (!Array.isArray(drivers) || drivers.length !== expectedDrivers.length || drivers.some((driver, index) => {
+    const [driverId, path] = expectedDrivers[index];
+    return driver?.driver_id !== driverId || driver.source_ref?.kind !== 'E2E_DRIVER_SOURCE' || driver.source_ref?.path !== path;
+  })) {
+    fail('E2E_ORCHESTRATION_REF_MISMATCH', 'Manifest four-driver closure is invalid.', 3);
+  }
+  return Object.freeze({
+    caseEntry: Object.freeze({ ...manifestCase[0] }),
+    runtimeJarRef: Object.freeze({ ...sourceBuild.local_runtime_jar }),
+    webDistRef: Object.freeze({ ...sourceBuild.web_dist }),
+    profileAssetRefs: Object.freeze(manifestInput.profileAssetRefs.map(reference => Object.freeze({ ...reference }))),
+    drivers: Object.freeze(drivers.map(driver => Object.freeze({ driver_id: driver.driver_id, source_ref: Object.freeze({ ...driver.source_ref }) })))
   });
 }
 

@@ -2,9 +2,11 @@ import { createHash, createHmac, randomBytes } from 'node:crypto';
 import { chmod, lstat, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { isAbsolute, relative, resolve, sep } from 'node:path';
 
-import { E2eRunInputError, safeRelativePath } from './canvas06-e2e-run-input.mjs';
+import { E2eRunInputError, loadActiveAttemptManifest, safeRelativePath, selectCommonAttemptInputs } from './canvas06-e2e-run-input.mjs';
 import { canonicalizeJcs } from './canvas06-rfc8785.mjs';
-import { verifyFaultPlan, writeFaultPlan } from './canvas06-e2e-attempt-artifacts.mjs';
+import { attemptRelativeRoot, verifyFaultPlan, writeFaultPlan } from './canvas06-e2e-attempt-artifacts.mjs';
+import { assertDirectory, copyRegularFile, copyTree, resolveInside, treeRef, verifyFileRef } from './canvas06-e2e-manifest-v01-support.mjs';
+import { verifyControlledInputBundle } from './verify-canvas06-controlled-input-bundle.mjs';
 
 const ATTEMPT_ORDINALS = Object.freeze([1, 2]);
 const FAULT_CASE_IDS = new Set([
@@ -13,6 +15,219 @@ const FAULT_CASE_IDS = new Set([
   'E2E-CANVAS-007.READONLY'
 ]);
 const FAULT_DOMAIN = Buffer.from('OPM-DEV-CANVAS-06-E2E-FAULT-LAUNCHER-001\0', 'ascii');
+
+/**
+ * 创建一个仅供后续 INITIAL/REOPEN 编排消费的 fresh attempt 输入根。
+ * 此函数不启动进程、不执行 case，也不生成任何 Report 或 placeholder。
+ */
+export async function prepareControlledAttempt({
+  controlled_bundle_root,
+  manifest_root,
+  manifest_path,
+  profile_asset_root,
+  report_staging_root,
+  case_entry,
+  attempt_ordinal,
+  java_executable,
+  browser_executable,
+  runtime_port,
+  web_port
+}) {
+  assertControlledAttemptArguments({ manifest_path, case_entry, attempt_ordinal, java_executable, browser_executable, runtime_port, web_port });
+  const controlledBundle = await verifyControlledInputBundle({ bundleRoot: controlled_bundle_root, consumer: 'E2E' }).catch(error => {
+    throw asOrchestrationError(error, 'E2E_ORCHESTRATION_INPUT_INVALID');
+  });
+  const manifestInput = await loadActiveAttemptManifest({
+    manifestRoot: manifest_root,
+    manifest: manifest_path,
+    profileAssetRoot: profile_asset_root
+  }).catch(error => { throw asOrchestrationError(error, 'E2E_ORCHESTRATION_INPUT_INVALID'); });
+  if (resolve(manifestInput.profileRoot) !== resolve(manifestInput.manifestRoot, 'inputs/upstream/profile-assets')) {
+    fail('E2E_ORCHESTRATION_REF_MISMATCH', 'Profile assets must be read from the Manifest final root.');
+  }
+  await assertControlledManifestTrust({ manifestInput, controlledBundle });
+  const inputs = selectCommonAttemptInputs({ manifestInput, caseEntry: case_entry });
+  const source = await verifyAttemptSources({ manifestInput, inputs });
+
+  const reportRoot = resolve(report_staging_root);
+  await assertDirectory(reportRoot, 'E2E_ORCHESTRATION_INPUT_INVALID');
+  const attemptRoot = await createFreshAttemptRoot({ reportRoot, caseId: inputs.caseEntry.case_id, attemptOrdinal: attempt_ordinal });
+  try {
+    await copyVerifiedAttemptSources({ attemptRoot, manifestInput, inputs, source });
+  } catch (error) {
+    throw asOrchestrationError(error, 'E2E_ORCHESTRATION_PROCESS_FAILED');
+  }
+  return freezePreparedAttempt({ attemptRoot, caseEntry: inputs.caseEntry, attemptOrdinal: attempt_ordinal });
+}
+
+async function assertControlledManifestTrust({ manifestInput, controlledBundle }) {
+  const references = [
+    ['intake_report_ref', controlledBundle.references.intake_report_ref],
+    ['handoff_ref', controlledBundle.references.handoff_ref],
+    ['input_materialization.bundle_ref', controlledBundle.references.evidence_bundle_ref]
+  ];
+  for (const [field, external] of references) {
+    const localRef = field === 'input_materialization.bundle_ref'
+      ? manifestInput.manifest.input_materialization?.bundle_ref
+      : manifestInput.manifest[field];
+    const local = await verifyFileRef({ root: manifestInput.manifestRoot, reference: localRef, code: 'E2E_ORCHESTRATION_REF_MISMATCH' });
+    const externalBytes = await readRegularBytes(external.absolute_path, 'E2E_ORCHESTRATION_REF_MISMATCH');
+    if (!local.bytes.equals(externalBytes)) fail('E2E_ORCHESTRATION_REF_MISMATCH', 'Controlled bundle trust input differs from the Manifest final root.');
+  }
+}
+
+async function verifyAttemptSources({ manifestInput, inputs }) {
+  const root = manifestInput.manifestRoot;
+  const runtimeJar = await verifyFileRef({ root, reference: inputs.runtimeJarRef, code: 'E2E_ORCHESTRATION_REF_MISMATCH' });
+  const webDist = await treeRef(root, inputs.webDistRef.path, 'E2E_ORCHESTRATION_REF_MISMATCH');
+  if (!sameRef(webDist, inputs.webDistRef)) fail('E2E_ORCHESTRATION_REF_MISMATCH', 'Manifest web-dist tree differs from its raw reference.');
+  const drivers = [];
+  for (const driver of inputs.drivers) {
+    drivers.push({ driver, source: await verifyFileRef({ root, reference: driver.source_ref, code: 'E2E_ORCHESTRATION_REF_MISMATCH' }) });
+  }
+  const profileAssets = [];
+  for (const reference of inputs.profileAssetRefs) {
+    const relativePath = profileAssetPath(reference.path);
+    const sourcePath = resolve(manifestInput.profileRoot, relativePath);
+    const bytes = await readRegularBytes(sourcePath, 'E2E_ORCHESTRATION_REF_MISMATCH');
+    if (bytes.length !== reference.byte_length || sha256(bytes) !== reference.sha256) {
+      fail('E2E_ORCHESTRATION_REF_MISMATCH', 'Profile asset bytes differ from the active Manifest reference.');
+    }
+    profileAssets.push({ reference, relativePath, sourcePath });
+  }
+  return Object.freeze({ runtimeJar, webDist, drivers: Object.freeze(drivers), profileAssets: Object.freeze(profileAssets) });
+}
+
+async function createFreshAttemptRoot({ reportRoot, caseId, attemptOrdinal }) {
+  const root = resolve(reportRoot);
+  const relativeAttemptRoot = attemptRelativeRoot(caseId, attemptOrdinal);
+  const parent = resolve(root, relativeAttemptRoot, '..');
+  if (!inside(root, parent) || parent === root) fail('E2E_ORCHESTRATION_ATTEMPT_NOT_FRESH', 'Attempt parent escapes the Report staging root.');
+  await ensureDirectoryPath(root, relativeAttemptRoot.split('/').slice(0, -1));
+  const attemptRoot = resolve(root, relativeAttemptRoot);
+  try {
+    await mkdir(attemptRoot, { recursive: false, mode: 0o700 });
+  } catch (error) {
+    fail('E2E_ORCHESTRATION_ATTEMPT_NOT_FRESH', 'Attempt root must not already exist.');
+  }
+  const details = await lstat(attemptRoot);
+  if (details.isSymbolicLink() || !details.isDirectory()) fail('E2E_ORCHESTRATION_ATTEMPT_NOT_FRESH', 'Attempt root is not a safe directory.');
+  return attemptRoot;
+}
+
+async function copyVerifiedAttemptSources({ attemptRoot, manifestInput, inputs, source }) {
+  const runtime = await copyRegularFile({
+    source: source.runtimeJar.path,
+    destinationRoot: attemptRoot,
+    destination: 'inputs/build/local-runtime.jar',
+    kind: inputs.runtimeJarRef.kind,
+    code: 'E2E_ORCHESTRATION_PROCESS_FAILED'
+  });
+  await verifyCopiedFile({ root: attemptRoot, reference: runtime, expected: inputs.runtimeJarRef });
+
+  const web = await copyTree({
+    sourceRoot: resolveInside(manifestInput.manifestRoot, inputs.webDistRef.path, 'E2E_ORCHESTRATION_REF_MISMATCH'),
+    destinationRoot: attemptRoot,
+    destination: 'inputs/build/web-dist',
+    code: 'E2E_ORCHESTRATION_PROCESS_FAILED'
+  });
+  if (!sameRef(web, { ...inputs.webDistRef, path: web.path })) fail('E2E_ORCHESTRATION_REF_MISMATCH', 'Copied web-dist differs from the Manifest tree reference.');
+
+  for (const asset of source.profileAssets) {
+    const copied = await copyRegularFile({
+      source: asset.sourcePath,
+      destinationRoot: attemptRoot,
+      destination: `profile/assets/${asset.relativePath}`,
+      kind: asset.reference.kind,
+      code: 'E2E_ORCHESTRATION_PROCESS_FAILED'
+    });
+    await verifyCopiedFile({ root: attemptRoot, reference: copied, expected: asset.reference });
+  }
+  for (const entry of source.drivers) {
+    const filename = entry.driver.source_ref.path.slice('inputs/drivers/'.length);
+    const copied = await copyRegularFile({
+      source: entry.source.path,
+      destinationRoot: attemptRoot,
+      destination: `inputs/drivers/${filename}`,
+      kind: entry.driver.source_ref.kind,
+      code: 'E2E_ORCHESTRATION_PROCESS_FAILED'
+    });
+    await verifyCopiedFile({ root: attemptRoot, reference: copied, expected: entry.driver.source_ref });
+  }
+}
+
+async function verifyCopiedFile({ root, reference, expected }) {
+  const copied = await verifyFileRef({ root, reference, code: 'E2E_ORCHESTRATION_REF_MISMATCH' });
+  if (copied.bytes.length !== expected.byte_length || sha256(copied.bytes) !== expected.sha256) {
+    fail('E2E_ORCHESTRATION_REF_MISMATCH', 'Copied attempt input differs from the Manifest raw reference.');
+  }
+}
+
+function freezePreparedAttempt({ attemptRoot, caseEntry, attemptOrdinal }) {
+  return Object.freeze({
+    case_entry: Object.freeze({ ...caseEntry }),
+    attempt_ordinal: attemptOrdinal,
+    attempt_root: attemptRoot,
+    runtime_jar: resolve(attemptRoot, 'inputs/build/local-runtime.jar'),
+    web_dist: resolve(attemptRoot, 'inputs/build/web-dist'),
+    profile_assets: resolve(attemptRoot, 'profile/assets'),
+    driver_source: resolve(attemptRoot, 'inputs/drivers/common-driver.mjs'),
+    storage: resolve(attemptRoot, 'storage'),
+    initial_runtime: resolve(attemptRoot, 'process/initial'),
+    reopen_runtime: resolve(attemptRoot, 'process/reopen')
+  });
+}
+
+function assertControlledAttemptArguments({ manifest_path, case_entry, attempt_ordinal, java_executable, browser_executable, runtime_port, web_port }) {
+  if (!safeRelativePath(manifest_path) || !case_entry || typeof case_entry.case_id !== 'string'
+      || !ATTEMPT_ORDINALS.includes(attempt_ordinal) || !isAbsolute(java_executable) || !isAbsolute(browser_executable)
+      || !validPort(runtime_port) || !validPort(web_port) || runtime_port === web_port) {
+    fail('E2E_ORCHESTRATION_INPUT_INVALID', 'Controlled attempt arguments are invalid.');
+  }
+}
+
+async function ensureDirectoryPath(root, segments) {
+  let current = root;
+  for (const segment of segments) {
+    current = resolve(current, segment);
+    try {
+      const details = await lstat(current);
+      if (details.isSymbolicLink() || !details.isDirectory()) fail('E2E_ORCHESTRATION_ATTEMPT_NOT_FRESH', 'Attempt parent contains an unsafe entry.');
+    } catch (error) {
+      if (error instanceof E2eRunInputError) throw error;
+      await mkdir(current, { recursive: false, mode: 0o700 });
+    }
+  }
+}
+
+async function readRegularBytes(path, code) {
+  let details;
+  try { details = await lstat(path); } catch { fail(code, 'Expected a regular attempt input.'); }
+  if (details.isSymbolicLink() || !details.isFile() || details.nlink !== 1) fail(code, 'Attempt input must be a single-link regular file.');
+  return readFile(path);
+}
+
+function profileAssetPath(path) {
+  const prefix = 'inputs/upstream/profile-assets/';
+  if (typeof path !== 'string' || !path.startsWith(prefix) || !safeRelativePath(path.slice(prefix.length))) {
+    fail('E2E_ORCHESTRATION_REF_MISMATCH', 'Manifest Profile asset path is invalid.');
+  }
+  return path.slice(prefix.length);
+}
+
+function sameRef(left, right) {
+  return left?.kind === right?.kind && left?.path === right?.path
+    && left?.byte_length === right?.byte_length && left?.sha256 === right?.sha256;
+}
+
+function validPort(value) {
+  return Number.isInteger(value) && value >= 1024 && value <= 65535;
+}
+
+function asOrchestrationError(error, code) {
+  if (error instanceof E2eRunInputError && error.code.startsWith('E2E_ORCHESTRATION_')) return error;
+  return new E2eRunInputError(code, error?.message ?? 'Controlled attempt input validation failed.', error?.exitCode === 3 ? 3 : 2);
+}
 
 // 只有该 plan builder 从冻结调度矩阵取得 ordinal。
 export async function prepareCaseFaultPlans({ reportRoot, manifest, caseId, nonces = {}, write = writeFaultPlan }) {
@@ -248,7 +463,7 @@ async function readBackFaultPlan({ reportRoot, caseId, attemptOrdinal, reference
 }
 
 function faultPlanPath(caseId, attemptOrdinal) {
-  return `attempts/${encodeCaseId(caseId)}/${attemptOrdinal}/fault-plan.json`;
+  return `${attemptRelativeRoot(caseId, attemptOrdinal)}/fault-plan.json`;
 }
 
 function encodeCaseId(value) {
