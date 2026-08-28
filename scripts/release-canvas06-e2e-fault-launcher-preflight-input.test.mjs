@@ -52,11 +52,51 @@ test('producer rejects a noncanonical JarIT result before publishing a bundle ro
   assert.deepEqual(await (await import('node:fs/promises')).readdir(fixture.output), []);
 });
 
-test('Gate Observation Schema 接受封闭 phase 快照并拒绝未知字段', () => {
+test('FLCB-P-001: PASS、12个DURING、零mutation、空failure通过Schema和payload复算', () => {
   const value = gateObservation();
-  assert.equal(validateGateObservation(value), true, JSON.stringify(validateGateObservation.errors));
-  value.before.unexpected = true;
-  assert.equal(validateGateObservation(value), false);
+  assertSchemaPass(value);
+});
+
+test('FLCB-P-002: FAILED、3个DURING真实前缀和Gate mutation failure通过Schema', () => {
+  const value = gateObservation({ status: 'FAILED', duringCount: 3, mutationCount: 1, failures: [failure('PRODUCTION_GATE_MUTATED_DURING_CONTROLLED_RUN', 'DURING', 'FL-SCH-02', 'INITIAL')] });
+  assertSchemaPass(value);
+});
+
+test('FLCB-P-003: FAILED、零DURING和BEFORE Playwright execution failure通过Schema', () => {
+  const value = gateObservation({ status: 'FAILED', duringCount: 0, failures: [failure('CONTROLLED_PLAYWRIGHT_EXECUTION_FAILED', 'BEFORE', null, null)] });
+  assertSchemaPass(value);
+});
+
+test('FLCB-N-001: PASS只有11个DURING被拒绝', () => {
+  assertSchemaFail(gateObservation({ duringCount: 11 }));
+});
+
+test('FLCB-N-002: PASS携带failure被拒绝', () => {
+  assertSchemaFail(gateObservation({ failures: [failure('CONTROLLED_PLAYWRIGHT_EXECUTION_FAILED', 'BEFORE', null, null)] }));
+});
+
+test('FLCB-N-003: PASS mutation非零被拒绝', () => {
+  assertSchemaFail(gateObservation({ mutationCount: 1 }));
+});
+
+test('FLCB-N-004: FAILED但failures为空被拒绝', () => {
+  assertSchemaFail(gateObservation({ status: 'FAILED', duringCount: 3, failures: [] }));
+});
+
+test('FLCB-N-005: failure code不在封闭枚举中被拒绝', () => {
+  assertSchemaFail(gateObservation({ status: 'FAILED', duringCount: 0, failures: [failure('UNKNOWN', 'BEFORE', null, null)] }));
+});
+
+test('FLCB-N-006: DURING failure缺少schedule或cycle被拒绝', () => {
+  assertSchemaFail(gateObservation({ status: 'FAILED', duringCount: 0, failures: [failure('CONTROLLED_PLAYWRIGHT_EXECUTION_FAILED', 'DURING', null, null)] }));
+});
+
+test('FLCB-N-007: BEFORE failure携带非null字段或额外字段被拒绝', () => {
+  const value = gateObservation({ status: 'FAILED', duringCount: 0, failures: [failure('CONTROLLED_PLAYWRIGHT_EXECUTION_FAILED', 'BEFORE', 'FL-SCH-01', 'INITIAL')] });
+  assertSchemaFail(value);
+  const extra = gateObservation({ status: 'FAILED', duringCount: 0, failures: [failure('CONTROLLED_PLAYWRIGHT_EXECUTION_FAILED', 'AFTER', null, null)] });
+  extra.failures[0].unexpected = true;
+  assertSchemaFail(extra);
 });
 
 async function createFixture(t) {
@@ -125,12 +165,22 @@ function goldenEnvironment(browser) {
   return value;
 }
 
-function gateObservation() {
+function gateObservation({ status = 'PASS_MATCHED', duringCount = 12, mutationCount = 0, failures = [] } = {}) {
   const digest64 = 'a'.repeat(64);
   const fileRef = { kind: 'HANDOFF', path: 'handoff/fixed-handoff.json', byte_length: 1, sha256: digest64 };
   const snapshot = phase => ({ observed_at: '2026-08-26T00:00:00Z', state: 'DISABLED', enabled_capability_ids: [], candidate_loader_status: 'NOT_ACTIVE', fixed_handoff_ref: fileRef, fixed_handoff_realpath: '/fixed-handoff.json', activation_input_root_realpath: '/activation', activation_input_refs: [], activation_input_set_sha256: '4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945', snapshot_payload_sha256: digest64, ...phase });
-  return { schema_id: 'OPM-DEV-CANVAS-06-E2E-FAULT-LAUNCHER-GATE-OBSERVATION-001', schema_version: '0.1', observation_id: `dev-canvas-06.fault-launcher-gate.${digest64.slice(0, 12)}.${digest64.slice(0, 12)}`, generated_at: '2026-08-26T00:00:00Z', preflight_descriptor_ref: { bundle_id: `canvas06-controlled-${digest64}`, bundle_identity_sha256: digest64, path: 'fault-launcher/preflight-descriptor.json', byte_length: 1, sha256: digest64 }, preflight_report_ref: { kind: 'FAULT_LAUNCHER_PREFLIGHT_REPORT', path: 'fault-launcher/preflight-report.json', byte_length: 1, sha256: digest64 }, before: snapshot({ phase: 'BEFORE' }), during: Array.from({ length: 12 }, (_, index) => snapshot({ phase: 'DURING', schedule_id: `FL-SCH-${String(Math.floor(index / 2) + 1).padStart(2, '0')}`, process_cycle: index % 2 === 0 ? 'INITIAL' : 'REOPEN', ordinal: index + 1 })), after: snapshot({ phase: 'AFTER' }), production_gate_mutation_count: 0, observation_status: 'PASS_MATCHED', failures: [], observation_payload_sha256: digest64 };
+  const value = { schema_id: 'OPM-DEV-CANVAS-06-E2E-FAULT-LAUNCHER-GATE-OBSERVATION-001', schema_version: '0.1', observation_id: `dev-canvas-06.fault-launcher-gate.${digest64.slice(0, 12)}.${digest64.slice(0, 12)}`, generated_at: '2026-08-26T00:00:00Z', preflight_descriptor_ref: { bundle_id: `canvas06-controlled-${digest64}`, bundle_identity_sha256: digest64, path: 'fault-launcher/preflight-descriptor.json', byte_length: 1, sha256: digest64 }, preflight_report_ref: { kind: 'FAULT_LAUNCHER_PREFLIGHT_REPORT', path: 'fault-launcher/preflight-report.json', byte_length: 1, sha256: digest64 }, before: snapshot({ phase: 'BEFORE' }), during: Array.from({ length: duringCount }, (_, index) => snapshot({ phase: 'DURING', schedule_id: `FL-SCH-${String(Math.floor(index / 2) + 1).padStart(2, '0')}`, process_cycle: index % 2 === 0 ? 'INITIAL' : 'REOPEN', ordinal: index + 1 })), after: snapshot({ phase: 'AFTER' }), production_gate_mutation_count: mutationCount, observation_status: status, failures, observation_payload_sha256: '' };
+  value.observation_payload_sha256 = sha(jcs(without(value, 'observation_payload_sha256')));
+  return value;
 }
+
+function failure(code, phase, schedule_id, process_cycle) { return { code, phase, schedule_id, process_cycle, evidence_refs: [] }; }
+function without(value, key) { const copy = { ...value }; delete copy[key]; return copy; }
+function assertSchemaPass(value) {
+  assert.equal(value.observation_payload_sha256, sha(jcs(without(value, 'observation_payload_sha256'))));
+  assert.equal(validateGateObservation(value), true, JSON.stringify(validateGateObservation.errors));
+}
+function assertSchemaFail(value) { assert.equal(validateGateObservation(value), false, 'Expected Gate Observation Schema rejection.'); }
 
 async function git(cwd, args) { execFileSync('git', ['-C', cwd, ...args]); }
 function sha(value) { return createHash('sha256').update(value).digest('hex'); }
