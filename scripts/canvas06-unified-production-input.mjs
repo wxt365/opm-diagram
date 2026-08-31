@@ -25,6 +25,7 @@ export const RUNNER_FAMILY_CASE_EXECUTION_MANIFEST_ACCESS_COMMIT = 'bbb01599d5c6
 export const DIRECT_MAIN_R11_INTEGRATION_COMMIT = '44d8bdaa6c6de66de7447604deaaf1578c1cc146';
 export const DIRECT_MAIN_R11_BASELINE_COMMIT = 'df91091f7270ede59efe6d43678fb731ee496a86';
 export const DIRECT_MAIN_R12_BASE_COMMIT = '8608f05b1a397270d2f14152159019e1bf96e3b1';
+export const DIRECT_MAIN_R13_BASE_COMMIT = 'ce1b84d074d8a08c250b0fe868af7db387625a2b';
 const PROFILE_RELATIVE_ROOT = 'profiles/profile.iso19450.2024.draft/0.2.0';
 export const ORIGIN_DELTA = Object.freeze([
   ['M', 'package.json'],
@@ -169,6 +170,16 @@ export const DIRECT_MAIN_R12_CLOSURE = Object.freeze([
   ['M', 'scripts/verify-opm-bootstrap-build-closure.test.mjs'],
   ['A', 'specs/opm-dev-canvas-06-r13-current-directory-bootstrap-boundary-bugfix-task-spec.md']
 ]);
+export const DIRECT_MAIN_R13_CLOSURE = Object.freeze([
+  ['A', 'docs/checklists/opm-dev-canvas-06-r14-playwright-global-timeout-boundary-bugfix-checklist.md'],
+  ['M', 'scripts/canvas06-e2e-release-config.test.mjs'],
+  ['M', 'scripts/canvas06-unified-production-input.mjs'],
+  ['M', 'scripts/canvas06-unified-production-input.test.mjs'],
+  ['M', 'scripts/rebuild-canvas06-manifest-v02-production.mjs'],
+  ['M', 'scripts/rebuild-canvas06-manifest-v02-production.test.mjs'],
+  ['A', 'specs/opm-dev-canvas-06-r14-playwright-global-timeout-boundary-bugfix-task-spec.md'],
+  ['M', 'tests/e2e/release/dev-canvas-06/playwright.release.config.ts']
+]);
 export const FAULT_2A_CUMULATIVE_DELTA = mergeDelta(FAULT_CONTRACT_DELTA, FAULT_2A_DELTA);
 export const FINAL_RUNNER_CUMULATIVE_DELTA = mergeDelta(FAULT_2A_CUMULATIVE_DELTA, RUNNER_DELTA, RUNNER_DELTA_OWNER_CLOSURE, RUNNER_CLI_DELTA, RUNNER_PLAYWRIGHT_LAUNCH_CLOSURE, RUNNER_PLAYWRIGHT_OUTPUT_ENV_NAMESPACE_CLOSURE, RUNNER_FAMILY_PROOF_DIAGNOSTIC_CLOSURE);
 const QUARANTINE_FAILURE_CODES = new Set(['CANVAS06_UNIFIED_HANDOFF_INVALID', 'CANVAS06_UNIFIED_INTAKE_INVALID', 'CANVAS06_UNIFIED_WEB_TREE_INVALID', 'CANVAS06_UNIFIED_COMMON_INVALID', 'CANVAS06_UNIFIED_JOIN_MISMATCH', 'CANVAS06_UNIFIED_TRANSACTION_FAILED']);
@@ -225,19 +236,19 @@ export function parseOptions(argv) {
     values.set(key, value);
   }
   const target = values.get('source-chain-target');
-  const expectedCount = ['FINAL_RUNNER', 'DIRECT_MAIN_R11', 'DIRECT_MAIN_R12'].includes(target) ? common.length + 1 : target === 'FAULT_2A' ? common.length : -1;
+  const expectedCount = ['FINAL_RUNNER', 'DIRECT_MAIN_R11', 'DIRECT_MAIN_R12', 'DIRECT_MAIN_R13'].includes(target) ? common.length + 1 : target === 'FAULT_2A' ? common.length : -1;
   if (values.size !== expectedCount || values.get('require-production') !== true || values.get('input-mode') !== 'EXTERNAL_RELEASE_STORE') {
     fail('CANVAS06_UNIFIED_ARGUMENT_INVALID', 'ARGS', '缺少 production 参数或 input-mode 非 EXTERNAL_RELEASE_STORE。');
   }
   for (const key of ['source-root', 'release-store-root']) if (!isAbsolute(values.get(key))) fail('CANVAS06_UNIFIED_ARGUMENT_INVALID', 'ARGS', `${key} 必须是绝对路径。`);
   if (values.get('origin-source-commit') !== ORIGIN_SOURCE_COMMIT || [...values.entries()].some(([key, value]) => key.endsWith('-commit') && !/^[a-f0-9]{40}$/.test(value))) fail('CANVAS06_UNIFIED_ARGUMENT_INVALID', 'ARGS', 'source chain commit 非法。');
-  if ((target === 'FAULT_2A' && values.get('source-commit') !== values.get('fault-2a-source-commit')) || (['FINAL_RUNNER', 'DIRECT_MAIN_R11', 'DIRECT_MAIN_R12'].includes(target) && values.get('source-commit') !== values.get('runner-source-commit'))) fail('CANVAS06_UNIFIED_ARGUMENT_INVALID', 'ARGS', 'source-commit 必须等于 target HEAD。');
+  if ((target === 'FAULT_2A' && values.get('source-commit') !== values.get('fault-2a-source-commit')) || (['FINAL_RUNNER', 'DIRECT_MAIN_R11', 'DIRECT_MAIN_R12', 'DIRECT_MAIN_R13'].includes(target) && values.get('source-commit') !== values.get('runner-source-commit'))) fail('CANVAS06_UNIFIED_ARGUMENT_INVALID', 'ARGS', 'source-commit 必须等于 target HEAD。');
   return Object.freeze(Object.fromEntries(values));
 }
 
 export function sourceChainArgs(options) {
   const keys = ['source-chain-target', 'origin-source-commit', 'fault-contract-source-commit', 'schema-conformance-source-commit', 'fault-2a-source-commit'];
-  if (['FINAL_RUNNER', 'DIRECT_MAIN_R11', 'DIRECT_MAIN_R12'].includes(options['source-chain-target'])) keys.push('runner-source-commit');
+  if (['FINAL_RUNNER', 'DIRECT_MAIN_R11', 'DIRECT_MAIN_R12', 'DIRECT_MAIN_R13'].includes(options['source-chain-target'])) keys.push('runner-source-commit');
   return keys.flatMap(key => [`--${key}`, options[key]]);
 }
 
@@ -339,7 +350,7 @@ export function assertSourceClean(sourceRoot, options) {
   assertDelta(sourceRoot, RUNNER_FAMILY_PROOF_DIAGNOSTIC_COMMIT, RUNNER_FAMILY_PROOF_DIAGNOSTIC_TRANSPORT_COMMIT, RUNNER_FAMILY_PROOF_DIAGNOSTIC_TRANSPORT_CLOSURE, 'RUNNER_F9_DELTA');
   assertSingleParent(sourceRoot, RUNNER_FAMILY_CYCLE_FAILURE_PRECEDENCE_COMMIT, RUNNER_FAMILY_PROOF_DIAGNOSTIC_TRANSPORT_COMMIT, 'RUNNER_F10_PARENT');
   assertDelta(sourceRoot, RUNNER_FAMILY_PROOF_DIAGNOSTIC_TRANSPORT_COMMIT, RUNNER_FAMILY_CYCLE_FAILURE_PRECEDENCE_COMMIT, RUNNER_FAMILY_CYCLE_FAILURE_PRECEDENCE_CLOSURE, 'RUNNER_F10_DELTA');
-  if (options['source-chain-target'] === 'DIRECT_MAIN_R11' || options['source-chain-target'] === 'DIRECT_MAIN_R12') {
+  if (options['source-chain-target'] === 'DIRECT_MAIN_R11' || options['source-chain-target'] === 'DIRECT_MAIN_R12' || options['source-chain-target'] === 'DIRECT_MAIN_R13') {
     assertExactParents(sourceRoot, DIRECT_MAIN_R11_INTEGRATION_COMMIT, [DIRECT_MAIN_R11_BASELINE_COMMIT, RUNNER_FAMILY_CASE_EXECUTION_MANIFEST_ACCESS_COMMIT], 'DIRECT_MAIN_R11_INTEGRATION_PARENTS');
     assertSingleParent(sourceRoot, DIRECT_MAIN_R12_BASE_COMMIT, DIRECT_MAIN_R11_INTEGRATION_COMMIT, 'DIRECT_MAIN_R11_PARENT');
     assertDelta(sourceRoot, DIRECT_MAIN_R11_INTEGRATION_COMMIT, DIRECT_MAIN_R12_BASE_COMMIT, DIRECT_MAIN_R11_CLOSURE, 'DIRECT_MAIN_R11_DELTA');
@@ -347,10 +358,14 @@ export function assertSourceClean(sourceRoot, options) {
       if (runner !== DIRECT_MAIN_R12_BASE_COMMIT) fail('CANVAS06_UNIFIED_BASE_INVALID', 'DIRECT_MAIN_R11_SOURCE_COMMIT', 'DIRECT_MAIN_R11 只接受固定 R12 source commit。');
       return;
     }
+    assertSingleParent(sourceRoot, DIRECT_MAIN_R13_BASE_COMMIT, DIRECT_MAIN_R12_BASE_COMMIT, 'DIRECT_MAIN_R12_PARENT');
+    assertDelta(sourceRoot, DIRECT_MAIN_R12_BASE_COMMIT, DIRECT_MAIN_R13_BASE_COMMIT, DIRECT_MAIN_R12_CLOSURE, 'DIRECT_MAIN_R12_DELTA');
     if (options['source-chain-target'] === 'DIRECT_MAIN_R12') {
-      assertSingleParent(sourceRoot, runner, DIRECT_MAIN_R12_BASE_COMMIT, 'DIRECT_MAIN_R12_PARENT');
-      assertDelta(sourceRoot, DIRECT_MAIN_R12_BASE_COMMIT, runner, DIRECT_MAIN_R12_CLOSURE, 'DIRECT_MAIN_R12_DELTA');
+      if (runner !== DIRECT_MAIN_R13_BASE_COMMIT) fail('CANVAS06_UNIFIED_BASE_INVALID', 'DIRECT_MAIN_R12_SOURCE_COMMIT', 'DIRECT_MAIN_R12 只接受固定 R13 source commit。');
+      return;
     }
+    assertSingleParent(sourceRoot, runner, DIRECT_MAIN_R13_BASE_COMMIT, 'DIRECT_MAIN_R13_PARENT');
+    assertDelta(sourceRoot, DIRECT_MAIN_R13_BASE_COMMIT, runner, DIRECT_MAIN_R13_CLOSURE, 'DIRECT_MAIN_R13_DELTA');
     return;
   }
   assertSingleParent(sourceRoot, runner, RUNNER_FAMILY_CYCLE_FAILURE_PRECEDENCE_COMMIT, 'RUNNER_F11_PARENT');

@@ -21,6 +21,7 @@ test('外层 CLI 仅接受两个绝对根及固定 base', () => {
   assert.equal(parseOptions(argv)['source-commit'], commit);
   assert.equal(parseOptions(argv.map(value => value === 'FINAL_RUNNER' ? 'DIRECT_MAIN_R11' : value))['source-chain-target'], 'DIRECT_MAIN_R11');
   assert.equal(parseOptions(argv.map(value => value === 'FINAL_RUNNER' ? 'DIRECT_MAIN_R12' : value))['source-chain-target'], 'DIRECT_MAIN_R12');
+  assert.equal(parseOptions(argv.map(value => value === 'FINAL_RUNNER' ? 'DIRECT_MAIN_R13' : value))['source-chain-target'], 'DIRECT_MAIN_R13');
   assert.throws(() => parseOptions([...argv, '--handoff-root', '/handoff']), error => error.code === 'CANVAS06_MANIFEST_ORCHESTRATOR_ARGUMENT_INVALID');
   assert.throws(() => parseOptions(argv.map(value => value === '/source' ? 'source' : value)), error => error.code === 'CANVAS06_MANIFEST_ORCHESTRATOR_ARGUMENT_INVALID');
   const mismatched = argv.map(value => value === 'FINAL_RUNNER' ? 'DIRECT_MAIN_R11' : value);

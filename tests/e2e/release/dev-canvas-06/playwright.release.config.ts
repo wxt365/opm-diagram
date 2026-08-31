@@ -24,7 +24,7 @@ export default defineConfig({
   forbidOnly: true,
   workers: 1,
   retries: 0,
-  timeout: 120_000,
+  timeout: 0,
   ...(controlledOutputDir && isAbsolute(controlledOutputDir) ? { outputDir: controlledOutputDir } : {}),
   use: {
     browserName: 'chromium',

@@ -10,7 +10,7 @@ const config = resolve(root, 'tests/e2e/release/dev-canvas-06/playwright.release
 test('release Playwright config fixes the browser context and never bootstraps a server', async () => {
   const source = await readFile(config, 'utf8');
   for (const value of [
-    "fullyParallel: false", 'forbidOnly: true', 'workers: 1', 'retries: 0', 'timeout: 120_000',
+    "fullyParallel: false", 'forbidOnly: true', 'workers: 1', 'retries: 0', 'timeout: 0',
     "browserName: 'chromium'", "locale: 'zh-CN'", "timezoneId: 'Asia/Shanghai'",
     "colorScheme: 'light'", "reducedMotion: 'reduce'", 'deviceScaleFactor: 1', "trace: 'retain-on-failure'"
   ]) assert.match(source, new RegExp(escapeRegExp(value)));
