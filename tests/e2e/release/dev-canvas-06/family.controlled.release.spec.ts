@@ -24,8 +24,8 @@ test('受控 Family E2E 只经 Runner session 执行', async () => {
     observation_sink: observationSink,
     resolve_invocation: resolveInvocation
   }: any): Promise<undefined> => {
-    const viewport = VIEWPORTS[caseEntry?.viewport_id as keyof typeof VIEWPORTS];
-    if (!viewport || caseEntry?.zoom_id !== 'Z-100') throw new Error('Family cycle viewport/zoom不符合冻结Manifest。');
+    const viewport = VIEWPORTS[caseEntry?.manifest_case?.viewport_id as keyof typeof VIEWPORTS];
+    if (!viewport || caseEntry?.manifest_case?.zoom_id !== 'Z-100') throw new Error('Family cycle viewport/zoom不符合冻结Manifest。');
     if (cycle === 'INITIAL' && typeof resolveInvocation !== 'function' || cycle === 'REOPEN' && resolveInvocation !== null) {
       throw new Error('Family cycle resolver边界无效。');
     }

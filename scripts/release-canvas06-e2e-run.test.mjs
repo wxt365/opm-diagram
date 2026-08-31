@@ -654,6 +654,14 @@ test('CaseExecution builder闭合178 Family companion输入与16 Common定义', 
   assert.ok(Object.isFrozen(commonExecutions[0].subject_steps));
 });
 
+test('Family bridge仅从完整CaseExecution的manifest_case读取viewport与zoom', async () => {
+  const bridge = await readFile(resolve('tests/e2e/release/dev-canvas-06/family.controlled.release.spec.ts'), 'utf8');
+  assert.match(bridge, /caseEntry\?\.manifest_case\?\.viewport_id/);
+  assert.match(bridge, /caseEntry\?\.manifest_case\?\.zoom_id/);
+  assert.doesNotMatch(bridge, /caseEntry\?\.viewport_id/);
+  assert.doesNotMatch(bridge, /caseEntry\?\.zoom_id/);
+});
+
 test('三个Family Driver按冻结UI路径执行130 PASS并为48 BLOCKED构造唯一正式负例', async () => {
   const { manifest: activeManifest, catalog } = await loadActiveCaseExecutionCatalog();
   const modules = new Map(await Promise.all([
