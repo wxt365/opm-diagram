@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import test from 'node:test';
 
-import { FAULT_2A_CUMULATIVE_DELTA, FAULT_2A_DELTA, FAULT_CONTRACT_DELTA, FINAL_RUNNER_CUMULATIVE_DELTA, ORIGIN_SOURCE_COMMIT, RUNNER_CLI_COMMIT, RUNNER_CLI_DELTA, RUNNER_CUMULATIVE_DELTA_CLOSURE, RUNNER_CUMULATIVE_DELTA_CLOSURE_COMMIT, RUNNER_DELTA, RUNNER_DELTA_OWNER_CLOSURE, RUNNER_FAMILY_CASE_EXECUTION_MANIFEST_ACCESS_CLOSURE, RUNNER_FAMILY_CYCLE_FAILURE_PRECEDENCE_CLOSURE, RUNNER_FAMILY_CYCLE_FAILURE_PRECEDENCE_COMMIT, RUNNER_FAMILY_PROOF_DIAGNOSTIC_CLOSURE, RUNNER_FAMILY_PROOF_DIAGNOSTIC_COMMIT, RUNNER_FAMILY_PROOF_DIAGNOSTIC_TRANSPORT_COMMIT, RUNNER_FAMILY_PROOF_DIAGNOSTIC_TRANSPORT_CLOSURE, RUNNER_FINAL_CHAIN_BASE_COMMIT, RUNNER_PROCESS_CONTROL_CLI_CLOSURE, RUNNER_PROCESS_CONTROL_CLI_COMMIT, RUNNER_PLAYWRIGHT_LAUNCH_CLOSURE, RUNNER_PLAYWRIGHT_LAUNCH_COMMIT, RUNNER_PLAYWRIGHT_OUTPUT_ENV_NAMESPACE_CLOSURE, RUNNER_PLAYWRIGHT_OUTPUT_ENV_NAMESPACE_COMMIT, UnifiedInputError, assertArtifactOrder, assertExactQuarantineGuard, assertExternalTopology, deriveExternalPaths, openExternalPaths, parseOptions, sourceEpoch, sourceChainArgs, treeRef, writeQuarantineMarker } from './canvas06-unified-production-input.mjs';
+import { DIRECT_MAIN_R11_BASELINE_COMMIT, DIRECT_MAIN_R11_CLOSURE, DIRECT_MAIN_R11_INTEGRATION_COMMIT, FAULT_2A_CUMULATIVE_DELTA, FAULT_2A_DELTA, FAULT_CONTRACT_DELTA, FINAL_RUNNER_CUMULATIVE_DELTA, ORIGIN_SOURCE_COMMIT, RUNNER_CLI_COMMIT, RUNNER_CLI_DELTA, RUNNER_CUMULATIVE_DELTA_CLOSURE, RUNNER_CUMULATIVE_DELTA_CLOSURE_COMMIT, RUNNER_DELTA, RUNNER_DELTA_OWNER_CLOSURE, RUNNER_FAMILY_CASE_EXECUTION_MANIFEST_ACCESS_CLOSURE, RUNNER_FAMILY_CASE_EXECUTION_MANIFEST_ACCESS_COMMIT, RUNNER_FAMILY_CYCLE_FAILURE_PRECEDENCE_CLOSURE, RUNNER_FAMILY_CYCLE_FAILURE_PRECEDENCE_COMMIT, RUNNER_FAMILY_PROOF_DIAGNOSTIC_CLOSURE, RUNNER_FAMILY_PROOF_DIAGNOSTIC_COMMIT, RUNNER_FAMILY_PROOF_DIAGNOSTIC_TRANSPORT_COMMIT, RUNNER_FAMILY_PROOF_DIAGNOSTIC_TRANSPORT_CLOSURE, RUNNER_FINAL_CHAIN_BASE_COMMIT, RUNNER_PROCESS_CONTROL_CLI_CLOSURE, RUNNER_PROCESS_CONTROL_CLI_COMMIT, RUNNER_PLAYWRIGHT_LAUNCH_CLOSURE, RUNNER_PLAYWRIGHT_LAUNCH_COMMIT, RUNNER_PLAYWRIGHT_OUTPUT_ENV_NAMESPACE_CLOSURE, RUNNER_PLAYWRIGHT_OUTPUT_ENV_NAMESPACE_COMMIT, UnifiedInputError, assertArtifactOrder, assertExactQuarantineGuard, assertExternalTopology, deriveExternalPaths, openExternalPaths, parseOptions, sourceEpoch, sourceChainArgs, treeRef, writeQuarantineMarker } from './canvas06-unified-production-input.mjs';
 
 const commit = 'a'.repeat(40);
 const argv = ['--input-mode', 'EXTERNAL_RELEASE_STORE', '--source-root', '/source', '--release-store-root', '/release-store', '--source-chain-target', 'FINAL_RUNNER', '--origin-source-commit', ORIGIN_SOURCE_COMMIT, '--fault-contract-source-commit', 'b'.repeat(40), '--schema-conformance-source-commit', 'c'.repeat(40), '--fault-2a-source-commit', 'd'.repeat(40), '--runner-source-commit', commit, '--source-commit', commit, '--require-production'];
@@ -25,6 +25,9 @@ test('source chain 精确锁定 C=20、A=7、R0=63、R=2、R2=9、R3=2、R4=2、
   assert.equal(RUNNER_FAMILY_PROOF_DIAGNOSTIC_COMMIT, '6557b63d84ecd951b9f5125fd60a10790e20ba5f');
   assert.equal(RUNNER_FAMILY_PROOF_DIAGNOSTIC_TRANSPORT_COMMIT, 'd1a9a960a70634a7e110944b6b8c6e6370fbfc2d');
   assert.equal(RUNNER_FAMILY_CYCLE_FAILURE_PRECEDENCE_COMMIT, 'e09350d1159b864ebf820996ddd4cbb324591e83');
+  assert.equal(RUNNER_FAMILY_CASE_EXECUTION_MANIFEST_ACCESS_COMMIT, 'bbb01599d5c6f3760f437d389b6bebdaa283e9ca');
+  assert.equal(DIRECT_MAIN_R11_INTEGRATION_COMMIT, '44d8bdaa6c6de66de7447604deaaf1578c1cc146');
+  assert.equal(DIRECT_MAIN_R11_BASELINE_COMMIT, 'df91091f7270ede59efe6d43678fb731ee496a86');
   assert.deepEqual(RUNNER_CUMULATIVE_DELTA_CLOSURE, [['M', 'scripts/canvas06-unified-production-input.mjs'], ['M', 'scripts/canvas06-unified-production-input.test.mjs']]);
   assert.deepEqual(RUNNER_PROCESS_CONTROL_CLI_CLOSURE, [
     ['M', 'scripts/canvas06-e2e-run-input.mjs'], ['M', 'scripts/canvas06-e2e-run-input.test.mjs'],
@@ -53,6 +56,12 @@ test('source chain 精确锁定 C=20、A=7、R0=63、R=2、R2=9、R3=2、R4=2、
   assert.deepEqual(RUNNER_FAMILY_CASE_EXECUTION_MANIFEST_ACCESS_CLOSURE, [
     ['M', 'scripts/canvas06-unified-production-input.mjs'], ['M', 'scripts/canvas06-unified-production-input.test.mjs'],
     ['M', 'scripts/release-canvas06-e2e-run.test.mjs'], ['M', 'tests/e2e/release/dev-canvas-06/family.controlled.release.spec.ts']
+  ]);
+  assert.deepEqual(DIRECT_MAIN_R11_CLOSURE, [
+    ['A', 'docs/checklists/opm-dev-canvas-06-r12-direct-main-source-chain-closure-bugfix-checklist.md'],
+    ['M', 'scripts/canvas06-unified-production-input.mjs'], ['M', 'scripts/canvas06-unified-production-input.test.mjs'],
+    ['M', 'scripts/rebuild-canvas06-manifest-v02-production.mjs'], ['M', 'scripts/rebuild-canvas06-manifest-v02-production.test.mjs'],
+    ['A', 'specs/opm-dev-canvas-06-r12-direct-main-source-chain-closure-bugfix-task-spec.md']
   ]);
   assert.deepEqual(RUNNER_DELTA_OWNER_CLOSURE, [['M', 'scripts/canvas06-unified-production-input.mjs'], ['M', 'scripts/canvas06-unified-production-input.test.mjs']]);
   assert.deepEqual(RUNNER_CLI_DELTA, [
@@ -109,6 +118,17 @@ test('CLI 只接受唯一 EXTERNAL_RELEASE_STORE production source chain', () =>
   assert.throws(() => parseOptions(argv.filter(value => value !== '--runner-source-commit' && value !== commit)), error => error.code === 'CANVAS06_UNIFIED_ARGUMENT_INVALID');
   assert.deepEqual(sourceChainArgs(options).slice(0, 2), ['--source-chain-target', 'FINAL_RUNNER']);
   assert.equal(sourceEpoch('1787619828'), '2026-08-25T01:03:48Z');
+});
+
+test('DIRECT_MAIN_R11 只接受 runner/source 的显式相等 join', () => {
+  const direct = argv.map(value => value === 'FINAL_RUNNER' ? 'DIRECT_MAIN_R11' : value);
+  const options = parseOptions(direct);
+  assert.equal(options['source-chain-target'], 'DIRECT_MAIN_R11');
+  assert.equal(options['source-commit'], options['runner-source-commit']);
+  assert.deepEqual(sourceChainArgs(options).slice(0, 2), ['--source-chain-target', 'DIRECT_MAIN_R11']);
+  const mismatched = [...direct];
+  mismatched[mismatched.indexOf('--source-commit') + 1] = 'b'.repeat(40);
+  assert.throws(() => parseOptions(mismatched), error => error.code === 'CANVAS06_UNIFIED_ARGUMENT_INVALID');
 });
 
 test('外置 release store 不得等于 source root 或位于 Git worktree', async () => {

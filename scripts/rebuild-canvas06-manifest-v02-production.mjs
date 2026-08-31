@@ -108,9 +108,9 @@ export function parseOptions(argv) {
     values.set(key, value);
   }
   const target = values.get('source-chain-target');
-  const expectedCount = target === 'FINAL_RUNNER' ? common.length + 1 : target === 'FAULT_2A' ? common.length : -1;
+  const expectedCount = ['FINAL_RUNNER', 'DIRECT_MAIN_R11'].includes(target) ? common.length + 1 : target === 'FAULT_2A' ? common.length : -1;
   if (values.size !== expectedCount || values.get('require-production') !== true || [...values.entries()].some(([key, value]) => key.endsWith('-commit') && !/^[a-f0-9]{40}$/.test(value))) fail('CANVAS06_MANIFEST_ORCHESTRATOR_ARGUMENT_INVALID', 'ARGS', '缺少 production guard 或提交身份无效。');
-  if ((target === 'FAULT_2A' && values.get('source-commit') !== values.get('fault-2a-source-commit')) || (target === 'FINAL_RUNNER' && values.get('source-commit') !== values.get('runner-source-commit'))) fail('CANVAS06_MANIFEST_ORCHESTRATOR_ARGUMENT_INVALID', 'ARGS', 'source-commit 必须等于 target HEAD。');
+  if ((target === 'FAULT_2A' && values.get('source-commit') !== values.get('fault-2a-source-commit')) || (['FINAL_RUNNER', 'DIRECT_MAIN_R11'].includes(target) && values.get('source-commit') !== values.get('runner-source-commit'))) fail('CANVAS06_MANIFEST_ORCHESTRATOR_ARGUMENT_INVALID', 'ARGS', 'source-commit 必须等于 target HEAD。');
   for (const key of ['source-root', 'release-store-root']) if (!isAbsolute(values.get(key))) fail('CANVAS06_MANIFEST_ORCHESTRATOR_ARGUMENT_INVALID', 'ARGS', `${key} 必须是绝对路径。`);
   return Object.freeze(Object.fromEntries(values));
 }
