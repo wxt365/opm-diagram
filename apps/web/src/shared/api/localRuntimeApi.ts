@@ -91,6 +91,14 @@ export interface ProjectionConstructWire {
   collection_completeness?: "COMPLETE" | "INCOMPLETE" | "NOT_APPLICABLE";
 }
 
+export interface SuppressedStateWire {
+  state_id: string;
+  owner_ref: { target_kind: "ELEMENT" | "FEATURE"; target_id: string };
+  name_or_value: string;
+  state_roles: Array<"INITIAL" | "DEFAULT" | "FINAL">;
+  explicitness: "SUPPRESSED";
+}
+
 export interface TextSentenceWire {
   sentence_id: string;
   text: string;
@@ -201,7 +209,7 @@ class LocalRuntimeApi {
     return this.queryContext(projectId, modelId, contextId, revision, "navigation");
   }
 
-  async projection(projectId: string, modelId: string, contextId: string, revision: string): Promise<QueryEnvelope<{ context_id: string; constructs: ProjectionConstructWire[] }>> {
+  async projection(projectId: string, modelId: string, contextId: string, revision: string): Promise<QueryEnvelope<{ context_id: string; constructs: ProjectionConstructWire[]; suppressed_states: SuppressedStateWire[] }>> {
     return this.queryContext(projectId, modelId, contextId, revision, "projection");
   }
 

@@ -32,7 +32,7 @@ test('rejects a symlinked input before writing a report input copy', async () =>
   await assert.rejects(() => stageManifestInputs({ manifestRoot, stagingRoot }), error => error.code === 'E2E_RUN_MANIFEST_INVALID');
 });
 
-test('materializes the exact ordered 23-file Runner Source Set and verifies source mirrors', async () => {
+test('materializes the exact ordered 24-file Runner Source Set and verifies source mirrors', async () => {
   const root = await mkdtemp(resolve(tmpdir(), 'opm-e2e-source-set-'));
   const sourceRoot = resolve(root, 'source');
   const stagingRoot = resolve(root, 'staging');
@@ -41,7 +41,7 @@ test('materializes the exact ordered 23-file Runner Source Set and verifies sour
   await writeFile(resolve(sourceRoot, 'untracked-extra.mjs'), 'not part of the frozen source set\n');
 
   const staged = await stageRunnerSourceSet({ sourceRoot, stagingRoot });
-  assert.equal(staged.sourceSet.entries.length, 23);
+  assert.equal(staged.sourceSet.entries.length, 24);
   assert.deepEqual(staged.sourceSet.entries.map(entry => entry.path), paths);
   assert.equal(staged.sourceSetRef.path, 'inputs/runner/runner-source-set.json');
   assert.match(staged.sourceSet.source_set_sha256, /^[a-f0-9]{64}$/);

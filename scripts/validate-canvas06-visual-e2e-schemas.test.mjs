@@ -13,17 +13,19 @@ const schemas = await Promise.all([
   'opm-dev-canvas-06-visual-report.schema.json',
   'opm-dev-canvas-06-e2e-manifest.schema.json',
   'opm-dev-canvas-06-e2e-manifest-v02.schema.json',
+  'opm-dev-canvas-06-e2e-common-setup-plan.schema.json',
   'opm-dev-canvas-06-e2e-report.schema.json',
   'opm-dev-canvas-06-e2e-attempt-artifact.schema.json',
   'opm-dev-canvas-06-e2e-attempt-artifact-v02.schema.json',
   'opm-dev-canvas-06-e2e-report-v02.schema.json',
   'opm-dev-canvas-06-e2e-runner-source-set.schema.json',
+  'opm-dev-canvas-06-e2e-controlled-invocation-context.schema.json',
   'opm-dev-canvas-06-token-digest-preimage.schema.json',
   'opm-dev-canvas-06-token-digest-parity-vectors.schema.json'
 ].map(schema));
 const ajv = new Ajv2020({ allErrors: true, strict: false, formats: { 'date-time': true } });
 schemas.forEach(item => ajv.addSchema(item));
-const [validateVisualManifest, validateVisualManifestV02, validateVisualReport, validateE2eManifest, validateE2eManifestV02, validateE2eReportV01, validateE2eArtifact, validateE2eArtifactV02, validateE2eReportV02, validateE2eRunnerSourceSet, validateTokenPreimage, validateTokenParityCatalog] = schemas.map(item => ajv.getSchema(item.$id));
+const [validateVisualManifest, validateVisualManifestV02, validateVisualReport, validateE2eManifest, validateE2eManifestV02, validateCommonSetupPlan, validateE2eReportV01, validateE2eArtifact, validateE2eArtifactV02, validateE2eReportV02, validateE2eRunnerSourceSet, validateControlledInvocationContext, validateTokenPreimage, validateTokenParityCatalog] = schemas.map(item => ajv.getSchema(item.$id));
 
 test('Visual Manifest accepts the frozen 378/756/1242/2484 matrix', () => {
   assert.equal(validateVisualManifest(visualManifest()), true, JSON.stringify(validateVisualManifest.errors));
@@ -72,6 +74,13 @@ test('Active E2E Manifest 0.2 closes all four exact driver sources', () => {
   const active = e2eManifestV02();
   assert.equal(validateE2eManifestV02(active), true, JSON.stringify(validateE2eManifestV02.errors));
   active.driver_catalog.pop();
+  assert.equal(validateE2eManifestV02(active), false);
+});
+
+test('Active E2E Manifest 0.2 requires the exact Common Setup Plan ref', () => {
+  const active = e2eManifestV02();
+  assert.equal(validateE2eManifestV02(active), true, JSON.stringify(validateE2eManifestV02.errors));
+  delete active.common_setup_plan_ref;
   assert.equal(validateE2eManifestV02(active), false);
 });
 
@@ -139,7 +148,7 @@ test('Active E2E Report 0.2 rejects malformed refs and semantic identity drift',
   assert.throws(() => assertE2eV02IdentityJoin(wrongJavaDirectory, sourceSet));
 });
 
-test('E2E Runner Source Set accepts exactly the frozen ordered 23-file allowlist', () => {
+test('E2E Runner Source Set accepts exactly the frozen ordered 24-file allowlist', () => {
   const sourceSet = e2eRunnerSourceSet();
   assert.equal(validateE2eRunnerSourceSet(sourceSet), true, JSON.stringify(validateE2eRunnerSourceSet.errors));
   assertRunnerSourceSetDigest(sourceSet);
@@ -155,6 +164,23 @@ test('E2E Runner Source Set accepts exactly the frozen ordered 23-file allowlist
   const digestDrift = e2eRunnerSourceSet(); digestDrift.source_set_sha256 = 'f'.repeat(64);
   assert.equal(validateE2eRunnerSourceSet(digestDrift), true, JSON.stringify(validateE2eRunnerSourceSet.errors));
   assert.throws(() => assertRunnerSourceSetDigest(digestDrift));
+});
+
+test('Controlled Invocation Context accepts only the frozen 194/388 schedule shape', () => {
+  const context = controlledInvocationContext();
+  assert.equal(validateControlledInvocationContext(context), true, JSON.stringify(validateControlledInvocationContext.errors));
+
+  const missing = controlledInvocationContext();
+  missing.execution_schedule.pop();
+  assert.equal(validateControlledInvocationContext(missing), false);
+
+  const extra = controlledInvocationContext();
+  extra.execution_schedule[0].unexpected = true;
+  assert.equal(validateControlledInvocationContext(extra), false);
+
+  const wrongTrust = controlledInvocationContext();
+  wrongTrust.input_trust.mode = 'CONTROLLED_TEST';
+  assert.equal(validateControlledInvocationContext(wrongTrust), false);
 });
 
 test('E2E Attempt Artifact Schema accepts all eleven frozen root identities', () => {
@@ -220,7 +246,7 @@ test('E2E Artifact Index requires exactly one of each ten core artifact kinds', 
   assert.equal(validateE2eArtifact(optionalCore), false);
 });
 
-test('Active E2E Attempt Artifact 0.2 closes Profile refs and the 16-entry index', () => {
+test('Active E2E Attempt Artifact 0.2 closes Profile refs and the 20-entry index', () => {
   for (const artifact of e2eAttemptArtifactsV02()) {
     assert.equal(validateE2eArtifactV02(artifact), true, `${artifact.schema_id}: ${JSON.stringify(validateE2eArtifactV02.errors)}`);
     assert.equal(validateE2eArtifact(artifact), false, artifact.schema_id);
@@ -232,6 +258,42 @@ test('Active E2E Attempt Artifact 0.2 closes Profile refs and the 16-entry index
   assert.equal(validateE2eArtifactV02(duplicateAssetKind), false);
   const genericRawRef = fixtureMaterializationV02(); genericRawRef.profile_asset_refs[1].kind = 'PROFILE_ASSET';
   assert.equal(validateE2eArtifactV02(genericRawRef), false);
+  const missingWorking = fixtureMaterializationV02(); delete missingWorking.storage.working_project_db_path;
+  assert.equal(validateE2eArtifactV02(missingWorking), false);
+  const legacyMutableRef = fixtureMaterializationV02(); legacyMutableRef.storage.project_db_ref.path = 'storage/projects/project.e2e.001/project.db';
+  assert.equal(validateE2eArtifactV02(legacyMutableRef), false);
+});
+
+test('Active Attempt Artifact 0.2 accepts only the frozen Family and Common case ID forms', () => {
+  const familyCaseId = 'G-OPL-PROC-001.CONSUMPTION_OBJECT.PASS';
+  const familyPlan = faultPlan(familyCaseId);
+  familyPlan.schema_version = '0.2';
+  assert.equal(validateE2eArtifactV02(familyPlan), true, JSON.stringify(validateE2eArtifactV02.errors));
+  const familyMaterialization = fixtureMaterializationV02();
+  familyMaterialization.case_id = familyCaseId;
+  familyMaterialization.fixture_kind = 'FAMILY';
+  familyMaterialization.fixture_ref = archiveRef('family/base.json');
+  familyMaterialization.input_ref = archiveRef('family/input.json');
+  assert.equal(validateE2eArtifactV02(familyMaterialization), true, JSON.stringify(validateE2eArtifactV02.errors));
+
+  const familyFileRef = structuredClone(familyMaterialization);
+  familyFileRef.fixture_ref = ref('FIXTURE', 'family/base.json');
+  assert.equal(validateE2eArtifactV02(familyFileRef), false);
+  const commonArchiveRef = fixtureMaterializationV02();
+  commonArchiveRef.input_ref = archiveRef('common/input.json');
+  assert.equal(validateE2eArtifactV02(commonArchiveRef), false);
+
+  for (const invalidCaseId of [
+    'G-OPL-STATE-001.CASE.PASS',
+    'G-OPL-PROC-01.CASE.PASS',
+    'G-OPL-PROC-001.CASE',
+    'G-OPL-PROC-001.case.PASS',
+    'G-OPL-PROC-001.CASE.PASS.EXTRA'
+  ]) {
+    const invalid = faultPlan(invalidCaseId);
+    invalid.schema_version = '0.2';
+    assert.equal(validateE2eArtifactV02(invalid), false, invalidCaseId);
+  }
 });
 
 test('Token digest parity catalog matches the frozen JCS bytes and payload SHA', async () => {
@@ -252,7 +314,7 @@ function e2eAttemptArtifacts() {
 }
 
 function e2eAttemptArtifactsV02() {
-  return [faultPlan(), fixtureMaterializationV02(), attemptObservation(), runtimeProcess(), browserEnvironment(), networkObservation(), consoleErrors(), transactionObservation(), reopenObservation(), apiExchangeIndex(), artifactIndexV02()]
+  return [faultPlan(), fixtureMaterializationV02(), attemptObservationV02(), runtimeProcess(), browserEnvironment(), networkObservation(), consoleErrors(), transactionObservation(), reopenObservation(), apiExchangeIndex(true), artifactIndexV02()]
     .map(artifact => ({ ...artifact, schema_version: '0.2' }));
 }
 
@@ -289,6 +351,18 @@ function attemptObservation() {
     assertion_results: [{ assertion_id: 'ASSERT-001', status: 'PASS', evidence_refs: [ref('ASSERTION_EVIDENCE', 'attempts/case/1/api-exchanges/index.json')] }],
     semantic_comparison_digest: digest(), artifact_payload_sha256: digest()
   };
+}
+
+function attemptObservationV02() {
+  const value = attemptObservation();
+  value.revision_document_before_sha256 = digest();
+  value.revision_document_after_sha256 = digest();
+  value.revision_document_reopen_sha256 = digest();
+  value.assertion_results = [{
+    assertion_id: 'TRANSACTION_MATCHED', status: 'PASS',
+    evidence_refs: [ref('TRANSACTION_OBSERVATION', 'attempts/case/1/transaction-observation.json')]
+  }];
+  return value;
 }
 
 function runtimeProcess() {
@@ -349,10 +423,12 @@ function reopenObservation() {
   };
 }
 
-function apiExchangeIndex() {
+function apiExchangeIndex(active = false) {
+  const exchange = { sequence: 1, operation_id: 'listProjects', method: 'GET', normalized_url: 'http://127.0.0.1:15173/api/v1/projects', request_ref: null, response_ref: ref('API_RESPONSE_BODY', 'attempts/case/1/api-exchanges/1-response.json'), status: 200, revision: 'revision.e2e.002' };
+  if (active) exchange.exchange_ref = ref('API_EXCHANGE', 'attempts/case/1/api-exchanges/exchange-000001.json');
   return {
     ...artifactBase('OPM-DEV-CANVAS-06-E2E-API-EXCHANGE-INDEX-001'),
-    exchanges: [{ sequence: 1, operation_id: 'listProjects', method: 'GET', normalized_url: 'http://127.0.0.1:15173/api/v1/projects', request_ref: null, response_ref: ref('API_RESPONSE_BODY', 'attempts/case/1/api-exchanges/1-response.json'), status: 200, revision: 'revision.e2e.002' }],
+    exchanges: [exchange],
     exchange_set_sha256: digest(), artifact_payload_sha256: digest()
   };
 }
@@ -369,6 +445,19 @@ function artifactIndex() {
 function fixtureMaterializationV02() {
   const value = fixtureMaterialization();
   value.schema_version = '0.2';
+  const projectId = value.identity.project_id;
+  value.storage = {
+    storage_root: 'storage',
+    materialized_base_root: 'storage/materialized-base',
+    project_db_ref: ref('PROJECT_DB', `storage/materialized-base/projects/${projectId}/project.db`),
+    working_project_db_path: `storage/projects/${projectId}/project.db`,
+    working_clone_byte_length: 1,
+    working_clone_sha256: digest(),
+    storage_schema_version: '1.0',
+    sqlite_quick_check: 'ok',
+    foreign_key_check_count: 0,
+    sidecar_absent: true
+  };
   value.profile_asset_tree_ref = ref('PROFILE_ASSET_TREE', 'profile/assets');
   value.profile_asset_refs = profileAssetRefs('profile/assets');
   value.profile_package_digest = value.active_binding.profile.sha256;
@@ -382,6 +471,10 @@ function artifactIndexV02() {
   for (const asset of profileAssetRefs('attempts/case/1/profile/assets')) {
     value.refs.push({ ...artifactEntry('PROFILE_ASSET', asset.path), asset_kind: asset.kind, capture_phase: 'MATERIALIZE' });
   }
+  value.refs.push({ ...artifactEntry('STDOUT_LOG', 'attempts/case/1/stdout/initial.log'), media_type: 'text/plain', capture_phase: 'RUNTIME' });
+  value.refs.push({ ...artifactEntry('STDERR_LOG', 'attempts/case/1/stderr/initial.log'), media_type: 'text/plain', capture_phase: 'RUNTIME' });
+  value.refs.push({ ...artifactEntry('STDOUT_LOG', 'attempts/case/1/stdout/reopen.log'), media_type: 'text/plain', capture_phase: 'REOPEN' });
+  value.refs.push({ ...artifactEntry('STDERR_LOG', 'attempts/case/1/stderr/reopen.log'), media_type: 'text/plain', capture_phase: 'REOPEN' });
   return value;
 }
 
@@ -444,6 +537,7 @@ function e2eManifestV02() {
     ['DRIVER-STRUCTURAL', 'structural-driver.mjs'],
     ['DRIVER-COMMON', 'common-driver.mjs']
   ].map(([driver_id, file]) => ({ driver_id, source_ref: ref('E2E_DRIVER_SOURCE', `inputs/drivers/${file}`) }));
+  manifest.common_setup_plan_ref = ref('COMMON_SETUP_PLAN', 'inputs/common/dev-canvas-06-common-setup-plan.json');
   manifest.profile_asset_tree_ref = ref('PROFILE_ASSET_TREE', 'inputs/upstream/profile-assets');
   manifest.profile_asset_refs = profileAssetRefs('inputs/upstream/profile-assets');
   return manifest;
@@ -536,18 +630,74 @@ function e2eRunnerSourceSet() {
     'scripts/verify-canvas06-e2e-manifest-v01.mjs',
     'scripts/verify-canvas06-controlled-input-bundle.mjs',
     'tests/e2e/release/dev-canvas-06/playwright.release.config.ts',
+    'tests/e2e/release/dev-canvas-06/family.controlled.release.spec.ts',
     'tests/e2e/release/dev-canvas-06/drivers/procedural-driver.mjs',
     'tests/e2e/release/dev-canvas-06/drivers/control-driver.mjs',
     'tests/e2e/release/dev-canvas-06/drivers/structural-driver.mjs',
     'tests/e2e/release/dev-canvas-06/drivers/common-driver.mjs'
   ];
   const value = {
-    schema_id: 'OPM-DEV-CANVAS-06-E2E-RUNNER-SOURCE-SET-001', schema_version: '0.1', source_set_version: '0.1.0',
+    schema_id: 'OPM-DEV-CANVAS-06-E2E-RUNNER-SOURCE-SET-001', schema_version: '0.2', source_set_version: '0.2.0',
     selection_policy: 'EXACT_ALLOWLIST_ALL_OTHERS_EXCLUDED',
     entries: paths.map(path => ({ path, byte_length: 1, sha256: digest() })),
     excluded_classes: ['ALL_PATHS_NOT_IN_ENTRIES', 'TEST_AND_SPEC_SOURCES_NOT_IN_ENTRIES', 'FIXTURE_TEMPLATE_CATALOG_AND_VECTOR_BYTES', 'CONTRACT_SCHEMA_AND_REFERENCE_BYTES', 'MANIFEST_BUILDER_ONLY_SOURCES', 'PRODUCT_FRONTEND_AND_RUNTIME_SOURCES', 'DEPENDENCY_AND_BUILD_OUTPUT_TREES', 'JAVA_EXECUTABLE_AND_BROWSER_MIRRORS', 'REPORT_INPUT_ATTEMPT_AND_RELEASE_ARTIFACTS', 'VCS_METADATA_AND_DIRTY_PATCH_BYTES', 'SYMLINK_HARDLINK_SOCKET_DEVICE_FIFO']
   };
   value.source_set_sha256 = sha256Jcs(value);
+  return value;
+}
+
+function controlledInvocationContext() {
+  const sourceSet = e2eRunnerSourceSet();
+  const value = {
+    schema_id: 'OPM-DEV-CANVAS-06-E2E-CONTROLLED-INVOCATION-CONTEXT-001',
+    schema_version: '0.1',
+    context_id: `dev-canvas-06.e2e-controlled-invocation.${digest().slice(0, 12)}.${sourceSet.source_set_sha256.slice(0, 12)}`,
+    input_mode: 'PRODUCTION_HANDOFF',
+    source_root_realpath: '/tmp/source',
+    input_trust: { mode: 'PRODUCTION_HANDOFF', root_realpath: '/tmp/handoff', primary_ref: ref('INTAKE_REPORT', 'inputs/raw/intake.json') },
+    manifest_root_realpath: '/tmp/manifest',
+    manifest_ref: ref('E2E_MANIFEST', 'dev-canvas-06-e2e-manifest.json'),
+    profile_asset_root_realpath: '/tmp/manifest/inputs/upstream/profile-assets',
+    profile_asset_tree_ref: ref('PROFILE_ASSET_TREE', 'inputs/upstream/profile-assets'),
+    profile_asset_refs: [
+      ref('GRAMMAR_ASSET', 'inputs/upstream/profile-assets/grammar.json'),
+      ref('NORMALIZATION_DATA', 'inputs/upstream/profile-assets/normalization.json'),
+      ref('PROFILE_PACKAGE', 'inputs/upstream/profile-assets/profile.json'),
+      ref('RULE_SET', 'inputs/upstream/profile-assets/rules.json'),
+      ref('SYMBOL_ASSET', 'inputs/upstream/profile-assets/symbols.json')
+    ],
+    report_staging_root_realpath: '/tmp/report-staging',
+    attempt_parent_realpath: '/tmp/report-staging/attempts',
+    process_control_parent_realpath: '/tmp/process-control',
+    java_executable_ref: ref('JAVA_EXECUTABLE', '/tmp/jdk/bin/java'),
+    browser_executable_ref: ref('BROWSER_EXECUTABLE', '/tmp/chromium'),
+    runtime_jar_ref: ref('LOCAL_RUNTIME_JAR', 'inputs/build/local-runtime.jar'),
+    web_dist_ref: ref('WEB_DIST_TREE', 'inputs/build/web-dist'),
+    runner_source_set_ref: ref('RUNNER_SOURCE_SET', 'inputs/runner/runner-source-set.json'),
+    driver_catalog: [
+      { driver_id: 'DRIVER-PROCEDURAL', source_ref: ref('E2E_DRIVER_SOURCE', 'inputs/drivers/procedural-driver.mjs') },
+      { driver_id: 'DRIVER-CONTROL', source_ref: ref('E2E_DRIVER_SOURCE', 'inputs/drivers/control-driver.mjs') },
+      { driver_id: 'DRIVER-STRUCTURAL', source_ref: ref('E2E_DRIVER_SOURCE', 'inputs/drivers/structural-driver.mjs') },
+      { driver_id: 'DRIVER-COMMON', source_ref: ref('E2E_DRIVER_SOURCE', 'inputs/drivers/common-driver.mjs') }
+    ],
+    runtime_port: 19080,
+    web_port: 15173,
+    execution_schedule: Array.from({ length: 194 }, (_, index) => [1, 2].map(attempt_ordinal => ({
+      ordinal: index * 2 + attempt_ordinal,
+      case_ordinal: index + 1,
+      case_id: `E2E-CANVAS-001.CASE-${String(index + 1).padStart(3, '0')}`,
+      suite_id: 'E2E-CANVAS-001',
+      driver_id: 'DRIVER-COMMON',
+      expectation: 'PASS',
+      attempt_ordinal,
+      viewport_id: 'VP-1440X900',
+      zoom_id: 'Z-100',
+      attempt_root_realpath: `/tmp/report-staging/attempts/case-${index + 1}/${attempt_ordinal}`,
+      runtime_port: 19080,
+      web_port: 15173
+    }))).flat()
+  };
+  value.context_payload_sha256 = sha256Jcs(value);
   return value;
 }
 

@@ -6,6 +6,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -24,6 +25,30 @@ public final class ProjectionDigestV01 {
             "endpoints", "modifiers", "labels", "collection_completeness");
 
     private ProjectionDigestV01() { }
+
+    public static Map<String, Object> apiProjectionDigestView(Map<String, Object> apiProjectionData) {
+        List<Violation> violations = new ArrayList<>();
+        Map<String, Object> source = object(apiProjectionData, "/data",
+                List.of("context_id", "constructs", "suppressed_states"),
+                List.of("context_id", "constructs", "suppressed_states"), violations);
+        if (source == null) {
+            throwFirst(violations);
+            throw new IllegalStateException("Projection API data校验未产生首错。");
+        }
+        Object contextId = string(source, "context_id", "/data", true, violations);
+        List<?> constructs = array(source, "constructs", "/data", violations);
+        List<?> suppressedStates = array(source, "suppressed_states", "/data", violations);
+        if (suppressedStates != null) {
+            for (int index = 0; index < suppressedStates.size(); index++) {
+                validateSuppressedState(suppressedStates.get(index), "/data/suppressed_states/" + index, violations);
+            }
+        }
+        throwFirst(violations);
+        Map<String, Object> digestView = new LinkedHashMap<>();
+        digestView.put("context_id", contextId);
+        digestView.put("constructs", constructs);
+        return Map.copyOf(digestView);
+    }
 
     public static Map<String, Object> preimage(Map<String, Object> projectionData) {
         List<Violation> violations = new ArrayList<>();
@@ -107,6 +132,28 @@ public final class ProjectionDigestV01 {
         if (source.containsKey("modifiers")) normalized.put("modifiers", normalizeStringPairs(source.get("modifiers"), pointer + "/modifiers", "modifier_id", "value", false, violations));
         if (source.containsKey("labels")) normalized.put("labels", normalizeStringPairs(source.get("labels"), pointer + "/labels", "slot_id", "text", false, violations));
         return normalized;
+    }
+
+    private static void validateSuppressedState(Object value, String pointer, List<Violation> violations) {
+        Map<String, Object> source = object(value, pointer,
+                List.of("state_id", "owner_ref", "name_or_value", "state_roles", "explicitness"),
+                List.of("state_id", "owner_ref", "name_or_value", "state_roles", "explicitness"), violations);
+        if (source == null) return;
+        string(source, "state_id", pointer, true, violations);
+        string(source, "name_or_value", pointer, true, violations);
+        Object explicitness = enumString(source, "explicitness", pointer, List.of("SUPPRESSED"), violations);
+        if (explicitness == null) return;
+        List<Object> roles = normalizeStringArray(source.get("state_roles"), pointer + "/state_roles",
+                List.of("INITIAL", "DEFAULT", "FINAL"), violations);
+        if (roles.size() != new HashSet<>(roles).size()) {
+            issue(violations, "PROJECTION_DIGEST_SCHEMA_MISMATCH", 2, pointer + "/state_roles", "State roles不得重复。");
+        }
+        Map<String, Object> owner = object(source.get("owner_ref"), pointer + "/owner_ref",
+                List.of("target_kind", "target_id", "occurrence_id"), List.of("target_kind", "target_id"), violations);
+        if (owner == null) return;
+        enumString(owner, "target_kind", pointer + "/owner_ref", List.of("ELEMENT", "STATE", "FACT", "FEATURE", "CONTEXT"), violations);
+        string(owner, "target_id", pointer + "/owner_ref", true, violations);
+        if (owner.containsKey("occurrence_id")) string(owner, "occurrence_id", pointer + "/owner_ref", true, violations);
     }
 
     private static Map<String, Object> normalizeLayout(Object value, String pointer, List<Violation> violations) {

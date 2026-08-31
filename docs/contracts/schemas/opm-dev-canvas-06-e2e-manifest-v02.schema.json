@@ -18,6 +18,7 @@
     "upstream_input_refs",
     "input_materialization",
     "common_fixture_catalog_ref",
+    "common_setup_plan_ref",
     "environment_policy",
     "fixture_refs",
     "driver_catalog",
@@ -69,6 +70,12 @@
     },
     "common_fixture_catalog_ref": {
       "$ref": "#/$defs/fileRef"
+    },
+    "common_setup_plan_ref": {
+      "allOf": [
+        {"$ref": "#/$defs/fileRef"},
+        {"properties": {"kind": {"const": "COMMON_SETUP_PLAN"}, "path": {"const": "inputs/common/dev-canvas-06-common-setup-plan.json"}}}
+      ]
     },
     "environment_policy": {
       "$ref": "#/$defs/environmentPolicy"

@@ -1,6 +1,6 @@
 # DEV-CANVAS-06 E2E Profile Asset 与摘要闭包设计
 
-文档版本：`v1.4`
+文档版本：`v1.5`
 
 文档状态：`FROZEN_INCLUDED`
 
@@ -136,6 +136,12 @@ manifest.generated_at == Instant.ofEpochSecond(source_date_epoch).toString()
 `parseUtcWholeSecond`必须同时满足：字段是JSON string；`Instant.parse`成功；`instant.getNano()==0`；按epoch second重建的`Instant.toString()`与原始字符串逐code point相等。合法形状因此唯一为大写`Z`结尾、无小数部分的UTC整秒。`.000Z`、非零小数、`+00:00`、其他offset、空白、大小写变化或任何解析后被归一化的表示均拒绝。历史Manifest`0.1`的`.000Z` bytes保持只读；活动`0.2` builder必须输出canonical整秒形式。
 
 `source_date_epoch`只作为Materializer内存中的Family/Common seed时间，统一驱动SQLite `created_at/updated_at`等确定性字段，写入文本固定为`Instant.ofEpochSecond(source_date_epoch).toString()`；它不新增到Manifest、Attempt Artifact或`fixture-materialization.json` Schema。Runner只能逐byte传递Manifest原始文件，不新增`--source-date-epoch`、环境变量或系统属性，不得解析、规范化或重写时间。Manifest semantic verifier可以提前执行同一检查，但Materializer和Artifact verifier仍必须从同一Manifest raw bytes各自独立派生；失败固定为`E2E_INPUT_INVALID/2`，且零SQLite、零`fixture-materialization.json`。
+
+### 2.9 SQLite base/working 分离
+
+Materializer确定性seed的原始SQLite证据固定写入`storage/materialized-base/projects/<project_id>/project.db`，`fixture-materialization.storage.project_db_ref`只引用该不可变base。Runtime使用的数据库固定为同一attempt内`storage/projects/<project_id>/project.db`，由Materializer在base关闭、完整性验证和sidecar清零后原子逐byte克隆。`working_clone_byte_length/working_clone_sha256`必须分别等于base ref的length/SHA；详细路径、原子顺序、Snapshot读取和Report验证边界以Common Driver受控编排设计`v1.9`第2.8节为唯一后继口径。
+
+该分离不新增时间、CLI或公共Schema版本；它关闭了Materialization raw identity与Runtime正常提交必然修改同一路径的冲突。任何consumer都不得用base SHA验证运行后的working bytes，也不得通过重写Materialization artifact追随working变化。
 
 ## 3. 三类摘要 Owner
 

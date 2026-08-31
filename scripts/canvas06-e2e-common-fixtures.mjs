@@ -8,12 +8,14 @@ import addFormats from 'ajv-formats';
 
 import { E2eRunInputError, safeRelativePath } from './canvas06-e2e-run-input.mjs';
 import { canonicalizeJcs } from './canvas06-rfc8785.mjs';
+import { COMMON_DRIVER_SOURCE_PATH, COMMON_SETUP_PLAN_PATH, verifyCommonSetupPlan } from './canvas06-e2e-common-setup-plan.mjs';
 
 const CATALOG_SCHEMA = JSON.parse(await readFile(new URL('../docs/contracts/schemas/opm-dev-canvas-06-common-fixture-catalog.schema.json', import.meta.url), 'utf8'));
 const ajv = new Ajv2020({ allErrors: true, strict: false });
 addFormats(ajv);
 const validateCatalog = ajv.compile(CATALOG_SCHEMA);
 const FACTORY_JCS_IMPORT = "import { sha256Jcs } from '../../../../../../scripts/canvas06-rfc8785.mjs';\n";
+const commonDriverPath = new URL('../tests/e2e/release/dev-canvas-06/drivers/common-driver.mjs', import.meta.url);
 
 export async function verifyCommonFixtureInput({ commonRoot, catalogPath, activeBinding }) {
   const root = await assertDirectory(commonRoot);
@@ -62,7 +64,24 @@ export async function verifyCommonFixtureInput({ commonRoot, catalogPath, active
     }));
   }
 
-  return Object.freeze({ catalog, cases: Object.freeze(verifiedCases) });
+  const planFile = await assertRegularFile(root, resolveInside(root, COMMON_SETUP_PLAN_PATH), 'Common Setup Plan');
+  const plan = await readJson(planFile.path, 'Common Setup Plan');
+  const catalogBytes = await readFile(catalogFile.path);
+  const driverBytes = await readFile(commonDriverPath);
+  try {
+    verifyCommonSetupPlan({
+      plan,
+      sourceBinding: activeBinding,
+      generatorRef: catalog.generator_ref,
+      commonFixtureCatalogRef: { kind: 'COMMON_FIXTURE_CATALOG', path: catalogRelativePath, byte_length: catalogBytes.length, sha256: sha256(catalogBytes) },
+      commonDriverRef: { kind: 'E2E_DRIVER_SOURCE', path: COMMON_DRIVER_SOURCE_PATH, byte_length: driverBytes.length, sha256: sha256(driverBytes) },
+      catalogCases: catalog.e2e_cases
+    });
+  } catch (error) {
+    throw new E2eRunInputError(error.code ?? 'E2E_COMMON_SETUP_PLAN_INVALID', error.message, error.exitCode ?? 2);
+  }
+
+  return Object.freeze({ catalog, plan, cases: Object.freeze(verifiedCases) });
 }
 
 async function loadFactory(path) {

@@ -48,6 +48,16 @@ test('uses the shared RFC 8785 canonicalizer for semantic comparison digests', (
   assert.equal(semanticComparisonDigest(base), semanticComparisonDigest(reordered));
 });
 
+test('semantic comparison digest排除attempt证据路径但保留断言结果', () => {
+  const first = observationForCanonicalization();
+  const second = observationForCanonicalization();
+  first.assertion_results = [{ assertion_id: 'ASSERT-001', status: 'PASS', evidence_refs: [ref('ASSERTION_EVIDENCE', 'attempts/case/1/api-exchanges/index.json')] }];
+  second.assertion_results = [{ assertion_id: 'ASSERT-001', status: 'PASS', evidence_refs: [ref('ASSERTION_EVIDENCE', 'attempts/case/2/api-exchanges/index.json')] }];
+  assert.equal(semanticComparisonDigest(first), semanticComparisonDigest(second));
+  second.assertion_results[0].status = 'FAILED';
+  assert.notEqual(semanticComparisonDigest(first), semanticComparisonDigest(second));
+});
+
 function fixtureInput() {
   const capabilities = fixtureCapabilities();
   const familyCases = Array.from({ length: 178 }, (_, index) => {
@@ -106,12 +116,12 @@ function attempt(entry, ordinal) {
     observed_status: entry.expectation === 'PASS' ? 'PASS_MATCHED' : 'BLOCKED_MATCHED',
     top_error_code: null,
     detail_error_code: null,
+    revision_document_before_sha256: digest('revision-before'), revision_document_after_sha256: digest('revision-after'), revision_document_reopen_sha256: digest('revision-after'),
     projection_before_sha256: digest('projection-before'), projection_after_sha256: digest('projection-after'), projection_reopen_sha256: digest('projection-after'),
     opl_before_sha256: digest('opl-before'), opl_after_sha256: digest('opl-after'), opl_reopen_sha256: digest('opl-after'),
     token_before_sha256: digest('token-before'), token_after_sha256: digest('token-after'), token_reopen_sha256: digest('token-after'),
     trace_before_sha256: digest('trace-before'), trace_after_sha256: digest('trace-after'), trace_reopen_sha256: digest('trace-after'),
     transaction: entry.expected_transaction,
-    reopen_matches: true,
     assertion_results: [{ assertion_id: 'ASSERT-001', status: 'PASS' }],
     artifact_refs: [ref('ARTIFACT', `attempts/${entry.case_id}/${ordinal}/artifact-index.json`, digest(`${entry.case_id}-${ordinal}`))]
   };
@@ -138,6 +148,7 @@ function observationForCanonicalization() {
     project_id: 'project', model_id: 'model', context_id: 'context', base_revision: 'base', head_revision: 'head',
     committed_revision: null, command_id: null, option_id: null, impact_token_id: null, observed_status: 'PASS_MATCHED',
     top_error_code: null, detail_error_code: null,
+    revision_document_before_sha256: digest('revision-before'), revision_document_after_sha256: digest('revision-after'), revision_document_reopen_sha256: digest('revision-reopen'),
     projection_before_sha256: digest('projection-before'), projection_after_sha256: digest('projection-after'), projection_reopen_sha256: digest('projection-reopen'),
     opl_before_sha256: digest('opl-before'), opl_after_sha256: digest('opl-after'), opl_reopen_sha256: digest('opl-reopen'),
     token_before_sha256: digest('token-before'), token_after_sha256: digest('token-after'), token_reopen_sha256: digest('token-reopen'),

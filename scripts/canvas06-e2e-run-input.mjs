@@ -97,15 +97,21 @@ export async function loadActiveAttemptManifest({ manifestRoot, manifest, profil
  * 从已验证的活动 Manifest 选择一个 Common attempt 的唯一输入集合。
  * 此处不读取 checkout，也不为缺失项推断默认路径。
  */
-export function selectCommonAttemptInputs({ manifestInput, caseEntry }) {
+export function selectAttemptInputs({ manifestInput, caseEntry }) {
   if (!manifestInput?.manifest || !manifestInput.manifestRoot || !manifestInput.profileRoot || !caseEntry?.case_id) {
     fail('E2E_ORCHESTRATION_INPUT_INVALID', 'Controlled attempt requires a verified Manifest input and case entry.');
   }
   const manifest = manifestInput.manifest;
   const manifestCase = manifest.cases?.filter(entry => entry?.case_id === caseEntry.case_id) ?? [];
-  if (manifestCase.length !== 1 || manifestCase[0].driver_id !== 'DRIVER-COMMON'
-      || canonicalizeJcs(caseEntry) !== canonicalizeJcs(manifestCase[0])) {
-    fail('E2E_ORCHESTRATION_INPUT_INVALID', 'Controlled attempt case must be exactly one Common Manifest entry.');
+  if (manifestCase.length !== 1 || canonicalizeJcs(caseEntry) !== canonicalizeJcs(manifestCase[0])) {
+    fail('E2E_ORCHESTRATION_INPUT_INVALID', 'Controlled attempt case must be exactly one Manifest entry.');
+  }
+  const fixtureKind = manifestCase[0].driver_id === 'DRIVER-COMMON' ? 'COMMON' : 'FAMILY';
+  const familyCatalogs = manifest.fixture_refs?.filter(reference => reference?.kind === 'FAMILY_FIXTURE_IDENTITY_CATALOG') ?? [];
+  if (!validCaseRef(manifestCase[0].fixture_ref) || !validCaseRef(manifestCase[0].input_ref)
+      || fixtureKind === 'FAMILY' && familyCatalogs.length !== 1
+      || fixtureKind === 'COMMON' && (manifestCase[0].fixture_ref.kind !== 'FIXTURE' || manifestCase[0].input_ref.kind !== 'INPUT')) {
+    fail('E2E_ORCHESTRATION_REF_MISMATCH', 'Manifest case materializer references are not closed.', 3);
   }
   const sourceBuild = manifest.source_build;
   if (sourceBuild?.local_runtime_jar?.kind !== 'LOCAL_RUNTIME_JAR'
@@ -127,13 +133,27 @@ export function selectCommonAttemptInputs({ manifestInput, caseEntry }) {
   })) {
     fail('E2E_ORCHESTRATION_REF_MISMATCH', 'Manifest four-driver closure is invalid.', 3);
   }
-  return Object.freeze({
-    caseEntry: Object.freeze({ ...manifestCase[0] }),
-    runtimeJarRef: Object.freeze({ ...sourceBuild.local_runtime_jar }),
-    webDistRef: Object.freeze({ ...sourceBuild.web_dist }),
-    profileAssetRefs: Object.freeze(manifestInput.profileAssetRefs.map(reference => Object.freeze({ ...reference }))),
-    drivers: Object.freeze(drivers.map(driver => Object.freeze({ driver_id: driver.driver_id, source_ref: Object.freeze({ ...driver.source_ref }) })))
+  return deepFreeze({
+    fixtureKind,
+    caseEntry: structuredClone(manifestCase[0]),
+    fixtureRef: structuredClone(manifestCase[0].fixture_ref),
+    inputRef: structuredClone(manifestCase[0].input_ref),
+    familyIdentityCatalogRef: fixtureKind === 'FAMILY' ? structuredClone(familyCatalogs[0]) : null,
+    manifestRef: structuredClone(manifestInput.manifestRef),
+    activeBinding: structuredClone(manifestInput.activeBinding),
+    runtimeJarRef: structuredClone(sourceBuild.local_runtime_jar),
+    webDistRef: structuredClone(sourceBuild.web_dist),
+    profileAssetRefs: structuredClone(manifestInput.profileAssetRefs),
+    drivers: drivers.map(driver => ({ driver_id: driver.driver_id, source_ref: structuredClone(driver.source_ref) }))
   });
+}
+
+export function selectCommonAttemptInputs({ manifestInput, caseEntry }) {
+  const selected = selectAttemptInputs({ manifestInput, caseEntry });
+  if (selected.fixtureKind !== 'COMMON') {
+    fail('E2E_ORCHESTRATION_INPUT_INVALID', 'Controlled Common attempt requires one Common Manifest entry.');
+  }
+  return selected;
 }
 
 export function parseUtcWholeSecond(value) {
@@ -319,6 +339,19 @@ function parseJson(bytes, code, exitCode) {
 
 function sameRawRef(left, right) {
   return left?.kind === right?.kind && left?.path === right?.path && left?.byte_length === right?.byte_length && left?.sha256 === right?.sha256;
+}
+
+function validCaseRef(value) {
+  return value && safeRelativePath(value.path) && Number.isSafeInteger(value.byte_length) && value.byte_length >= 0
+    && typeof value.sha256 === 'string' && /^[a-f0-9]{64}$/u.test(value.sha256);
+}
+
+function deepFreeze(value) {
+  if (value && typeof value === 'object' && !Object.isFrozen(value)) {
+    for (const child of Object.values(value)) deepFreeze(child);
+    Object.freeze(value);
+  }
+  return value;
 }
 
 function sameAssetReference(value, expected) {

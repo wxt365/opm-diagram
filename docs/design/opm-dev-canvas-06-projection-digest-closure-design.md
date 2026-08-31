@@ -1,5 +1,7 @@
 # DEV-CANVAS-06 Projection Digest Closure 设计
 
+文档版本：`v1.1`
+
 文档版本：`1.0`
 
 设计状态：`FROZEN`
@@ -80,11 +82,20 @@ org.opm.localruntime.releaseauthoring.ProjectionDigestV01
 }
 ```
 
-`data`只来自正式query envelope的`data`成员；`request_id/revision/profile_version/rule_version/freshness/page`不进入preimage。producer必须先验证query envelope及expected revision，再提取data；禁止对整个response求摘要或从DOM/X6/Pinia重建Projection。
+`data`只来自正式query envelope的`data`成员；`request_id/revision/profile_version/rule_version/freshness/page`不进入preimage。producer必须先验证query envelope及expected revision，再调用唯一API adapter提取digest view；禁止对整个response求摘要或从DOM/X6/Pinia重建Projection。
+
+当前`API-CTX-002/0.2.0-draft`正式data固定为`{context_id,constructs,suppressed_states}`。`suppressed_states`是Inspector使用的非画布辅助清单，加入时间晚于Digest `0.1`冻结，禁止静默混入历史preimage。两端必须提供且只提供以下adapter：
+
+```text
+Node projectionDigestViewV01(apiProjectionData) -> {context_id,constructs}
+Java ProjectionDigestV01.apiProjectionDigestView(apiProjectionData) -> {context_id,constructs}
+```
+
+adapter必须先拒绝顶层缺失/extra、非数组`suppressed_states`及其中缺失/extra或非法`state_id/owner_ref/name_or_value/state_roles/explicitness`，再原样保留`context_id/constructs`引用进入既有normalizer。`suppressed_states`不进入Digest `0.1` bytes；其一致性由完整API raw evidence、Revision document digest和上层deep comparison共同保护。任何未来需要让该清单参与Projection SHA的变更必须发布Digest `0.2`，不得重解释`0.1`。
 
 ### 4.2 封闭字段域
 
-`data`、construct、layout、endpoint、modifier、label和binary64 tag的字段由preimage Schema递归`additionalProperties=false`。construct必填：
+digest view、construct、layout、endpoint、modifier、label和binary64 tag的字段由preimage Schema递归`additionalProperties=false`。正式API data的额外`suppressed_states`只允许由第4.1节adapter验证后排除。construct必填：
 
 ```text
 occurrence_id,target_id,construct_role,label,layout

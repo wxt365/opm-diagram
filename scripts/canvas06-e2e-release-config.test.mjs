@@ -27,9 +27,10 @@ test('release Playwright config fixes the browser context and never bootstraps a
   const output = loaded.stdout + loaded.stderr;
   assert.equal(loaded.status, 0, output);
   const discovered = output.split('\n').filter(line => /^  \S+\.release\.spec\.ts:\d+:\d+ › /.test(line));
-  assert.equal(discovered.length, 1, output);
-  assert.match(discovered[0], /^  fault-launcher\.controlled\.release\.spec\.ts:\d+:\d+ › 受控 Fault Launcher 只经 Runner 生命周期接口执行$/);
-  assert.match(output, /Total: 1 test in 1 file/);
+  assert.equal(discovered.length, 2, output);
+  assert.match(discovered[0], /^  family\.controlled\.release\.spec\.ts:\d+:\d+ › 受控 Family E2E 只经 Runner session 执行$/);
+  assert.match(discovered[1], /^  fault-launcher\.controlled\.release\.spec\.ts:\d+:\d+ › 受控 Fault Launcher 只经 Runner 生命周期接口执行$/);
+  assert.match(output, /Total: 2 tests in 2 files/);
 });
 
 function escapeRegExp(value) {

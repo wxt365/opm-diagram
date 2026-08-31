@@ -74,6 +74,9 @@ export function semanticComparisonDigest(observation) {
     observed_status: observation.observed_status,
     top_error_code: observation.top_error_code ?? null,
     detail_error_code: observation.detail_error_code ?? null,
+    revision_document_before_sha256: observation.revision_document_before_sha256,
+    revision_document_after_sha256: observation.revision_document_after_sha256,
+    revision_document_reopen_sha256: observation.revision_document_reopen_sha256,
     projection_before_sha256: observation.projection_before_sha256,
     projection_after_sha256: observation.projection_after_sha256,
     projection_reopen_sha256: observation.projection_reopen_sha256,
@@ -87,7 +90,10 @@ export function semanticComparisonDigest(observation) {
     trace_after_sha256: observation.trace_after_sha256,
     trace_reopen_sha256: observation.trace_reopen_sha256,
     transaction: observation.transaction,
-    assertion_results: observation.assertion_results
+    assertion_results: observation.assertion_results.map(result => ({
+      assertion_id: result.assertion_id,
+      status: result.status
+    }))
   };
   return sha256(Buffer.from(jcs(payload), 'utf8'));
 }
@@ -150,7 +156,8 @@ function evaluateAttempt({ entry, observation, expectedStatus }) {
     failureCodes.push('E2E_EXPECTATION_MISMATCH');
   }
   if (!sameTransaction(entry.expected_transaction, observation.transaction)) failureCodes.push('E2E_TRANSACTION_DELTA_MISMATCH');
-  if (observation.reopen_matches !== true) failureCodes.push('E2E_REVISION_MISMATCH');
+  const reopenMatches = attemptReopenMatches(observation);
+  if (!reopenMatches) failureCodes.push('E2E_REVISION_MISMATCH');
   const semanticDigest = semanticComparisonDigest(observation);
   if (observation.semantic_comparison_digest !== semanticDigest) failureCodes.push('E2E_INPUT_INVALID');
   const status = failureCodes.length === 0 ? expectedStatus : 'FAILED';
@@ -168,10 +175,16 @@ function evaluateAttempt({ entry, observation, expectedStatus }) {
       head_revision: observation.head_revision,
       observed_status: observation.observed_status,
       transaction: observation.transaction,
-      reopen_matches: observation.reopen_matches === true,
+      reopen_matches: reopenMatches,
       artifact_refs: observation.artifact_refs
     }
   });
+}
+
+function attemptReopenMatches(observation) {
+  return ['revision_document', 'projection', 'opl', 'token', 'trace']
+    .every(kind => isDigest(observation[`${kind}_after_sha256`])
+      && observation[`${kind}_after_sha256`] === observation[`${kind}_reopen_sha256`]);
 }
 
 function aggregateCapabilities({ manifestCases, caseResults, capabilities }) {

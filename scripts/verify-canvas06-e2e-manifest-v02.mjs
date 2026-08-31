@@ -9,6 +9,8 @@ import { assertCaseDriverClosure, assertDriverCatalog, assertProfileAssetThreeWa
 import { loadProfileAssetClosure } from './canvas06-e2e-manifest-v02-profile.mjs';
 import { loadControlledReadyTrustChain, loadProductionReadyTrustChain, readJsonRef } from './canvas06-e2e-manifest-v01-trust.mjs';
 import { assertDirectory, fileRef, jcs, listTree, readJson, resolveInside, sha256, treeRef, verifyFileRef } from './canvas06-e2e-manifest-v01-support.mjs';
+import { verifyCommonFixtureInput } from './canvas06-e2e-common-fixtures.mjs';
+import { rebaseCommonSetupPlanRefs } from './canvas06-e2e-common-setup-plan.mjs';
 
 const schema = JSON.parse(await readFile(new URL('../docs/contracts/schemas/opm-dev-canvas-06-e2e-manifest-v02.schema.json', import.meta.url), 'utf8'));
 const commonSchema = JSON.parse(await readFile(new URL('../docs/contracts/schemas/opm-dev-canvas-06-common-fixture-catalog.schema.json', import.meta.url), 'utf8'));
@@ -100,15 +102,23 @@ async function verifyDrivers(root, manifest, sourceRootOption) {
 async function verifyCommon(root, manifest, activeBinding) {
   const commonRoot = resolveInside(root, 'inputs/common', 'E2E_MANIFEST_COMMON_FIXTURE_INVALID');
   const entries = await listTree(commonRoot, 'E2E_MANIFEST_COMMON_FIXTURE_INVALID');
-  if (entries.length !== 43) fail('E2E_MANIFEST_COMMON_FIXTURE_INVALID', 'COMMON_43', 'Common root must contain exactly 43 files.');
+  if (entries.length !== 44) fail('E2E_MANIFEST_COMMON_FIXTURE_INVALID', 'COMMON_44', 'Common root must contain exactly 44 files.');
   const catalogRef = await rawRef(root, `inputs/common/dev-canvas-06-common-fixture-catalog.json`, 'COMMON_FIXTURE_CATALOG');
-  if (!isDeepStrictEqual(catalogRef, manifest.common_fixture_catalog_ref)) fail('E2E_MANIFEST_COMMON_FIXTURE_INVALID', 'COMMON_43', 'Common catalog ref is not the exact staged raw ref.');
+  if (!isDeepStrictEqual(catalogRef, manifest.common_fixture_catalog_ref)) fail('E2E_MANIFEST_COMMON_FIXTURE_INVALID', 'COMMON_44', 'Common catalog ref is not the exact staged raw ref.');
+  const setupPlanRef = await rawRef(root, 'inputs/common/dev-canvas-06-common-setup-plan.json', 'COMMON_SETUP_PLAN');
+  if (!isDeepStrictEqual(setupPlanRef, manifest.common_setup_plan_ref)) fail('E2E_MANIFEST_COMMON_FIXTURE_INVALID', 'COMMON_44', 'Common Setup Plan ref is not the exact staged raw ref.');
   const catalog = await readJson(resolveInside(root, catalogRef.path, 'E2E_MANIFEST_COMMON_FIXTURE_INVALID'), 'E2E_MANIFEST_COMMON_FIXTURE_INVALID');
-  if (!validateCommon(catalog) || catalog.catalog_version !== '0.2.0' || !isDeepStrictEqual(catalog.source_binding, activeBinding)) fail('E2E_MANIFEST_COMMON_FIXTURE_INVALID', 'COMMON_43', 'Common catalog is not active and bound to the Handoff.');
+  if (!validateCommon(catalog) || catalog.catalog_version !== '0.2.0' || !isDeepStrictEqual(catalog.source_binding, activeBinding)) fail('E2E_MANIFEST_COMMON_FIXTURE_INVALID', 'COMMON_44', 'Common catalog is not active and bound to the Handoff.');
   for (const item of catalog.e2e_cases) for (const reference of [item.base_fixture_ref, item.input_ref]) {
     const staged = await rawRef(root, `inputs/common/${reference.path}`, reference.kind);
-    if (staged.byte_length !== reference.byte_length || staged.sha256 !== reference.sha256) fail('E2E_MANIFEST_COMMON_FIXTURE_INVALID', 'COMMON_43', 'Common fixture raw ref differs from Catalog.');
+    if (staged.byte_length !== reference.byte_length || staged.sha256 !== reference.sha256) fail('E2E_MANIFEST_COMMON_FIXTURE_INVALID', 'COMMON_44', 'Common fixture raw ref differs from Catalog.');
   }
+  let verified;
+  try { verified = await verifyCommonFixtureInput({ commonRoot, catalogPath: 'dev-canvas-06-common-fixture-catalog.json', activeBinding }); }
+  catch (error) { fail('E2E_MANIFEST_COMMON_FIXTURE_INVALID', 'COMMON_44', error.message); }
+  const commonDriverRef = manifest.driver_catalog.find(item => item.driver_id === 'DRIVER-COMMON')?.source_ref;
+  try { rebaseCommonSetupPlanRefs({ plan: verified.plan, manifestCatalogRef: catalogRef, manifestCommonDriverRef: commonDriverRef }); }
+  catch (error) { fail('E2E_MANIFEST_JOIN_MISMATCH', 'COMMON_SETUP_PLAN_JOIN', error.message); }
 }
 
 async function verifyProfile(root, manifest, options, activeBinding) {
@@ -132,7 +142,7 @@ async function verifyCases(root, manifest) {
 
 async function verifyExactTree(root, manifest, manifestName) {
   const expected = new Set([manifestName, 'inputs/build/package-lock.json', 'inputs/upstream/family/profile.json']);
-  for (const ref of [manifest.intake_report_ref, manifest.handoff_ref, manifest.input_materialization.bundle_ref, manifest.source_build.local_runtime_jar, manifest.common_fixture_catalog_ref, ...manifest.profile_asset_refs, ...manifest.fixture_refs, ...manifest.driver_catalog.map(item => item.source_ref)]) expected.add(ref.path);
+  for (const ref of [manifest.intake_report_ref, manifest.handoff_ref, manifest.input_materialization.bundle_ref, manifest.source_build.local_runtime_jar, manifest.common_fixture_catalog_ref, manifest.common_setup_plan_ref, ...manifest.profile_asset_refs, ...manifest.fixture_refs, ...manifest.driver_catalog.map(item => item.source_ref)]) expected.add(ref.path);
   for (const item of manifest.upstream_input_refs) expected.add(item.ref.path);
   for (const item of await listTree(resolveInside(root, 'inputs/build/web-dist', 'E2E_MANIFEST_TRANSACTION_INVALID'), 'E2E_MANIFEST_TRANSACTION_INVALID')) expected.add(`inputs/build/web-dist/${item.path}`);
   for (const item of await listTree(resolveInside(root, 'inputs/common', 'E2E_MANIFEST_TRANSACTION_INVALID'), 'E2E_MANIFEST_TRANSACTION_INVALID')) expected.add(`inputs/common/${item.path}`);

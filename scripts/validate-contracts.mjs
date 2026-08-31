@@ -33,6 +33,7 @@ const commandAjv = new Ajv2020({ allErrors: true, strict: false });
 addFormats(commandAjv);
 const validateCommand = commandAjv.compile(openApi.components.schemas.ExecuteEditCommandRequest);
 const validateOption = commandAjv.compile(openApi.components.schemas.CommandCapabilityOption);
+const validateErrorEnvelope = commandAjv.compile(openApi.components.schemas.ErrorEnvelope);
 
 const writeGuard = {
   request_id: "request.contract.001",
@@ -134,6 +135,27 @@ assertInvalid(validateOption, {
   impact_summary: undefined,
   impact_token: undefined,
 }, "Delete option without impact token");
+
+const modifierCombinationError = {
+  error: {
+    code: "MODIFIER_COMBINATION_INVALID",
+    category: "DOMAIN",
+    message: "Control modifier combination is invalid",
+    retryable: false,
+    diagnostic_id: "diagnostic.contract.modifier",
+  },
+};
+assertValid(validateErrorEnvelope, modifierCombinationError, "422 modifier combination ErrorEnvelope");
+assertInvalid(validateErrorEnvelope, {
+  error: { ...modifierCombinationError.error, code: "UNKNOWN_DOMAIN_CODE" },
+}, "ErrorEnvelope with unknown code");
+assertInvalid(validateErrorEnvelope, {
+  ...modifierCombinationError,
+  unexpected: true,
+}, "ErrorEnvelope with extra property");
+assertInvalid(validateErrorEnvelope, {
+  error: { ...modifierCombinationError.error, retryable: "false" },
+}, "ErrorEnvelope with invalid retryable shape");
 
 console.log("OpenAPI, representative JSON Schema examples, and API-EDT contract cases are valid.");
 

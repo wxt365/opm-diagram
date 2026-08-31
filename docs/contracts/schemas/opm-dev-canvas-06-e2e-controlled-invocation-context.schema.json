@@ -1,0 +1,131 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:opm:contract:dev-canvas-06-e2e-controlled-invocation-context:0.1",
+  "title": "OPM DEV-CANVAS-06 E2E Controlled Invocation Context",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_id", "schema_version", "context_id", "input_mode", "source_root_realpath",
+    "input_trust", "manifest_root_realpath", "manifest_ref", "profile_asset_root_realpath",
+    "profile_asset_tree_ref", "profile_asset_refs", "report_staging_root_realpath",
+    "attempt_parent_realpath", "process_control_parent_realpath", "java_executable_ref",
+    "browser_executable_ref", "runtime_jar_ref", "web_dist_ref", "runner_source_set_ref",
+    "driver_catalog", "runtime_port", "web_port", "execution_schedule", "context_payload_sha256"
+  ],
+  "properties": {
+    "schema_id": {"const": "OPM-DEV-CANVAS-06-E2E-CONTROLLED-INVOCATION-CONTEXT-001"},
+    "schema_version": {"const": "0.1"},
+    "context_id": {"type": "string", "pattern": "^dev-canvas-06\\.e2e-controlled-invocation\\.[a-f0-9]{12}\\.[a-f0-9]{12}$"},
+    "input_mode": {"enum": ["PRODUCTION_HANDOFF", "CONTROLLED_TEST"]},
+    "source_root_realpath": {"$ref": "#/$defs/absolutePath"},
+    "input_trust": {"$ref": "#/$defs/inputTrust"},
+    "manifest_root_realpath": {"$ref": "#/$defs/absolutePath"},
+    "manifest_ref": {"$ref": "#/$defs/fileRef"},
+    "profile_asset_root_realpath": {"$ref": "#/$defs/absolutePath"},
+    "profile_asset_tree_ref": {"allOf": [{"$ref": "#/$defs/fileRef"}, {"properties": {"kind": {"const": "PROFILE_ASSET_TREE"}}}]},
+    "profile_asset_refs": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "prefixItems": [
+        {"allOf": [{"$ref": "#/$defs/fileRef"}, {"properties": {"kind": {"const": "GRAMMAR_ASSET"}}}]},
+        {"allOf": [{"$ref": "#/$defs/fileRef"}, {"properties": {"kind": {"const": "NORMALIZATION_DATA"}}}]},
+        {"allOf": [{"$ref": "#/$defs/fileRef"}, {"properties": {"kind": {"const": "PROFILE_PACKAGE"}}}]},
+        {"allOf": [{"$ref": "#/$defs/fileRef"}, {"properties": {"kind": {"const": "RULE_SET"}}}]},
+        {"allOf": [{"$ref": "#/$defs/fileRef"}, {"properties": {"kind": {"const": "SYMBOL_ASSET"}}}]}
+      ],
+      "items": false
+    },
+    "report_staging_root_realpath": {"$ref": "#/$defs/absolutePath"},
+    "attempt_parent_realpath": {"$ref": "#/$defs/absolutePath"},
+    "process_control_parent_realpath": {"$ref": "#/$defs/absolutePath"},
+    "java_executable_ref": {"allOf": [{"$ref": "#/$defs/fileRef"}, {"properties": {"kind": {"const": "JAVA_EXECUTABLE"}}}]},
+    "browser_executable_ref": {"allOf": [{"$ref": "#/$defs/fileRef"}, {"properties": {"kind": {"const": "BROWSER_EXECUTABLE"}}}]},
+    "runtime_jar_ref": {"allOf": [{"$ref": "#/$defs/fileRef"}, {"properties": {"kind": {"const": "LOCAL_RUNTIME_JAR"}}}]},
+    "web_dist_ref": {"allOf": [{"$ref": "#/$defs/fileRef"}, {"properties": {"kind": {"const": "WEB_DIST_TREE"}}}]},
+    "runner_source_set_ref": {"allOf": [{"$ref": "#/$defs/fileRef"}, {"properties": {"kind": {"const": "RUNNER_SOURCE_SET"}}}]},
+    "driver_catalog": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "prefixItems": [
+        {"$ref": "#/$defs/proceduralDriver"},
+        {"$ref": "#/$defs/controlDriver"},
+        {"$ref": "#/$defs/structuralDriver"},
+        {"$ref": "#/$defs/commonDriver"}
+      ],
+      "items": false
+    },
+    "runtime_port": {"$ref": "#/$defs/port"},
+    "web_port": {"$ref": "#/$defs/port"},
+    "execution_schedule": {"type": "array", "minItems": 388, "maxItems": 388, "items": {"$ref": "#/$defs/scheduleItem"}},
+    "context_payload_sha256": {"$ref": "#/$defs/digest"}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"input_mode": {"const": "PRODUCTION_HANDOFF"}}},
+      "then": {"properties": {"input_trust": {"properties": {"mode": {"const": "PRODUCTION_HANDOFF"}, "primary_ref": {"properties": {"kind": {"const": "INTAKE_REPORT"}}}}}}},
+      "else": {"properties": {"input_trust": {"properties": {"mode": {"const": "CONTROLLED_TEST"}, "primary_ref": {"properties": {"kind": {"const": "CONTROLLED_BUNDLE_DESCRIPTOR"}}}}}}}
+    }
+  ],
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "absolutePath": {"type": "string", "minLength": 2, "pattern": "^(?:/|[A-Za-z]:[\\\\/]).+"},
+    "relativePath": {"type": "string", "minLength": 1, "pattern": "^(?!/)(?![A-Za-z]:)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*//)(?!.*\\\\)(?!.*\\u0000).+$"},
+    "refPath": {"type": "string", "minLength": 1, "pattern": "^(?:(?:/|[A-Za-z]:[\\\\/]).+|(?!/)(?![A-Za-z]:)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*//)(?!.*\\\\)(?!.*\\u0000).+)$"},
+    "fileRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "path", "byte_length", "sha256"],
+      "properties": {
+        "kind": {"type": "string", "minLength": 1},
+        "path": {"$ref": "#/$defs/refPath"},
+        "byte_length": {"type": "integer", "minimum": 0},
+        "sha256": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "inputTrust": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "root_realpath", "primary_ref"],
+      "properties": {
+        "mode": {"enum": ["PRODUCTION_HANDOFF", "CONTROLLED_TEST"]},
+        "root_realpath": {"$ref": "#/$defs/absolutePath"},
+        "primary_ref": {"$ref": "#/$defs/fileRef"}
+      }
+    },
+    "driver": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["driver_id", "source_ref"],
+      "properties": {
+        "driver_id": {"enum": ["DRIVER-PROCEDURAL", "DRIVER-CONTROL", "DRIVER-STRUCTURAL", "DRIVER-COMMON"]},
+        "source_ref": {"allOf": [{"$ref": "#/$defs/fileRef"}, {"properties": {"kind": {"const": "E2E_DRIVER_SOURCE"}}}]}
+      }
+    },
+    "proceduralDriver": {"allOf": [{"$ref": "#/$defs/driver"}, {"properties": {"driver_id": {"const": "DRIVER-PROCEDURAL"}, "source_ref": {"properties": {"path": {"const": "inputs/drivers/procedural-driver.mjs"}}}}}]},
+    "controlDriver": {"allOf": [{"$ref": "#/$defs/driver"}, {"properties": {"driver_id": {"const": "DRIVER-CONTROL"}, "source_ref": {"properties": {"path": {"const": "inputs/drivers/control-driver.mjs"}}}}}]},
+    "structuralDriver": {"allOf": [{"$ref": "#/$defs/driver"}, {"properties": {"driver_id": {"const": "DRIVER-STRUCTURAL"}, "source_ref": {"properties": {"path": {"const": "inputs/drivers/structural-driver.mjs"}}}}}]},
+    "commonDriver": {"allOf": [{"$ref": "#/$defs/driver"}, {"properties": {"driver_id": {"const": "DRIVER-COMMON"}, "source_ref": {"properties": {"path": {"const": "inputs/drivers/common-driver.mjs"}}}}}]},
+    "port": {"type": "integer", "minimum": 1024, "maximum": 65535},
+    "scheduleItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ordinal", "case_ordinal", "case_id", "suite_id", "driver_id", "expectation", "attempt_ordinal", "viewport_id", "zoom_id", "attempt_root_realpath", "runtime_port", "web_port"],
+      "properties": {
+        "ordinal": {"type": "integer", "minimum": 1, "maximum": 388},
+        "case_ordinal": {"type": "integer", "minimum": 1, "maximum": 194},
+        "case_id": {"type": "string", "minLength": 1},
+        "suite_id": {"pattern": "^E2E-CANVAS-00[1-7]$"},
+        "driver_id": {"enum": ["DRIVER-PROCEDURAL", "DRIVER-CONTROL", "DRIVER-STRUCTURAL", "DRIVER-COMMON"]},
+        "expectation": {"enum": ["PASS", "BLOCKED"]},
+        "attempt_ordinal": {"enum": [1, 2]},
+        "viewport_id": {"type": "string", "minLength": 1},
+        "zoom_id": {"type": "string", "minLength": 1},
+        "attempt_root_realpath": {"$ref": "#/$defs/absolutePath"},
+        "runtime_port": {"$ref": "#/$defs/port"},
+        "web_port": {"$ref": "#/$defs/port"}
+      }
+    }
+  }
+}

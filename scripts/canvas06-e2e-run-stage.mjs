@@ -12,7 +12,7 @@ const validateRunnerSourceSet = sourceSetAjv.compile(RUNNER_SOURCE_SET_SCHEMA);
 const runnerSourcePaths = Object.freeze(RUNNER_SOURCE_SET_SCHEMA.properties.entries.prefixItems.map(item => item.allOf?.[1]?.properties?.path?.const));
 const excludedClasses = Object.freeze(RUNNER_SOURCE_SET_SCHEMA.properties.excluded_classes.prefixItems.map(item => item.const));
 
-if (runnerSourcePaths.length !== 23 || runnerSourcePaths.some(path => typeof path !== 'string') || excludedClasses.length !== 11 || excludedClasses.some(value => typeof value !== 'string')) {
+if (runnerSourcePaths.length !== 24 || runnerSourcePaths.some(path => typeof path !== 'string') || excludedClasses.length !== 11 || excludedClasses.some(value => typeof value !== 'string')) {
   throw new Error('E2E Runner Source Set Schema does not contain its frozen allowlist.');
 }
 
@@ -53,8 +53,8 @@ export async function stageRunnerSourceSet({ sourceRoot, stagingRoot }) {
   const entries = captured.map(({ path, byte_length, sha256 }) => ({ path, byte_length, sha256 }));
   const payload = {
     schema_id: 'OPM-DEV-CANVAS-06-E2E-RUNNER-SOURCE-SET-001',
-    schema_version: '0.1',
-    source_set_version: '0.1.0',
+    schema_version: '0.2',
+    source_set_version: '0.2.0',
     selection_policy: 'EXACT_ALLOWLIST_ALL_OTHERS_EXCLUDED',
     entries,
     excluded_classes: [...excludedClasses]

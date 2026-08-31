@@ -44,7 +44,7 @@ const commonCases = {
     cell('state.common.subject'), fill('p03-state-inspector-name', 'ready'), role('INITIAL', false), role('DEFAULT', true), role('FINAL', true), button('保存 State'), wait('API-EDT-002', 'POST')
   ], [api('API-EDT-002', 'POST', 200)], 'TX_COMMIT_1', 'REOPEN_COMMITTED'),
   'E2E-CANVAS-001.STATE_EXPLICITNESS_EXPANSION': definition('M_STATE_SUPPRESSED', [
-    cell('state.common.subject'), button('显式'), wait('API-EDT-002', 'POST')
+    cell('object.common.owner'), testId('p03-suppressed-state-state.common.subject'), wait('API-EDT-002', 'POST')
   ], [api('API-EDT-002', 'POST', 200)], 'TX_COMMIT_1', 'REOPEN_COMMITTED'),
   'E2E-CANVAS-001.STATE_MOBILE_CREATE_REOPEN': definition('M_OBJECT', [
     cell('object.common.owner'), testId('p03-tool-state'), cell('object.common.owner'), fill('p03-state-name', 'mobile-ready'), role('INITIAL', true), button('创建'), wait('API-EDT-002', 'POST')
@@ -122,8 +122,36 @@ async function executePrecondition({ step, caseId, attempt_identity, preconditio
   if (usedPreconditions.has(step.kind)) fail('A Common Driver precondition may run only once per case.');
   usedPreconditions.add(step.kind);
   const receipt = await precondition_client.execute({ case_id: caseId, attempt_identity, ...step, expected_apis });
-  if (!receipt?.raw_request || !receipt?.actual_request || !receipt?.response) fail('Precondition evidence is incomplete.');
+  validatePreconditionReceipt(receipt, step);
   if (typeof observation_sink.recordPrecondition === 'function') await observation_sink.recordPrecondition(receipt);
+}
+
+function validatePreconditionReceipt(receipt, step) {
+  if (!plainObject(receipt) || !deepFrozen(receipt) || receipt.kind !== step.kind || receipt.source_locator !== step.source_observation_ref) {
+    fail('Precondition evidence is incomplete.');
+  }
+  if (receipt.mode === 'DIRECT_COMMAND') {
+    if (!sameKeys(receipt, ['mode', 'kind', 'source_locator', 'resolved_source_refs', 'raw_request', 'actual_request', 'response', 'exchange_ref', 'baseline_rebind'])
+        || !plainObject(receipt.resolved_source_refs)
+        || !sameKeys(receipt.resolved_source_refs, ['setup_projection_exchange_ref', 'setup_projection_response_ref'])
+        || !rawRef(receipt.resolved_source_refs.setup_projection_exchange_ref, 'API_EXCHANGE')
+        || !rawRef(receipt.resolved_source_refs.setup_projection_response_ref, 'API_RESPONSE_BODY')
+        || !receipt.raw_request || !receipt.actual_request || !receipt.response || !rawRef(receipt.exchange_ref, 'API_EXCHANGE')) {
+      fail('DIRECT_COMMAND precondition evidence is incomplete.');
+    }
+    return;
+  }
+  if (receipt.mode === 'REQUEST_MUTATION') {
+    if (!sameKeys(receipt, ['mode', 'kind', 'source_locator', 'source_exchange_ref', 'match', 'json_pointer', 'replacement', 'state'])
+        || receipt.state !== 'ARMED' || !rawRef(receipt.source_exchange_ref, 'API_EXCHANGE') || !plainObject(receipt.match)
+        || !sameKeys(receipt.match, ['operation_id', 'method', 'normalized_url', 'command_type', 'base_revision'])
+        || receipt.match.operation_id !== 'API-EDT-002' || receipt.match.method !== 'POST'
+        || !nonEmptyString(receipt.json_pointer) || !nonEmptyString(receipt.replacement)) {
+      fail('REQUEST_MUTATION precondition evidence is incomplete.');
+    }
+    return;
+  }
+  fail('Precondition evidence mode is invalid.');
 }
 
 async function waitForApi(observation_sink, step, expectedApis) {
@@ -261,7 +289,13 @@ function deepFreeze(value) {
 }
 
 function plainObject(value) { return value !== null && typeof value === 'object' && !Array.isArray(value); }
+function deepFrozen(value) { return !value || typeof value !== 'object' || (Object.isFrozen(value) && Object.values(value).every(deepFrozen)); }
 function sameKeys(value, keys) { return Object.keys(value).length === keys.length && keys.every(key => Object.hasOwn(value, key)); }
 function nonEmptyString(value) { return typeof value === 'string' && value.length > 0; }
+function rawRef(value, kind) {
+  return plainObject(value) && sameKeys(value, ['kind', 'path', 'byte_length', 'sha256']) && value.kind === kind
+    && nonEmptyString(value.path) && !value.path.startsWith('/') && !value.path.split('/').includes('..')
+    && Number.isSafeInteger(value.byte_length) && value.byte_length >= 0 && /^[a-f0-9]{64}$/u.test(value.sha256);
+}
 function cssEscape(value) { return value.replace(/[^a-zA-Z0-9_-]/g, character => `\\${character.codePointAt(0).toString(16)} `); }
 function fail(message) { const error = new Error(message); error.code = 'E2E_DRIVER_MAPPING_INVALID'; error.exitCode = 3; throw error; }

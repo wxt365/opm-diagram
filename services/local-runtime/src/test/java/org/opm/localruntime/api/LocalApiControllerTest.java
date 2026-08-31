@@ -14,13 +14,19 @@ import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+import java.nio.ByteBuffer;
+import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.security.MessageDigest;
+import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -97,6 +103,189 @@ class LocalApiControllerTest {
                 .andExpect(status().isForbidden());
     }
 
+    @Test
+    void returnsModifierCombinationInvalidForFrozenControlAndStructuralCases() throws Exception {
+        ModelFixture fixture = createModelFixture("modifier");
+
+        Map<String, Object> controlOption = capabilityOption(fixture, fixture.factId(), "UPDATE_FACT", List.of(), "CAP-ISO-CTRL-001");
+        Map<String, Object> controlPayload = map(
+                "fact_id", fixture.factId(),
+                "expected_capability_ref", map("capability_id", "CAP-ISO-PROC-001"),
+                "replacement", map("modifiers", List.of(
+                        map("modifier_id", "control.capability", "value", "CAP-ISO-CTRL-001"),
+                        map("modifier_id", "control.segment", "value", "PROCESS_OUTPUT"))),
+                "capability_query_id", controlOption.get("capability_query_id"),
+                "selected_option_id", controlOption.get("option_id"));
+        MvcResult controlResult = perform(write(command(fixture), editRequest(
+                        "request.control.invalid.001", "command.control.invalid.001", fixture.revision(), "UPDATE_FACT", controlPayload)))
+                .andExpect(status().isUnprocessableEntity())
+                .andReturn();
+        assertErrorEnvelope(controlResult, "MODIFIER_COMBINATION_INVALID");
+
+        Map<String, Object> structuralOption = capabilityOption(fixture, null, "CREATE_FACT",
+                List.of(fixture.firstObjectId(), fixture.secondObjectId()), "CAP-ISO-STRUCT-001");
+        Map<String, Object> structuralPayload = map(
+                "context_id", fixture.contextId(),
+                "capability_ref", structuralOption.get("capability_ref"),
+                "fact_family", "STRUCTURAL",
+                "fact_id", "fact.structural.invalid.001",
+                "normalized_endpoints", structuralOption.get("normalized_endpoints"),
+                "direction", "DIRECTED",
+                "labels", List.of(),
+                "modifiers", List.of(),
+                "logical_groups", List.of(),
+                "collection_completeness", "NOT_APPLICABLE",
+                "occurrence", map("ownership", "OWNED", "construct_role", "STRUCTURAL_LINK"),
+                "layout", map("x", 180, "y", 220),
+                "capability_query_id", structuralOption.get("capability_query_id"),
+                "selected_option_id", structuralOption.get("option_id"));
+        MvcResult structuralResult = perform(write(command(fixture), editRequest(
+                        "request.structural.invalid.001", "command.structural.invalid.001", fixture.revision(), "CREATE_FACT", structuralPayload)))
+                .andExpect(status().isUnprocessableEntity())
+                .andReturn();
+        assertErrorEnvelope(structuralResult, "MODIFIER_COMBINATION_INVALID");
+    }
+
+    @Test
+    void keepsUnlistedOwnerAndCandidateFailuresAsDomainRejected() throws Exception {
+        ModelFixture fixture = createModelFixture("domain");
+
+        Map<String, Object> stateOption = capabilityOption(fixture, fixture.firstObjectId(), "CREATE_STATE", List.of(), "CAP-STATE-001");
+        Map<String, Object> statePayload = map(
+                "context_id", fixture.contextId(),
+                "state_id", "state.invalid-owner.001",
+                "owner_ref", map("target_kind", "ELEMENT", "target_id", "element.missing.001"),
+                "capability_ref", stateOption.get("capability_ref"),
+                "name_or_value", "Invalid owner",
+                "state_roles", List.of("INITIAL"),
+                "occurrence", map("ownership", "OWNED", "construct_role", "STATE_NODE"),
+                "layout", map("x", 80, "y", 240),
+                "capability_query_id", stateOption.get("capability_query_id"),
+                "selected_option_id", stateOption.get("option_id"));
+        MvcResult ownerResult = perform(write(command(fixture), editRequest(
+                        "request.state.invalid-owner.001", "command.state.invalid-owner.001", fixture.revision(), "CREATE_STATE", statePayload)))
+                .andExpect(status().isUnprocessableEntity())
+                .andReturn();
+        assertErrorEnvelope(ownerResult, "DOMAIN_REJECTED");
+
+        Map<String, Object> structuralOption = capabilityOption(fixture, null, "CREATE_FACT",
+                List.of(fixture.firstObjectId(), fixture.secondObjectId()), "CAP-ISO-STRUCT-001");
+        Map<String, Object> staleCandidatePayload = map(
+                "context_id", fixture.contextId(),
+                "capability_ref", structuralOption.get("capability_ref"),
+                "fact_family", "STRUCTURAL",
+                "fact_id", "fact.structural.stale.001",
+                "normalized_endpoints", structuralOption.get("normalized_endpoints"),
+                "direction", "DIRECTED",
+                "labels", List.of(map("slot_id", "forward_tag", "text", "contains")),
+                "modifiers", List.of(),
+                "logical_groups", List.of(),
+                "collection_completeness", "NOT_APPLICABLE",
+                "occurrence", map("ownership", "OWNED", "construct_role", "STRUCTURAL_LINK"),
+                "layout", map("x", 180, "y", 300),
+                "capability_query_id", structuralOption.get("capability_query_id"),
+                "selected_option_id", "option.structural.mismatched");
+        MvcResult candidateResult = perform(write(command(fixture), editRequest(
+                        "request.structural.stale.001", "command.structural.stale.001", fixture.revision(), "CREATE_FACT", staleCandidatePayload)))
+                .andExpect(status().isUnprocessableEntity())
+                .andReturn();
+        assertErrorEnvelope(candidateResult, "DOMAIN_REJECTED");
+    }
+
+    private ModelFixture createModelFixture(String suffix) throws Exception {
+        Map<String, Object> projectResult = response(perform(write(post("/api/v1/projects"), map(
+                "request_id", "request.project." + suffix,
+                "command_id", "command.project." + suffix,
+                "name", "MVC Project " + suffix))).andExpect(status().isCreated()).andReturn());
+        String projectId = string(data(projectResult).get("project_id"));
+        Map<String, Object> modelResult = response(perform(write(post("/api/v1/projects/{projectId}/models", projectId),
+                modelRequest("request.model." + suffix, "command.model." + suffix))).andExpect(status().isCreated()).andReturn());
+        String modelId = string(data(modelResult).get("model_id"));
+        String revision = string(data(modelResult).get("head_revision"));
+        String contextId = string(data(response(perform(get("/api/v1/projects/{projectId}/models/{modelId}/workspace-session", projectId, modelId)
+                .param("request_id", "request.workspace." + suffix)).andExpect(status().isOk()).andReturn())).get("root_context_id"));
+
+        String firstObjectId = "element." + suffix + ".object-a";
+        String secondObjectId = "element." + suffix + ".object-b";
+        String processId = "element." + suffix + ".process";
+        revision = createElement(projectId, modelId, contextId, revision, firstObjectId, "OBJECT", "Object A");
+        revision = createElement(projectId, modelId, contextId, revision, secondObjectId, "OBJECT", "Object B");
+        revision = createElement(projectId, modelId, contextId, revision, processId, "PROCESS", "Processing");
+
+        ModelFixture beforeFact = new ModelFixture(projectId, modelId, contextId, revision, firstObjectId, secondObjectId, processId, "fact." + suffix + ".consumption");
+        Map<String, Object> option = capabilityOption(beforeFact, null, "CREATE_FACT", List.of(firstObjectId, processId), "CAP-ISO-PROC-001");
+        Map<String, Object> factPayload = map(
+                "context_id", contextId,
+                "capability_ref", option.get("capability_ref"),
+                "fact_family", "TRANSFORMATION",
+                "fact_id", beforeFact.factId(),
+                "normalized_endpoints", option.get("normalized_endpoints"),
+                "direction", "DIRECTED",
+                "labels", List.of(),
+                "modifiers", List.of(),
+                "logical_groups", List.of(),
+                "occurrence", map("ownership", "OWNED", "construct_role", "PROCEDURAL_LINK"),
+                "layout", map("x", 180, "y", 120),
+                "capability_query_id", option.get("capability_query_id"),
+                "selected_option_id", option.get("option_id"));
+        revision = committed(response(perform(write(command(beforeFact), editRequest(
+                "request.fact." + suffix, "command.fact." + suffix, revision, "CREATE_FACT", factPayload))).andExpect(status().isOk()).andReturn()));
+        return new ModelFixture(projectId, modelId, contextId, revision, firstObjectId, secondObjectId, processId, beforeFact.factId());
+    }
+
+    private String createElement(String projectId, String modelId, String contextId, String revision,
+                                 String elementId, String kind, String name) throws Exception {
+        ModelFixture fixture = new ModelFixture(projectId, modelId, contextId, revision, null, null, null, null);
+        return committed(response(perform(write(command(fixture), editRequest(
+                "request." + elementId, "command." + elementId, revision, "CREATE_ELEMENT",
+                map("kind", kind, "element_id", elementId, "name", name, "layout", map("x", 80, "y", 80)))))
+                .andExpect(status().isOk()).andReturn()));
+    }
+
+    private Map<String, Object> capabilityOption(ModelFixture fixture, String selectionId, String intent,
+                                                  List<String> endpoints, String capabilityId) throws Exception {
+        MockHttpServletRequestBuilder request = get("/api/v1/projects/{projectId}/models/{modelId}/contexts/{contextId}/command-capabilities",
+                fixture.projectId(), fixture.modelId(), fixture.contextId())
+                .param("request_id", "request.option." + capabilityId.toLowerCase())
+                .param("revision", fixture.revision())
+                .param("intent", intent);
+        if (selectionId != null) request.param("selection_id", selectionId);
+        for (String endpoint : endpoints) request.param("endpoint", endpoint);
+        Map<String, Object> capabilityResult = response(perform(request).andExpect(status().isOk()).andReturn());
+        return ((List<?>) data(capabilityResult).get("options")).stream()
+                .map(Map.class::cast)
+                .filter(option -> capabilityId.equals(string(((Map<?, ?>) option.get("capability_ref")).get("capability_id"))))
+                .map(option -> (Map<String, Object>) option)
+                .findFirst()
+                .orElseThrow();
+    }
+
+    private MockHttpServletRequestBuilder command(ModelFixture fixture) {
+        return post("/api/v1/projects/{projectId}/models/{modelId}/contexts/{contextId}/commands",
+                fixture.projectId(), fixture.modelId(), fixture.contextId());
+    }
+
+    @SuppressWarnings("unchecked")
+    private void assertErrorEnvelope(MvcResult result, String expectedCode) throws Exception {
+        assertEquals(MediaType.APPLICATION_PROBLEM_JSON_VALUE, result.getResponse().getContentType());
+        byte[] rawBody = result.getResponse().getContentAsByteArray();
+        String decoded = StandardCharsets.UTF_8.newDecoder()
+                .onMalformedInput(CodingErrorAction.REPORT)
+                .onUnmappableCharacter(CodingErrorAction.REPORT)
+                .decode(ByteBuffer.wrap(rawBody))
+                .toString();
+        assertFalse(decoded.isBlank());
+        Map<String, Object> envelope = objectMapper.readValue(rawBody, new TypeReference<>() { });
+        assertEquals(Set.of("error"), envelope.keySet());
+        Map<String, Object> error = (Map<String, Object>) envelope.get("error");
+        assertEquals(Set.of("code", "category", "message", "retryable", "diagnostic_id"), error.keySet());
+        assertEquals(expectedCode, error.get("code"));
+        assertEquals("DOMAIN", error.get("category"));
+        assertEquals(false, error.get("retryable"));
+        assertTrue(string(error.get("message")).length() > 0);
+        assertTrue(string(error.get("diagnostic_id")).matches("^[A-Za-z][A-Za-z0-9._:-]{2,159}$"));
+    }
+
     private MockHttpServletRequestBuilder write(MockHttpServletRequestBuilder request, Map<String, Object> body) throws Exception {
         return request.header("Origin", "http://localhost").header("X-OPM-Session", SESSION).contentType(MediaType.APPLICATION_JSON).content(objectMapper.writeValueAsString(body));
     }
@@ -116,4 +305,6 @@ class LocalApiControllerTest {
     @SuppressWarnings("unchecked") private String committed(Map<String, Object> response) { return string(((Map<String, Object>) response.get("meta")).get("committed_revision")); }
     private String string(Object value) { return value == null ? null : value.toString(); }
     private String digest(String value) { try { byte[] bytes = MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8)); StringBuilder result = new StringBuilder(bytes.length * 2); for (byte item : bytes) result.append(String.format("%02x", item)); return result.toString(); } catch (Exception exception) { throw new IllegalStateException(exception); } }
+    private record ModelFixture(String projectId, String modelId, String contextId, String revision, String firstObjectId,
+                                String secondObjectId, String processId, String factId) { }
 }

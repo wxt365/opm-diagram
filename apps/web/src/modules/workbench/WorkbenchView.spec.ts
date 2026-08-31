@@ -38,7 +38,7 @@ function configureApi() {
     { occurrence_id: "occ.state", target_id: "state.material.ready", construct_role: "STATE_NODE", label: "Ready", owner_id: "element.object", state_roles: ["INITIAL"], explicitness: "EXPLICIT", fold_state: "UNFOLDED", layout: { x: 116, y: 118, width: 88, height: 28, z_order: 3 } },
     { occurrence_id: "occ.fact", target_id: "fact.consumption", construct_role: "CONSUMPTION_LINK", layout: { x: 250, y: 116, width: 160, height: 2, z_order: 3 }, source_id: "element.object", process_id: "element.process", source_occurrence_id: "occ.object", target_occurrence_id: "occ.process", symbol_ref: "symbol.link.consumption", layout_ref: "layout.fact", capability_id: "CAP-ISO-PROC-001", endpoints: [endpoint("CONSUMED_OBJECT", "ELEMENT", "element.object", 0), endpoint("CONSUMING_PROCESS", "ELEMENT", "element.process", 1)] },
     { occurrence_id: "occ.fact.structural", target_id: "fact.structural", construct_role: "STRUCTURAL_LINK", layout: { x: 250, y: 272, width: 160, height: 2, z_order: 3 }, symbol_ref: "symbol.link.structural.tagged.state", layout_ref: "layout.fact.structural", capability_id: "CAP-ISO-STRUCT-010", direction: "DIRECTED", labels: [{ slot_id: "forward_tag", text: "owns" }], collection_completeness: "NOT_APPLICABLE", endpoints: [endpoint("STATE_TAGGED_SOURCE", "STATE", "state.material.ready", 0), endpoint("STATE_TAGGED_TARGET", "ELEMENT", "element.object.product", 1)] },
-  ] } });
+  ], suppressed_states: [] } });
   api.commandCapabilities.mockResolvedValue({ data: { allowed: ["CREATE_ELEMENT", "CREATE_FACT"], forbidden: [], capability_query_id: "query.1", options: [] } });
   api.textProjection.mockResolvedValue({ data: { sentences: [{ sentence_id: "sentence.1", text: "Transform consumes Material.", ordinal: 0 }], traces: [{ sentence_id: "sentence.1", fact_ids: ["fact.consumption"], occurrence_ids: ["occ.object", "occ.process"] }] } });
   api.revisions.mockResolvedValue([{ revision_id: "revision.1", sequence: 1, kind: "DRAFT", created_at: "2026-07-28T00:00:00Z", immutable: true, blocking_count: 0 }]);
@@ -156,6 +156,24 @@ describe("WorkbenchView", () => {
 
     expect(wrapper.get('[data-testid="p03-state-inspector"]').exists()).toBe(true);
     expect(wrapper.get('[data-testid="p03-state-inspector-name"]').element.tagName).toBe("INPUT");
+  });
+
+  it("Object inspector 通过 Projection 清单显式化抑制 State", async () => {
+    api.projection.mockResolvedValueOnce({ data: {
+      constructs: [{ occurrence_id: "occ.object", target_id: "element.object", construct_role: "OBJECT_NODE", label: "Material", layout: { x: 80, y: 80, width: 160, height: 72, z_order: 1 } }],
+      suppressed_states: [{ state_id: "state.common.subject", owner_ref: { target_kind: "ELEMENT", target_id: "element.object" }, name_or_value: "draft", state_roles: ["INITIAL"], explicitness: "SUPPRESSED" }],
+    } });
+    const { wrapper } = await mountWorkbench();
+
+    await wrapper.get('[data-testid="p03-canvas-select-object"]').trigger("click");
+    await flushPromises();
+    await wrapper.get('[data-testid="p03-suppressed-state-state.common.subject"]').trigger("click");
+    await flushPromises();
+
+    expect(api.executeP0Command).toHaveBeenCalledWith("project.1", "model.1", "context.root", "revision.1", {
+      commandType: "STATE_EXPLICIT",
+      payload: { context_id: "context.root", state_id: "state.common.subject" },
+    });
   });
 
   it("Fact 删除仅使用Runtime返回的enabled impact token", async () => {

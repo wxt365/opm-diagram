@@ -1,19 +1,19 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:opm:contract:dev-canvas-06-e2e-runner-source-set:0.1",
+  "$id": "urn:opm:contract:dev-canvas-06-e2e-runner-source-set:0.2",
   "title": "OPM DEV-CANVAS-06 E2E Runner Source Set",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema_id", "schema_version", "source_set_version", "selection_policy", "entries", "excluded_classes", "source_set_sha256"],
   "properties": {
     "schema_id": {"const": "OPM-DEV-CANVAS-06-E2E-RUNNER-SOURCE-SET-001"},
-    "schema_version": {"const": "0.1"},
-    "source_set_version": {"const": "0.1.0"},
+    "schema_version": {"const": "0.2"},
+    "source_set_version": {"const": "0.2.0"},
     "selection_policy": {"const": "EXACT_ALLOWLIST_ALL_OTHERS_EXCLUDED"},
     "entries": {
       "type": "array",
-      "minItems": 23,
-      "maxItems": 23,
+      "minItems": 24,
+      "maxItems": 24,
       "prefixItems": [
         {"allOf": [{"$ref": "#/$defs/sourceEntry"}, {"properties": {"path": {"const": "scripts/release-canvas06-e2e-run.mjs"}}}]},
         {"allOf": [{"$ref": "#/$defs/sourceEntry"}, {"properties": {"path": {"const": "scripts/verify-canvas06-e2e-report.mjs"}}}]},
@@ -34,6 +34,7 @@
         {"allOf": [{"$ref": "#/$defs/sourceEntry"}, {"properties": {"path": {"const": "scripts/verify-canvas06-e2e-manifest-v01.mjs"}}}]},
         {"allOf": [{"$ref": "#/$defs/sourceEntry"}, {"properties": {"path": {"const": "scripts/verify-canvas06-controlled-input-bundle.mjs"}}}]},
         {"allOf": [{"$ref": "#/$defs/sourceEntry"}, {"properties": {"path": {"const": "tests/e2e/release/dev-canvas-06/playwright.release.config.ts"}}}]},
+        {"allOf": [{"$ref": "#/$defs/sourceEntry"}, {"properties": {"path": {"const": "tests/e2e/release/dev-canvas-06/family.controlled.release.spec.ts"}}}]},
         {"allOf": [{"$ref": "#/$defs/sourceEntry"}, {"properties": {"path": {"const": "tests/e2e/release/dev-canvas-06/drivers/procedural-driver.mjs"}}}]},
         {"allOf": [{"$ref": "#/$defs/sourceEntry"}, {"properties": {"path": {"const": "tests/e2e/release/dev-canvas-06/drivers/control-driver.mjs"}}}]},
         {"allOf": [{"$ref": "#/$defs/sourceEntry"}, {"properties": {"path": {"const": "tests/e2e/release/dev-canvas-06/drivers/structural-driver.mjs"}}}]},

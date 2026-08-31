@@ -14,6 +14,7 @@ import {
   parseVerifyOptions,
   resolveReportRoot,
   resolveVerifierReport,
+  selectAttemptInputs,
   selectCommonAttemptInputs
 } from './canvas06-e2e-run-input.mjs';
 import { canonicalizeJcs } from './canvas06-rfc8785.mjs';
@@ -104,6 +105,8 @@ test('loads the active Manifest and exact five-file Profile input without a fall
   assert.equal(input.profilePackageDigest, input.activeBinding.profile.sha256);
   const commonCase = input.manifest.cases.find(entry => entry.driver_id === 'DRIVER-COMMON');
   const selected = selectCommonAttemptInputs({ manifestInput: input, caseEntry: commonCase });
+  assert.equal(selected.fixtureKind, 'COMMON');
+  assert.equal(selected.familyIdentityCatalogRef, null);
   assert.equal(selected.drivers.length, 4);
   assert.equal(selected.runtimeJarRef.path, 'inputs/build/local-runtime.jar');
   assert.equal(selected.webDistRef.path, 'inputs/build/web-dist');
@@ -111,6 +114,15 @@ test('loads the active Manifest and exact five-file Profile input without a fall
     () => selectCommonAttemptInputs({ manifestInput: input, caseEntry: input.manifest.cases.find(entry => entry.driver_id !== 'DRIVER-COMMON') }),
     error => error.code === 'E2E_ORCHESTRATION_INPUT_INVALID'
   );
+  const familyCase = input.manifest.cases.find(entry => entry.driver_id !== 'DRIVER-COMMON');
+  const family = selectAttemptInputs({ manifestInput: input, caseEntry: familyCase });
+  assert.equal(family.fixtureKind, 'FAMILY');
+  assert.equal(family.fixtureRef.sha256, familyCase.fixture_ref.sha256);
+  assert.equal(family.inputRef.sha256, familyCase.input_ref.sha256);
+  assert.equal(family.familyIdentityCatalogRef.kind, 'FAMILY_FIXTURE_IDENTITY_CATALOG');
+  assert.equal(family.manifestRef.sha256, input.manifestRef.sha256);
+  assert.equal(family.activeBinding.binding_digest, input.activeBinding.binding_digest);
+  assert.equal(Object.isFrozen(family.activeBinding.profile), true);
   assert.throws(
     () => selectCommonAttemptInputs({ manifestInput: input, caseEntry: { ...commonCase, expectation: 'BLOCKED' } }),
     error => error.code === 'E2E_ORCHESTRATION_INPUT_INVALID'
@@ -180,6 +192,10 @@ async function activeManifest(profileRoot) {
         }
       }
     ],
+    common_setup_plan_ref: {
+      kind: 'COMMON_SETUP_PLAN', path: 'inputs/common/dev-canvas-06-common-setup-plan.json',
+      byte_length: 1, sha256: 'b'.repeat(64)
+    },
     profile_asset_tree_ref: {
       kind: 'PROFILE_ASSET_TREE', path: relativeRoot,
       byte_length: refs.reduce((total, ref) => total + ref.byte_length, 0),

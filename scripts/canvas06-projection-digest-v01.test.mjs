@@ -6,6 +6,7 @@ import {
   ProjectionDigestV01Error,
   buildProjectionDigestPreimageV01,
   canonicalBytesProjectionV01,
+  projectionDigestViewV01,
   sha256ProjectionV01
 } from './canvas06-projection-digest-v01.mjs';
 
@@ -36,6 +37,30 @@ test('matches all nine frozen Projection Digest 0.1 negative vectors', () => {
       return true;
     });
   }
+});
+
+test('validates current API Projection and preserves the frozen 0.1 digest view', () => {
+  const view = { context_id: 'context.snapshot', constructs: [] };
+  const apiData = {
+    ...view,
+    suppressed_states: [{
+      state_id: 'state.suppressed',
+      owner_ref: { target_kind: 'ELEMENT', target_id: 'object.owner' },
+      name_or_value: 'draft',
+      state_roles: ['INITIAL'],
+      explicitness: 'SUPPRESSED'
+    }]
+  };
+  assert.deepEqual(projectionDigestViewV01(apiData), view);
+  assert.equal(sha256ProjectionV01(projectionDigestViewV01(apiData)), sha256ProjectionV01(view));
+  assert.throws(() => projectionDigestViewV01({ ...apiData, unknown: true }), error =>
+    error instanceof ProjectionDigestV01Error && error.code === 'PROJECTION_DIGEST_SCHEMA_MISMATCH'
+      && error.jsonPointer === '/data/unknown');
+  assert.throws(() => projectionDigestViewV01({
+    ...apiData,
+    suppressed_states: [{ ...apiData.suppressed_states[0], state_roles: ['INITIAL', 'INITIAL'] }]
+  }), error => error instanceof ProjectionDigestV01Error && error.code === 'PROJECTION_DIGEST_SCHEMA_MISMATCH'
+    && error.jsonPointer === '/data/suppressed_states/0/state_roles');
 });
 
 function materializeInput(value) {

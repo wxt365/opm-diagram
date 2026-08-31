@@ -4,16 +4,29 @@ import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import test from 'node:test';
 
-import { FAULT_2A_CUMULATIVE_DELTA, FAULT_2A_DELTA, FAULT_CONTRACT_DELTA, FINAL_RUNNER_CUMULATIVE_DELTA, ORIGIN_SOURCE_COMMIT, UnifiedInputError, assertArtifactOrder, assertExactQuarantineGuard, assertExternalTopology, deriveExternalPaths, openExternalPaths, parseOptions, sourceEpoch, sourceChainArgs, treeRef, writeQuarantineMarker } from './canvas06-unified-production-input.mjs';
+import { FAULT_2A_CUMULATIVE_DELTA, FAULT_2A_DELTA, FAULT_CONTRACT_DELTA, FINAL_RUNNER_CUMULATIVE_DELTA, ORIGIN_SOURCE_COMMIT, RUNNER_DELTA, UnifiedInputError, assertArtifactOrder, assertExactQuarantineGuard, assertExternalTopology, deriveExternalPaths, openExternalPaths, parseOptions, sourceEpoch, sourceChainArgs, treeRef, writeQuarantineMarker } from './canvas06-unified-production-input.mjs';
 
 const commit = 'a'.repeat(40);
 const argv = ['--input-mode', 'EXTERNAL_RELEASE_STORE', '--source-root', '/source', '--release-store-root', '/release-store', '--source-chain-target', 'FINAL_RUNNER', '--origin-source-commit', ORIGIN_SOURCE_COMMIT, '--fault-contract-source-commit', 'b'.repeat(40), '--schema-conformance-source-commit', 'c'.repeat(40), '--fault-2a-source-commit', 'd'.repeat(40), '--runner-source-commit', commit, '--source-commit', commit, '--require-production'];
 
-test('source chain 精确锁定 C=20、A=7、Fault累计25与最终累计42个路径', () => {
+test('source chain 精确锁定 C=20、A=7、R=33、Fault累计25与最终累计52个路径', () => {
   assert.equal(FAULT_CONTRACT_DELTA.length, 20);
   assert.equal(FAULT_2A_DELTA.length, 7);
   assert.equal(FAULT_2A_CUMULATIVE_DELTA.length, 25);
-  assert.equal(FINAL_RUNNER_CUMULATIVE_DELTA.length, 42);
+  assert.equal(FINAL_RUNNER_CUMULATIVE_DELTA.length, 52);
+  assert.equal(RUNNER_DELTA.length, 33);
+  assert.equal(RUNNER_DELTA.some(([, path]) => path === 'docs/contracts/schemas/opm-dev-canvas-06-e2e-attempt-artifact-v02.schema.json'), true);
+  assert.equal(RUNNER_DELTA.some(([, path]) => path === 'scripts/canvas06-e2e-attempt-artifacts.mjs'), true);
+  assert.equal(RUNNER_DELTA.some(([, path]) => path === 'scripts/canvas06-e2e-attempt-artifacts.test.mjs'), true);
+  assert.equal(RUNNER_DELTA.some(([, path]) => path === 'scripts/canvas06-e2e-release-config.test.mjs'), true);
+  assert.equal(RUNNER_DELTA.some(([, path]) => path === 'scripts/verify-canvas06-e2e-report.mjs'), true);
+  assert.equal(RUNNER_DELTA.some(([, path]) => path === 'scripts/verify-canvas06-e2e-report.test.mjs'), true);
+  assert.equal(RUNNER_DELTA.some(([, path]) => path === 'services/local-runtime/src/main/java/org/opm/localruntime/releaseevidence/E2EFixtureMaterializerCli.java'), true);
+  assert.equal(RUNNER_DELTA.some(([, path]) => path === 'services/local-runtime/src/test/java/org/opm/localruntime/releaseevidence/E2EFixtureMaterializerCliTest.java'), true);
+  assert.equal(RUNNER_DELTA.some(([, path]) => path === 'tests/e2e/release/dev-canvas-06/drivers/common-driver.mjs'), true);
+  assert.equal(RUNNER_DELTA.some(([, path]) => path === 'tests/e2e/release/dev-canvas-06/drivers/common-driver.test.mjs'), true);
+  assert.equal(FINAL_RUNNER_CUMULATIVE_DELTA.some(([, path]) => path === 'services/local-runtime/src/test/java/org/opm/localruntime/application/LocalApiServiceTest.java'), true);
+  assert.equal(FAULT_2A_CUMULATIVE_DELTA.some(([, path]) => path === 'services/local-runtime/src/test/java/org/opm/localruntime/application/LocalApiServiceTest.java'), false);
   assert.deepEqual(FAULT_2A_DELTA, [
     ['A', 'scripts/canvas06-e2e-fault-launcher-controlled.test.mjs'],
     ['M', 'scripts/canvas06-e2e-release-config.test.mjs'],
