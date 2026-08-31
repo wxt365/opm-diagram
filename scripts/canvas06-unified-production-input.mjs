@@ -10,6 +10,7 @@ export { jcs };
 
 export const ORIGIN_PARENT_COMMIT = 'e598b305a44ebb9c9845c1f5563bc36c3a89a2b4';
 export const ORIGIN_SOURCE_COMMIT = '9048bb355aff18d5c00fbbaeb1660b979f4e6daa';
+export const RUNNER_IMPLEMENTATION_COMMIT = '144e74bfa64dfb79bcea5ce572034768e4b3b016';
 const PROFILE_RELATIVE_ROOT = 'profiles/profile.iso19450.2024.draft/0.2.0';
 export const ORIGIN_DELTA = Object.freeze([
   ['M', 'package.json'],
@@ -66,42 +67,16 @@ export const FAULT_2A_DELTA = Object.freeze([
   ['A', 'tests/e2e/release/dev-canvas-06/fault-launcher.controlled.release.spec.ts']
 ]);
 export const RUNNER_DELTA = Object.freeze([
-  ['M', 'docs/contracts/openapi/opm-local-api-v1.yaml'],
-  ['M', 'docs/contracts/schemas/opm-dev-canvas-06-e2e-attempt-artifact-v02.schema.json'],
-  ['A', 'docs/contracts/schemas/opm-dev-canvas-06-e2e-controlled-invocation-context.schema.json'],
-  ['M', 'docs/contracts/schemas/opm-dev-canvas-06-e2e-runner-source-set.schema.json'],
-  ['M', 'package.json'],
-  ['M', 'scripts/canvas06-e2e-attempt-artifacts.mjs'],
-  ['M', 'scripts/canvas06-e2e-attempt-artifacts.test.mjs'],
-  ['M', 'scripts/canvas06-e2e-release-config.test.mjs'],
-  ['M', 'scripts/canvas06-e2e-run-preflight.mjs'],
-  ['M', 'scripts/canvas06-e2e-run-preflight.test.mjs'],
-  ['M', 'scripts/canvas06-e2e-run-report.mjs'],
-  ['M', 'scripts/canvas06-e2e-run-report.test.mjs'],
-  ['M', 'scripts/canvas06-e2e-run-stage.mjs'],
-  ['M', 'scripts/canvas06-e2e-run-stage.test.mjs'],
-  ['M', 'scripts/canvas06-unified-production-input.mjs'],
-  ['M', 'scripts/canvas06-unified-production-input.test.mjs'],
-  ['M', 'scripts/release-canvas06-e2e-run.mjs'],
-  ['M', 'scripts/release-canvas06-e2e-run.test.mjs'],
-  ['M', 'scripts/validate-canvas06-visual-e2e-schemas.test.mjs'],
-  ['M', 'scripts/validate-contracts.mjs'],
-  ['M', 'scripts/verify-canvas06-e2e-report.mjs'],
-  ['M', 'scripts/verify-canvas06-e2e-report.test.mjs'],
-  ['M', 'services/local-runtime/src/main/java/org/opm/localruntime/application/LocalApiService.java'],
-  ['M', 'services/local-runtime/src/main/java/org/opm/localruntime/releaseevidence/E2EFixtureMaterializerCli.java'],
-  ['M', 'services/local-runtime/src/test/java/org/opm/localruntime/api/LocalApiControllerTest.java'],
-  ['M', 'services/local-runtime/src/test/java/org/opm/localruntime/application/LocalApiServiceTest.java'],
-  ['M', 'services/local-runtime/src/test/java/org/opm/localruntime/releaseevidence/E2EFixtureMaterializerCliTest.java'],
-  ['M', 'tests/e2e/release/dev-canvas-06/drivers/common-driver.mjs'],
-  ['M', 'tests/e2e/release/dev-canvas-06/drivers/common-driver.test.mjs'],
-  ['M', 'tests/e2e/release/dev-canvas-06/drivers/control-driver.mjs'],
-  ['M', 'tests/e2e/release/dev-canvas-06/drivers/procedural-driver.mjs'],
-  ['M', 'tests/e2e/release/dev-canvas-06/drivers/structural-driver.mjs'],
-  ['A', 'tests/e2e/release/dev-canvas-06/family.controlled.release.spec.ts']
+  ['M', 'apps/web/src/modules/workbench/WorkbenchView.spec.ts'], ['M', 'apps/web/src/modules/workbench/WorkbenchView.vue'], ['M', 'apps/web/src/shared/api/localRuntimeApi.ts'], ['M', 'apps/web/src/stores/workbenchRuntime.ts'],
+  ['M', 'docs/checklists/opm-dev-canvas-06-e2e-common-driver-controlled-orchestration-implementation-checklist.md'], ['M', 'docs/contracts/openapi/opm-local-api-v1.yaml'], ['M', 'docs/contracts/schemas/opm-dev-canvas-06-e2e-attempt-artifact-v02.schema.json'], ['A', 'docs/contracts/schemas/opm-dev-canvas-06-e2e-common-setup-plan.schema.json'], ['A', 'docs/contracts/schemas/opm-dev-canvas-06-e2e-controlled-invocation-context.schema.json'], ['M', 'docs/contracts/schemas/opm-dev-canvas-06-e2e-manifest-v02.schema.json'], ['M', 'docs/contracts/schemas/opm-dev-canvas-06-e2e-runner-source-set.schema.json'],
+  ['M', 'docs/design/opm-dev-canvas-06-e2e-common-driver-controlled-orchestration-design.md'], ['A', 'docs/design/opm-dev-canvas-06-e2e-common-setup-plan-design.md'], ['M', 'docs/design/opm-dev-canvas-06-e2e-profile-assets-and-digest-closure-design.md'], ['M', 'docs/design/opm-dev-canvas-06-projection-digest-closure-design.md'],
+  ['M', 'scripts/build-canvas06-common-visual-fixtures.mjs'], ['M', 'scripts/canvas06-e2e-attempt-artifacts.mjs'], ['M', 'scripts/canvas06-e2e-attempt-artifacts.test.mjs'], ['M', 'scripts/canvas06-e2e-common-fixtures.mjs'], ['A', 'scripts/canvas06-e2e-common-setup-plan.mjs'], ['A', 'scripts/canvas06-e2e-common-setup-plan.test.mjs'], ['M', 'scripts/canvas06-e2e-manifest-v02-compose.mjs'], ['M', 'scripts/canvas06-e2e-release-config.test.mjs'], ['M', 'scripts/canvas06-e2e-run-input.mjs'], ['M', 'scripts/canvas06-e2e-run-input.test.mjs'], ['M', 'scripts/canvas06-e2e-run-report.mjs'], ['M', 'scripts/canvas06-e2e-run-report.test.mjs'], ['M', 'scripts/canvas06-e2e-run-stage.mjs'], ['M', 'scripts/canvas06-e2e-run-stage.test.mjs'], ['M', 'scripts/canvas06-projection-digest-v01.mjs'], ['M', 'scripts/canvas06-projection-digest-v01.test.mjs'], ['M', 'scripts/canvas06-unified-production-input.mjs'], ['M', 'scripts/canvas06-unified-production-input.test.mjs'], ['M', 'scripts/common-visual-fixtures.test.mjs'], ['M', 'scripts/release-canvas06-e2e-manifest-v02.mjs'], ['M', 'scripts/release-canvas06-e2e-run.mjs'], ['M', 'scripts/release-canvas06-e2e-run.test.mjs'], ['M', 'scripts/validate-canvas06-visual-e2e-schemas.test.mjs'], ['M', 'scripts/validate-contracts.mjs'], ['M', 'scripts/verify-canvas06-common-visual-fixtures.mjs'], ['M', 'scripts/verify-canvas06-e2e-manifest-v02.mjs'], ['M', 'scripts/verify-canvas06-e2e-report.mjs'], ['M', 'scripts/verify-canvas06-e2e-report.test.mjs'],
+  ['M', 'services/local-runtime/src/main/java/org/opm/localruntime/application/LocalApiService.java'], ['M', 'services/local-runtime/src/main/java/org/opm/localruntime/releaseauthoring/ProjectionDigestV01.java'], ['A', 'services/local-runtime/src/main/java/org/opm/localruntime/releaseevidence/E2EAttemptSnapshotCli.java'], ['A', 'services/local-runtime/src/main/java/org/opm/localruntime/releaseevidence/E2EAttemptSnapshotSupport.java'], ['M', 'services/local-runtime/src/main/java/org/opm/localruntime/releaseevidence/E2EFixtureMaterializerCli.java'], ['A', 'services/local-runtime/src/main/java/org/opm/localruntime/releaseevidence/E2ETransactionSnapshotCli.java'], ['M', 'services/local-runtime/src/test/java/org/opm/localruntime/api/LocalApiControllerTest.java'], ['M', 'services/local-runtime/src/test/java/org/opm/localruntime/application/LocalApiServiceTest.java'], ['M', 'services/local-runtime/src/test/java/org/opm/localruntime/releaseauthoring/ProjectionDigestV01Test.java'], ['A', 'services/local-runtime/src/test/java/org/opm/localruntime/releaseevidence/E2EAttemptSnapshotCliTest.java'], ['M', 'services/local-runtime/src/test/java/org/opm/localruntime/releaseevidence/E2EFixtureMaterializerCliTest.java'], ['M', 'services/local-runtime/src/test/java/org/opm/localruntime/releaseevidence/E2EFixtureMaterializerJarIT.java'],
+  ['M', 'specs/opm-dev-canvas-06-e2e-common-driver-controlled-orchestration-implementation-task-spec.md'], ['A', 'specs/opm-dev-canvas-06-e2e-common-setup-plan-implementation-task-spec.md'], ['M', 'tests/e2e/release/dev-canvas-06/drivers/common-driver.mjs'], ['M', 'tests/e2e/release/dev-canvas-06/drivers/common-driver.test.mjs'], ['M', 'tests/e2e/release/dev-canvas-06/drivers/control-driver.mjs'], ['M', 'tests/e2e/release/dev-canvas-06/drivers/procedural-driver.mjs'], ['M', 'tests/e2e/release/dev-canvas-06/drivers/structural-driver.mjs'], ['A', 'tests/e2e/release/dev-canvas-06/family.controlled.release.spec.ts']
 ]);
+export const RUNNER_DELTA_OWNER_CLOSURE = Object.freeze([['M', 'scripts/canvas06-unified-production-input.mjs'], ['M', 'scripts/canvas06-unified-production-input.test.mjs']]);
 export const FAULT_2A_CUMULATIVE_DELTA = mergeDelta(FAULT_CONTRACT_DELTA, FAULT_2A_DELTA);
-export const FINAL_RUNNER_CUMULATIVE_DELTA = mergeDelta(FAULT_2A_CUMULATIVE_DELTA, RUNNER_DELTA);
+export const FINAL_RUNNER_CUMULATIVE_DELTA = mergeDelta(FAULT_2A_CUMULATIVE_DELTA, RUNNER_DELTA, RUNNER_DELTA_OWNER_CLOSURE);
 const QUARANTINE_FAILURE_CODES = new Set(['CANVAS06_UNIFIED_HANDOFF_INVALID', 'CANVAS06_UNIFIED_INTAKE_INVALID', 'CANVAS06_UNIFIED_WEB_TREE_INVALID', 'CANVAS06_UNIFIED_COMMON_INVALID', 'CANVAS06_UNIFIED_JOIN_MISMATCH', 'CANVAS06_UNIFIED_TRANSACTION_FAILED']);
 const QUARANTINE_FAILURE_STAGES = new Set(['FSYNC_RELEASES_PARENT', 'SPAWN_INDEPENDENT_INSTALLED_VERIFIER', 'INSTALLED_REVERIFY_HANDOFF_INTAKE_WEB_COMMON']);
 
@@ -248,8 +223,10 @@ export function assertSourceClean(sourceRoot, options) {
     return;
   }
   const runner = options['runner-source-commit'];
-  assertSingleParent(sourceRoot, runner, fault, 'RUNNER_PARENT');
-  assertDelta(sourceRoot, fault, runner, RUNNER_DELTA, 'RUNNER_DELTA');
+  assertSingleParent(sourceRoot, RUNNER_IMPLEMENTATION_COMMIT, fault, 'RUNNER_IMPLEMENTATION_PARENT');
+  assertDelta(sourceRoot, fault, RUNNER_IMPLEMENTATION_COMMIT, RUNNER_DELTA, 'RUNNER_IMPLEMENTATION_DELTA');
+  assertSingleParent(sourceRoot, runner, RUNNER_IMPLEMENTATION_COMMIT, 'RUNNER_DELTA_OWNER_PARENT');
+  assertDelta(sourceRoot, RUNNER_IMPLEMENTATION_COMMIT, runner, RUNNER_DELTA_OWNER_CLOSURE, 'RUNNER_DELTA_OWNER_CLOSURE');
   assertDelta(sourceRoot, origin, runner, FINAL_RUNNER_CUMULATIVE_DELTA, 'FINAL_RUNNER_CUMULATIVE_DELTA');
 }
 
