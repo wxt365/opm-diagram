@@ -485,6 +485,13 @@ test('production Context loader拒绝额外环境通道和raw ref漂移', async 
     }),
     error => error.code === 'E2E_INVOCATION_CONTEXT_INVALID'
   );
+  await assert.rejects(
+    () => loadFamilyControlledInvocationContextFromEnvironment({
+      OPM_CANVAS06_E2E_CONTROL_CONTEXT_REF: '{}',
+      PLAYWRIGHT_OUTPUT_DIR: '/controlled/playwright-output'
+    }),
+    error => error.code === 'E2E_INVOCATION_CONTEXT_INVALID' && error.message === 'Controlled Context environment ref is invalid.'
+  );
 });
 
 test('Family production bridge拒绝未登记Context和非冻结handler', async () => {

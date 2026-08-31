@@ -13,7 +13,7 @@ export const releaseLaunchArgs = Object.freeze([
 
 // 受控 attempt 由 Runner 显式指定测试文件，避免默认扫描误用开发服务器。
 export const controlledAttemptEnvironmentKey = 'CANVAS06_ATTEMPT_WEB_ORIGIN';
-const controlledOutputDir = process.env.OPM_CANVAS06_E2E_PLAYWRIGHT_OUTPUT_DIR;
+const controlledOutputDir = process.env.PLAYWRIGHT_OUTPUT_DIR;
 const controlledAttemptTestMatch = '**/*.controlled.spec.ts';
 const releaseTestMatch = '**/*.release.spec.ts';
 

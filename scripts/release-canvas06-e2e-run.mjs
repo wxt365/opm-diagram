@@ -228,7 +228,7 @@ export async function runReleasePlaywright({ sourceRoot, contextRef, outputDir }
   const environment = { ...process.env };
   for (const key of Object.keys(environment)) if (key.startsWith('OPM_CANVAS06_E2E_')) delete environment[key];
   environment[FAMILY_CONTEXT_ENV] = canonicalizeJcs(contextRef);
-  environment.OPM_CANVAS06_E2E_PLAYWRIGHT_OUTPUT_DIR = controlledOutputDir;
+  environment.PLAYWRIGHT_OUTPUT_DIR = controlledOutputDir;
   const child = spawn(process.execPath, [cli, 'test', '--config', config, 'tests/e2e/release/dev-canvas-06/family.controlled.release.spec.ts'], {
     cwd: sourceRoot, env: environment, stdio: ['ignore', 'pipe', 'pipe'], shell: false
   });
