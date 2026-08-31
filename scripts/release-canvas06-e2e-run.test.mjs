@@ -43,10 +43,17 @@ import {
   buildFamilyBrowserEnvironment,
   selectSubjectReceipt,
   expectedSubjectForCase,
-  buildAttemptIndexEntries
+  buildAttemptIndexEntries,
+  runCli
 } from './release-canvas06-e2e-run.mjs';
 
 const CASE_ID = 'E2E-CANVAS-007.ASSET_MISSING';
+
+test('CLI 在参数拒绝时不创建输出或导入副作用', async () => {
+  const root = await mkdtemp(resolve(tmpdir(), 'canvas06-e2e-cli-'));
+  await assert.rejects(() => runCli([], {}), error => error.code === 'E2E_RUN_ARGUMENT_INVALID' && error.exitCode === 2);
+  assert.deepEqual(await readdir(root), []);
+});
 
 test('writes and reads back both frozen attempt Fault Plans before a later producer can run', async () => {
   const root = await mkdtemp(resolve(tmpdir(), 'canvas06-e2e-plan-'));

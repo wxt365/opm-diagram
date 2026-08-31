@@ -1,14 +1,17 @@
 import { createHash } from 'node:crypto';
 import Ajv2020 from 'ajv/dist/2020.js';
 import addFormats from 'ajv-formats';
-import { readFile } from 'node:fs/promises';
+import { lstat, readFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
 
 import { E2eRunInputError } from './canvas06-e2e-run-input.mjs';
 import { canonicalizeJcs as jcs } from './canvas06-rfc8785.mjs';
 
-const REPORT_SCHEMA = JSON.parse(await readFile(new URL('../docs/contracts/schemas/opm-dev-canvas-06-e2e-report.schema.json', import.meta.url), 'utf8'));
+const HISTORICAL_REPORT_SCHEMA = JSON.parse(await readFile(new URL('../docs/contracts/schemas/opm-dev-canvas-06-e2e-report.schema.json', import.meta.url), 'utf8'));
+const REPORT_SCHEMA = JSON.parse(await readFile(new URL('../docs/contracts/schemas/opm-dev-canvas-06-e2e-report-v02.schema.json', import.meta.url), 'utf8'));
 const ajv = new Ajv2020({ allErrors: true, strict: false });
 addFormats(ajv);
+ajv.addSchema(HISTORICAL_REPORT_SCHEMA);
 const validateReport = ajv.compile(REPORT_SCHEMA);
 
 const FAILURE_ORDER = Object.freeze([
@@ -27,7 +30,7 @@ export function composeE2eReport({ manifest, observations, capabilities, base })
   const reportStatus = isReady({ summary, capabilityResults, failures }) ? 'READY_FOR_ENABLEMENT_EVALUATION' : 'BLOCKED';
   const report = {
     schema_id: 'OPM-DEV-CANVAS-06-E2E-REPORT-001',
-    schema_version: '0.1',
+    schema_version: '0.2',
     report_id: reportId(base.manifest_ref.sha256, base.runner_identity.runner_source_sha256),
     generated_at: base.generated_at,
     runner_identity: base.runner_identity,
@@ -55,6 +58,33 @@ export function composeE2eReport({ manifest, observations, capabilities, base })
 export function reportId(manifestSha256, runnerSourceSha256) {
   if (!isDigest(manifestSha256) || !isDigest(runnerSourceSha256)) fail('E2E_RUN_INPUT_INVALID', 'Report identity requires two SHA-256 values.');
   return `dev-canvas-06.e2e-report.${manifestSha256.slice(0, 12)}.${runnerSourceSha256.slice(0, 12)}`;
+}
+
+/** 从已写入的活动 Attempt artifact 生成 Report 的唯一只读投影。 */
+export async function readE2eAttemptObservations({ reportRoot, manifest }) {
+  assertManifest(manifest);
+  const root = resolve(reportRoot);
+  const observations = [];
+  for (const entry of manifest.cases) for (const ordinal of [1, 2]) {
+    const attemptRoot = resolve(root, 'attempts', encodeCaseId(entry.case_id), String(ordinal));
+    const [observation, index, indexRef] = await Promise.all([
+      readJson(resolve(attemptRoot, 'attempt-observation.json')),
+      readJson(resolve(attemptRoot, 'artifact-index.json')),
+      rawRef(root, resolve(attemptRoot, 'artifact-index.json'), 'ARTIFACT_INDEX')
+    ]);
+    if (observation?.case_id !== entry.case_id || observation?.attempt_ordinal !== ordinal
+        || !Array.isArray(index?.refs)) {
+      fail('E2E_RUN_CASE_SET_INVALID', 'Attempt artifact identity is incomplete.');
+    }
+    observations.push(Object.freeze({
+      ...observation,
+      artifact_refs: Object.freeze([
+        indexRef,
+        ...index.refs.map(item => ({ kind: item.kind, path: item.path, byte_length: item.byte_length, sha256: item.sha256 }))
+      ].sort((left, right) => Buffer.compare(Buffer.from(left.path, 'utf8'), Buffer.from(right.path, 'utf8'))))
+    }));
+  }
+  return Object.freeze(observations);
 }
 
 export function semanticComparisonDigest(observation) {
@@ -249,7 +279,7 @@ function isReady({ summary, capabilityResults, failures }) {
   return summary.case_count === 194 && summary.family_case_count === 178
     && summary.family_pass_expectation_count === 130 && summary.family_blocked_expectation_count === 48
     && summary.common_case_count === 16 && summary.attempt_count === 388
-    && summary.pass_matched_count === 146 && summary.blocked_matched_count === 48
+    && summary.pass_matched_count === 137 && summary.blocked_matched_count === 57
     && summary.failed_count === 0 && summary.skipped_count === 0 && summary.retry_count === 0
     && capabilityResults.length === 34 && capabilityResults.every(result => result.status !== 'FAILED') && failures.length === 0;
 }
@@ -289,6 +319,31 @@ function isDigest(value) {
 
 function sha256(value) {
   return createHash('sha256').update(value).digest('hex');
+}
+
+async function readJson(path) {
+  const details = await lstat(path).catch(() => null);
+  if (!details || details.isSymbolicLink() || !details.isFile() || details.nlink !== 1) {
+    fail('E2E_RUN_CASE_SET_INVALID', 'Attempt artifact is missing or unsafe.');
+  }
+  try { return JSON.parse(await readFile(path, 'utf8')); }
+  catch { fail('E2E_RUN_CASE_SET_INVALID', 'Attempt artifact is not valid JSON.'); }
+}
+
+async function rawRef(root, path, kind) {
+  const details = await lstat(path).catch(() => null);
+  if (!details || details.isSymbolicLink() || !details.isFile() || details.nlink !== 1) {
+    fail('E2E_RUN_CASE_SET_INVALID', 'Attempt artifact index is missing or unsafe.');
+  }
+  const bytes = await readFile(path);
+  const relative = path.slice(`${root}/`.length);
+  if (!relative || relative.startsWith('../')) fail('E2E_RUN_CASE_SET_INVALID', 'Attempt artifact index escapes the Report root.');
+  return Object.freeze({ kind, path: relative, byte_length: bytes.length, sha256: sha256(bytes) });
+}
+
+function encodeCaseId(value) {
+  return Array.from(Buffer.from(value, 'utf8')).map(byte => /[A-Za-z0-9._-]/.test(String.fromCharCode(byte))
+    ? String.fromCharCode(byte) : `%${byte.toString(16).toUpperCase().padStart(2, '0')}`).join('');
 }
 
 function fail(code, message) {

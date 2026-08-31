@@ -8,7 +8,7 @@ import { isDeepStrictEqual } from 'node:util';
 
 import Ajv2020 from 'ajv/dist/2020.js';
 
-import { E2eRunInputError, loadActiveAttemptManifest, safeRelativePath, selectAttemptInputs } from './canvas06-e2e-run-input.mjs';
+import { E2eRunInputError, loadActiveAttemptManifest, parseRunOptions, resolveReportRoot, safeRelativePath, selectAttemptInputs } from './canvas06-e2e-run-input.mjs';
 import { canonicalizeJcs } from './canvas06-rfc8785.mjs';
 import {
   attemptRelativeRoot,
@@ -28,6 +28,11 @@ import {
 import { assertDirectory, copyRegularFile, copyTree, resolveInside, treeRef, verifyFileRef } from './canvas06-e2e-manifest-v01-support.mjs';
 import { verifyControlledInputBundle } from './verify-canvas06-controlled-input-bundle.mjs';
 import { COMMON_DRIVER_SOURCE_PATH, rebaseCommonSetupPlanRefs, verifyCommonSetupPlan } from './canvas06-e2e-common-setup-plan.mjs';
+import { preflightE2eRun } from './canvas06-e2e-run-preflight.mjs';
+import { stageManifestInputs, stageRunnerSourceSet } from './canvas06-e2e-run-stage.mjs';
+import { commitReportRoot } from './canvas06-e2e-run-transaction.mjs';
+import { composeE2eReport, readE2eAttemptObservations, reportId } from './canvas06-e2e-run-report.mjs';
+import { verifyE2eReportRoot } from './verify-canvas06-e2e-report.mjs';
 
 const ATTEMPT_ORDINALS = Object.freeze([1, 2]);
 const FAULT_CASE_IDS = new Set([
@@ -66,6 +71,174 @@ const validateTransactionSnapshotPair = familyContextAjv.compile({
 });
 const verifiedFamilyInvocationContexts = new WeakSet();
 const verifiedExecutionToolchains = new WeakMap();
+
+/** 活动 Runner 的唯一命令行入口；完整 194/388 调度由受控 Playwright bridge 执行。 */
+export async function runCli(argv = process.argv.slice(2), dependencies = {}) {
+  const options = parseRunOptions(argv);
+  const paths = resolveReportRoot({
+    outputRoot: options['output-root'],
+    out: options.out,
+    reportId: reportIdFromOutput(options.out)
+  });
+  const preflight = await (dependencies.preflight ?? preflightE2eRun)(options, dependencies.preflightDependencies ?? {});
+  const finalRoot = await (dependencies.commitReportRoot ?? commitReportRoot)({
+    outputRoot: paths.outputRoot,
+    reportRoot: paths.reportRoot,
+    write: stagingRoot => executeCliRun({ options, preflight, stagingRoot, dependencies })
+  });
+  const reportPath = resolve(finalRoot, 'dev-canvas-06-e2e-report.json');
+  const bytes = await readFile(reportPath);
+  return Object.freeze({ reportPath, sha256: sha256(bytes) });
+}
+
+async function executeCliRun({ options, preflight, stagingRoot, dependencies }) {
+  const stagedManifest = await stageManifestInputs({
+    manifestRoot: options['manifest-root'], stagingRoot, manifestName: options.manifest
+  });
+  const stagedRunner = await stageRunnerSourceSet({ sourceRoot: options['source-root'], stagingRoot });
+  const expectedReportId = reportId(stagedManifest.manifestRef.sha256, stagedRunner.sourceSet.source_set_sha256);
+  if (reportIdFromOutput(options.out) !== expectedReportId) {
+    throw new E2eRunInputError('E2E_RUN_ARGUMENT_INVALID', 'out does not match the staged Manifest and Runner Source Set identity.', 2);
+  }
+  const manifestInput = await loadActiveAttemptManifest({
+    manifestRoot: stagingRoot,
+    manifest: stagedManifest.manifestRef.path,
+    profileAssetRoot: resolve(stagingRoot, 'inputs/upstream/profile-assets')
+  });
+  if (!sameRef(manifestInput.manifestRef, stagedManifest.manifestRef)) {
+    throw new E2eRunInputError('E2E_RUN_MANIFEST_INVALID', 'Staged Manifest raw reference drifted.', 3);
+  }
+  const controlParent = await mkdtemp(resolve(pathsParent(stagingRoot), '.canvas06-e2e-control-'));
+  try {
+    const contextResult = await writeFamilyControlledInvocationContext({
+      input_mode: options['input-mode'],
+      source_root_realpath: resolve(options['source-root']),
+      input_trust: await cliInputTrust({ options, preflight }),
+      manifest_input: manifestInput,
+      report_staging_root_realpath: stagingRoot,
+      attempt_parent_realpath: stagingRoot,
+      process_control_parent_realpath: controlParent,
+      java_executable_ref: await absoluteExecutableRef(preflight.runtime.java_path, 'JAVA_EXECUTABLE'),
+      browser_executable_ref: await absoluteExecutableRef(preflight.runtime.browser_path, 'BROWSER_EXECUTABLE'),
+      runner_source_set_ref: stagedRunner.sourceSetRef,
+      runner_source_set: stagedRunner.sourceSet,
+      runtime_port: Number(options['runtime-port']),
+      web_port: Number(options['web-port'])
+    });
+    await (dependencies.runPlaywright ?? runReleasePlaywright)({
+      sourceRoot: preflight.source.root,
+      contextRef: contextResult.ref
+    });
+    const observations = await readE2eAttemptObservations({ reportRoot: stagingRoot, manifest: manifestInput.manifest });
+    const report = composeE2eReport({
+      manifest: manifestInput.manifest,
+      observations,
+      capabilities: preflight.capabilities,
+      base: await buildReportBase({ stagingRoot, manifestInput, preflight, runnerSourceSet: stagedRunner })
+    });
+    await writeSyncedFile(resolve(stagingRoot, 'dev-canvas-06-e2e-report.json'), Buffer.from(`${canonicalizeJcs(report)}\n`, 'utf8'));
+    await verifyE2eReportRoot({ reportRoot: stagingRoot, reportPath: resolve(stagingRoot, 'dev-canvas-06-e2e-report.json') });
+  } finally {
+    await rm(controlParent, { recursive: true, force: true });
+  }
+}
+
+async function cliInputTrust({ options, preflight }) {
+  if (options['input-mode'] === 'PRODUCTION_HANDOFF') {
+    return deepFreeze({
+      mode: 'PRODUCTION_HANDOFF', root_realpath: resolve(options['handoff-root']), primary_ref: preflight.trust.intake.ref
+    });
+  }
+  const descriptorPath = resolve(options['controlled-bundle-root'], 'controlled-bundle.json');
+  return deepFreeze({
+    mode: 'CONTROLLED_TEST', root_realpath: resolve(options['controlled-bundle-root']),
+    primary_ref: await relativeFileRef(resolve(options['controlled-bundle-root']), descriptorPath, 'CONTROLLED_BUNDLE_DESCRIPTOR')
+  });
+}
+
+async function buildReportBase({ stagingRoot, manifestInput, preflight, runnerSourceSet }) {
+  const firstCase = manifestInput.manifest.cases[0];
+  const browser = await readJson(resolve(stagingRoot, attemptRelativeRoot(firstCase.case_id, 1), 'browser-environment.json'));
+  const javaRoot = `inputs/runner/toolchain/java/${sha256(await readFile(preflight.runtime.java_path))}`;
+  const java = {
+    evidence_version: '0.1.0', major_version: 21,
+    executable_basename: process.platform === 'win32' ? 'java.exe' : 'java',
+    mirror_ref: await relativeFileRef(stagingRoot, resolve(stagingRoot, javaRoot, process.platform === 'win32' ? 'java.exe' : 'java'), 'E2E_JAVA_EXECUTABLE_MIRROR'),
+    version_output_ref: await relativeFileRef(stagingRoot, resolve(stagingRoot, javaRoot, 'java-version.txt'), 'E2E_JAVA_VERSION_OUTPUT'),
+    release_metadata_ref: await relativeFileRef(stagingRoot, resolve(stagingRoot, javaRoot, 'release'), 'E2E_JAVA_RELEASE_METADATA'),
+    os_arch: `${process.platform}/${process.arch}`
+  };
+  java.image_payload_sha256 = sha256(Buffer.from(canonicalizeJcs(java), 'utf8'));
+  return deepFreeze({
+    generated_at: new Date().toISOString(),
+    runner_identity: {
+      runner_version: '0.2.0', source_commit: preflight.source.source_commit,
+      node_version: process.version, playwright_version: '1.57.0', chromium_version: browser.chromium_version,
+      os: `${process.platform}-${process.arch}`, command: 'npm run release:canvas06:e2e:run -- <frozen-cli>',
+      runner_source_sha256: runnerSourceSet.sourceSet.source_set_sha256,
+      runner_source_set_ref: runnerSourceSet.sourceSetRef, java_executable: java
+    },
+    manifest_ref: manifestInput.manifestRef,
+    intake_report_ref: manifestInput.manifest.intake_report_ref,
+    handoff_ref: manifestInput.manifest.handoff_ref,
+    upstream_source_build: manifestInput.manifest.upstream_source_build,
+    source_build: manifestInput.manifest.source_build,
+    environment: {
+      environment_fingerprint: browser.environment_fingerprint, locale: browser.locale, timezone: browser.timezone,
+      color_scheme: browser.color_scheme, reduced_motion: browser.reduced_motion, device_scale_factor: browser.viewport.device_scale_factor
+    }
+  });
+}
+
+async function runReleasePlaywright({ sourceRoot, contextRef }) {
+  const cli = resolve(sourceRoot, 'node_modules/@playwright/test/cli.js');
+  await assertExecutableInput(cli, 'E2E_RUN_ENVIRONMENT_INVALID');
+  const environment = { ...process.env };
+  for (const key of Object.keys(environment)) if (key.startsWith('OPM_CANVAS06_E2E_')) delete environment[key];
+  environment[FAMILY_CONTEXT_ENV] = canonicalizeJcs(contextRef);
+  const child = spawn(process.execPath, [cli, 'test', 'tests/e2e/release/dev-canvas-06/family.controlled.release.spec.ts'], {
+    cwd: sourceRoot, env: environment, stdio: ['ignore', 'pipe', 'pipe'], shell: false
+  });
+  const outcome = await new Promise((resolveChild, rejectChild) => {
+    child.once('error', rejectChild);
+    child.once('close', (code, signal) => resolveChild({ code, signal }));
+  });
+  if (outcome.code !== 0 || outcome.signal !== null) {
+    throw new E2eRunInputError('E2E_UNEXPECTED_RUNTIME_ERROR', 'Controlled Playwright session did not complete the full schedule.', 3);
+  }
+}
+
+function reportIdFromOutput(out) {
+  const match = /^dev-canvas-06\/e2e\/reports\/(dev-canvas-06\.e2e-report\.[a-f0-9]{12}\.[a-f0-9]{12})\/dev-canvas-06-e2e-report\.json$/.exec(out ?? '');
+  if (!match) throw new E2eRunInputError('E2E_RUN_ARGUMENT_INVALID', 'out must use the frozen Report path.', 2);
+  return match[1];
+}
+
+function pathsParent(path) { return resolve(path, '..'); }
+
+async function absoluteExecutableRef(path, kind) {
+  const bytes = await readSingleLinkFile(path, 'E2E_RUN_ENVIRONMENT_INVALID');
+  return Object.freeze({ kind, path: resolve(path), byte_length: bytes.length, sha256: sha256(bytes) });
+}
+
+async function relativeFileRef(root, path, kind) {
+  const bytes = await readSingleLinkFile(path, 'E2E_RUN_OUTPUT_INVALID');
+  const relativePath = relative(resolve(root), resolve(path)).split(sep).join('/');
+  if (!safeRelativePath(relativePath)) throw new E2eRunInputError('E2E_RUN_OUTPUT_INVALID', 'Report raw reference escapes staging root.', 4);
+  return Object.freeze({ kind, path: relativePath, byte_length: bytes.length, sha256: sha256(bytes) });
+}
+
+async function readJson(path) {
+  try { return JSON.parse((await readSingleLinkFile(path, 'E2E_RUN_OUTPUT_INVALID')).toString('utf8')); }
+  catch (error) { if (error instanceof E2eRunInputError) throw error; throw new E2eRunInputError('E2E_RUN_OUTPUT_INVALID', 'Expected one valid JSON artifact.', 4); }
+}
+
+async function assertExecutableInput(path, code) {
+  const details = await lstat(path).catch(() => null);
+  if (!details || details.isSymbolicLink() || !details.isFile() || details.nlink !== 1) {
+    throw new E2eRunInputError(code, 'Required executable input is unsafe.', 3);
+  }
+}
 
 export async function writeFamilyControlledInvocationContext({
   input_mode,
@@ -401,7 +574,7 @@ async function verifyFamilyInvocationInputTrust({ context, manifestInput }) {
     return;
   }
   if (context.input_mode !== 'PRODUCTION_HANDOFF' || trust.mode !== 'PRODUCTION_HANDOFF'
-      || !sameRef(trust.primary_ref, manifestInput.manifest.intake_report_ref)) {
+      || !sameRawIdentity(trust.primary_ref, manifestInput.manifest.intake_report_ref)) {
     contextFail('E2E_INVOCATION_CONTEXT_REF_MISMATCH', 'Production Intake ref differs from Context trust.');
   }
   const local = await verifyFileRef({ root: manifestInput.manifestRoot, reference: manifestInput.manifest.intake_report_ref, code: 'E2E_INVOCATION_CONTEXT_REF_MISMATCH' });
@@ -4203,6 +4376,9 @@ function sameRef(left, right) {
   return left?.kind === right?.kind && left?.path === right?.path
     && left?.byte_length === right?.byte_length && left?.sha256 === right?.sha256;
 }
+function sameRawIdentity(left, right) {
+  return left?.kind === right?.kind && left?.byte_length === right?.byte_length && left?.sha256 === right?.sha256;
+}
 
 function validPort(value) {
   return Number.isInteger(value) && value >= 1024 && value <= 65535;
@@ -4524,4 +4700,15 @@ function fail(code, message) {
 
 function sha256(value) {
   return createHash('sha256').update(value).digest('hex');
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+  runCli().then(result => {
+    process.stdout.write(`${result.reportPath}\t${result.sha256}\n`);
+  }).catch(error => {
+    const code = error?.code ?? 'E2E_RUN_INTERNAL_ERROR';
+    const exitCode = Number.isInteger(error?.exitCode) ? error.exitCode : 4;
+    process.stderr.write(`${code}\tCLI\t-\t-\n`);
+    process.exitCode = exitCode;
+  });
 }

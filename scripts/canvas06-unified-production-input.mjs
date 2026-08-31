@@ -11,6 +11,7 @@ export { jcs };
 export const ORIGIN_PARENT_COMMIT = 'e598b305a44ebb9c9845c1f5563bc36c3a89a2b4';
 export const ORIGIN_SOURCE_COMMIT = '9048bb355aff18d5c00fbbaeb1660b979f4e6daa';
 export const RUNNER_IMPLEMENTATION_COMMIT = '144e74bfa64dfb79bcea5ce572034768e4b3b016';
+export const RUNNER_DELTA_OWNER_COMMIT = '4b30d269c100e655e8c75060a96bcb2ae11e4aa0';
 const PROFILE_RELATIVE_ROOT = 'profiles/profile.iso19450.2024.draft/0.2.0';
 export const ORIGIN_DELTA = Object.freeze([
   ['M', 'package.json'],
@@ -75,6 +76,17 @@ export const RUNNER_DELTA = Object.freeze([
   ['M', 'specs/opm-dev-canvas-06-e2e-common-driver-controlled-orchestration-implementation-task-spec.md'], ['A', 'specs/opm-dev-canvas-06-e2e-common-setup-plan-implementation-task-spec.md'], ['M', 'tests/e2e/release/dev-canvas-06/drivers/common-driver.mjs'], ['M', 'tests/e2e/release/dev-canvas-06/drivers/common-driver.test.mjs'], ['M', 'tests/e2e/release/dev-canvas-06/drivers/control-driver.mjs'], ['M', 'tests/e2e/release/dev-canvas-06/drivers/procedural-driver.mjs'], ['M', 'tests/e2e/release/dev-canvas-06/drivers/structural-driver.mjs'], ['A', 'tests/e2e/release/dev-canvas-06/family.controlled.release.spec.ts']
 ]);
 export const RUNNER_DELTA_OWNER_CLOSURE = Object.freeze([['M', 'scripts/canvas06-unified-production-input.mjs'], ['M', 'scripts/canvas06-unified-production-input.test.mjs']]);
+export const RUNNER_CLI_DELTA = Object.freeze([
+  ['M', 'package.json'],
+  ['M', 'scripts/canvas06-e2e-run-preflight.mjs'],
+  ['M', 'scripts/canvas06-e2e-run-preflight.test.mjs'],
+  ['M', 'scripts/canvas06-e2e-run-report.mjs'],
+  ['M', 'scripts/canvas06-e2e-run-report.test.mjs'],
+  ['M', 'scripts/canvas06-unified-production-input.mjs'],
+  ['M', 'scripts/canvas06-unified-production-input.test.mjs'],
+  ['M', 'scripts/release-canvas06-e2e-run.mjs'],
+  ['M', 'scripts/release-canvas06-e2e-run.test.mjs']
+]);
 export const FAULT_2A_CUMULATIVE_DELTA = mergeDelta(FAULT_CONTRACT_DELTA, FAULT_2A_DELTA);
 export const FINAL_RUNNER_CUMULATIVE_DELTA = mergeDelta(FAULT_2A_CUMULATIVE_DELTA, RUNNER_DELTA, RUNNER_DELTA_OWNER_CLOSURE);
 const QUARANTINE_FAILURE_CODES = new Set(['CANVAS06_UNIFIED_HANDOFF_INVALID', 'CANVAS06_UNIFIED_INTAKE_INVALID', 'CANVAS06_UNIFIED_WEB_TREE_INVALID', 'CANVAS06_UNIFIED_COMMON_INVALID', 'CANVAS06_UNIFIED_JOIN_MISMATCH', 'CANVAS06_UNIFIED_TRANSACTION_FAILED']);
@@ -225,8 +237,10 @@ export function assertSourceClean(sourceRoot, options) {
   const runner = options['runner-source-commit'];
   assertSingleParent(sourceRoot, RUNNER_IMPLEMENTATION_COMMIT, fault, 'RUNNER_IMPLEMENTATION_PARENT');
   assertDelta(sourceRoot, fault, RUNNER_IMPLEMENTATION_COMMIT, RUNNER_DELTA, 'RUNNER_IMPLEMENTATION_DELTA');
-  assertSingleParent(sourceRoot, runner, RUNNER_IMPLEMENTATION_COMMIT, 'RUNNER_DELTA_OWNER_PARENT');
-  assertDelta(sourceRoot, RUNNER_IMPLEMENTATION_COMMIT, runner, RUNNER_DELTA_OWNER_CLOSURE, 'RUNNER_DELTA_OWNER_CLOSURE');
+  assertSingleParent(sourceRoot, RUNNER_DELTA_OWNER_COMMIT, RUNNER_IMPLEMENTATION_COMMIT, 'RUNNER_DELTA_OWNER_PARENT');
+  assertDelta(sourceRoot, RUNNER_IMPLEMENTATION_COMMIT, RUNNER_DELTA_OWNER_COMMIT, RUNNER_DELTA_OWNER_CLOSURE, 'RUNNER_DELTA_OWNER_CLOSURE');
+  assertSingleParent(sourceRoot, runner, RUNNER_DELTA_OWNER_COMMIT, 'RUNNER_CLI_PARENT');
+  assertDelta(sourceRoot, RUNNER_DELTA_OWNER_COMMIT, runner, RUNNER_CLI_DELTA, 'RUNNER_CLI_DELTA');
   assertDelta(sourceRoot, origin, runner, FINAL_RUNNER_CUMULATIVE_DELTA, 'FINAL_RUNNER_CUMULATIVE_DELTA');
 }
 
