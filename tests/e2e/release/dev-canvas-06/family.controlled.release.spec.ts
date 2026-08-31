@@ -73,5 +73,12 @@ test('受控 Family E2E 只经 Runner session 执行', async () => {
     return undefined;
   });
 
-  await owner.runFamilyControlledInvocationSession({ invocation_context: invocationContext, cycle_handler: cycleHandler });
+  try {
+    await owner.runFamilyControlledInvocationSession({ invocation_context: invocationContext, cycle_handler: cycleHandler });
+  } catch (error: any) {
+    if (error?.code === 'E2E_ORCHESTRATION_BROWSER_PROOF_INVALID' && error?.proof_state !== undefined) {
+      try { await owner.writeFamilyProofDiagnostic({ outputDir: process.env.PLAYWRIGHT_OUTPUT_DIR, error }); } catch { /* 保留原始 Family proof 错误。 */ }
+    }
+    throw error;
+  }
 });

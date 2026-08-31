@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { createHash, createHmac } from 'node:crypto';
 import { EventEmitter } from 'node:events';
-import { chmod, cp, lstat, mkdir, mkdtemp, readFile, readdir, writeFile } from 'node:fs/promises';
+import { chmod, cp, link, lstat, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { basename, dirname, resolve } from 'node:path';
@@ -45,8 +45,10 @@ import {
   expectedSubjectForCase,
   buildAttemptIndexEntries,
   assertProcessControlParent,
+  readFamilyProofDiagnostic,
   runReleasePlaywright,
-  runCli
+  runCli,
+  writeFamilyProofDiagnostic
 } from './release-canvas06-e2e-run.mjs';
 
 const CASE_ID = 'E2E-CANVAS-007.ASSET_MISSING';
@@ -69,6 +71,74 @@ test('release Playwright 启动失败时清理受控输出目录', async () => {
   const root = await mkdtemp(resolve(tmpdir(), 'canvas06-playwright-output-'));
   await assert.rejects(() => runReleasePlaywright({ sourceRoot: root, contextRef: {}, outputDir: resolve(root, 'output') }), error => error.code === 'E2E_RUN_ENVIRONMENT_INVALID');
   await assert.rejects(() => lstat(resolve(root, 'output')), { code: 'ENOENT' });
+});
+
+const FAMILY_PROOF_STATE = Object.freeze({
+  bound: true, confirmed: true, sentinel_active: true, late_event_detected: false,
+  pending_capture_count: 0, pending_capture_error: false, waiter_count: 0, unresolved_network_count: 0,
+  reopen_mode: true, subject_before_bound: false, subject_baseline_matches: false, common_mode: true,
+  resolved_setup_baseline: false, reopen_expectation_required: true, reopen_verification_state: 4,
+  requires_precondition: false, precondition_state: 0, precondition_complete: false
+});
+
+test('Family child仅为精确R8 Browser proof错误原子写入canonical诊断', async () => {
+  const root = await mkdtemp(resolve(tmpdir(), 'canvas06-family-proof-write-'));
+  const outputDir = resolve(root, 'output');
+  const error = Object.assign(new Error('proof'), { code: 'E2E_ORCHESTRATION_BROWSER_PROOF_INVALID', proof_state: FAMILY_PROOF_STATE });
+  try {
+    await writeFamilyProofDiagnostic({ outputDir, error });
+    const path = resolve(outputDir, 'family-proof-diagnostic.json');
+    const expected = Buffer.from(`${canonicalizeJcs({ proof_state: FAMILY_PROOF_STATE, schema_id: 'OPM-DEV-CANVAS-06-FAMILY-PROOF-DIAGNOSTIC-001', schema_version: '0.1' })}\n`, 'utf8');
+    assert.deepEqual(await readFile(path), expected);
+    const proofState = await readFamilyProofDiagnostic(outputDir);
+    assert.deepEqual(proofState, FAMILY_PROOF_STATE);
+    assert.equal(Object.isFrozen(proofState), true);
+    await assert.rejects(
+      () => writeFamilyProofDiagnostic({ outputDir: resolve(root, 'wrong-code'), error: Object.assign(new Error('wrong'), { code: 'E2E_ORCHESTRATION_INPUT_INVALID', proof_state: FAMILY_PROOF_STATE }) }),
+      TypeError
+    );
+    await assert.rejects(() => lstat(resolve(root, 'wrong-code')), { code: 'ENOENT' });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('Family proof诊断在父Runner中严格读取并始终清理受控输出目录', async () => {
+  const root = await mkdtemp(resolve(tmpdir(), 'canvas06-family-proof-parent-'));
+  const canonical = `${canonicalizeJcs({ proof_state: FAMILY_PROOF_STATE, schema_id: 'OPM-DEV-CANVAS-06-FAMILY-PROOF-DIAGNOSTIC-001', schema_version: '0.1' })}\n`;
+  const variants = [
+    ['missing', '', undefined],
+    ['extra-key', `await writeFile(path, ${JSON.stringify(canonicalizeJcs({ extra: true, proof_state: FAMILY_PROOF_STATE, schema_id: 'OPM-DEV-CANVAS-06-FAMILY-PROOF-DIAGNOSTIC-001', schema_version: '0.1' }) + '\n')});`, undefined],
+    ['non-canonical', `await writeFile(path, ${JSON.stringify(JSON.stringify({ schema_id: 'OPM-DEV-CANVAS-06-FAMILY-PROOF-DIAGNOSTIC-001', schema_version: '0.1', proof_state: FAMILY_PROOF_STATE }) + '\n')});`, undefined],
+    ['multiple-links', `await writeFile(path, ${JSON.stringify(canonical)}); await link(path, resolve(output, 'family-proof-diagnostic-copy.json'));`, undefined],
+    ['wrong-schema', `await writeFile(path, ${JSON.stringify(canonicalizeJcs({ proof_state: FAMILY_PROOF_STATE, schema_id: 'WRONG', schema_version: '0.1' }) + '\n')});`, undefined],
+    ['valid', `await writeFile(path, ${JSON.stringify(canonical)});`, FAMILY_PROOF_STATE]
+  ];
+  try {
+    for (const [name, body, expectedProofState] of variants) {
+      const sourceRoot = resolve(root, name);
+      const cli = resolve(sourceRoot, 'node_modules/@playwright/test/cli.js');
+      const outputDir = resolve(sourceRoot, 'controlled-output');
+      await mkdir(dirname(cli), { recursive: true });
+      await writeFile(resolve(sourceRoot, 'package.json'), '{"type":"module"}\n');
+      await writeFile(cli, `import { link, mkdir, writeFile } from 'node:fs/promises';\nimport { resolve } from 'node:path';\nconst output = process.env.PLAYWRIGHT_OUTPUT_DIR;\nconst path = resolve(output, 'family-proof-diagnostic.json');\nawait mkdir(output, { recursive: true });\n${body}\nprocess.exitCode = 1;\n`);
+      await assert.rejects(
+        () => runReleasePlaywright({ sourceRoot, contextRef: {}, outputDir }),
+        error => error.code === 'E2E_UNEXPECTED_RUNTIME_ERROR' && error.exitCode === 3 && assert.deepEqual(error.proof_state, expectedProofState) === undefined
+      );
+      await assert.rejects(() => lstat(outputDir), { code: 'ENOENT' });
+    }
+    const successRoot = resolve(root, 'success');
+    const successCli = resolve(successRoot, 'node_modules/@playwright/test/cli.js');
+    const successOutput = resolve(successRoot, 'controlled-output');
+    await mkdir(dirname(successCli), { recursive: true });
+    await writeFile(resolve(successRoot, 'package.json'), '{"type":"module"}\n');
+    await writeFile(successCli, 'process.exitCode = 0;\n');
+    await runReleasePlaywright({ sourceRoot: successRoot, contextRef: {}, outputDir: successOutput });
+    await assert.rejects(() => lstat(successOutput), { code: 'ENOENT' });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });
 
 test('writes and reads back both frozen attempt Fault Plans before a later producer can run', async () => {

@@ -48,6 +48,18 @@ const FAMILY_VIEWPORTS = Object.freeze({
 });
 const FAULT_DOMAIN = Buffer.from('OPM-DEV-CANVAS-06-E2E-FAULT-LAUNCHER-001\0', 'ascii');
 const FAMILY_CONTEXT_ENV = 'OPM_CANVAS06_E2E_CONTROL_CONTEXT_REF';
+const FAMILY_PROOF_DIAGNOSTIC_NAME = 'family-proof-diagnostic.json';
+const FAMILY_PROOF_DIAGNOSTIC_SCHEMA_ID = 'OPM-DEV-CANVAS-06-FAMILY-PROOF-DIAGNOSTIC-001';
+const FAMILY_PROOF_DIAGNOSTIC_SCHEMA_VERSION = '0.1';
+const FAMILY_PROOF_STATE_BOOLEAN_KEYS = Object.freeze([
+  'bound', 'confirmed', 'sentinel_active', 'late_event_detected', 'pending_capture_error',
+  'reopen_mode', 'subject_before_bound', 'subject_baseline_matches', 'common_mode',
+  'resolved_setup_baseline', 'reopen_expectation_required', 'requires_precondition', 'precondition_complete'
+]);
+const FAMILY_PROOF_STATE_INTEGER_KEYS = Object.freeze([
+  'pending_capture_count', 'waiter_count', 'unresolved_network_count', 'reopen_verification_state', 'precondition_state'
+]);
+const FAMILY_PROOF_STATE_KEYS = Object.freeze([...FAMILY_PROOF_STATE_BOOLEAN_KEYS, ...FAMILY_PROOF_STATE_INTEGER_KEYS].toSorted());
 const FAMILY_CONTEXT_SCHEMA = JSON.parse(await readFile(new URL('../docs/contracts/schemas/opm-dev-canvas-06-e2e-controlled-invocation-context.schema.json', import.meta.url), 'utf8'));
 const ATTEMPT_ARTIFACT_SCHEMA = JSON.parse(await readFile(new URL('../docs/contracts/schemas/opm-dev-canvas-06-e2e-attempt-artifact-v02.schema.json', import.meta.url), 'utf8'));
 const familyContextAjv = new Ajv2020({ allErrors: true, strict: false, formats: { 'date-time': true } });
@@ -239,11 +251,79 @@ export async function runReleasePlaywright({ sourceRoot, contextRef, outputDir }
     child.once('close', (code, signal) => resolveChild({ code, signal }));
   });
   const diagnostic = `${await stdout}\n${await stderr}`.replaceAll('\0', '').slice(0, 16 * 1024);
-  await rm(controlledOutputDir, { recursive: true, force: true });
-  await assertAbsent(controlledOutputDir);
-  if (outcome.code !== 0 || outcome.signal !== null) {
-    throw new E2eRunInputError('E2E_UNEXPECTED_RUNTIME_ERROR', `Controlled Playwright session did not complete the full schedule.\n${diagnostic}`, 3);
+  let proofState;
+  try {
+    if (outcome.code !== 0 || outcome.signal !== null) proofState = await readFamilyProofDiagnostic(controlledOutputDir);
+  } finally {
+    await rm(controlledOutputDir, { recursive: true, force: true });
+    await assertAbsent(controlledOutputDir);
   }
+  if (outcome.code !== 0 || outcome.signal !== null) {
+    const error = new E2eRunInputError('E2E_UNEXPECTED_RUNTIME_ERROR', `Controlled Playwright session did not complete the full schedule.\n${diagnostic}`, 3);
+    if (proofState !== undefined) error.proof_state = proofState;
+    throw error;
+  }
+}
+
+/** 仅受控 Playwright child 可调用的 Family proof 诊断原子写入器。 */
+export async function writeFamilyProofDiagnostic({ outputDir, error }) {
+  if (error?.code !== 'E2E_ORCHESTRATION_BROWSER_PROOF_INVALID' || !isFamilyProofState(error.proof_state)) {
+    throw new TypeError('Family proof diagnostic requires the exact R8 Browser proof failure.');
+  }
+  if (!isAbsolute(outputDir)) throw new TypeError('Family proof diagnostic output directory is invalid.');
+  const root = resolve(outputDir);
+  await mkdir(root, { recursive: true });
+  const rootInfo = await lstat(root);
+  if (!rootInfo.isDirectory() || rootInfo.isSymbolicLink()) throw new TypeError('Family proof diagnostic output directory is unsafe.');
+  const finalPath = resolve(root, FAMILY_PROOF_DIAGNOSTIC_NAME);
+  const temporaryPath = resolve(root, `.${FAMILY_PROOF_DIAGNOSTIC_NAME}.tmp`);
+  await assertAbsent(finalPath);
+  await assertAbsent(temporaryPath);
+  const value = { proof_state: error.proof_state, schema_id: FAMILY_PROOF_DIAGNOSTIC_SCHEMA_ID, schema_version: FAMILY_PROOF_DIAGNOSTIC_SCHEMA_VERSION };
+  const bytes = Buffer.from(`${canonicalizeJcs(value)}\n`, 'utf8');
+  let published = false;
+  try {
+    const handle = await open(temporaryPath, 'wx', 0o600);
+    try {
+      await handle.writeFile(bytes);
+      await handle.sync();
+    } finally {
+      await handle.close();
+    }
+    await rename(temporaryPath, finalPath);
+    published = true;
+    await fsyncDirectory(root);
+  } catch (writeError) {
+    await rm(temporaryPath, { force: true });
+    if (published) await rm(finalPath, { force: true });
+    throw writeError;
+  }
+}
+
+export async function readFamilyProofDiagnostic(outputDir) {
+  const root = resolve(outputDir);
+  const path = resolve(root, FAMILY_PROOF_DIAGNOSTIC_NAME);
+  try {
+    const info = await lstat(path);
+    if (!info.isFile() || info.isSymbolicLink() || info.nlink !== 1) return undefined;
+    const bytes = await readSingleLinkFile(path, 'E2E_RUN_OUTPUT_INVALID');
+    const text = bytes.toString('utf8');
+    if (!Buffer.from(text, 'utf8').equals(bytes)) return undefined;
+    const value = JSON.parse(text);
+    if (!plainObject(value) || Object.keys(value).toSorted().join('\0') !== 'proof_state\0schema_id\0schema_version'
+        || value.schema_id !== FAMILY_PROOF_DIAGNOSTIC_SCHEMA_ID || value.schema_version !== FAMILY_PROOF_DIAGNOSTIC_SCHEMA_VERSION
+        || !isFamilyProofState(value.proof_state) || !bytes.equals(Buffer.from(`${canonicalizeJcs(value)}\n`, 'utf8'))) return undefined;
+    return deepFreeze(structuredClone(value.proof_state));
+  } catch {
+    return undefined;
+  }
+}
+
+function isFamilyProofState(value) {
+  if (!plainObject(value) || Object.keys(value).toSorted().join('\0') !== FAMILY_PROOF_STATE_KEYS.join('\0')) return false;
+  return FAMILY_PROOF_STATE_BOOLEAN_KEYS.every(key => typeof value[key] === 'boolean')
+    && FAMILY_PROOF_STATE_INTEGER_KEYS.every(key => Number.isSafeInteger(value[key]) && value[key] >= 0)
+    && value.reopen_verification_state <= 4 && value.precondition_state <= 3;
 }
 
 function captureChildText(stream) {
