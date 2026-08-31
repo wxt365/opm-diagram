@@ -42,6 +42,7 @@ import {
   writeFamilyApiExchangeIndex,
   buildFamilyBrowserEnvironment,
   selectSubjectReceipt,
+  selectFamilyCycleFailure,
   expectedSubjectForCase,
   buildAttemptIndexEntries,
   assertProcessControlParent,
@@ -71,6 +72,17 @@ test('release Playwright 启动失败时清理受控输出目录', async () => {
   const root = await mkdtemp(resolve(tmpdir(), 'canvas06-playwright-output-'));
   await assert.rejects(() => runReleasePlaywright({ sourceRoot: root, contextRef: {}, outputDir: resolve(root, 'output') }), error => error.code === 'E2E_RUN_ENVIRONMENT_INVALID');
   await assert.rejects(() => lstat(resolve(root, 'output')), { code: 'ENOENT' });
+});
+
+test('Family cycle保留primary failure，仅端口未释放可覆盖cleanup failure', () => {
+  const primary = Object.freeze({ code: 'E2E_ORCHESTRATION_PROCESS_FAILED', exitCode: 3 });
+  const browserProof = Object.freeze({ code: 'E2E_ORCHESTRATION_BROWSER_PROOF_INVALID', exitCode: 4 });
+  const evidence = Object.freeze({ code: 'EVIDENCE_TRANSACTION', exitCode: 4 });
+  const port = Object.freeze({ code: 'E2E_ORCHESTRATION_PORT_NOT_RELEASED', exitCode: 4 });
+  assert.equal(selectFamilyCycleFailure(null, browserProof), browserProof);
+  assert.equal(selectFamilyCycleFailure(primary, browserProof), primary);
+  assert.equal(selectFamilyCycleFailure(primary, evidence), primary);
+  assert.equal(selectFamilyCycleFailure(primary, port), port);
 });
 
 const FAMILY_PROOF_STATE = Object.freeze({

@@ -4,12 +4,12 @@ import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import test from 'node:test';
 
-import { FAULT_2A_CUMULATIVE_DELTA, FAULT_2A_DELTA, FAULT_CONTRACT_DELTA, FINAL_RUNNER_CUMULATIVE_DELTA, ORIGIN_SOURCE_COMMIT, RUNNER_CLI_COMMIT, RUNNER_CLI_DELTA, RUNNER_CUMULATIVE_DELTA_CLOSURE, RUNNER_CUMULATIVE_DELTA_CLOSURE_COMMIT, RUNNER_DELTA, RUNNER_DELTA_OWNER_CLOSURE, RUNNER_FAMILY_PROOF_DIAGNOSTIC_CLOSURE, RUNNER_FAMILY_PROOF_DIAGNOSTIC_COMMIT, RUNNER_FAMILY_PROOF_DIAGNOSTIC_TRANSPORT_CLOSURE, RUNNER_FINAL_CHAIN_BASE_COMMIT, RUNNER_PROCESS_CONTROL_CLI_CLOSURE, RUNNER_PROCESS_CONTROL_CLI_COMMIT, RUNNER_PLAYWRIGHT_LAUNCH_CLOSURE, RUNNER_PLAYWRIGHT_LAUNCH_COMMIT, RUNNER_PLAYWRIGHT_OUTPUT_ENV_NAMESPACE_CLOSURE, RUNNER_PLAYWRIGHT_OUTPUT_ENV_NAMESPACE_COMMIT, UnifiedInputError, assertArtifactOrder, assertExactQuarantineGuard, assertExternalTopology, deriveExternalPaths, openExternalPaths, parseOptions, sourceEpoch, sourceChainArgs, treeRef, writeQuarantineMarker } from './canvas06-unified-production-input.mjs';
+import { FAULT_2A_CUMULATIVE_DELTA, FAULT_2A_DELTA, FAULT_CONTRACT_DELTA, FINAL_RUNNER_CUMULATIVE_DELTA, ORIGIN_SOURCE_COMMIT, RUNNER_CLI_COMMIT, RUNNER_CLI_DELTA, RUNNER_CUMULATIVE_DELTA_CLOSURE, RUNNER_CUMULATIVE_DELTA_CLOSURE_COMMIT, RUNNER_DELTA, RUNNER_DELTA_OWNER_CLOSURE, RUNNER_FAMILY_CYCLE_FAILURE_PRECEDENCE_CLOSURE, RUNNER_FAMILY_PROOF_DIAGNOSTIC_CLOSURE, RUNNER_FAMILY_PROOF_DIAGNOSTIC_COMMIT, RUNNER_FAMILY_PROOF_DIAGNOSTIC_TRANSPORT_COMMIT, RUNNER_FAMILY_PROOF_DIAGNOSTIC_TRANSPORT_CLOSURE, RUNNER_FINAL_CHAIN_BASE_COMMIT, RUNNER_PROCESS_CONTROL_CLI_CLOSURE, RUNNER_PROCESS_CONTROL_CLI_COMMIT, RUNNER_PLAYWRIGHT_LAUNCH_CLOSURE, RUNNER_PLAYWRIGHT_LAUNCH_COMMIT, RUNNER_PLAYWRIGHT_OUTPUT_ENV_NAMESPACE_CLOSURE, RUNNER_PLAYWRIGHT_OUTPUT_ENV_NAMESPACE_COMMIT, UnifiedInputError, assertArtifactOrder, assertExactQuarantineGuard, assertExternalTopology, deriveExternalPaths, openExternalPaths, parseOptions, sourceEpoch, sourceChainArgs, treeRef, writeQuarantineMarker } from './canvas06-unified-production-input.mjs';
 
 const commit = 'a'.repeat(40);
 const argv = ['--input-mode', 'EXTERNAL_RELEASE_STORE', '--source-root', '/source', '--release-store-root', '/release-store', '--source-chain-target', 'FINAL_RUNNER', '--origin-source-commit', ORIGIN_SOURCE_COMMIT, '--fault-contract-source-commit', 'b'.repeat(40), '--schema-conformance-source-commit', 'c'.repeat(40), '--fault-2a-source-commit', 'd'.repeat(40), '--runner-source-commit', commit, '--source-commit', commit, '--require-production'];
 
-test('source chain 精确锁定 C=20、A=7、R0=63、R=2、R2=9、R3=2、R4=2、R5=6、R6=5、R7=5、R8=4、R9=5、Fault累计25与最终累计86个路径', () => {
+test('source chain 精确锁定 C=20、A=7、R0=63、R=2、R2=9、R3=2、R4=2、R5=6、R6=5、R7=5、R8=4、R9=5、R10=4、Fault累计25与最终累计86个路径', () => {
   assert.equal(FAULT_CONTRACT_DELTA.length, 20);
   assert.equal(FAULT_2A_DELTA.length, 7);
   assert.equal(FAULT_2A_CUMULATIVE_DELTA.length, 25);
@@ -23,6 +23,7 @@ test('source chain 精确锁定 C=20、A=7、R0=63、R=2、R2=9、R3=2、R4=2、
   assert.equal(RUNNER_PLAYWRIGHT_LAUNCH_COMMIT, '8ab7da6f482887820a54c1d35d8ee683e5e0083f');
   assert.equal(RUNNER_PLAYWRIGHT_OUTPUT_ENV_NAMESPACE_COMMIT, 'd43aedbd9832f2e64126a61567c0a79a4b39a176');
   assert.equal(RUNNER_FAMILY_PROOF_DIAGNOSTIC_COMMIT, '6557b63d84ecd951b9f5125fd60a10790e20ba5f');
+  assert.equal(RUNNER_FAMILY_PROOF_DIAGNOSTIC_TRANSPORT_COMMIT, 'd1a9a960a70634a7e110944b6b8c6e6370fbfc2d');
   assert.deepEqual(RUNNER_CUMULATIVE_DELTA_CLOSURE, [['M', 'scripts/canvas06-unified-production-input.mjs'], ['M', 'scripts/canvas06-unified-production-input.test.mjs']]);
   assert.deepEqual(RUNNER_PROCESS_CONTROL_CLI_CLOSURE, [
     ['M', 'scripts/canvas06-e2e-run-input.mjs'], ['M', 'scripts/canvas06-e2e-run-input.test.mjs'],
@@ -43,6 +44,10 @@ test('source chain 精确锁定 C=20、A=7、R0=63、R=2、R2=9、R3=2、R4=2、
     ['M', 'scripts/canvas06-unified-production-input.mjs'], ['M', 'scripts/canvas06-unified-production-input.test.mjs'],
     ['M', 'scripts/release-canvas06-e2e-run.mjs'], ['M', 'scripts/release-canvas06-e2e-run.test.mjs'],
     ['M', 'tests/e2e/release/dev-canvas-06/family.controlled.release.spec.ts']
+  ]);
+  assert.deepEqual(RUNNER_FAMILY_CYCLE_FAILURE_PRECEDENCE_CLOSURE, [
+    ['M', 'scripts/canvas06-unified-production-input.mjs'], ['M', 'scripts/canvas06-unified-production-input.test.mjs'],
+    ['M', 'scripts/release-canvas06-e2e-run.mjs'], ['M', 'scripts/release-canvas06-e2e-run.test.mjs']
   ]);
   assert.deepEqual(RUNNER_DELTA_OWNER_CLOSURE, [['M', 'scripts/canvas06-unified-production-input.mjs'], ['M', 'scripts/canvas06-unified-production-input.test.mjs']]);
   assert.deepEqual(RUNNER_CLI_DELTA, [

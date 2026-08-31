@@ -2523,7 +2523,7 @@ async function runFamilyInvocationCycle({
     let runtimeTermination = null;
     const protect = async operation => {
       try { await operation(); }
-      catch (error) { failure = failure && !isEvidenceFailure(error) ? failure : asEvidenceFailure(error); }
+      catch (error) { failure = selectFamilyCycleFailure(failure, asEvidenceFailure(error)); }
     };
     if (sink) await protect(() => sink.finalizeProof());
     if (web) await protect(() => stopOwnedChild(web));
@@ -4219,6 +4219,10 @@ function driverContractFail(message) { throw new E2eRunInputError('E2E_DRIVER_CO
 function caseExecutionFail(message) { throw new E2eRunInputError('E2E_INPUT_INVALID', message, 2); }
 function browserProofFailure(message) { throw new E2eRunInputError('E2E_ORCHESTRATION_BROWSER_PROOF_INVALID', message, 4); }
 function evidenceTransaction(message) { return new E2eRunInputError('EVIDENCE_TRANSACTION', message, 4); }
+export function selectFamilyCycleFailure(primaryFailure, cleanupFailure) {
+  if (cleanupFailure?.code === 'E2E_ORCHESTRATION_PORT_NOT_RELEASED') return cleanupFailure;
+  return primaryFailure ?? cleanupFailure;
+}
 function asEvidenceFailure(error) {
   return isEvidenceFailure(error) && error.exitCode === 4
     ? error
