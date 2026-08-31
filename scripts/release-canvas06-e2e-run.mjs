@@ -131,7 +131,8 @@ async function executeCliRun({ options, preflight, processControlParent, staging
     });
     await (dependencies.runPlaywright ?? runReleasePlaywright)({
       sourceRoot: preflight.source.root,
-      contextRef: contextResult.ref
+      contextRef: contextResult.ref,
+      outputDir: resolve(controlParent, 'playwright-output')
     });
     const observations = await readE2eAttemptObservations({ reportRoot: stagingRoot, manifest: manifestInput.manifest });
     const report = composeE2eReport({
@@ -218,22 +219,47 @@ async function buildReportBase({ stagingRoot, manifestInput, preflight, runnerSo
   });
 }
 
-async function runReleasePlaywright({ sourceRoot, contextRef }) {
+export async function runReleasePlaywright({ sourceRoot, contextRef, outputDir }) {
   const cli = resolve(sourceRoot, 'node_modules/@playwright/test/cli.js');
+  const config = resolve(sourceRoot, 'tests/e2e/release/dev-canvas-06/playwright.release.config.ts');
+  const controlledOutputDir = resolve(outputDir);
   await assertExecutableInput(cli, 'E2E_RUN_ENVIRONMENT_INVALID');
+  await assertAbsent(controlledOutputDir);
   const environment = { ...process.env };
   for (const key of Object.keys(environment)) if (key.startsWith('OPM_CANVAS06_E2E_')) delete environment[key];
   environment[FAMILY_CONTEXT_ENV] = canonicalizeJcs(contextRef);
-  const child = spawn(process.execPath, [cli, 'test', 'tests/e2e/release/dev-canvas-06/family.controlled.release.spec.ts'], {
+  environment.OPM_CANVAS06_E2E_PLAYWRIGHT_OUTPUT_DIR = controlledOutputDir;
+  const child = spawn(process.execPath, [cli, 'test', '--config', config, 'tests/e2e/release/dev-canvas-06/family.controlled.release.spec.ts'], {
     cwd: sourceRoot, env: environment, stdio: ['ignore', 'pipe', 'pipe'], shell: false
   });
+  const stdout = captureChildText(child.stdout);
+  const stderr = captureChildText(child.stderr);
   const outcome = await new Promise((resolveChild, rejectChild) => {
     child.once('error', rejectChild);
     child.once('close', (code, signal) => resolveChild({ code, signal }));
   });
+  const diagnostic = `${await stdout}\n${await stderr}`.replaceAll('\0', '').slice(0, 16 * 1024);
+  await rm(controlledOutputDir, { recursive: true, force: true });
+  await assertAbsent(controlledOutputDir);
   if (outcome.code !== 0 || outcome.signal !== null) {
-    throw new E2eRunInputError('E2E_UNEXPECTED_RUNTIME_ERROR', 'Controlled Playwright session did not complete the full schedule.', 3);
+    throw new E2eRunInputError('E2E_UNEXPECTED_RUNTIME_ERROR', `Controlled Playwright session did not complete the full schedule.\n${diagnostic}`, 3);
   }
+}
+
+function captureChildText(stream) {
+  return new Promise(resolveText => {
+    const chunks = [];
+    let length = 0;
+    stream?.on('data', chunk => {
+      if (length >= 16 * 1024) return;
+      const bytes = Buffer.from(chunk).subarray(0, 16 * 1024 - length);
+      chunks.push(bytes);
+      length += bytes.length;
+    });
+    stream?.once('end', () => resolveText(Buffer.concat(chunks).toString('utf8')));
+    stream?.once('error', () => resolveText(Buffer.concat(chunks).toString('utf8')));
+    if (!stream) resolveText('');
+  });
 }
 
 function reportIdFromOutput(out) {

@@ -4,26 +4,32 @@ import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import test from 'node:test';
 
-import { FAULT_2A_CUMULATIVE_DELTA, FAULT_2A_DELTA, FAULT_CONTRACT_DELTA, FINAL_RUNNER_CUMULATIVE_DELTA, ORIGIN_SOURCE_COMMIT, RUNNER_CLI_COMMIT, RUNNER_CLI_DELTA, RUNNER_CUMULATIVE_DELTA_CLOSURE, RUNNER_CUMULATIVE_DELTA_CLOSURE_COMMIT, RUNNER_DELTA, RUNNER_DELTA_OWNER_CLOSURE, RUNNER_FINAL_CHAIN_BASE_COMMIT, RUNNER_PROCESS_CONTROL_CLI_CLOSURE, UnifiedInputError, assertArtifactOrder, assertExactQuarantineGuard, assertExternalTopology, deriveExternalPaths, openExternalPaths, parseOptions, sourceEpoch, sourceChainArgs, treeRef, writeQuarantineMarker } from './canvas06-unified-production-input.mjs';
+import { FAULT_2A_CUMULATIVE_DELTA, FAULT_2A_DELTA, FAULT_CONTRACT_DELTA, FINAL_RUNNER_CUMULATIVE_DELTA, ORIGIN_SOURCE_COMMIT, RUNNER_CLI_COMMIT, RUNNER_CLI_DELTA, RUNNER_CUMULATIVE_DELTA_CLOSURE, RUNNER_CUMULATIVE_DELTA_CLOSURE_COMMIT, RUNNER_DELTA, RUNNER_DELTA_OWNER_CLOSURE, RUNNER_FINAL_CHAIN_BASE_COMMIT, RUNNER_PROCESS_CONTROL_CLI_CLOSURE, RUNNER_PROCESS_CONTROL_CLI_COMMIT, RUNNER_PLAYWRIGHT_LAUNCH_CLOSURE, UnifiedInputError, assertArtifactOrder, assertExactQuarantineGuard, assertExternalTopology, deriveExternalPaths, openExternalPaths, parseOptions, sourceEpoch, sourceChainArgs, treeRef, writeQuarantineMarker } from './canvas06-unified-production-input.mjs';
 
 const commit = 'a'.repeat(40);
 const argv = ['--input-mode', 'EXTERNAL_RELEASE_STORE', '--source-root', '/source', '--release-store-root', '/release-store', '--source-chain-target', 'FINAL_RUNNER', '--origin-source-commit', ORIGIN_SOURCE_COMMIT, '--fault-contract-source-commit', 'b'.repeat(40), '--schema-conformance-source-commit', 'c'.repeat(40), '--fault-2a-source-commit', 'd'.repeat(40), '--runner-source-commit', commit, '--source-commit', commit, '--require-production'];
 
-test('source chain 精确锁定 C=20、A=7、R0=63、R=2、R2=9、R3=2、R4=2、R5=6、Fault累计25与最终累计85个路径', () => {
+test('source chain 精确锁定 C=20、A=7、R0=63、R=2、R2=9、R3=2、R4=2、R5=6、R6=5、Fault累计25与最终累计86个路径', () => {
   assert.equal(FAULT_CONTRACT_DELTA.length, 20);
   assert.equal(FAULT_2A_DELTA.length, 7);
   assert.equal(FAULT_2A_CUMULATIVE_DELTA.length, 25);
-  assert.equal(FINAL_RUNNER_CUMULATIVE_DELTA.length, 85);
+  assert.equal(FINAL_RUNNER_CUMULATIVE_DELTA.length, 86);
   assert.equal(RUNNER_DELTA.length, 63);
   assert.equal(RUNNER_CLI_DELTA.length, 9);
   assert.equal(RUNNER_CLI_COMMIT, '6918ee26153f880802ebadbc8fc01407e4f5b906');
   assert.equal(RUNNER_CUMULATIVE_DELTA_CLOSURE_COMMIT, 'e20136020ee71d9fa1fd3a03d15e5dbf57d4d3f8');
   assert.equal(RUNNER_FINAL_CHAIN_BASE_COMMIT, 'a76358782c34227d8888daa184648469bed3390a');
+  assert.equal(RUNNER_PROCESS_CONTROL_CLI_COMMIT, '0d7d8b4290c0cbc49dca4dcf887bc7fee4154efa');
   assert.deepEqual(RUNNER_CUMULATIVE_DELTA_CLOSURE, [['M', 'scripts/canvas06-unified-production-input.mjs'], ['M', 'scripts/canvas06-unified-production-input.test.mjs']]);
   assert.deepEqual(RUNNER_PROCESS_CONTROL_CLI_CLOSURE, [
     ['M', 'scripts/canvas06-e2e-run-input.mjs'], ['M', 'scripts/canvas06-e2e-run-input.test.mjs'],
     ['M', 'scripts/canvas06-unified-production-input.mjs'], ['M', 'scripts/canvas06-unified-production-input.test.mjs'],
     ['M', 'scripts/release-canvas06-e2e-run.mjs'], ['M', 'scripts/release-canvas06-e2e-run.test.mjs']
+  ]);
+  assert.deepEqual(RUNNER_PLAYWRIGHT_LAUNCH_CLOSURE, [
+    ['M', 'scripts/canvas06-unified-production-input.mjs'], ['M', 'scripts/canvas06-unified-production-input.test.mjs'],
+    ['M', 'scripts/release-canvas06-e2e-run.mjs'], ['M', 'scripts/release-canvas06-e2e-run.test.mjs'],
+    ['M', 'tests/e2e/release/dev-canvas-06/playwright.release.config.ts']
   ]);
   assert.deepEqual(RUNNER_DELTA_OWNER_CLOSURE, [['M', 'scripts/canvas06-unified-production-input.mjs'], ['M', 'scripts/canvas06-unified-production-input.test.mjs']]);
   assert.deepEqual(RUNNER_CLI_DELTA, [

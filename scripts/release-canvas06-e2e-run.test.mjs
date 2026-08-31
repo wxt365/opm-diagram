@@ -45,6 +45,7 @@ import {
   expectedSubjectForCase,
   buildAttemptIndexEntries,
   assertProcessControlParent,
+  runReleasePlaywright,
   runCli
 } from './release-canvas06-e2e-run.mjs';
 
@@ -62,6 +63,12 @@ test('process-control parent 必须为空且与 Runner 输入输出隔离', asyn
   assert.equal(await assertProcessControlParent({ parent: root, isolatedFrom: isolated }), root);
   await writeFile(resolve(root, 'residual'), 'x');
   await assert.rejects(() => assertProcessControlParent({ parent: root, isolatedFrom: isolated }), error => error.code === 'E2E_RUN_ARGUMENT_INVALID');
+});
+
+test('release Playwright 启动失败时清理受控输出目录', async () => {
+  const root = await mkdtemp(resolve(tmpdir(), 'canvas06-playwright-output-'));
+  await assert.rejects(() => runReleasePlaywright({ sourceRoot: root, contextRef: {}, outputDir: resolve(root, 'output') }), error => error.code === 'E2E_RUN_ENVIRONMENT_INVALID');
+  await assert.rejects(() => lstat(resolve(root, 'output')), { code: 'ENOENT' });
 });
 
 test('writes and reads back both frozen attempt Fault Plans before a later producer can run', async () => {
