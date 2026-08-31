@@ -105,4 +105,4 @@ Golden Authoring 先冻结了 capture 数量、Catalog ref 和最终 Report，�
 
 本设计闭环不构成新 Common fixture、Plan、candidate、Approval、approved version、Visual Manifest/Report、GATE READY、Capability enablement、生产发布或 ISO 19450:2024 符合性证明。
 
-> 历史状态指针（2026-08-07）：本规格冻结的是Visual Common Materialization首轮`v1.0`。当前唯一口径为`v1.4`，已追加JCS owner/parity、唯一空Text Artifact/计数、五类index、8类UI step和43文件self-contained root闭包；全局状态以冻结基线`v1.21`为准。本历史规格不构成新增契约的实现证据。
+> 历史状态指针（2026-08-26更新）：本规格冻结的是Visual Common Materialization首轮`v1.0`。当前唯一口径为`v1.5`，已追加JCS owner/parity、空Text Artifact/index/UI/43文件root、四份adapter机器Schema和独立one-shot fault闭包；全局状态以冻结基线`v1.52`为准。本历史规格不构成新增契约的实现证据。

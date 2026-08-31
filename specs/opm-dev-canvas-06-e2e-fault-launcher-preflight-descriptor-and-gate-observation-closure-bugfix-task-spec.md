@@ -4,7 +4,9 @@
 
 设计修正状态：`COMPLETE`
 
-Fault Launcher 2A 准入：`BLOCKED_BY_PREFLIGHT_DESCRIPTOR_CONTRACT_IMPLEMENTATION`
+Fault Launcher 2A 准入：`BLOCKED_BY_FINAL_PRODUCTION_SOURCE_CHAIN_IMPLEMENTATION`
+
+活动source-chain准入：`opm-dev-canvas-06-final-production-source-chain-closure-bugfix-task-spec.md`取代旧D01 fixed commits，并保持本文Bundle/Descriptor/Manifest D05、D10A/D10B、Invocation Context和evidence事务语义不变。新2A必须绑定新链Stage A，旧`586d6de...`不得作为活动contract base。
 
 ## Task Type
 
@@ -47,7 +49,8 @@ Clean Base 闭包只处理了 `36 READ_ONLY_BASELINE + 2 A` 和依赖阻断输�
 3. Bundle `0.2` 必须以不可变 `preflight_descriptor_ref` 引用 Fault Launcher Preflight Descriptor `0.1`；
 4. descriptor 固定 JarIT Report、Golden Environment/browser、三类 case 的两个 attempt、12 个 process cycle、端口分配和执行前 Gate snapshot；
 5. 原 `FLCP-D10-GATE` 拆为 preflight dependency `FLCP-D10A-GATE-PREFLIGHT` 和 execution evidence `FLCP-D10B-GATE-EXECUTION`；
-6. 2A 实现保持两个新增文件的逻辑范围，但必须等待后继 contract 包形成新的 clean base intake，禁止从 `0dcaa27...` 直接继续 Build。
+6. 两个controlled新增文件的逻辑范围保持不变；活动A-stage另授权两个Runner `M`，合计`4=2 M+2 A`，且必须等待新S形成clean base intake，禁止从`0dcaa27...`直接继续Build；
+7. 2A 只暴露第 17 章唯一 `--run-controlled` 协议，由同一父进程完成 preflight、Playwright、Gate Observation 验证和 evidence root 原子提交；旧 `--preflight`、`--mode=preflight` 及散落的 Runtime/Web/browser override 全部废止。
 
 ## 4. 版本、引用方与无环拓扑
 
@@ -59,6 +62,7 @@ Clean Base 闭包只处理了 `36 READ_ONLY_BASELINE + 2 A` 和依赖阻断输�
 | Fault Launcher Controlled Input Bundle | `OPM-DEV-CANVAS-06-CONTROLLED-INPUT-BUNDLE-001/0.2` | 后继实现目标 |
 | Preflight Descriptor | `OPM-DEV-CANVAS-06-E2E-FAULT-LAUNCHER-PREFLIGHT-DESCRIPTOR-001/0.1` | 后继实现目标 |
 | JarIT Report | `OPM-DEV-CANVAS-06-E2E-FAULT-LAUNCHER-JARIT-REPORT-001/0.1` | 后继实现目标 |
+| Controlled Preflight Report | `OPM-DEV-CANVAS-06-E2E-FAULT-LAUNCHER-CONTROLLED-PREFLIGHT-001/0.2` | 2A Node owner文档级封闭契约；无独立Schema文件 |
 | Gate Execution Observation | `OPM-DEV-CANVAS-06-E2E-FAULT-LAUNCHER-GATE-OBSERVATION-001/0.1` | 后继实现目标 |
 
 机器 Schema 路径固定为：
@@ -90,7 +94,7 @@ actual Manifest 0.2 + descriptor
   -> gate-observation.json 0.1
 ```
 
-Descriptor 不得包含 `manifest_ref`。受控 Manifest builder 本来就消费 controlled bundle；若 descriptor 再引用 final Manifest 会形成构建环。实际 Manifest 仍由 preflight CLI 独立传入，`FLCP-D05-MANIFEST` 必须逐项比较 source commit、三个 case、attempt ordinal 和 process cycle，不允许靠路径或名称推断。
+Descriptor 不得包含 `manifest_ref`。受控 Manifest builder 本来就消费 controlled bundle；若 descriptor 再引用 final Manifest 会形成构建环。实际 Manifest 由第 17 章受控执行 CLI 以 `--manifest-root` 和固定 `--manifest` token 独立传入，`FLCP-D05-MANIFEST` 必须区分 Manifest 自有的三个 case 字段与 Descriptor 自有的 attempt/process schedule，再执行字段级交叉闭包；不允许靠路径、目录名或 case 名称片段推断。
 
 生产 Manifest 不增加可选字段，不接受 Bundle `0.2`，不承载 Fault Launcher 测试输入。Fault Launcher controlled lane 只接受 Bundle `0.2`；其他历史 Visual/E2E lane 是否继续读取 `0.1` 由其既有 verifier 决定，不得把 `0.2` 静默降级为 `0.1`。
 
@@ -324,11 +328,11 @@ activation_input_set_sha256=4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f
 
 ### 10.2 唯一 observer 边界
 
-Gate observer 是 parent Runner 内部只读 owner，只允许读取 exact fixed Handoff 和受控 production activation input root。`candidate_loader_status=NOT_ACTIVE` 只能由 verified activation input set 为空推导；不得通过 UI 文本、进程名、HTTP 200、测试 mock 或“没有创建 Candidate”推断。
+Gate observation算法是两个2A文件共同遵守的单一只读契约：Node父owner在preflight中执行D10A；controlled spec验证Invocation Context并调用Runner owner的`runControlledLifecycleSession()`，D10B的BEFORE/DURING/AFTER采样与Artifact writer只在该接口内部执行。两条调用链都只允许读取 exact fixed Handoff 和受控 production activation input root，不共享可变状态、不增加第三个helper或第二条IPC通道。`candidate_loader_status=NOT_ACTIVE` 只能由 verified activation input set 为空推导；不得通过 UI 文本、进程名、HTTP 200、测试 mock 或“没有创建 Candidate”推断。
 
-Observer 不新增公共 HTTP API，不修改 Runtime production wire，不调用 Activation/Enablement writer，不创建或删除 activation 输入。输入 root、Handoff 或 refs 发生变化时必须 fail-closed。
+两个observer调用点均不新增公共 HTTP API，不修改 Runtime production wire，不调用 Activation/Enablement writer，不创建或删除 activation 输入。输入 root、Handoff 或 refs 发生变化时必须 fail-closed。父owner不得根据Playwright stdout猜测cycle完成；controlled spec不得把Gate值回传为可变命令。D10B唯一机器输出就是第11.2节Gate Observation Artifact。
 
-受控 preflight CLI 必须新增且只新增以下两个显式输入：
+第 17 章受控执行 CLI 必须包含且只通过以下两个显式输入取得 production Gate：
 
 ```text
 --fixed-handoff <absolute-current-fixed-handoff-json>
@@ -351,13 +355,13 @@ fixed Handoff和activation root必须与 source、controlled bundle、Manifest�
 
 ### 11.1 时间点与计数
 
-`FLCP-D10B-GATE-EXECUTION` 不属于 preflight dependency，由 Playwright 执行 artifact 承接：
+`FLCP-D10B-GATE-EXECUTION` 不属于preflight dependency，由Playwright child内的Runner lifecycle接口生成执行artifact。成功分支的时间点固定为：
 
-1. `BEFORE`：preflight `READY_TO_RUN` 后、首个 Runtime/Web/Browser child 启动前，恰 1 项；
-2. `DURING`：每个 `INITIAL/REOPEN` cycle 完成且对应子进程终止后立即观测，按第 8 章顺序恰 12 项；
-3. `AFTER`：全部 Runtime/Web/Browser child 终止后、artifact staging commit 前，恰 1 项。
+1. `BEFORE`：preflight `READY_TO_RUN` 后、首个Runtime/Web及cycle-local Chromium启动前，恰1项；
+2. `DURING`：每个`INITIAL/REOPEN` handler已关闭其Chromium/context/page并取得临时confirm；lifecycle接口继续保留迟到事件sentinel直到handler settle，完成零迟到事件复核、sink/precondition client关闭、全部sentinel移除和最终Browser proof接纳，再终止对应Runtime/Web并验证两个端口释放后立即观测，按第8章顺序恰12项；
+3. `AFTER`：全部已启动cycle-local Chromium与Runtime/Web均终止、12个Descriptor唯一端口均无listener后、artifact staging commit前，恰1项。
 
-总观测数固定为 `14=1 BEFORE+12 DURING+1 AFTER`。所有快照都必须与 D10A 重新观测值 exact 相等，聚合必须为 `production_gate_mutation_count=0`。
+成功分支总观测数固定为 `14=1 BEFORE+12 DURING+1 AFTER`。所有快照都必须与 D10A 重新观测值 exact 相等，聚合必须为 `production_gate_mutation_count=0`。若 Gate 漂移或 Playwright 在第 12 个 cycle 前失败，`during[]`只能是已结束 cycle 的有序前缀，长度为`0..12`；仍必须在终止全部已启动child后取得恰一项`AFTER`，禁止伪造未执行cycle的观测以补足14项。
 
 ### 11.2 Gate Observation Artifact 0.1
 
@@ -395,9 +399,9 @@ preflight_descriptor_ref={
 
 `preflight_report_ref.path`相对controlled evidence root；`preflight_descriptor_ref.path`相对其显式`bundle_id` root。两类ref形状不同且均`additionalProperties=false`，禁止把descriptor复制进evidence root后降格为普通file ref。
 
-preflight CLI成功时仍只写`RFC8785_JCS(report)+LF`到stdout。父Runner必须先逐byte验证stdout、Schema和payload SHA，再在启动Playwright前把完全相同的JSON bytes原子写入fresh controlled evidence staging root的`fault-launcher/preflight-report.json`；禁止重新序列化。preflight为BLOCKED或输出不闭合时不得创建该mirror或任何evidence root。
+受控命令preflight阶段READY时在内存形成`RFC8785_JCS(report)+LF`，最终stdout仍只允许这些bytes。父Runner必须先逐byte验证Report `0.2`封闭字段、条件语义和payload SHA，再在启动Playwright前把完全相同的JSON bytes原子写入第17章controlled evidence staging root的`fault-launcher/preflight-report.json`；禁止重新序列化。preflight为BLOCKED或输出不闭合时不得创建该mirror或任何evidence root。
 
-`before/after` 使用第 10.1 节完整snapshot形状并增加 `phase`；`during[]` 恰 12 项，每项增加 `phase=DURING/schedule_id/process_cycle/ordinal`。`ordinal=1..12`，schedule/cycle 顺序必须与第 8 章完全一致。`failures[]`每项封闭为`{code,phase,schedule_id,process_cycle,evidence_refs}`；非DURING阶段的`schedule_id/process_cycle`必须显式为JSON `null`，成功时数组为空。
+`before/after` 使用第 10.1 节完整snapshot形状并增加 `phase`；`during[]`允许`0..12`项，每项增加 `phase=DURING/schedule_id/process_cycle/ordinal`。数组必须是第8章计划的有序前缀，`ordinal`从1连续到当前数组长度，禁止跳号；只有`PASS_MATCHED`才要求恰12项。`failures[]`每项封闭为`{code,phase,schedule_id,process_cycle,evidence_refs}`；非DURING阶段的`schedule_id/process_cycle`必须显式为JSON `null`，成功时数组为空。
 
 成功值固定为：
 
@@ -407,7 +411,9 @@ production_gate_mutation_count=0
 failures=[]
 ```
 
-`observation_payload_sha256=SHA-256(JCS(删除本字段后的 artifact))`。Artifact 必须在 fresh attempt evidence staging root 中写临时文件、flush/fsync、原子 rename，并由只读 verifier 复算后才能被 controlled Playwright result 引用；不得写入 production Report root。
+失败分支固定为`observation_status=FAILED`、`failures`非空。若首错为Gate漂移，`production_gate_mutation_count>=1`且首项code为`PRODUCTION_GATE_MUTATED_DURING_CONTROLLED_RUN`；若首错为非Gate的Playwright执行失败，mutation count保持实际观测值，首项code为`CONTROLLED_PLAYWRIGHT_EXECUTION_FAILED`。`before`和`after`仍各恰一项，`during[]`只允许第11.1节的有序前缀。Schema必须用条件分支区分`PASS_MATCHED`的`12/0/[]`与`FAILED`的`0..12/non-empty`，不得要求提前停止后仍伪造12项。
+
+`observation_payload_sha256=SHA-256(JCS(删除本字段后的 artifact))`。Artifact 必须在第 17 章唯一 controlled evidence staging root 中写固定临时文件、flush/fsync、原子 rename，并由2A Node owner的只读 verifier复算后才能提交final root；不得写入 production Report root。
 
 ### 11.3 漂移与首错
 
@@ -421,6 +427,8 @@ production_gate_mutation_count>=1
 
 Runner 必须保留首次不一致的 phase/schedule/cycle/evidence refs，立即停止所有尚未开始的 cycle，终止本轮已启动的受控子进程，写出 FAILED Gate Observation Artifact；禁止继续执行后再用 AFTER 覆盖首次错误。该失败不是 retry、skip、PASS 或 production gate 回滚证明。
 
+非Gate的Playwright首错同样立即停止尚未开始的cycle并写`CONTROLLED_PLAYWRIGHT_EXECUTION_FAILED`，但不得把它改写为production Gate mutation；两类首错均必须保留，后续终止或AFTER观测失败只能追加到`failures[]`，不得覆盖首项。
+
 ## 12. Preflight 检查顺序与错误边界
 
 唯一顺序为：
@@ -432,7 +440,8 @@ Runner 必须保留首次不一致的 phase/schedule/cycle/evidence refs，立�
 -> JarIT Report/Runtime JAR join
 -> Golden Environment/Browser join
 -> schedule/port closure
--> actual Manifest semantic join
+-> actual Manifest raw/Schema/官方controlled verifier
+-> actual Manifest与Descriptor字段级D05 join
 -> FLCP-D01~D09
 -> FLCP-D10A current Gate re-observation
 -> preflight report
@@ -448,19 +457,21 @@ Runner 必须保留首次不一致的 phase/schedule/cycle/evidence refs，立�
 
 ## 13. 后继 Contract 实现包
 
-### 13.1 Build 前置与 base supersession
+### 13.1 历史Build前置与活动supersession
 
-当前 `0dcaa27a92693feaf28b731ebed2f81a9ccea02c` 继续作为 36 项 Fault Launcher raw-ref 的不可变来源，但不再是 2A 的直接可实施 parent。必须先从 exact `0dcaa27...` 建立独立 contract 实现 commit；其通过验证并被接纳为新的 clean base 后，2A commit 才能以该 commit 为唯一 parent。
+旧`0dcaa27a92693feaf28b731ebed2f81a9ccea02c`、候选`63851f8878dcf6da86e99d5ffa7795ac48200920`及其exact `2 M`后继`586d6dee1b07c6634267aeb344e8826adb1ddb4b`只保留为历史raw-ref、Schema修正和接纳记录，不得作为活动A输入。活动origin为`9048bb355aff18d5c00fbbaeb1660b979f4e6daa`；必须先按Final Production Source Chain形成C与S，A才能以S为唯一parent提交`4=2 M+2 A`。
 
-新 contract commit 未形成前：
+当前状态为：
 
 ```text
-Fault Launcher 2A = BLOCKED_BY_PREFLIGHT_DESCRIPTOR_CONTRACT_IMPLEMENTATION
+Fault Launcher A = BLOCKED_BY_FINAL_PRODUCTION_SOURCE_CHAIN_IMPLEMENTATION
 Controlled Playwright = NOT_RUN
 GATE-06-03 = BLOCKED/NOT_RUN
 ```
 
-### 13.2 精确 allowlist：`12=4 M+8 A`
+### 13.2 历史contract逻辑allowlist：`12=4 M+8 A`
+
+下列12项保留为contract语义来源；活动Stage C的完整`20=12 M+8 A` allowlist只由Final Production Source Chain规格承接。
 
 只允许：
 
@@ -480,6 +491,8 @@ A scripts/verify-canvas06-e2e-fault-launcher-preflight-input.test.mjs
 ```
 
 该包不得修改活动 Manifest、Attempt Artifact、Report、Runner Source Set、Fault Plan、36 项基线、2A 两文件、OpenAPI、SQLite DDL、Profile、production wire 或既有 release root。若实现证明必须修改上述任一路径，必须新建 bugfix 规格，禁止静默扩展 allowlist。
+
+`63851f8...`已经承载上述12个逻辑路径，但不构成可接纳结果。其唯一后继修正包固定为`2 M`：只修改Gate Observation Schema及既有producer contract测试，冻结PASS恰12项DURING、FAILED真实`0..12`有序前缀、两类failure code和`3`正`7`负矩阵。修正包、接纳条件和回滚唯一由`opm-dev-canvas-06-e2e-fault-launcher-contract-base-schema-conformance-bugfix-task-spec.md`承接；禁止由2A、producer/verifier或第三个helper复制、放宽或旁路Schema。
 
 ### 13.3 原子产物与验证
 
@@ -561,7 +574,9 @@ Producer 只允许在 source root 外的 fresh controlled staging root 工作，
 6. Gate snapshot 非 `DISABLED + [] + NOT_ACTIVE`、activation set 非空或 SHA 不等；
 7. preflight 写入 D10B、Playwright 事后修改 preflight report；
 8. BEFORE、任一 DURING 或 AFTER Gate 漂移，后续 cycle 未停止；
-9. production Manifest 接受 Bundle `0.2` 或 Fault Launcher descriptor。
+9. production Manifest 接受 Bundle `0.2` 或 Fault Launcher descriptor；
+10. Context缺字段/extra/错误payload或raw SHA、schedule重排/补项、root/ref漂移、child读取第二个前缀环境键；
+11. 使用`node`经PATH启动、默认缓存Chromium、未匹配`*.release.spec.ts`的历史文件名，或父进程从stdout猜测cycle并合成Gate Artifact。
 
 ## 15. 回滚与状态边界
 
@@ -578,8 +593,244 @@ Producer 只允许在 source root 外的 fresh controlled staging root 工作，
 3. `E2EFaultLauncherJarIT` 当前恰有 6 个 `@Test` 方法；
 4. Release Candidate `0.1` 已有可复用的 `DISABLED + [] + NOT_ACTIVE` Gate snapshot value 形状；
 5. `SHA-256(JCS([]))=4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945`；
-6. 2A 两个目标文件、四份新 Schema、producer/verifier、真实 descriptor 和 Gate Observation Artifact 当前均未生成。
+6. 四份Schema、producer/verifier及旧候选`63851f8...`已经形成；旧conformant后继`586d6de...`的接纳只作为历史证据。活动C/S/A均未创建，可信Invocation Context和真实Gate Observation Artifact仍未生成。
 
 ### 16.2 待实现
 
-后继 contract commit SHA、12 项 raw ref、patch SHA、新 clean base intake、2A final commit、真实端口、descriptor identity、preflight report 和 14 项 Gate observation 只能由对应实现和受控执行产生，不得在设计文档中预填。
+旧Schema conformance后继`586d6de...`的12项raw ref、集合摘要和patch SHA已经按历史接纳记录冻结。活动C/S/A及其stage patch必须重新形成和验收；A final commit、真实端口、descriptor identity、preflight report、Invocation Context和Gate observation仍只能由对应实现和受控执行产生，不得预填。14项只属于完整成功分支；提前失败分支只能记录真实有序前缀。
+
+## 17. 2A Controlled Run 唯一协议
+
+### 17.1 唯一 CLI
+
+`scripts/canvas06-e2e-fault-launcher-controlled.test.mjs`只允许两个入口：无业务参数的`node --test`定向测试入口，以及以下唯一受控执行入口。不得再实现独立preflight模式或第二个execution wrapper：
+
+```text
+node scripts/canvas06-e2e-fault-launcher-controlled.test.mjs --run-controlled \
+  --source-root <absolute-clean-2A-source-root> \
+  --controlled-bundle-root <absolute-read-only-bundle-v02-root> \
+  --manifest-root <absolute-read-only-manifest-v02-root> \
+  --manifest dev-canvas-06-e2e-manifest.json \
+  --java-home <absolute-jdk21-home> \
+  --browser-executable <absolute-chromium-executable> \
+  --fixed-handoff <absolute-current-fixed-handoff-json> \
+  --production-activation-root <absolute-read-only-activation-root> \
+  --attempt-parent <absolute-fresh-attempt-parent> \
+  --process-control-parent <absolute-fresh-process-control-parent> \
+  --evidence-parent <absolute-fresh-controlled-evidence-parent>
+```
+
+`--run-controlled`是无值flag且恰好一次；其余参数均为分离token并恰好一次。拒绝未知、重复、空值、`--x=y`、位置参数、相对路径。`--manifest`唯一合法值为上列固定basename；其他路径必须经lexical absolute、normalized realpath、类型、single-link和containment检查。source、bundle、Manifest、Java、browser、fixed Handoff、activation、attempt、process-control、evidence任意两个root不得相等或互相包含；browser/java文件可位于各自显式home内，但不得位于attempt/process-control/evidence写根。禁止从cwd、环境变量、PATH、checkout扫描、目录名或latest ref补值。
+
+旧参数`--preflight`、`--mode=preflight`、`--candidate-source-commit`、`--controlled-bundle`、`--runtime-jar`、`--web-root`、`--browser-root`和`--control-parent`全部为未知参数并返回`2`。candidate commit只从clean source HEAD复算；Runtime JAR和Web tree只从actual Manifest的`source_build` refs解析；browser只从显式file与Descriptor/Golden Environment三方join解析。
+
+同一父进程唯一顺序为：参数验证 -> preflight -> READY report原字节镜像 -> Invocation Context原子发布 -> Playwright执行 -> D10B artifact -> staging verifier -> evidence root原子提交 -> installed verifier。READY不再使命令提前退出；它只授权同一调用继续执行固定Playwright token数组。
+
+### 17.2 Actual Manifest 输入与官方验证
+
+Manifest唯一物理文件为：
+
+```text
+<manifest-root>/dev-canvas-06-e2e-manifest.json
+```
+
+父进程必须在任何写入前对root和文件执行`lstat/open/fstat`前后identity复核，要求single-link、非symlink常规文件、严格UTF-8、无BOM/CR、单个JSON对象和`RFC8785_JCS(object)+LF`原始形状，并生成封闭ref：
+
+```text
+manifest_ref={
+  kind=E2E_MANIFEST,
+  path=dev-canvas-06-e2e-manifest.json,
+  byte_length,
+  sha256
+}
+```
+
+随后必须以当前父进程已经运行的exact `process.execPath`，通过`execFile`直接执行`--source-root`内活动Manifest v02只读verifier及固定参数；cwd固定为source root，禁止shell、PATH、npm profile或另一个Node。该调用只是官方verifier的受控内部入口，不形成第二套语义；不得在2A owner复制或放宽其完整验证：
+
+```text
+<current-process.execPath> <source-root>/scripts/verify-canvas06-e2e-manifest-v02.mjs \
+  --input-mode CONTROLLED_TEST \
+  --controlled-bundle-root <validated-controlled-bundle-root> \
+  --source-root <validated-source-root> \
+  --manifest-root <validated-manifest-root> \
+  --manifest dev-canvas-06-e2e-manifest.json \
+  --profile-asset-root <manifest-root>/inputs/upstream/profile-assets
+```
+
+verifier入口不存在、非零退出、修改任一输入或产生文件均使`FLCP-D05-MANIFEST=MISSING|MISMATCH/MANIFEST_V02_NOT_READY`。2A不得以历史v01 verifier、仅Ajv shape检查、测试fixture verifier或内部fallback替代。
+
+### 17.3 `FLCP-D05-MANIFEST` 字段级 exact join
+
+官方verifier成功后，2A owner还必须执行以下唯一交叉闭包：
+
+1. Manifest固定为`OPM-DEV-CANVAS-06-E2E-MANIFEST-001/0.2`、`manifest_version=0.2.0`、`source_build.dirty_before_build=false`；
+2. `manifest.source_build.source_commit = descriptor.source_commit = candidate_source_commit = git -C <source-root> rev-parse HEAD`；
+3. `source_build.local_runtime_jar`必须在Manifest root内闭合；其`kind/byte_length/sha256`与Descriptor、JarIT Report和bundle内Runtime JAR相等，path按各自root独立验证，不要求错误地逐字符相等；
+4. `source_build.web_dist`只允许由Manifest v02 verifier按tree ref闭合，2A不得接受CLI覆盖路径；
+5. `cases[]`中以下三个`case_id`各恰好一次、顺序固定为`ASSET_MISSING/PERSISTENCE_FAILED/READONLY`，三项均为`suite_id=E2E-CANVAS-007`、`expectation=BLOCKED`、`viewport_id=VP-1440X900`、`zoom_id=Z-100`、`driver_id=DRIVER-COMMON`、零八项`expected_transaction`、`assertion_ids=[REVISION_OR_BLOCKED_MATCHED,REOPEN_MATCHED]`，且不得出现`capability_id/coverage_key`；
+6. 三项`fixture_ref/input_ref`必须分别在Manifest root内通过raw ref复核，并由活动Common Catalog语义验证，不得只比较路径文本；
+7. Manifest本身不承载attempt或process cycle字段。Descriptor `fault_attempt_schedule`必须按第8章为每个上述Manifest case提供ordinal `1,2`两项，且每项`process_cycles=[INITIAL,REOPEN]`、fault kind映射正确；六项schedule必须全部且只引用这三个已验证Manifest case；
+8. Descriptor六项schedule、六项port allocation和12个cycle的闭包属于D05交叉验证证据，不得声称为Manifest自有字段。
+
+任一项失败固定使D05为`MISMATCH/MANIFEST_V02_NOT_READY`；`dependency_results[D05].evidence_refs`必须包含actual `manifest_ref`和已验证Descriptor ref，缺失输入时使用空数组，不得填占位SHA。
+
+### 17.4 Preflight Report 0.2 与三段 source 身份
+
+旧文档级Preflight Report `0.1`在任何真实artifact生成前废止。2A唯一输出版本固定为同一`schema_id`的`schema_version=0.2`，根对象封闭为：
+
+```text
+schema_id
+schema_version
+status
+origin_base_source_commit
+contract_base_source_commit
+candidate_source_commit
+manifest_ref
+preflight_descriptor_ref
+baseline_raw_refs_sha256
+implementation_delta
+dependency_results
+blocking_dependency_ids
+playwright_command
+report_payload_sha256
+```
+
+活动`origin_base_source_commit`固定为`9048bb355aff18d5c00fbbaeb1660b979f4e6daa`。`candidate_source_commit`是可读取的source HEAD，否则为JSON `null`；`contract_base_source_commit`是candidate恰有一个parent时的完整parent SHA，否则为`null`。`manifest_ref`和`preflight_descriptor_ref`仅在对应raw/Schema/identity验证完成后为对象，否则显式`null`，禁止占位。
+
+其余字段唯一规则为：
+
+1. `status`只允许`BLOCKED_BY_DEPENDENCY|READY_TO_RUN`；
+2. `baseline_raw_refs_sha256`固定为`69491a6226cd98b9a5028fec31457e885c86020dbab4e57c381b75f4389b411e`；
+3. `implementation_delta`恰含以下四项且顺序固定，每项封闭为`{path,expected_status,observed_status}`：
+
+```text
+M scripts/release-canvas06-e2e-run.mjs
+M scripts/release-canvas06-e2e-run.test.mjs
+A scripts/canvas06-e2e-fault-launcher-controlled.test.mjs
+A tests/e2e/release/dev-canvas-06/fault-launcher.controlled.release.spec.ts
+```
+
+`expected_status`只允许`M|A`且必须等于上表；`observed_status`只允许`M|A|ABSENT|DRIFT`，READY时必须逐项等于expected；
+4. `dependency_results`恰为D01~D09/D10A的固定顺序，每项封闭为`{dependency_id,status,detail_code,evidence_refs}`，status只允许`READY|MISSING|MISMATCH`，READY时detail固定`READY`；
+5. `evidence_refs[]`是封闭union：普通`{kind,path,byte_length,sha256}`file ref、既有封闭tree ref，或Descriptor专用`{bundle_id,bundle_identity_sha256,path,byte_length,sha256}`bundle file ref；缺失证据只能用空数组，不得用占位SHA；
+6. `blocking_dependency_ids`按固定dependency顺序包含全部且仅非READY ID，无重复；
+7. `playwright_command`在BLOCKED时为JSON `null`，READY时为实现规格第8.4节固定token数组；首token必须是本次父进程`process.execPath`的absolute normalized realpath，禁止记录逻辑字符串`node`后再通过PATH执行；
+8. `report_payload_sha256=SHA-256(JCS(删除本字段后的report))`。
+
+`FLCP-D01-SOURCE`唯一READY条件由Final Production Source Chain覆盖为四节点、三段校验：candidate A恰有一个parent且等于S，S恰有一个parent且等于C，C恰有一个parent且等于活动origin O；`O -> C`、`C -> S`分别匹配冻结stage，`S -> A`逐项等于上述`2 M+2 A`，candidate source porcelain为空。`implementation_delta`仍只计算S到A；Report不增加中间commit字段，D01通过parent链推导并复核C。
+
+`implementation_delta`反例固定包括：数组长度为`0..3`或`>=5`；漏任一Runner `M`；把Runner写成`A`、controlled新增文件写成`M`；四项顺序漂移；observed与expected不等；同路径重复、extra、rename/copy/type-change；两个Runner在A与S raw SHA相等。任一反例使D01=`MISMATCH/SOURCE_COMMIT_NOT_READY`，Report仍保持Schema-valid `BLOCKED_BY_DEPENDENCY`，不得启动Playwright或创建evidence root。
+
+### 17.5 Controlled Evidence Root 与 Invocation Context
+
+身份和路径唯一为：
+
+```text
+controlled_run_id
+= "dev-canvas-06.fault-launcher-run."
+  + manifest_ref.sha256[0:12] + "."
+  + preflight_descriptor_ref.sha256[0:12]
+
+staging=<evidence-parent>/.<controlled_run_id>.staging
+final=<evidence-parent>/<controlled_run_id>
+```
+
+`--evidence-parent`必须是已存在、空、single-link、非symlink的可写目录；staging/final启动时都必须`ENOENT`，禁止覆盖、合并、扫描、latest选择或自动清理residual。最终可消费布局恰为：
+
+```text
+<controlled_run_id>/
+  fault-launcher/preflight-report.json
+  fault-launcher/gate-observation.json
+```
+
+`preflight-report.json`必须与本次preflight内存中的`RFC8785_JCS(report)+LF`逐byte相等；`gate-observation.json`必须为第11章Artifact `0.1`。不得复制Descriptor或Manifest到evidence root，不得加入Playwright截图、trace、日志、SQLite、attempt或production Report；这些继续由各自既有root承接。
+
+Playwright是独立子进程，禁止以“父进程已验证对象”作为未物化的隐式输入。父进程到唯一controlled spec的全部跨进程输入只能通过以下只读Invocation Context传递：
+
+```text
+context_id
+= "dev-canvas-06.fault-launcher-playwright."
+  + manifest_ref.sha256[0:12] + "."
+  + preflight_descriptor_ref.sha256[0:12]
+
+context_tmp=<process-control-parent>/.<context_id>.json.tmp
+context_final=<process-control-parent>/<context_id>.json
+```
+
+Context为文档级封闭机器契约`OPM-DEV-CANVAS-06-E2E-FAULT-LAUNCHER-PLAYWRIGHT-CONTEXT-001/0.1`，不新增第三个Schema/source owner；根对象`additionalProperties=false`，字段恰为：
+
+```text
+schema_id, schema_version, controlled_run_id,
+source_root_realpath, controlled_bundle_root_realpath,
+manifest_root_realpath, manifest_ref, profile_asset_root_realpath,
+java_executable_ref, browser_executable_ref,
+fixed_handoff_ref, activation_input_root_realpath,
+attempt_parent_realpath, process_control_parent_realpath,
+evidence_staging_root_realpath,
+preflight_descriptor_ref, preflight_report_ref,
+execution_schedule, context_payload_sha256
+```
+
+字段规则固定如下：
+
+1. `schema_id/schema_version`分别为上述常量；`controlled_run_id`必须逐字符等于第17.5节公式；
+2. 所有`*_realpath`均为父进程完成第17.1至17.3节验证后的非空absolute normalized realpath，禁止`.`/`..`/NUL，禁止child重新选择root；各root的类型、link、containment和fresh/read-only语义继续按第17.1节，Context不能放宽；
+3. `manifest_ref/preflight_descriptor_ref/preflight_report_ref`复用本规格封闭形状，且必须逐字段等于父进程本轮已验证对象；
+4. `java_executable_ref/browser_executable_ref/fixed_handoff_ref`均为封闭`{kind,path,byte_length,sha256}`；kind分别固定为`JAVA_EXECUTABLE/BROWSER_EXECUTABLE/FIXED_HANDOFF`，`path`为absolute normalized realpath，`byte_length`为正safe integer，`sha256`为64位小写hex；Java ref必须等于`<java-home>/bin/java`实体验证结果，browser ref必须通过CLI/Descriptor/Golden Environment三方join，Handoff ref必须等于D10A读取的live bytes；
+5. `profile_asset_root_realpath`必须逐字符等于`<manifest-root>/inputs/upstream/profile-assets`的验证后realpath；`evidence_staging_root_realpath`必须等于第17.5节staging；其他输入root分别逐字符等于对应CLI验证后realpath；
+6. `execution_schedule`恰12项且每项`additionalProperties=false`，字段固定为`{ordinal,schedule_id,case_id,attempt_ordinal,process_cycle,runtime_port,web_port}`；字符串非空，`attempt_ordinal`只允许`1|2`，`process_cycle`只允许`INITIAL|REOPEN`，两个port均为`1024..65535`整数；按第8章case顺序、每case attempt `1,2`、每attempt `INITIAL,REOPEN`展开，`ordinal=1..12`连续，同一schedule的两个cycle复用Descriptor锁定的端口对，不同schedule的12个端口全局互异；
+7. `context_payload_sha256`为64位小写hex；所有对象和schedule item都拒绝额外字段，所有数组保持给定顺序且禁止重复。
+
+`execution_schedule`必须由已验证Descriptor生成并与Manifest三个case交叉验证，child不得重排、补项或从路径推断。
+
+Context原始bytes唯一为`RFC8785_JCS(context)+LF`，`context_payload_sha256=SHA-256(JCS(删除本字段后的context))`。父进程在READY Report原字节镜像完成后、BEFORE观测前，按`exclusive tmp -> full write -> file fsync/close -> raw/字段/join/payload复核 -> no-replace rename -> process-control-parent fsync`写入；tmp/final启动时均须`ENOENT`。Context写入或复核失败属于`EVIDENCE_TRANSACTION/4`，不得启动Playwright。
+
+父进程启动Playwright时，必须先从child环境删除全部`OPM_CANVAS06_FAULT_*`键，再只加入：
+
+```text
+OPM_CANVAS06_FAULT_CONTROL_CONTEXT_REF
+= RFC8785_JCS({
+     kind: "CONTROLLED_PLAYWRIGHT_CONTEXT",
+     path: <context_final absolute normalized realpath>,
+     byte_length: <context raw byte length>,
+     sha256: <context raw sha256>
+   })
+```
+
+环境值本身不带LF。父进程必须以`execFile(process.execPath, fixedArgs, {cwd: source_root_realpath, env: sanitizedEnv, shell: false})`启动，首token与Preflight Report逐字符相等；child stdout/stderr使用pipe捕获，禁止转发到父stdout或污染唯一Report bytes。child/spec必须拒绝缺失、重复语义、非canonical JCS、额外字段、相对/错误path、raw ref漂移、Context字段或任何上游join漂移，并在启动Runtime/Web/Browser或创建attempt前失败。spec只允许读取该一个前缀键；不得读取cwd作为输入、CLI旁路、其他环境键、默认目录或父进程内存假设。Manifest、Descriptor、schedule、ports、Runtime/Web/Profile/browser、Gate roots、attempt/evidence roots均只从验证后的Context取得；随后唯一调用`runControlledLifecycleSession()`，不得直接调用`prepareControlledAttempt()`或复制spawn、READY、client、cleanup和Artifact语义。每个预绑定handler只能以`browser_executable_ref.path`启动本cycle的fresh Chromium process/context/page；Page创建后必须在route/navigation/API前调用owner sink的`attachBrowserPage(page)`，并在`finally`关闭Page/Context/Browser后以相同对象调用`confirmBrowserClosed({browser,context,page})`。confirm返回只表示进入`CONFIRMED_SENTINEL`，handler不得移除Runner sentinel或把confirm后的事件写入业务观测；最终proof只能由Runner在handler settle后判定。禁止使用Playwright默认缓存浏览器、PATH发现、跨cycle复用Browser或由spec自行判定关闭证明。
+
+Context验证成功后，controlled spec只能构造6项schedule乘2个cycle的预绑定handler并调用Runner owner的`runControlledLifecycleSession()`。该接口是D10B BEFORE/DURING/AFTER sampler与`.gate-observation.json.tmp -> gate-observation.json`的唯一writer；spec和父进程均不得直接合成、补写或改写观测，父进程只能在Playwright退出后执行只读staging/installed verifier。Context在child侧不闭合时，spec不得相信其中的evidence path或写Artifact，父进程固定按`EVIDENCE_TRANSACTION/4`处理；只有Context已闭合且lifecycle接口进入D10B后发生的Gate或controlled执行失败，才允许按第11.2节提交Schema-valid FAILED Artifact并exit `1`。
+
+Context及其tmp位于process-control root而非controlled evidence root，禁止被两个文件的evidence verifier或production Report消费。成功或失败后Context final保持只读诊断输入，不由本命令删除、覆盖或重用；下一次执行必须使用fresh process-control parent。
+
+### 17.6 原子写入、失败与首错
+
+BLOCKED preflight只把Report `0.2`写stdout并exit `3`，不得创建staging/final、attempt或process-control内容。十项READY后唯一事务顺序为：
+
+```text
+exclusive mkdir staging
+-> exclusive mkdir staging/fault-launcher
+-> 写 .preflight-report.json.tmp
+-> file fsync -> raw reread -> no-replace rename preflight-report.json
+-> fault-launcher directory fsync
+-> 原子写入并复核 Invocation Context -> process-control-parent fsync
+-> 启动固定Playwright child -> child复核Context
+-> controlled spec只调用runControlledLifecycleSession()
+-> lifecycle接口取得BEFORE -> 串行执行12 cycle；每cycle先闭合Page绑定与同Page网络观测，confirm后保持迟到事件sentinel直到handler settle，按零迟到事件、sink关闭、sentinel移除、最终Browser proof、Runtime/Web与端口顺序闭合，再取得DURING
+-> lifecycle接口终止全部Runtime/Web child、验证端口释放并取得AFTER
+-> lifecycle接口写 .gate-observation.json.tmp
+-> file fsync -> raw/Schema/payload/semantic reread
+-> no-replace rename gate-observation.json
+-> fault-launcher directory fsync
+-> staging只读完整verifier
+-> postorder fsync全部staging目录
+-> no-replace rename staging为final
+-> evidence-parent fsync
+-> final只读installed verifier
+```
+
+参数token、绝对路径形状、root相等/包含或CLI目标类型不合法时exit `2`且无Report；Bundle、Descriptor、Manifest、JarIT、Environment等依赖raw/Schema/semantic不闭合必须进入对应dependency并以BLOCKED Report exit `3`，不得退化为参数错误。十项READY后，无论最终exit为`0/1/4`，stdout都恰为本次Preflight Report `0.2`的JCS bytes加LF，禁止混入Playwright日志。完整Playwright和installed verify通过后exit `0`。Playwright产品断言失败或Gate mutation时，只要Schema-valid FAILED Gate Artifact和完整root通过verifier，仍原子提交final并exit `1`，该root只是失败证据，不是PASS或Gate READY。
+
+Invocation Context、临时文件、fsync、rename、staging/final verifier或目录提交任一步失败固定stderr首行为`E2E_FAULT_LAUNCHER_CONTROLLED_EVIDENCE_FAILED\tEVIDENCE_TRANSACTION`并exit `4`；final必须不存在，staging保留为不可消费诊断根，禁止本命令自动覆盖、删除、移动或重试。若final rename已成功但installed verifier失败，final保留且永远不得消费，恢复/隔离等待独立授权流程；不得回rename或覆盖同identity。
+
+Gate/controlled execution首错规则沿用第11.3节并由Stage A lifecycle interface closure收紧。Browser proof、Artifact形成、child/端口cleanup不闭合或无法取得AFTER不是可伪造的`FAILED`业务证据，而是evidence transaction failure/exit `4`。Browser proof失败包括confirm后迟到事件、业务监听与sentinel切换存在空窗、sentinel提前移除或最终残留，统一使用内部`E2E_ORCHESTRATION_BROWSER_PROOF_INVALID`，不得采样当前DURING或提交可消费Artifact。2A Node owner必须以同一只读函数在staging rename前和final rename后完整验证root、两文件raw ref、report payload、Descriptor/Manifest join、Gate Artifact条件分支和root basename公式；不得新增第三个source文件或外部writer。lifecycle接口及对应Runner测试完成前，D01~D10A可以继续验证，但禁止创建A commit或执行D10B。

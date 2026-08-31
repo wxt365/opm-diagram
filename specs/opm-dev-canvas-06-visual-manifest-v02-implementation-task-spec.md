@@ -15,7 +15,7 @@
 
 ## 2. 设计输入
 
-唯一事实源为 Golden Authoring `v1.4` 第 10 章、Visual Common Materialization `v1.4`、Golden Environment `0.2` 设计修正、DEV-CANVAS-06 第 4.4 节、`opm-dev-canvas-06-visual-e2e-input-correction-bugfix-task-spec.md`，以及 Visual Manifest `0.1` 历史 Schema。修正规格唯一承接 builder owner、Visual/E2E 版本决定、approved transitive exact join 和 bundle class/root/identity；本规格不得建立第二套输入规则。`0.2` 保留 `0.1` 全部字段/计数/顺序，只新增设计冻结的八个必填 provenance 字段和 `0.2.0` generator identity。
+唯一事实源为 Golden Authoring `v1.4` 第 10 章、Visual Common Materialization `v1.5`及03C Adapter/Fault闭包、Golden Environment `0.2` 设计修正、DEV-CANVAS-06 第 4.4 节、`opm-dev-canvas-06-visual-e2e-input-correction-bugfix-task-spec.md`，以及 Visual Manifest `0.1` 历史 Schema。修正规格唯一承接 builder owner、Visual/E2E 版本决定、approved transitive exact join 和 bundle class/root/identity；本规格不得建立第二套输入规则。`0.2` 保留 `0.1` 全部字段/计数/顺序，只新增设计冻结的八个必填 provenance 字段和 `0.2.0` generator identity。
 
 ## 3. 前置条件
 

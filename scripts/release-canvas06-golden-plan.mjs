@@ -40,8 +40,10 @@ async function main() {
   if (!validateHandoff(handoff.value) || handoff.value.handoff_status !== 'READY_FOR_DEV_CANVAS_06' || handoff.value.blockers.length) block('GOLDEN_HANDOFF_NOT_READY', 'READY Handoff is required.');
   if (!same(intake.value.handoff_ref, handoff.ref)) block('GOLDEN_INTAKE_MISMATCH', 'Intake Handoff reference differs from supplied bytes.');
 
-  const catalogPath = resolveInside(sourceRoot, required(options, 'common-fixture-catalog'));
-  const catalog = await loadJsonRef(sourceRoot, required(options, 'common-fixture-catalog'), 'COMMON_FIXTURE_CATALOG');
+  const catalogName = required(options, 'common-fixture-catalog');
+  const commonRoot = options.has('common-fixture-root') ? await externalCommonRoot(required(options, 'common-fixture-root'), catalogName) : sourceRoot;
+  const catalogPath = resolveInside(commonRoot, catalogName);
+  const catalog = await loadJsonRef(commonRoot, catalogName, 'COMMON_FIXTURE_CATALOG');
   const validateCatalog = ajv.compile(catalogSchema);
   if (!validateCatalog(catalog.value) || !same(catalog.value.source_binding, handoff.value.active_binding)) block('GOLDEN_COMMON_FIXTURE_MISMATCH', 'Common Fixture Catalog does not match the active binding.');
   await verifyCommonFixtureRoot(resolveInside(handoffRoot, intake.value.handoff_ref.path), dirname(catalogPath));
@@ -186,7 +188,8 @@ function indexed(items, key) { const result = new Map(); for (const item of item
 function familyOrder(id) { return id.startsWith('CAP-ISO-PROC-') ? Number(id.slice(-3)) : id.startsWith('CAP-ISO-CTRL-') ? 100 + Number(id.slice(-3)) : 200 + Number(id.slice(-3)); }
 function safe(path) { return path && !path.startsWith('/') && !path.split('/').includes('..') && !path.includes('\\'); }
 function same(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
-function parseOptions(values) { const allowed = new Set(['handoff-root', 'intake-report', 'source-root', 'common-fixture-catalog', 'runtime-jar', 'work-root', 'change-id', 'source-date-epoch', 'out']); const result = new Map(); for (let index = 0; index < values.length; index += 2) { const flag = values[index]; const value = values[index + 1]; if (!flag?.startsWith('--') || !allowed.has(flag.slice(2)) || value === undefined || result.has(flag.slice(2))) input('Invalid planner options.'); result.set(flag.slice(2), value); } return result; }
+async function externalCommonRoot(value, catalogName) { if (catalogName !== 'dev-canvas-06-common-fixture-catalog.json' || !value.startsWith('/')) input('External Common root requires the fixed Catalog name.'); const path = resolve(value); const details = await stat(path); if (!details.isDirectory()) input('External Common root must be a directory.'); return path; }
+function parseOptions(values) { const allowed = new Set(['handoff-root', 'intake-report', 'source-root', 'common-fixture-catalog', 'common-fixture-root', 'runtime-jar', 'work-root', 'change-id', 'source-date-epoch', 'out']); const result = new Map(); for (let index = 0; index < values.length; index += 2) { const flag = values[index]; const value = values[index + 1]; if (!flag?.startsWith('--') || !allowed.has(flag.slice(2)) || value === undefined || result.has(flag.slice(2))) input('Invalid planner options.'); result.set(flag.slice(2), value); } return result; }
 function required(values, key) { const value = values.get(key); if (!value) input(`Missing --${key}.`); return value; }
 function resolveRequired(values, key) { return resolve(required(values, key)); }
 function resolveInside(base, path) { if (!safe(path)) input(`Path must remain inside root: ${path}`); const resolved = resolve(base, path); if (!resolved.startsWith(`${resolve(base)}/`)) input(`Path escapes root: ${path}`); return resolved; }

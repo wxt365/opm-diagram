@@ -1,6 +1,6 @@
 # DEV-CANVAS-06 E2E Profile Asset 与摘要闭包设计
 
-文档版本：`v1.5`
+文档版本：`v1.6`
 
 文档状态：`FROZEN_INCLUDED`
 
@@ -109,9 +109,9 @@ Source raw/ref/package/binding、output fresh、Staging fresh/isolation和五文
 
 身份、路径、文件集合、raw/tree/package/binding drift固定为`E2E_MANIFEST_PROFILE_ASSET_INVALID/3`；Staging已存在或与受控root重叠为`E2E_MANIFEST_TRANSACTION_INVALID/3`；mkdir/copy/fsync/read I/O失败为`E2E_MANIFEST_IO_FAILED/4`。首错必须服从上述时序，不能并发竞态决定。
 
-Attempt Artifact verifier 不新增 Source Set 外的 Node 文件；它由既有 `scripts/verify-canvas06-e2e-report.mjs --scope ATTEMPT` 承接，完整 Report 使用同一文件的显式 `--scope REPORT`。Node Token writer 固定归入既有 `scripts/canvas06-e2e-attempt-artifacts.mjs`，两者均已在Runner Source Set `0.1`的23项allowlist中；Java Token writer由exact Runtime JAR ref承接。
+Attempt Artifact verifier 不新增 Source Set 外的 Node 文件；它由既有 `scripts/verify-canvas06-e2e-report.mjs --scope ATTEMPT` 承接，完整 Report 使用同一文件的显式 `--scope REPORT`。Node Token writer 固定归入既有 `scripts/canvas06-e2e-attempt-artifacts.mjs`，两者均在活动Runner Source Set `0.2/24` allowlist中；Java Token writer由exact Runtime JAR ref承接。
 
-Manifest `0.2` raw/Profile校验的共享纯函数owner固定为23项Source Set内的 `scripts/canvas06-e2e-run-input.mjs`。Runner直接调用该owner，不执行上游Manifest verifier CLI；Manifest v02 builder/verifier调用同一owner并由各自generator identity记录入口源码，避免新增未被任一source identity承接的helper。
+Manifest `0.2` raw/Profile校验的共享纯函数owner固定为24项Source Set内的 `scripts/canvas06-e2e-run-input.mjs`。Runner直接调用该owner，不执行上游Manifest verifier CLI；Manifest v02 builder/verifier调用同一owner并由各自generator identity记录入口源码，避免新增未被任一source identity承接的helper。
 
 校验顺序固定为：
 

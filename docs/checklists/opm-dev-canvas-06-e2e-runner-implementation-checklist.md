@@ -1,14 +1,16 @@
 # DEV-CANVAS-06 E2E Runner Implementation Checklist
 
-状态：`IN_PROGRESS/ACTIVE_PROFILE_DIGEST_CONTRACT_READY`。`clean-37c5412a9c12`的exact Evidence Bundle、安装后的fixed Handoff和活动production Manifest已通过Node `v24.19.0`/JDK `21.0.7` production verifier；Family Materializer的输入依赖已解除，可进入实现。Manifest/Attempt Artifact `0.2`、Profile asset tree/raw refs 和 Token parity 设计已冻结，但尚未接入现有 CLI/Materializer/Artifact verifier。Java Materializer与Runner仍未实现，不得执行真实Family materialization或提升 production `194/388`、`GATE-06-03`、Candidate、Activation、Capability 或 ISO 状态。
+状态：`IN_PROGRESS/BLOCKED_BY_FINAL_PRODUCTION_SOURCE_CHAIN_IMPLEMENTATION`。历史Evidence Bundle、fixed Handoff和Manifest验证不构成新链生产输入；最终Runner必须在`9048bb3... -> C -> S -> A -> R`连续链的Stage R形成，并从clean `R`重建全部生产输入。Manifest/Attempt Artifact `0.2`、Profile asset tree/raw refs和Token parity设计已冻结，但Java Materializer与Runner仍未完成，不得执行真实`194/388`或提升`GATE-06-03`、Candidate、Activation、Capability、production或ISO状态。
 
 ## Spec Mapping
 
 - 当前规格：`specs/opm-dev-canvas-06-e2e-runner-implementation-task-spec.md`。
-- Fault Launcher实现入口：实现规格、clean base闭包、Preflight Descriptor/Gate Observation闭包及对应checklist；活动边界为`origin base=0dcaa27... + 36 READ_ONLY_BASELINE + contract 12=4 M+8 A + 2 A`。
+- Final production source-chain入口：`specs/opm-dev-canvas-06-final-production-source-chain-closure-bugfix-task-spec.md`及对应checklist；唯一最终source为尚未创建的Stage R。
+- Fault Launcher实现入口：实现规格、Preflight Descriptor/Gate Observation闭包、Final Production Source Chain与Stage A Release Discovery/Source Guard规格；活动边界为`9048bb3... -> C -> S -> A`，A=`7=5 M+2 A`，唯一controlled入口为`--run-controlled`。旧`0dcaa27.../63851f8.../586d6de...`只读且不可消费。
 - Manifest v02入口：`specs/opm-dev-canvas-06-e2e-manifest-v02-builder-verifier-implementation-task-spec.md`及对应checklist；负责第四driver、Profile输入和活动Report `137/57`修正。
-- Common Driver/编排入口：`docs/design/opm-dev-canvas-06-e2e-common-driver-controlled-orchestration-design.md v1.4`、对应实现规格/checklist、Runner Source Set闭包及17项集成Source规格/checklist。
-- Artifact设计输入：活动 `specs/opm-dev-canvas-06-e2e-profile-assets-and-digest-closure-bugfix-task-spec.md`、`docs/design/opm-dev-canvas-06-e2e-profile-assets-and-digest-closure-design.md`、Manifest/Attempt Artifact `0.2` Schema、Family Fixture Identity Catalog `0.1/0.1.0`、Projection Digest Closure `v1.0/0.1`、活动E2E Report `0.2`与Runner Source Set `0.1`；实现只读消费。历史 Manifest/Attempt Artifact/Report `0.1`仅只读。
+- Common Driver/编排入口：`docs/design/opm-dev-canvas-06-e2e-common-driver-controlled-orchestration-design.md v1.11`、Stage A lifecycle closure、Common Precondition closure、对应实现规格/checklist及Final Production Source Chain规格/checklist。
+- Family Driver入口：Family Driver设计`v1.6`、实现规格、Family Error Code Mapping、Controlled Invocation及Stage R Service Regression/Source Guard闭包；合并后Stage R为`23=21 M+2 A`、O..R为`43=31 M+12 A`。
+- Artifact设计输入：活动 `specs/opm-dev-canvas-06-e2e-profile-assets-and-digest-closure-bugfix-task-spec.md`、`docs/design/opm-dev-canvas-06-e2e-profile-assets-and-digest-closure-design.md`、Manifest/Attempt Artifact `0.2` Schema、Family Fixture Identity Catalog `0.1/0.1.0`、Projection Digest Closure `v1.0/0.1`、活动E2E Report `0.2`、Controlled Invocation Context `0.1`与Runner Source Set `0.2`；历史 Manifest/Attempt Artifact/Report/Source Set `0.1`仅只读。
 - Task Type：`feature`。
 - Active Playbooks：`testing (primary)`、`backend-springboot`、`design-module-docs`。
 - 目标/身份/输入：规格第 1、2 节。
@@ -23,7 +25,7 @@
 ## Boundary
 
 - [ ] 只修改规格第 3 节允许的 Runner、helper、release config、driver、test-only Java、定向测试、命令和状态文档。
-- [ ] 不修改历史 E2E Manifest/Attempt Artifact `0.1`、活动 Manifest/Attempt Artifact `0.2`、活动Report `0.2`、Runner Source Set `0.1`、Common/Visual Schema、OpenAPI、SQLite DDL、Profile/Rule/Grammar/Symbol/Handoff 或 Vue 业务行为。
+- [ ] 不修改历史 E2E Manifest/Attempt Artifact/Source Set `0.1`、活动 Manifest/Attempt Artifact/Report `0.2`、Common/Visual Schema、SQLite DDL、Profile/Rule/Grammar/Symbol/Handoff 或 Vue 业务行为；Source Set、Context Schema和OpenAPI只按Stage R精确allowlist修改。
 - [ ] test-only materializer/fault launcher 默认生产启动不可达且无公共 API。
 - [ ] 不把 controlled Report、代码完成或 Schema-valid 当成 production Gate READY。
 
@@ -34,12 +36,13 @@
 - [x] 活动 Attempt Artifact `0.2` 的 filename/schema identity、Profile tree/raw refs、递归封闭字段、fault映射、materialization、Runtime/Browser/Network/Console/Transaction/Reopen/API/Index join、Report投影和失败边界已由 Profile/Digest closure 设计与 `0.2` union Schema 冻结，实现不得重新定义机器格式；Family Project与attempt ordinal来源也已冻结。历史 `v1.3/0.1` 仅兼容读取。
 - [x] 历史 attempt artifact writer 已实现固定filename-to-schema identity、JCS payload SHA、同attempt单链接原子写入和三类fault plan映射；活动 `0.2` 的 Profile tree/raw refs、16 类 Index 条目和 Token digest writer 尚未接入，Runtime/Browser/Materializer producer仍待实现。
 - [x] Projection Digest Closure `v1.0/0.1`设计、preimage/vector Schema及4正/9负不可变vector已冻结；活动 Attempt Artifact `0.2` 继续绑定该Projection摘要，并继承历史`v1.3`冻结的Family identity/Fault Plan ordinal语义。
-- [x] 活动E2E Report已升级为`0.2`，冻结`runner_version=0.2.0`、Java executable byte mirror/version/release refs及23项Runner Source Set；活动 Manifest/Attempt Artifact 为`0.2`，历史 Manifest/Attempt Artifact/Report `0.1`保持只读。
-- [x] Common controlled orchestration owner已收敛到Source Set第1项`release-canvas06-e2e-run.mjs`；Source Set保持`0.1/0.1.0/23`，Report保持`0.2/0.2.0`，`8=7 M+1 A`仅为17项集成包内职责子集，禁止独立production orchestration helper或独立commit。
+- [x] 活动E2E Report保持`0.2`，冻结`runner_version=0.2.0`、Java executable byte mirror/version/release refs及24项Runner Source Set；活动 Manifest/Attempt Artifact 为`0.2`，历史 Manifest/Attempt Artifact/Report `0.1`保持只读。
+- [x] production controlled orchestration owner已收敛到Source Set第1项`release-canvas06-e2e-run.mjs`和第20项唯一bridge；Source Set活动口径为`0.2/0.2.0/24`，Report保持`0.2/0.2.0`，禁止Source Set外production helper。
+- [x] Family Driver `v1.4`已冻结`33/35/110`集合、五方exact join、五参数接口、130真实UI PASS、48个“UI合法候选+单次正式API负例”、Runner-owned CTRL RUN_SETUP identity binder、subject transaction和PASS/BLOCKED reopen/evidence，以及`19=15 CTRL+4 STRUCT`错误码封闭集合。实现仍未开始。
 - [x] Handoff、Intake解析Handoff、Manifest、source HEAD、Report runner identity与Common/External final commit六方source join已冻结；祖先关系不能替代逐字符相等。
 - [x] `--manifest` 与 `--profile-asset-root`、Manifest raw/schema/semantic -> Profile tree/raw ref -> binding join 顺序、Profile tree digest、五项 raw ref 和 zero-output rejection 已冻结；现有 CLI 尚未实现该成功路径。
-- [x] Fault Launcher `v1.2`已冻结九项命令行配置、普通启动NOOP/partial与production fail-closed、32-byte parent nonce/challenge和HMAC、Plan raw SHA/链接/首错顺序、三个精确产品hook、一次性状态机、稳定协议错误码及正反例矩阵；36项实现基线已进入exact `0dcaa27...`且只读。
-- [x] Fault Launcher活动边界已收敛为`36 READ_ONLY_BASELINE + contract 12=4 M+8 A + 2 A`；Bundle `0.2`、Descriptor/JarIT/Gate Observation `0.1`、D10A/D10B均已冻结，contract/new base未实现，2A状态为`BLOCKED_BY_PREFLIGHT_DESCRIPTOR_CONTRACT_IMPLEMENTATION`；基线集合摘要固定为`69491a...b411e`。
+- [x] Fault Launcher `v1.9`已冻结九项命令行配置、普通启动NOOP/partial与production fail-closed、32-byte parent nonce/challenge和HMAC、Plan raw SHA/链接/首错顺序、三个精确产品hook、一次性状态机、Stage A六方法sink、confirm后sentinel与最终Browser proof、稳定协议错误码及正反例矩阵；36项基线已从活动origin `9048bb3...`复算，摘要固定为`69491a...b411e`。
+- [x] Fault Launcher活动边界已收敛为Stage C=`20=12 M+8 A`、S=`2 M`、A=`7=5 M+2 A`；A修改两个Runner、release discovery、两个unified source guard并新增两个controlled文件。Bundle `0.2`、Descriptor/JarIT/Gate Observation `0.1`、Preflight Report `0.2`、唯一CLI、Manifest D05、Invocation Context、D10A/D10B和evidence事务均已冻结；C/S已形成，A待重写接纳。
 - [x] OPL/Trace 唯一复用 `OplGoldenArtifactCanonicalWriter`；Token JCS preimage、固定 canonical writer、3 正向量/4 负向量和 Node/Java parity 已实现。Node writer 位于 `scripts/canvas06-e2e-attempt-artifacts.mjs`，Java writer 位于 `TokenCanonicalWriter`；两端均逐字段验证 preimage、canonical UTF-8 bytes、SHA/error/pointer。该证据不提升 Materializer、Runner、Report 或 Gate 状态。
 - [x] `canvas06-projection-digest-v01.mjs`、Java `ProjectionDigestV01`及同一vector全链路parity已实现；`4`个正向量和`9`个负向量验证preimage、canonical bytes、SHA、错误码与JSON Pointer一致。
 - [x] 历史Common Fixture staging输入 verifier已复核Catalog Schema `0.1`、16个唯一有序case、Factory raw ref及BASE/INPUT JCS；Java Materializer已有COMMON空Revision受控集成证据。该完成项不证明活动Catalog `0.2.0`、Common Driver v0.2或Manifest v02输入闭包。
@@ -52,19 +55,21 @@
 - [ ] Materializer以同一次exact JAR raw观测同时生成`runtime_jar_ref`与`source_sha256`并强制SHA相等；不得摘要`.class`、Java/Runner source-set、Manifest字符串或其他JAR。
 - [ ] Materializer只从Manifest原始`generated_at`严格往返派生`source_date_epoch`；Runner不得新增时间参数，`.000Z`/fraction/offset/非法值以`E2E_INPUT_INVALID/2`零SQLite、零artifact拒绝，verifier独立复算并检查seed时间。
 - [ ] 复用 E2E Manifest verifier，闭合 production READY Handoff 与 controlled descriptor 信任链。
-- [ ] 实现 clean source、固定23项runner source set、JDK 21 executable mirror/version/release evidence、Playwright/Chromium、browser SHA 和端口排他预检。
+- [ ] 实现 clean source、固定24项runner source set、JDK 21 executable mirror/version/release evidence、Playwright/Chromium、browser SHA 和端口排他预检。
 - [ ] 实现 self-contained Report staging/final root、Manifest inputs逐byte复制、fsync和目录级atomic rename。
 - [ ] 实现只服务 production dist 的loopback Web server；无Vite/HMR/外网proxy。
-- [ ] 实现每 attempt fresh SQLite/Runtime/Web/browser/process/context/port proof和reopen cycle。
+- [ ] 实现每attempt fresh SQLite；每个INITIAL/REOPEN cycle使用fresh Runtime/Web与spec-owned fresh Chromium process/context/page，复用同attempt storage；Page必须在route/navigation/API前attach，finally关闭后以相同对象confirm，并闭合同Page网络事件、三类关闭事件、零pending、child与端口证明。
 - [x] Manifest/Handoff/Evidence Bundle已适配并在安装后production verifier中验证唯一Family Identity Catalog raw ref、178 -> 2集合与fixture deep join。
 - [x] 已从Golden seed抽取显式`SeedIdentity`入口；调用方传入的Project ID逐字写入SQLite，既有Golden默认派生保持不变。
 - [x] 复用不含Project派生的seed kernel 实现 Family exact Revision 和 Common deterministic empty model 的 non-web materializer；Family Project 只读 Catalog，Common Project 使用 `sha256(UTF8(case_id))` 前16位，禁止 Golden/Recovery 派生或默认。Artifact Index 生产仍待实现。
 - [x] plan builder先原子写入并验证`fault-plan.json`；Materializer及其余artifact只从该文件读取`attempt_ordinal`，禁止路径/循环下标反推。
 - [x] 历史Common Factory输出与BASE/INPUT raw fixture JCS相等；历史Catalog `0.1.0` bytes不修改。
 - [x] Common Driver、三个selector、Fact删除入口、store、factory和活动Catalog `0.2.0` root已作为只读前置存在；其局部实现不等于controlled执行或Report证据。
-- [ ] 按17项集成Source规格，在同一`e598...`clean worktree内联合实现External Store `9=7 M+2 A`与Common编排`8=7 M+1 A`，一次提交为`17=14 M+3 A`；Common子集在`release-canvas06-e2e-run.mjs`实现`prepareControlledAttempt()`并以Manifest `driver_catalog[3]`锁定的既有Common driver闭合16项受控执行，禁止重复修改Driver/UI/factory。
-- [ ] 先完成`12=4 M+8 A`contract包并接纳新base，再只新增Fault Launcher controlled Playwright spec与Node preflight/test owner；preflight按D01~D09/D10A输出封闭机器对象，READY后执行三case、6 attempts、12 cycles，并以D10B记录14项Gate观测。36项launcher/guard/Plan/port/hook/Runner基线不得修改；发现基线缺陷必须新开bugfix规格。
+- [ ] 按Final Production Source Chain从`9048bb3...`连续形成C/S/A/R；R的`23=21 M+2 A`固定先执行API/Runtime contract `5 M`及source guard `2 M`，再实现Context、bridge、Family Driver和production Runner。Service及测试不加入24项Source Set，Runtime JAR必须从同一R重建。Common Driver/UI/factory保持只读。
+- [ ] A以S为唯一parent并精确提交`7=5 M+2 A`：两个Runner `M`实现并测试`runControlledLifecycleSession()`及六方法sink/Browser proof状态机，release discovery精确发现唯一受控spec，两个unified source guard接纳七项delta，两个新增文件只调用该接口。状态机固定为`ATTACHED_SAMPLING -> CONFIRMED_SENTINEL -> CLOSED`，confirm后sentinel持续到handler settle/sink关闭且最终零残留。唯一`--run-controlled`入口完成D01~D10A后，由lifecycle接口执行6 attempts/12 cycles、owner构造Common clients、同Page网络观测、Runtime/Web READY与cleanup、真实D10B和Gate Artifact写入；未授权基线不得修改。
 - [ ] 实现正式UI触发、稳定等待、同Revision Projection/OPL/Token/Trace和事务/reopen断言。
+- [ ] 三个Family Driver实现`33/35/110`原序case membership；130 PASS真实UI、48 BLOCKED合法候选+单次API负例、SETUP/subject transaction和重开证据全部通过。
+- [ ] Runner在Driver调用前完成`MaterializedAttemptIdentity -> RUN_SETUP -> SetupBoundAttemptIdentity`；CTRL以正式response/diff唯一交集取得`setup_fact_id`，并与baseline、API Exchange response ref和subject request逐字段闭合；PROC/STRUCT/Common显式null/base。
 - [ ] 实现外网、console/pageerror、5xx、skip/retry/timeout检测。
 - [ ] 实现全部必填attempt artifact、artifact index、source set aggregate和semantic comparison digest。
 - [ ] 在既有 `verify-canvas06-e2e-report.mjs` 实现必填 `--scope REPORT/ATTEMPT`，ATTEMPT模式闭合 `10+1+5`、五类 `asset_kind`、OPL/Trace Java writer、Token parity和验证前后tree SHA不变；禁止scope自动推断。
@@ -77,7 +82,7 @@
 - [ ] controlled完整194/388正例通过，Family `130 PASS+48 BLOCKED`、Common `7 PASS+9 BLOCKED`、总计`137 PASS+57 BLOCKED`及34 Capability聚合正确。
 - [ ] production信任链正例只消费Manifest build副本，不执行build或启动dev server。
 - [ ] 完整BLOCKED Report正例可验证，`--require-ready`拒绝。
-- [ ] 参数、class、path、ref、digest、23项source allowlist、Java mirror/ref、JDK/browser/port反例通过；额外覆盖direct-root checkout fallback、Profile extra/link、`--input`缺失/跨root/raw drift、CodeSource为`file:`/`jar:file:`/裸`nested:`/其他entry/额外nested链/query/fragment/authority/非canonical URI/test classpath/其他JAR、outer lexical/real path或单次解码不闭合、`.class`/source-set错误preimage、`source_sha256 != runtime_jar_ref.sha256`及Manifest时间`.000Z`/fraction/offset/空白/非法/归一化/fallback。
+- [ ] 参数、class、path、ref、digest、24项source allowlist、Context 388项、Runner owner import-safe、child API exact import、attach后单次resolver、Driver dispatch、一次性同源client、SETUP非COMMITTED/零多Fact/交集不唯一/affected_ids重序/旧或可变identity/response ref与Revision漂移/禁止推断、Java mirror/ref、JDK/browser/port反例通过；额外覆盖既有direct-root、CodeSource、source SHA与Manifest时间矩阵。
 - [ ] JDK 21 fork exact built Spring Boot JAR并通过`PropertiesLauncher`加载Materializer的成功集成测试通过；断言完整nested CodeSource、outer lexical/real path及外层JAR raw SHA三者闭合。
 - [ ] symlink/hardlink/extra、跨root、existing final、staging residual反例通过。
 - [ ] Family/Common混用、Identity Catalog缺失/extra/重复/SHA/字段/Project命名空间drift、factory drift、非空storage、fault guard旁路和driver错映射反例通过。
@@ -89,7 +94,7 @@
 - [ ] artifact缺失/extra/SHA、case/attempt/capability聚合和Report ID反例通过。
 - [ ] 所有rename前故障final零输出；rename后fsync失败保留但不声明成功。
 - [ ] verifier运行前后Report root tree digest相等且不访问网络。
-- [x] `npm run release:canvas06:e2e:runner:test`通过`44/44`；其中production static loopback测试必须在允许绑定`127.0.0.1`的环境运行。
+- [x] `npm run release:canvas06:e2e:runner:test`通过`47/47`；活动 Manifest fixture 同时覆盖第四 driver 与五资产 Profile 闭合，其中production static loopback测试必须在允许绑定`127.0.0.1`的环境运行。
 - [x] 历史/活动Report、Runner Source Set、历史/活动 Manifest/Attempt Artifact、Profile asset 和 Token parity Schema/fixture 已并入`npm run release:canvas06:visual-e2e-schema:test`并通过`19/19`；这只证明机器契约、Profile package/raw digest分离、固定 canonical bytes 和局部join，不证明 producer/verifier 或 Java Token writer 已实现。
 - [ ] E2E Manifest、Visual/E2E Schema、contract、lint、typecheck、build和Maven回归通过。
 - [ ] `git diff --check`通过。

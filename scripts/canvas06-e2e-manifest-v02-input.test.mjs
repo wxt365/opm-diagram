@@ -8,7 +8,7 @@ test('producer and verifier reject mode mixing, duplicate flags, and noncanonica
   assert.equal(parseProducerOptions(producer)['input-mode'], 'CONTROLLED_TEST');
   assert.throws(() => parseProducerOptions([...producer, '--source-root', 'other']), error => error.code === 'E2E_MANIFEST_ARGUMENT_INVALID');
   assert.throws(() => parseProducerOptions(producer.map(value => value === '1782864000' ? '01782864000' : value)), error => error.code === 'E2E_MANIFEST_ARGUMENT_INVALID');
-  assert.throws(() => parseVerifierOptions(['--input-mode', 'CONTROLLED_TEST', '--controlled-bundle-root', 'controlled', '--manifest-root', 'manifest', '--manifest', 'dev-canvas-06-e2e-manifest.json', '--profile-asset-root', 'profile', '--require-production']), error => error.code === 'E2E_MANIFEST_INPUT_CLASS_INVALID');
+  assert.throws(() => parseVerifierOptions(['--input-mode', 'CONTROLLED_TEST', '--controlled-bundle-root', 'controlled', '--source-root', 'source', '--manifest-root', 'manifest', '--manifest', 'dev-canvas-06-e2e-manifest.json', '--profile-asset-root', 'profile', '--require-production']), error => error.code === 'E2E_MANIFEST_INPUT_CLASS_INVALID');
 });
 
 test('source date epoch has one exact UTC-whole-second representation', () => {

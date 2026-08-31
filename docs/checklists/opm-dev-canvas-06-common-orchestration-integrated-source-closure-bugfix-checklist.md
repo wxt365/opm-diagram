@@ -1,6 +1,8 @@
 # Checklist: DEV-CANVAS-06 Common编排与External Store集成Source闭包修正
 
-状态：`FROZEN/COMPLETE`
+状态：`FROZEN/ORIGIN_IMPLEMENTED/SUPERSEDED_FOR_FINAL_BUILD`
+
+活动边界：`9048bb3...`已作为final production chain的origin被接纳；本清单的17项结论只用于origin intake，后继C/S/A/R与最终六方join统一转到`opm-dev-canvas-06-final-production-source-chain-closure-bugfix-checklist.md`。
 
 ## Task Type
 
@@ -77,6 +79,6 @@
 ## 当前门状态
 
 - 设计修正：`COMPLETE`。
-- 17项集成Source Build：`READY_FOR_BUILD/NOT_STARTED`。
-- production input/Manifest/Runner：`NOT_RUN`。
+- 17项集成Source：`9048bb3.../ORIGIN_IMPLEMENTED/SUPERSEDED_FOR_FINAL_BUILD`。
+- origin Manifest：`194_CASE_INPUT_BUILT/ATTEMPTS_NOT_RUN`；final production input/Manifest/Runner：`NOT_CREATED/NOT_RUN`。
 - `GATE-06-03`：`BLOCKED/NOT_RUN`。

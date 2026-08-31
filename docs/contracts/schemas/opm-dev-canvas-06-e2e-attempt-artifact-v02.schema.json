@@ -49,7 +49,7 @@
     },
     "caseId": {
       "type": "string",
-      "pattern": "^E2E-CANVAS-00[1-7]\\..+$"
+      "pattern": "^(?:E2E-CANVAS-00[1-7]\\..+|G-OPL-(?:PROC|CTRL|STRUCT)-\\d{3}\\.[A-Z0-9_]+\\.(?:PASS|BLOCKED))$"
     },
     "nullableString": {
       "anyOf": [
@@ -97,6 +97,45 @@
           "$ref": "#/$defs/digest"
         }
       }
+    },
+    "archiveEntryRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "byte_length",
+        "sha256",
+        "bundle_sha256",
+        "archive_entry_path"
+      ],
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/path"
+        },
+        "byte_length": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "bundle_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "archive_entry_path": {
+          "$ref": "#/$defs/path"
+        }
+      }
+    },
+    "attemptInputRef": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/fileRef"
+        },
+        {
+          "$ref": "#/$defs/archiveEntryRef"
+        }
+      ]
     },
     "assetIdentity": {
       "type": "object",
@@ -521,10 +560,10 @@
           ]
         },
         "fixture_ref": {
-          "$ref": "#/$defs/fileRef"
+          "$ref": "#/$defs/attemptInputRef"
         },
         "input_ref": {
-          "$ref": "#/$defs/fileRef"
+          "$ref": "#/$defs/attemptInputRef"
         },
         "active_binding": {
           "$ref": "#/$defs/binding"
@@ -576,7 +615,69 @@
         "profile_package_digest": {
           "$ref": "#/$defs/digest"
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "fixture_kind": {
+                "const": "FAMILY"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "fixture_ref": {
+                "$ref": "#/$defs/archiveEntryRef"
+              },
+              "input_ref": {
+                "$ref": "#/$defs/archiveEntryRef"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "fixture_kind": {
+                "const": "COMMON"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "fixture_ref": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/fileRef"
+                  },
+                  {
+                    "properties": {
+                      "kind": {
+                        "const": "FIXTURE"
+                      }
+                    }
+                  }
+                ]
+              },
+              "input_ref": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/fileRef"
+                  },
+                  {
+                    "properties": {
+                      "kind": {
+                        "const": "INPUT"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ]
     },
     "attemptObservation": {
       "type": "object",

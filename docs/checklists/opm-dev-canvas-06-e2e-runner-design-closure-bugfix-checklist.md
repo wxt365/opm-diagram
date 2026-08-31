@@ -61,4 +61,4 @@
 
 - [x] 回滚只删除本轮新增四个文档并恢复六个入口原文，无 Schema、代码或数据回滚。
 
-> 历史状态指针（2026-08-17）：本 checklist 的`32=21+10+1/BLOCKED_BY_DESIGN`是当轮复核结果。当前全局状态以冻结基线`v1.21`、Visual Common Materialization`v1.4`、E2E Attempt Artifact`v1.3`、Family Identity Catalog`0.1/0.1.0`、活动Report`0.2`和Runner Source Set`0.1`为准，口径为`32=22+10/READY_FOR_DEVELOPMENT`。E2E Manifest Family Catalog适配、E2E Java/source/artifact producer、02B/03C/03B与production执行仍缺失。
+> 历史状态指针（2026-08-26更新）：本 checklist 的`32=21+10+1/BLOCKED_BY_DESIGN`是当轮复核结果。当前全局状态以冻结基线`v1.52`、Visual Common Materialization`v1.5`及03C Adapter/Fault闭包、E2E Attempt Artifact`v1.3`、Family Identity Catalog`0.1/0.1.0`、活动Report`0.2`和Runner Source Set`0.1`为准，口径为`32=22+10/READY_FOR_DEVELOPMENT`。03C Node adapter/fault/8 base/144 clone、03B与production执行仍缺失。

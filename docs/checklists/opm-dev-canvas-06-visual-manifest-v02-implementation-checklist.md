@@ -11,7 +11,7 @@
 
 ## Input Gate
 
-- [x] Golden Authoring `v1.4`、Visual Common Materialization `v1.4`、Golden Environment `0.2` 设计和八字段仍为 `FROZEN`。
+- [x] Golden Authoring `v1.4`、Visual Common Materialization `v1.5`及03C Adapter/Fault闭包、Golden Environment `0.2` 设计和八字段仍为 `FROZEN`。
 - [x] Visual/E2E 输入修正规格已冻结独立 builder、Visual `0.2`、E2E `0.1` 和 bundle class/root/identity；旧合并 builder 已是历史目标。
 - [ ] 04 Golden Verifier 已完成。
 - [ ] exact approved version 在 `--require-approved` 下通过。

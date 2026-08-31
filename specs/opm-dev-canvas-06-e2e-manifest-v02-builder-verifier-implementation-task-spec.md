@@ -2,11 +2,13 @@
 
 文档状态：`FROZEN_FOR_IMPLEMENTATION`
 
-实现状态：`NOT_STARTED`
+实现状态：`NODE_CLOSURE_COMPLETE / PRODUCTION_REBUILD_PENDING`
 
 Build准入：`READY_FOR_BUILD`
 
-Production重建准入：`BLOCKED_BY_17_PATH_INTEGRATED_SOURCE_IMPLEMENTATION`
+Production重建准入：`READY_FOR_CLEAN_R_EXTERNAL_STORE_REBUILD`
+
+活动source输入：`opm-dev-canvas-06-final-production-source-chain-closure-bugfix-task-spec.md`取代“17项commit即最终source”的限制。既有`9048bb3...` Manifest只作为origin build证据；最终production Manifest必须在新Runner commit `R`形成后，从clean `R`与fresh external store重建，并与Handoff、Intake、source HEAD和Report完成六方join。
 
 ## Task Type
 
@@ -48,13 +50,13 @@ Production重建准入：`BLOCKED_BY_17_PATH_INTEGRATED_SOURCE_IMPLEMENTATION`
 
 1. `docs/contracts/schemas/opm-dev-canvas-06-e2e-manifest-v02.schema.json`；
 2. `docs/design/opm-dev-canvas-06-e2e-profile-assets-and-digest-closure-design.md v1.5`；
-3. `docs/design/opm-dev-canvas-06-e2e-common-driver-controlled-orchestration-design.md v1.4`；
+3. `docs/design/opm-dev-canvas-06-e2e-common-driver-controlled-orchestration-design.md v1.7`与Stage A lifecycle closure；
 4. Family Fixture Identity Catalog `0.1/0.1.0`与活动Common Catalog `0.2.0`；
 5. 由统一Source生产输入重建规格形成的Handoff `0.2`、exact READY Intake、Runtime JAR和Web dist tree；
 6. 活动Report Schema `opm-dev-canvas-06-e2e-report-v02.schema.json/0.2`。
 7. 已通过独立Common E2E输入重建Verifier的活动`0.2.0` 43文件root；其factory source必须与第四`DRIVER-COMMON`所属clean source commit中的factory raw bytes相等；
 8. `specs/opm-dev-canvas-06-unified-source-production-input-rebuild-bugfix-task-spec.md`冻结的source-root固定路径、Handoff/Web tree和exact join；
-9. `specs/opm-dev-canvas-06-common-orchestration-integrated-source-closure-bugfix-task-spec.md`冻结的`e598...`base、`17=14 M+3 A`唯一final commit、六方source join和production重建顺序。
+9. `specs/opm-dev-canvas-06-common-orchestration-integrated-source-closure-bugfix-task-spec.md`形成的`e598... -> 9048bb3...`与`17=14 M+3 A`只作为origin来源；最终production source、六方join和重建顺序唯一按Final Production Source Chain的`9048bb3... -> C -> S -> A -> R0 -> R`执行。
 
 冲突时本规格只覆盖Manifest v02 producer/verifier、第四driver与137/57聚合修正；不重解释Profile摘要、Fixture、Fault或Runner Artifact语义。
 
@@ -371,4 +373,4 @@ git diff --check
 
 ## 13. 状态边界
 
-本规格完成仅表示Manifest v02 producer/verifier和活动137/57机器口径可实现。`e598b305...`已完成历史source集成，但其旧统一Builder/Verifier仍绑定source内installed root和untracked例外，正确触发本规格clean/root守卫。production正例必须等待17项集成Source包完成：以`e598...`为唯一parent一次提交`17=14 M+3 A`，从该final commit在独立source/release store拓扑中重建external统一输入，并完成新进程Unified Verifier、外层staging与两个Manifest Verifier；独立9项或8项commit均不得消费。不得据此宣称E2E Report、`GATE-06-03`、Candidate、Activation、Capability、production发布或ISO 19450:2024符合性。
+本规格完成仅表示Manifest v02 producer/verifier和活动137/57机器口径可实现。`e598... -> 9048bb3...`的17项集成及既有194-case Manifest只构成origin build证据，不是最终production source。production正例必须等待C/S/A/R全部形成，从fresh clean `R`与独立release store重建external统一输入，完成新进程Unified Verifier、外层staging与两个Manifest Verifier，并使Handoff、Intake、Manifest、source HEAD、Report和R六方逐字符相等；独立9项、8项、旧17项commit或A均不得消费为最终source。不得据此宣称E2E Report、`GATE-06-03`、Candidate、Activation、Capability、production发布或ISO 19450:2024符合性。

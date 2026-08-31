@@ -1,6 +1,7 @@
 package org.opm.localruntime;
 
 import org.opm.localruntime.releaseauthoring.GoldenFixtureMaterializationException;
+import org.opm.localruntime.releaseauthoring.ReleaseGoldenAuthoringLaunchMode;
 import org.opm.localruntime.releaseevidence.fault.E2EFaultLauncherArguments;
 import org.opm.localruntime.releaseevidence.fault.E2EFaultLauncherException;
 import org.springframework.boot.SpringApplication;
@@ -14,7 +15,7 @@ public class LocalRuntimeApplication {
         try {
             E2EFaultLauncherArguments.scanRaw(args);
             ConfigurableApplicationContext context = SpringApplication.run(LocalRuntimeApplication.class, args);
-            if (context.getEnvironment().matchesProfiles("release-golden-authoring")) {
+            if (ReleaseGoldenAuthoringLaunchMode.isFiniteReleaseInvocation(context.getEnvironment())) {
                 System.exit(SpringApplication.exit(context));
             }
         } catch (RuntimeException exception) {

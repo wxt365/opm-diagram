@@ -1,6 +1,8 @@
 # Checklist: DEV-CANVAS-06 E2E Fault Launcher Clean Base与受控Playwright闭包修正
 
-状态：`FROZEN/COMPLETE/SUPERSEDED_FOR_BUILD_BY_PREFLIGHT_DESCRIPTOR_CLOSURE`
+状态：`FROZEN/COMPLETE/HISTORICAL_NOT_CONSUMABLE`
+
+活动边界：36项raw-ref字段表和两个controlled新增路径继续作为历史来源；旧`2 A` delta已由final production source-chain闭包取代为A=`4=2 M+2 A`。新origin为`9048bb3...`，新C/S/A尚未创建。
 
 ## Task Type
 
@@ -19,7 +21,7 @@
 | Fix Strategy/base intake | 3、4 | F06~F15 |
 | 2A与36 raw refs | 5、6 | F16~F25 |
 | 缺陷回流 | 7 | F26~F30 |
-| Playwright依赖/机器输出 | 8 | F31~F43 |
+| 历史Playwright协议废止 | 8 | F31~F43 |
 | 验收/回滚/事实 | 9~11 | F44~F52 |
 
 ## Checklist
@@ -54,19 +56,19 @@
 - [x] F28 基线缺陷必须新建bugfix规格与checklist。
 - [x] F29 新规格必须显式扩展allowlist并重建clean base。
 - [x] F30 禁止mock/skip/dynamic patch/fallback绕过缺陷。
-- [x] F31 唯一preflight CLI和参数集合已冻结。
-- [x] F32 参数错误与依赖阻断边界已分离。
-- [x] F33 历史十项dependency已冻结；活动第十项由后继规格替换为D10A，D10B移至执行artifact。
-- [x] F34 三case、6 attempts、12 cycles计数已冻结。
-- [x] F35 机器对象Schema ID/version已冻结。
-- [x] F36 顶层11字段封闭。
-- [x] F37 dependency result形状与状态枚举已冻结。
-- [x] F38 payload SHA公式已冻结。
-- [x] F39 BLOCKED stdout/stderr/exit=3已冻结。
-- [x] F40 BLOCKED零Runtime/Web/Browser/SQLite/attempt输出已冻结。
-- [x] F41 READY命令token数组已冻结且不修改package.json。
+- [x] F31 独立preflight CLI已明确废止，唯一业务入口转由后继规格第17章承接。
+- [x] F32 历史参数错误与依赖阻断文字不再作为可执行CLI契约。
+- [x] F33 D01~D09/D10A顺序和D10B分域只以后继规格为准。
+- [x] F34 三case、6 attempts、12 cycles计数继续有效。
+- [x] F35 历史Preflight Report `0.1`在真实产物前废止。
+- [x] F36 活动Report `0.2`的origin/contract/candidate三段字段由后继规格冻结。
+- [x] F37 dependency result形状与状态枚举转由后继规格承接。
+- [x] F38 payload SHA公式转由后继规格承接。
+- [x] F39 BLOCKED stdout/stderr/exit `3`边界转由后继规格承接。
+- [x] F40 BLOCKED零Runtime/Web/Browser/SQLite/attempt/evidence副作用保持不变。
+- [x] F41 READY token数组保持不变，但必须由同一`--run-controlled`调用执行。
 - [x] F42 READY不等于Playwright通过。
-- [x] F43 skip/fixme/only/retry/dev/mock均禁止。
+- [x] F43 skip/fixme/only/retry/dev/mock禁止保持不变。
 - [x] F44 Fault Launcher活动规格/checklist同步完成。
 - [x] F45 Runner/Toolchain状态同步完成。
 - [x] F46 README、测试策略、执行包与冻结基线同步完成。
@@ -80,7 +82,8 @@
 ## 当前门状态
 
 - 设计修正：`COMPLETE`。
-- Fault Launcher 2A Build：`BLOCKED_BY_PREFLIGHT_DESCRIPTOR_CONTRACT_IMPLEMENTATION`。
-- Preflight Contract：`FROZEN_FOR_IMPLEMENTATION/NOT_STARTED`。
+- Fault Launcher 2A Build：`BLOCKED_BY_CONTRACT_BASE_SCHEMA_CONFORMANCE_BUGFIX`。
+- Preflight Contract候选：`63851f8878dcf6da86e99d5ffa7795ac48200920/REJECTED_AS_2A_CONTRACT_BASE`。
+- Schema conformance后继base：`FROZEN_FOR_IMPLEMENTATION/NOT_STARTED`。
 - Controlled Playwright：`NOT_RUN`；依赖不齐时必须输出`BLOCKED_BY_DEPENDENCY`机器对象。
 - `GATE-06-03`：`BLOCKED/NOT_RUN`。

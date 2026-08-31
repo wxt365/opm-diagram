@@ -218,7 +218,7 @@ npm run release:canvas06:e2e:manifest:verify -- --input-mode <mode> ... --manife
 ### 13.1 事实
 
 1. 当前 Visual Manifest `0.2`、E2E Manifest `0.1` 和 controlled bundle descriptor Schema 已存在，controlled bundle verifier 已实现；Visual/E2E Manifest builder 尚未实现；
-2. Golden Authoring `v1.4` 与 Visual Common Materialization `v1.4` 已冻结 Visual approved 消费守卫、Common空Text Artifact、五类index、8类UI step、43文件self-contained root及JCS owner/parity边界；真实 approved version、Visual/E2E production Manifest/Report 和 `GATE-06-03 READY` 尚不存在；
+2. Golden Authoring `v1.4` 与 Visual Common Materialization `v1.5`及03C Adapter/Fault闭包已冻结 Visual approved 消费守卫、Common空Text Artifact、index/UI/43文件root、四份adapter机器Schema、独立one-shot fault及JCS owner/parity边界；真实 approved version、Visual/E2E production Manifest/Report 和 `GATE-06-03 READY` 尚不存在；
 3. 当前仓库只有公共 Visual/E2E fixture root，没有本规格冻结的受控 bundle root；
 4. 本规格不生成 Candidate、Activation，不启用 Capability，也不构成 ISO 19450:2024 符合性证据。
 

@@ -10,7 +10,12 @@ final class ReleaseGoldenAuthoringCondition implements Condition {
 
     @Override
     public boolean matches(ConditionContext context, AnnotatedTypeMetadata metadata) {
-        return context.getEnvironment() instanceof ConfigurableEnvironment environment
-                && ReleaseGoldenAuthoringGuard.matches(environment);
+        if (!(context.getEnvironment() instanceof ConfigurableEnvironment environment)) return false;
+        try {
+            return ReleaseGoldenAuthoringLaunchMode.require(environment)
+                    == ReleaseGoldenAuthoringLaunchMode.RELEASE_GOLDEN_FIXTURE_MATERIALIZE;
+        } catch (GoldenFixtureMaterializationException exception) {
+            return false;
+        }
     }
 }

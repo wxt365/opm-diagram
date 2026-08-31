@@ -1,12 +1,14 @@
 # Spec: DEV-CANVAS-06 E2E Fault Launcher 实现
 
-文档状态：`FROZEN_FOR_IMPLEMENTATION/BLOCKED_BY_PREFLIGHT_DESCRIPTOR_CONTRACT_IMPLEMENTATION`
+文档状态：`FROZEN_FOR_IMPLEMENTATION/D01_THREE_STAGE_SOURCE_CLOSURE_APPLIED`
 
 实现状态：`BASELINE_IMPLEMENTED/CONTROLLED_PLAYWRIGHT_NOT_STARTED`
 
-Build准入：`BLOCKED_BY_PREFLIGHT_DESCRIPTOR_CONTRACT_IMPLEMENTATION`
+Build准入：`BLOCKED_BY_FINAL_PRODUCTION_SOURCE_CHAIN_IMPLEMENTATION`
 
-受控source commit准入：`ORIGIN_BASE_READY/CONTRACT_CLEAN_BASE_NOT_CREATED/2A_COMMIT_NOT_CREATED`
+历史受控source commit：`ORIGIN_BASE_0DCAA27/CONTRACT_CANDIDATE_63851F8_REJECTED/CONFORMANT_BASE_586D6DE_HISTORICAL_READY/NOT_CONSUMABLE`
+
+活动source-chain准入：由Final Production Source Chain及Stage A Release Discovery/Source Guard闭包唯一取代为`9048bb3... -> rebuilt Fault contract -> rebuilt schema conformance -> A`。A的source delta固定为`7=5 M+2 A`：修改Runner owner及其测试、release discovery test、两个unified source guard owner，并新增controlled Node owner与Playwright spec。本文Fault产品语义和controlled执行契约不变；C/S已形成，首轮A candidate必须重写后接纳。
 
 ## Task Type
 
@@ -20,19 +22,19 @@ Build准入：`BLOCKED_BY_PREFLIGHT_DESCRIPTOR_CONTRACT_IMPLEMENTATION`
 
 ## 1. 目标
 
-实现 `docs/design/opm-dev-canvas-06-e2e-fault-launcher-design.md v1.2`，使三个 Common 故障 case 的 `INITIAL` cycle 在 exact Runtime JAR 中通过 test-only、fail-closed 的 Spring 装配产生真实产品错误，同时保证普通启动、191个 `NONE` INITIAL 和全部194个 `REOPEN` 永远只装配 NOOP。
+实现 `docs/design/opm-dev-canvas-06-e2e-fault-launcher-design.md v1.9`，使三个 Common 故障 case 的 `INITIAL` cycle 在 exact Runtime JAR 中通过 test-only、fail-closed 的 Spring 装配产生真实产品错误，同时保证普通启动、191个 `NONE` INITIAL 和全部194个 `REOPEN` 永远只装配 NOOP。
 
 本实现包只关闭 Fault Launcher、三个产品 hook、错误映射、Common 故障输入及受控验证，不生成 production `194/388` Report，不提升 `GATE-06-03`、Candidate、Activation、Capability 或 ISO 状态。
 
 ## 2. 权威输入
 
-1. Fault Launcher 唯一语义输入：`docs/design/opm-dev-canvas-06-e2e-fault-launcher-design.md v1.2`；
+1. Fault Launcher 唯一语义输入：`docs/design/opm-dev-canvas-06-e2e-fault-launcher-design.md v1.9`；
 2. Fault Plan 唯一机器输入：`OPM-DEV-CANVAS-06-E2E-FAULT-PLAN-001/0.2`，由活动 Attempt Artifact `0.2` union Schema承接；
 3. Runner、Manifest、Profile asset、JAR identity和Attempt输出继续受 E2E Runner规格、Profile/Digest closure及既有Schema约束；
 4. Common活动输入由 `tests/e2e/release/dev-canvas-06/fixtures/factories/common-fixture-factory.mjs` 唯一生成，活动Catalog版本仍为`0.2.0`；
 5. Spring Boot版本固定为根POM锁定的`3.5.10`，EnvironmentPostProcessor注册采用该版本实际支持的`META-INF/spring.factories`；
-6. `0dcaa27...`、36项只读raw ref和唯一`2 A`逻辑范围由Clean Base闭包规格冻结；Bundle `0.2`、Descriptor/JarIT/Gate Observation `0.1`、D10A/D10B和当前Build阻断以后继Preflight Descriptor/Gate Observation闭包规格为活动覆盖输入；
-7. 后继contract包必须先形成新clean base intake，2A final commit以该commit为唯一parent。新base未形成前禁止创建、amend或cherry-pick 2A commit。
+6. 36项baseline raw ref由Clean Base闭包保留为历史字段表并已从新origin复算；A允许修改其中两个Runner ref，并由后继修正规格额外授权release discovery test和两个C/A重叠source guard，另新增两个controlled文件。Bundle `0.2`、Descriptor/JarIT/Gate Observation `0.1`、Preflight Report `0.2`、D10A/D10B、唯一controlled CLI、Manifest D05 join和evidence事务以后继Preflight闭包第17章为活动输入；
+7. 历史contract候选`63851f8878dcf6da86e99d5ffa7795ac48200920`因Gate Observation Schema conformance缺陷固定拒绝，其single-parent `2 M`后继`586d6dee1b07c6634267aeb344e8826adb1ddb4b`只保留为历史接纳记录，不得作为活动2A base消费。活动A必须以新S为唯一parent，D01按Final Production Source Chain验证`O -> C -> S -> A`，禁止复用旧origin、旧candidate或旧contract base。
 
 ## 3. 非目标与硬禁止
 
@@ -57,9 +59,9 @@ Build准入：`BLOCKED_BY_PREFLIGHT_DESCRIPTOR_CONTRACT_IMPLEMENTATION`
 
 ## 4. 精确 Source Delta Allowlist
 
-旧38路径集合不再是可修改allowlist。活动实现边界固定为`36 READ_ONLY_BASELINE + 2 A`：第4.1至4.4节及第4.5节前12项均为只读基线，只有第4.5节最后两个controlled Playwright路径允许新增。未列文件以及36项基线一律禁止进入2A source commit。
+旧38路径集合不再是可修改allowlist。活动实现边界由后继修正规格固定为`7=5 M+2 A`：第4.4节五个路径允许修改，第4.5节最后两个controlled路径允许新增，未列文件一律禁止进入A source commit。
 
-origin base固定为`0dcaa27a92693feaf28b731ebed2f81a9ccea02c`。该base中旧38路径恰为36项存在、2项不存在；36项完整`path/byte_length/sha256`和有序集合摘要`69491a6226cd98b9a5028fec31457e885c86020dbab4e57c381b75f4389b411e`由Clean Base闭包规格第6章唯一冻结。后继contract包必须以该origin base为唯一parent形成新clean base；最终2A commit再以新base为唯一parent，且相对新base的delta逐项等于两个`A`。Common factory及其测试仍由Common Driver实现规格唯一拥有。
+活动origin固定为`9048bb355aff18d5c00fbbaeb1660b979f4e6daa`；36项完整`path/byte_length/sha256`和摘要`69491a...b411e`已从该origin复算。活动链为`O -> C -> S -> A`，`S -> A`精确为`7=5 M+2 A`。Common factory及其测试仍由Common Driver实现规格唯一拥有。
 
 ### 4.1 生产Java与构建文件：`7 READ_ONLY_BASELINE`
 
@@ -105,15 +107,23 @@ org.opm.localruntime.releaseevidence.fault.E2EFaultLauncherEnvironmentPostProces
 
 不得使用不存在的EnvironmentPostProcessor `.imports`约定，不得注册ApplicationListener、FailureAnalyzer或production auto-configuration。
 
-### 4.4 Runner source：`6 READ_ONLY_BASELINE`
+### 4.4 Runner、discovery与source guard：`5 M + 4 READ_ONLY_BASELINE`
+
+允许修改：
 
 1. `scripts/release-canvas06-e2e-run.mjs`
 2. `scripts/release-canvas06-e2e-run.test.mjs`
+3. `scripts/canvas06-e2e-release-config.test.mjs`
+4. `scripts/canvas06-unified-production-input.mjs`
+5. `scripts/canvas06-unified-production-input.test.mjs`
+
+只读：
+
 3. `scripts/verify-canvas06-common-visual-fixtures.mjs`
 4. `scripts/canvas06-e2e-common-fixtures.test.mjs`
 5. `scripts/verify-canvas06-e2e-report.mjs`
 6. `scripts/verify-canvas06-e2e-report.test.mjs`
-Common factory及16项映射只按Common Driver实现规格修改。Runner只允许增加challenge、raw SHA、命令组装、READY等待、INITIAL/REOPEN分支和进程证据；不得在本切片修改Report聚合、failure precedence或source set 23项Schema。
+Common factory及16项映射只按Common Driver实现规格修改。两个Runner `M`只允许实现controlled invocation、Invocation Context消费、唯一`runControlledLifecycleSession()`及其内部`prepareControlledAttempt()`、Runtime/Web lifecycle、Common clients、D10B/cleanup和回归测试；其余三个`M`只允许关闭唯一release spec discovery与七路径source guard。不得在A实现production Report聚合、修改failure precedence或Source Set Schema。Stage R可继续修改两个Runner文件，但必须保持A的controlled回归。
 
 ### 4.5 Java测试基线与受控E2E新增：`12 READ_ONLY_BASELINE + 2 A`
 
@@ -134,7 +144,7 @@ Common factory及16项映射只按Common Driver实现规格修改。Runner只允
 
 唯一允许新增：
 
-1. `tests/e2e/release/dev-canvas-06/fault-launcher.controlled.spec.ts`
+1. `tests/e2e/release/dev-canvas-06/fault-launcher.controlled.release.spec.ts`
 2. `scripts/canvas06-e2e-fault-launcher-controlled.test.mjs`
 
 受控test/spec不进入Runner Source Set、不复制进production Report root，也不能冒充production evidence。
@@ -143,9 +153,9 @@ Common factory及16项映射只按Common Driver实现规格修改。Runner只允
 
 实现任务只允许同步本规格checklist、Runner checklist、测试策略、开发执行包、冻结基线和`docs/README.md`。不得用状态文档扩展代码allowlist。
 
-### 4.7 Clean Base Intake
+### 4.7 历史Base证据与活动Intake
 
-base intake已接纳为：
+以下base intake只作为旧source-chain的不可变历史证据保留：
 
 ```text
 base_source_commit=0dcaa27a92693feaf28b731ebed2f81a9ccea02c
@@ -163,7 +173,7 @@ baseline_raw_refs_sha256=69491a6226cd98b9a5028fec31457e885c86020dbab4e57c381b75f
 base_intake_status=READY
 ```
 
-实施必须从该commit的fresh detached worktree或fresh branch checkout开始，修改前`git status --porcelain=v1 --untracked-files=all`必须为空。最终commit只允许两个`A`，不得amend base、修改36项、把当前dirty main整体提交或从其他checkout补bytes。若新增测试发现36项存在代码缺陷，必须输出`FAULT_LAUNCHER_BASELINE_DEFECT_DETECTED`并停止本包；只能新建独立bugfix规格/checklist，显式扩展allowlist、冻结新base和回归证据后修复，禁止mock、skip、动态patch或fallback绕过。
+上述`READY`不再构成活动Build准入。活动Intake唯一来自新S `2f698cff...`。实施必须从S的fresh clean worktree开始。A commit只允许`7=5 M+2 A`，不得amend S、修改未列路径、提交dirty main或从其他checkout补bytes。release discovery缺陷已由独立后继bugfix规格扩展allowlist；其他只读基线若再发现缺陷，仍必须输出`FAULT_LAUNCHER_BASELINE_DEFECT_DETECTED`并停止本包，禁止mock、skip、动态patch或fallback绕过。
 
 ## 5. Spring启动与失败传播
 
@@ -328,22 +338,29 @@ npm run contract:validate
 ### 8.4 Controlled E2E
 
 ```text
-node scripts/canvas06-e2e-fault-launcher-controlled.test.mjs \
-  --mode=preflight \
-  --source-root=<exact clean 2A source root> \
-  --candidate-source-commit=<40 lowerhex> \
-  --manifest=<exact Manifest v02 final> \
-  --controlled-bundle=<exact controlled bundle descriptor> \
-  --runtime-jar=<attempt-local exact Runtime JAR> \
-  --web-root=<production Web root> \
-  --browser-root=<exact Playwright browser root> \
-  --fixed-handoff=<absolute current fixed Handoff JSON> \
-  --production-activation-root=<absolute read-only activation input root> \
-  --attempt-parent=<fresh attempt parent> \
-  --control-parent=<fresh control parent>
+node scripts/canvas06-e2e-fault-launcher-controlled.test.mjs --run-controlled \
+  --source-root <absolute-clean-2A-source-root> \
+  --controlled-bundle-root <absolute-read-only-bundle-v02-root> \
+  --manifest-root <absolute-read-only-manifest-v02-root> \
+  --manifest dev-canvas-06-e2e-manifest.json \
+  --java-home <absolute-jdk21-home> \
+  --browser-executable <absolute-chromium-executable> \
+  --fixed-handoff <absolute-current-fixed-handoff-json> \
+  --production-activation-root <absolute-read-only-activation-root> \
+  --attempt-parent <absolute-fresh-attempt-parent> \
+  --process-control-parent <absolute-fresh-process-control-parent> \
+  --evidence-parent <absolute-fresh-controlled-evidence-parent>
 ```
 
-preflight必须先验证Bundle `0.2`和Preflight Descriptor `0.1`，再按活动闭包规格`FLCP-D01~D09、FLCP-D10A-GATE-PREFLIGHT`固定顺序验证十项依赖。任一依赖非READY时，stdout唯一为`RFC8785_JCS(report)+LF`，`status=BLOCKED_BY_DEPENDENCY`、`playwright_command=null`、exit=`3`，stderr首行为`E2E_FAULT_LAUNCHER_CONTROLLED_BLOCKED\tDEPENDENCY_PREFLIGHT`；且零Runtime/Web/Browser子进程、零SQLite、零attempt/control目录及零Manifest/Report/release写入。十项全READY时，report为`READY_TO_RUN`并给出唯一token数组：`node node_modules/@playwright/test/cli.js test tests/e2e/release/dev-canvas-06/fault-launcher.controlled.spec.ts --config=tests/e2e/release/dev-canvas-06/playwright.release.config.ts --workers=1 --retries=0`。READY只授权父Runner执行，不等于测试通过。Playwright还必须生成D10B的`1+12+1=14`项Gate Observation Artifact，任一漂移立即失败并停止后续cycle。
+该命令是preflight与execution唯一入口，参数形状、未知旧参数拒绝、root隔离、退出码和原子顺序只按活动闭包规格第17章实现。candidate commit从clean source HEAD复算；不得接受`--candidate-source-commit`。Runtime JAR和Web tree从actual Manifest `source_build` refs解析；不得接受`--runtime-jar/--web-root`。browser从`--browser-executable`与Descriptor/Golden Environment三方闭合；不得接受browser root扫描。
+
+父进程必须先对`<manifest-root>/dev-canvas-06-e2e-manifest.json`生成raw ref并执行活动Manifest v02 `CONTROLLED_TEST` verifier，再按第17.3节逐字段完成D05：Manifest只拥有三个exact case及其fixture/input/driver/transaction/assertion字段；两次attempt、`INITIAL/REOPEN`和端口只来自Descriptor并与三个case交叉验证。不得把schedule伪装成Manifest字段或只按名称匹配。
+
+preflight按`FLCP-D01~D09、FLCP-D10A-GATE-PREFLIGHT`固定顺序验证十项依赖。D01必须证明`O -> C -> S -> A`三段single-parent及冻结stage delta，`S -> A`精确为`7=5 M+2 A`；Preflight Report仍为`OPM-DEV-CANVAS-06-E2E-FAULT-LAUNCHER-CONTROLLED-PREFLIGHT-001/0.2`且不增加字段，`implementation_delta`恰含七项。任一依赖非READY时保持既有BLOCKED输出、exit `3`和零副作用边界。
+
+十项全READY时，同一调用把READY report原字节镜像到`<evidence-parent>/.dev-canvas-06.fault-launcher-run.<manifest12>.<descriptor12>.staging/fault-launcher/preflight-report.json`，再按活动闭包规格第17.5节原子写Invocation Context，并只以`OPM_CANVAS06_FAULT_CONTROL_CONTEXT_REF=<context raw ref JCS>`传入独立Playwright child。唯一token数组为：`<current-process.execPath-absolute-realpath> node_modules/@playwright/test/cli.js test tests/e2e/release/dev-canvas-06/fault-launcher.controlled.release.spec.ts --config=tests/e2e/release/dev-canvas-06/playwright.release.config.ts --workers=1 --retries=0`；必须用`execFile`、`shell=false`和source root cwd执行，禁止PATH解析Node。文件名必须匹配固定配置的`**/*.release.spec.ts`；不得修改配置或用未匹配的历史文件名。READY只授权继续执行，不等于测试通过。
+
+Playwright成功时，Runner lifecycle接口生成的D10B固定`1 BEFORE+12 DURING+1 AFTER`；每个DURING只能位于handler已在route/navigation/API前绑定cycle-local Page、`finally`关闭Chromium/context/page、以相同对象取得三类关闭事件和零pending网络观测的临时确认，且Runner持续保留迟到事件sentinel直到handler settle，完成零迟到事件复核、sink/precondition client关闭、全部sentinel移除和最终Browser proof接纳，再终止Runtime/Web并释放端口之后。Browser proof不闭合，包括confirm后迟到事件、监听空窗、sentinel提前移除或最终残留，固定为`E2E_ORCHESTRATION_BROWSER_PROOF_INVALID -> EVIDENCE_TRANSACTION/4`，不得采样当前DURING或提交可消费Artifact。Gate或Playwright业务提前失败时`during[]`只能是已执行cycle的有序前缀，仍须终止已启动child并取得AFTER，禁止补写虚假观测。两文件通过staging verifier、目录fsync、no-replace rename和installed verifier后，final root唯一为`<evidence-parent>/dev-canvas-06.fault-launcher-run.<manifest12>.<descriptor12>`。完整成功exit `0`；Schema-valid失败证据提交后exit `1`；事务失败exit `4`且final不存在、staging保留不可消费。该controlled evidence root不得写入production Report root，也不构成`194/388`或Gate READY。
 
 ### 8.5 正反例矩阵
 
@@ -373,19 +390,19 @@ preflight必须先验证Bundle `0.2`和Preflight Descriptor `0.1`，再按活动
 
 同时满足以下条件，才能把实现状态记为`IMPLEMENTED/CONTROLLED_VALIDATED`：
 
-1. 第4章source delta逐项等于两个`A`，36项raw ref及集合摘要不变，无extra文件；
-2. 第8.1~8.4所有非依赖阻断命令通过；controlled E2E不得跳过；
+1. 第4章source delta逐项等于`7=5 M+2 A`，未授权raw ref不变、36项origin摘要可复核且无extra文件；
+2. 第8.1~8.4所有非依赖阻断命令通过；controlled E2E不得跳过；Preflight Report `0.2`、Manifest D05字段级join、Gate Artifact成功/提前失败条件分支和evidence staging/final双重验证均闭合；
 3. 三类产品错误、协议错误、一次性和零增量均有机器测试；
 4. 普通/NONE/REOPEN与Recovery回归通过；
 5. 新Common root、Catalog、Manifest按第7章在新不可变版本根闭合；
-6. `git diff --check`、source clean与文档状态同步通过；
+6. `git diff --check`、source clean与文档状态同步通过；final evidence root恰含两个固定JSON且root identity、fsync/rename/installed verify均通过；
 7. OpenAPI、SQLite DDL、production配置、公共HTTP wire和既有release root零变化。
 
 未生成production `194/388`和READY Report时，`GATE-06-03`仍为`NOT_RUN`。
 
 ## 10. 回滚
 
-1. 代码回滚只回退第4章两个新增文件，不改写36项base；
+1. 代码回滚只回退第4章四项A-stage delta：两个Runner恢复为S的exact bytes，删除两个controlled新增文件；不得改写其余34项base；
 2. 新版本根已安装但未切fixed Handoff时，保持隔离且不激活；
 3. fixed切换失败按Postverify既有backup恢复旧JSON；
 4. 不删除、覆盖或改写任何旧`clean-*`、用户SQLite、Handoff evidence或Schema；
@@ -393,8 +410,8 @@ preflight必须先验证Bundle `0.2`和Preflight Descriptor `0.1`，再按活动
 
 ## 11. 事实与非结论
 
-事实：本文已冻结旧38个Fault Launcher逻辑路径的活动分类：36项为`0dcaa27...`中的只读raw-ref基线，只有两个controlled Playwright路径允许新增；Spring注册/顺序、verified-state传递、封闭Fault Plan validator、显式context构造链、Recovery隔离、三个hook、Common/Catalog/Manifest生成布局、重建顺序和分层验收均由base及活动设计承接。Common factory及其测试由独立Common Driver实现规格拥有。
+事实：本文已冻结Fault Launcher路径的活动分类：36项raw-ref基线从活动origin `9048bb3...`复算；其中两个Runner在A允许修改，其余34项只读，另有两个controlled路径允许新增。Spring注册/顺序、verified-state传递、封闭Fault Plan validator、显式context构造链、Recovery隔离、三个hook、Common/Catalog/Manifest生成布局、重建顺序和分层验收均由base及活动设计承接。Common factory及其测试由独立Common Driver实现规格拥有。2A唯一CLI、actual Manifest定位与官方verifier、D05字段级join、三段source身份、Preflight Report `0.2`、父到Playwright单一raw-ref Invocation Context、controlled spec命名/testMatch和evidence root事务由Preflight Descriptor/Gate Observation闭包规格第17章承接。
 
-事实：origin base已固定为`0dcaa27a92693feaf28b731ebed2f81a9ccea02c`，36项基线存在且只读；Preflight Descriptor contract实现和新clean base均未形成，因此2A Build为`BLOCKED_BY_PREFLIGHT_DESCRIPTOR_CONTRACT_IMPLEMENTATION`。四份新Schema、producer/verifier、新base、两个2A文件、2A final commit/patch SHA、真实preflight与Gate Observation、controlled Playwright结果均不存在；活动Manifest v02生产输入、真实`194/388` Report和`GATE-06-03` READY证据也未由本设计任务生成。
+事实：旧`0dcaa27... -> 63851f8... -> 586d6de...`链仅保留为不可消费历史证据。活动origin固定为`9048bb355aff18d5c00fbbaeb1660b979f4e6daa`，C/S/A均未创建，A-stage patch SHA、真实preflight、Gate Observation和controlled Playwright结果均未生成；活动Manifest v02生产输入、真实`194/388` Report和`GATE-06-03` READY证据也未生成。
 
 非结论：`FROZEN_FOR_IMPLEMENTATION`不等于Java代码、Spring装配、真实UI/API、production Report、Gate、发布或ISO完成。

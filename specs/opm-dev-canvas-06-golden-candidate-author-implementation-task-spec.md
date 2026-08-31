@@ -20,7 +20,7 @@
 ## 2. 设计输入
 
 - `docs/design/opm-dev-canvas-06-golden-authoring-design.md` `v1.4`；
-- `docs/design/opm-dev-canvas-06-visual-common-materialization-design.md` `v1.1`；
+- `docs/design/opm-dev-canvas-06-visual-common-materialization-design.md` `v1.5`；
 - `specs/opm-dev-canvas-06-golden-environment-v02-design-bugfix-task-spec.md`；
 - `docs/design/opm-dev-canvas-06-golden-fixture-materializer-design.md` `v1.5`；
 - `docs/design/opm-dev-canvas-06-materialization-verifier-controlled-case-catalog.md` `v1.1`；
@@ -35,7 +35,7 @@
 
 1. Capture Planner、Materialization Report semantic verifier 和 Golden Environment `0.2` Schema/semantic verifier 已完成；
 2. 02B checklist全部通过，新Common fixture/Catalog/Plan的semantic join通过；
-3. 03C checklist全部通过，8个Common base、attestation、fresh clone和fault hook受控集成通过；
+3. 03C checklist全部通过，四份adapter机器契约、唯一ESM函数/144次callback、8个Common base、attestation、fresh clone和独立one-shot fault hook受控集成通过；
 4. 输入 Plan 为新 change ID 的 `READY_FOR_AUTHORING`，130 项 Family root 在 `--require-materialized` 下通过，旧 `GOLDEN-CANVAS06-20260803-001` 被 semantic preflight拒绝；
 5. source checkout clean，Node 22/npm 10.9.4/Java 21/Playwright 1.57.0/Chromium 143.0.7499.4 可用；
 6. 真实 release 执行必须使用新 clean Handoff/Bundle/Plan；受控 test Plan 只能证明实现。
@@ -64,7 +64,7 @@
 1. CLI 严格实现主设计第 7 章参数，拒绝所有禁止参数和非空 candidate root；
 2. 复核 Plan/Handoff/Intake、130 项 materialization、active binding、clean build、Runtime JAR、Web dist 和 source epoch；
 3. 生成并校验完整 environment fingerprint 和实际 font refs，禁止隐式系统字体替代；
-4. Family capture 每 attempt 从 130 个 immutable SQLite base 创建独立 clone；Common capture 只能通过 03C adapter 从8个immutable base创建144个fresh clone，禁止03B自行seed或选择API/SQLite路径；
+4. Family capture 每 attempt 从 130 个 immutable SQLite base 创建独立 clone；Common capture 只能静态ESM调用03C的`runCommonVisualMaterialization(request,captureCallback)`，从8个immutable base创建144个fresh clone并消费Schema-valid normalized result，禁止03B自行seed、选择API/SQLite路径、动态加载callback或重定义callback/result字段；
 5. 固定单 browser lane，对 1242 capture 和 9 blank 各执行两次新 context，按 Plan 顺序稳定等待并生成 raw/geometry/projection 证据；
 6. 只在两次 attempt 完全一致、计数闭合且无额外文件时保留 attempt 1 canonical refs；
 7. 先原子写并通过 semantic verifier 的 candidate Golden Environment `0.2`，其完整 fingerprint、1242 PNG、9 blank 和 font refs 与 candidate content 深度相等；
@@ -118,4 +118,4 @@ Schema、runner、verifier、Common Factory、全量正反测试和性能证据�
 
 ## 12. 事实与假设
 
-事实：当前 `03B` runner 与真实 candidate 尚未完成；Authoring Report 和 Golden Environment `0.2` Schema/离线 verifier 已完成，但 runtime browser/font/Plan 闭包尚未实现。Common Runtime Materialization与Color Profile语义已经由设计`v1.0`冻结，不再是设计待定项；02B/03C实现尚未开始，是当前明确依赖。假设：无；真实环境 SHA、PNG 和性能必须执行生成。
+事实：当前 `03B` runner 与真实 candidate 尚未完成；Authoring Report 和 Golden Environment `0.2` Schema/离线 verifier 已完成，但 runtime browser/font/Plan 闭包尚未实现。Common Runtime Materialization、Color Profile、Node adapter四份机器契约及one-shot fault实现边界已由Visual Common`v1.5`冻结，不再是设计待定项；03C仍处于实现/验收未完成状态，是当前明确依赖。假设：无；真实环境 SHA、PNG 和性能必须执行生成。

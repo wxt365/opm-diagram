@@ -1,6 +1,6 @@
 # DEV-CANVAS-06 E2E Common Driver 与受控编排设计
 
-文档版本：`v1.4`
+文档版本：`v1.11`
 
 文档状态：`FROZEN_FOR_IMPLEMENTATION`
 
@@ -14,9 +14,11 @@
 2. controlled bundle、活动Manifest、exact Runtime JAR、production Web dist与fresh attempt root之间的唯一信任和复制关系；
 3. `INITIAL -> REOPEN`的进程、storage、事务基线和证据采集顺序。
 
-同时关闭production编排owner与Runner Source Set的身份冲突：编排实现只能收敛到Source Set `0.1`已列入的Runner入口，不允许新增Source Set外production helper。
+同时关闭production编排owner与Runner Source Set的身份冲突：编排实现只能收敛到活动Source Set `0.2`列入的Runner入口和唯一production bridge，不允许新增Source Set外production helper。
 
 本设计不生成Manifest、Report、Gate、Candidate、Activation或Capability证据，不修改公共HTTP wire、SQLite DDL、产品默认配置或Recovery协议。
+
+Stage A lifecycle owner由`specs/opm-dev-canvas-06-stage-a-controlled-lifecycle-interface-closure-bugfix-task-spec.md`收紧；production `194/388`的Context、Driver dispatch、一次性同源client和bridge由`specs/opm-dev-canvas-06-family-controlled-invocation-closure-bugfix-task-spec.md`唯一补齐。发生冲突时，按后者的活动production口径执行。
 
 ## 2. 已确认的冲突与修正决定
 
@@ -64,21 +66,21 @@ READONLY                            -> READ_ONLY_REVISION
 
 ### 2.4 Runner Source Set身份冲突
 
-历史`v1.2`实现规格要求新增独立`canvas06-e2e-controlled-orchestration.mjs`，但活动Runner Source Set `0.1/0.1.0`固定23项并以`ALL_PATHS_NOT_IN_ENTRIES`排除该文件。独立实现会使实际编排逻辑无法进入Report `0.2`的`runner_source_sha256`，因此禁止继续采用。
+历史`v1.2`实现规格要求新增独立`canvas06-e2e-controlled-orchestration.mjs`，但历史Runner Source Set `0.1/0.1.0`固定23项并排除该文件。独立实现会使实际编排逻辑无法进入Report `0.2`的`runner_source_sha256`，因此禁止继续采用。
 
 唯一修正如下：
 
 1. `prepareControlledAttempt()`及本设计第6章全部production编排唯一实现在`scripts/release-canvas06-e2e-run.mjs`；
-2. 编排单元与契约测试唯一收敛到`scripts/release-canvas06-e2e-run.test.mjs`，浏览器验收由`common-driver.controlled.spec.ts`承接；
+2. 编排单元与契约测试唯一收敛到`scripts/release-canvas06-e2e-run.test.mjs`，浏览器验收由`family.controlled.release.spec.ts`同时承接Family/Common；
 3. 禁止新增独立production orchestration文件、第二CLI或动态加载Source Set外helper；
-4. Runner Source Set保持`0.1/0.1.0`、23项不变，E2E Report保持`0.2`和`runner_version=0.2.0`不变；
-5. Runner入口、input owner、artifact owner和release Playwright config的实际bytes继续由既有Source Set raw ref及aggregate承接；测试源继续属于排除集。
+4. Runner Source Set活动口径升级为`0.2/0.2.0/24`，第20项显式纳入production bridge；E2E Report保持`0.2`和`runner_version=0.2.0`不变；
+5. Runner入口、input owner、artifact owner、release Playwright config、bridge和四Driver的实际bytes由活动Source Set raw ref及aggregate承接；其他测试源继续属于排除集。
 
 该决定不改变第3至5章的Common动作语义，也不授权重复修改已经存在的Common Driver、三个selector、Fact删除入口、store或factory。
 
 ### 2.5 Manifest/Runner跨commit身份冲突
 
-External Store与Common编排分别形成source commit时，即使两个commit线性相邻，也无法同时满足Manifest source、Runner clean HEAD与Report runner identity逐字符相等。唯一活动source方案固定为：以`e598b305a44ebb9c9845c1f5563bc36c3a89a2b4`为base，在同一fresh clean worktree中联合实现External Store `9=7 M+2 A`与Common编排`8=7 M+1 A`，联合验证后一次提交为`17=14 M+3 A`。两个子集不得分别形成可消费commit，Git祖先关系不得替代身份相等。
+External Store与Common编排分别形成source commit时，即使两个commit线性相邻，也无法同时满足Manifest source、Runner clean HEAD与Report runner identity逐字符相等。该局部闭包已实际形成`e598... -> 9048bb3...`的`17=14 M+3 A` origin；它不再是最终source。最终活动方案由Final Production Source Chain Closure固定为`9048bb3... -> C -> S -> A -> R`，Manifest/Runner/Report最终统一绑定R。两个职责子集仍不得分别形成可消费commit，Git祖先关系不得替代身份相等。
 
 该final commit必须同时等于Handoff source、Intake解析后的Handoff source、Manifest `source_build.source_commit`、Runner source HEAD和Report `runner_identity.source_commit`。唯一实施和production重建顺序由Common编排与External Store集成Source闭包规格承接。
 
@@ -166,12 +168,14 @@ R(role,name)= page.getByRole(role,{name,exact:true})
 {"type":"SUBMIT_TEST_ID","test_id":"<non-empty>"}
 {"type":"CLICK_ROLE","role":"button|checkbox|tab","name":"<exact accessible name>"}
 {"type":"WAIT_API","operation_id":"API-EDT-001|API-EDT-002","method":"GET|POST","ordinal":1}
-{"type":"PRECONDITION_API","kind":"ADVANCE_HEAD|REPLACE_OPTION_ID|REPLACE_IMPACT_TOKEN|SUBMIT_TEXT_BLOCKED_COMMAND|SUBMIT_READONLY_COMMAND","source_observation_ref":"<attempt内既有API observation id>"}
+{"type":"PRECONDITION_API","kind":"ADVANCE_HEAD|REPLACE_OPTION_ID|REPLACE_IMPACT_TOKEN|SUBMIT_TEXT_BLOCKED_COMMAND|SUBMIT_READONLY_COMMAND","source_observation_ref":"setup-baseline-api"}
 ```
 
 `SET_ROLE.checked`必须是JSON boolean，允许`true|false`；示例中的`true`不是常量，`STATE_CREATE_RENAME_ROLES`的`INITIAL=false`必须原样保留。`SET_ROLE`唯一selector为`T(p03-state-candidate|p03-state-inspector) + R(checkbox,role)`。`WAIT_API.ordinal`按同一subject内相同`operation_id+method`从`1`开始连续计数，禁止跳号。表5中的缩写必须机械展开成上述JSON后写入`COMMON_CASES`；表内断言属于expected observation，不得伪装成第九类step。
 
 每步等待条件固定为：locator唯一且稳定两个animation frame；动作后等待指定API响应与Projection refresh完成。禁止固定毫秒sleep。`REPLACE_OPTION_ID/REPLACE_IMPACT_TOKEN`只改写下一条匹配的正式产品请求；`ADVANCE_HEAD`先提交独立正式命令再重置subject baseline；`SUBMIT_TEXT_BLOCKED_COMMAND/SUBMIT_READONLY_COMMAND`各发送一次由已验证Projection、binding和活动Manifest输入构造的正式`API-EDT-002`请求。其原始request/actual request/response必须进入API artifact，不能改写产品代码或绕过公共HTTP wire。
+
+五类操作的case适用集合、两字段setup baseline seed到首个attached Page Projection的内部绑定、完整command payload、一次性`route.continue`改写、动态source raw ref解析、`resolved_source_refs`、五字段`match`、DIRECT/ARMED/十三字段final receipt和baseline重绑定唯一由[Common Precondition Machine Contract Closure规格](../../specs/opm-dev-canvas-06-common-precondition-machine-contract-closure-bugfix-task-spec.md)承接。`source_observation_ref="setup-baseline-api"`是固定`SOURCE_LOCATOR_TOKEN`，不是运行期observation id或raw ref；Runner必须按kind解析actual ref，禁止把该字符串持久化为`*_ref`。
 
 ## 5. 16 Case精确映射
 
@@ -216,23 +220,22 @@ p03-fact-delete-impact
 
 ### 6.1 唯一入口
 
-Runner内部编排owner固定在`scripts/release-canvas06-e2e-run.mjs`，不得新建独立production helper。该owner提供：
+Runner内部编排owner固定在`scripts/release-canvas06-e2e-run.mjs`，不得新建独立production helper。controlled spec唯一允许调用：
 
 ```text
-prepareControlledAttempt({
-  controlled_bundle_root,
-  manifest_root,
-  manifest_path,
-  profile_asset_root,
-  report_staging_root,
-  case_entry,
-  attempt_ordinal,
-  java_executable,
-  browser_executable,
-  runtime_port,
-  web_port
-}) -> PreparedAttempt
+runControlledLifecycleSession({
+  invocation_context,
+  manifest,
+  preflight_descriptor,
+  cycle_handlers
+}) -> Promise<ControlledLifecycleResult>
 ```
+
+`prepareControlledAttempt()`继续存在，但只作为上述接口内部的attempt准备步骤，controlled spec不得直接调用。`cycle_handlers`恰含6个schedule的`INITIAL/REOPEN`函数，每个函数只接收`{origin,observation_sink}`。observation sink及其嵌套precondition client都由lifecycle接口逐cycle构造；spec只可原样调用`attachBrowserPage/confirmBrowserClosed`并把业务观测方法传给既有Common Driver。handler参数与`undefined`返回值保持不变。
+
+上述四参数入口只用于Stage A Fault `3/6/12`。production `194/388`使用Controlled Invocation Context `0.1`和唯一production bridge；Runner按Manifest原序构造完整`CommonCaseExecution`，Page attach后向Common Driver传入`{page,case_entry,attempt_identity,observation_sink,precondition_client}`。precondition client每attempt最多一次，只能经attached Page对Web origin执行同源fetch，并把raw/actual/response写入Attempt Artifact `0.2`的API Exchange；禁止固定拒绝、Node HTTP旁路或直连Runtime origin。
+
+sink恰含`attachBrowserPage(page)`、`confirmBrowserClosed({browser,context,page})`、`waitForApi(expected)`、`waitForProjectionRefresh()`、`recordPrecondition(receipt)`和`precondition_client`六个顶层成员。spec在fresh page创建后、route/navigation/API前恰调用一次attach；Runner由该Page取得同树Context/Browser、安装网络和三类关闭事件监听，使两个wait方法只消费同cycle绑定Page的有序事件。handler在`finally`依次关闭Page/Context/Browser后，以相同对象引用恰调用一次confirm；Page close、Context close、Browser disconnected和零pending网络观测全部闭合后，confirm只进入临时`CONFIRMED_SENTINEL`状态：业务采样缓冲立即冻结，会继续采样或写artifact的监听立即移除，但覆盖Page `request/response/requestfailed/close`、Context `close`和Browser `disconnected`的最小sentinel必须无间隙保留到handler settle与sink关闭。sentinel只可设置`late_event_detected=true`，不得追加观测或满足wait。Runner复核零迟到事件、关闭sink/precondition client并移除全部sentinel后，才进入`CLOSED`并接纳最终Browser proof。duplicate/late/cross-cycle attach、错误对象、缺失/重复confirm、残留请求、confirm后迟到事件、监听空窗、sentinel提前移除或最终残留，固定为`E2E_ORCHESTRATION_BROWSER_PROOF_INVALID`并升级`EVIDENCE_TRANSACTION/4`。
 
 不新增`--runtime-jar`或`--web-dist-root`覆盖参数。两者唯一来源是已验证Manifest final root：
 
@@ -263,30 +266,22 @@ reopen_runtime=<attempt_root>/process/reopen
 ### 6.3 唯一顺序
 
 ```text
-VERIFY_CONTROLLED_BUNDLE
--> VERIFY_MANIFEST_0.2_AND_PROFILE
--> VERIFY_SOURCE_REFS
--> CREATE_FRESH_ATTEMPT_ROOT
--> COPY_RUNTIME_JAR_AND_REVERIFY_RAW_REF
--> COPY_WEB_DIST_AND_REVERIFY_TREE_REF
--> COPY_PROFILE_AND_DRIVER_AND_REVERIFY
--> MATERIALIZE_M0_IN_FRESH_STORAGE
--> START_INITIAL_RUNTIME
--> START_PRODUCTION_WEB
--> START_FRESH_CHROMIUM
--> EXECUTE_SETUP
--> CAPTURE_SUBJECT_BASELINE
--> EXECUTE_SUBJECT
--> CAPTURE_INITIAL_ARTIFACTS
--> STOP_BROWSER_WEB_RUNTIME
--> START_FRESH_REOPEN_RUNTIME_WEB_BROWSER_ON_SAME_STORAGE
--> EXECUTE_REOPEN_ASSERTION
--> CAPTURE_REOPEN_ARTIFACTS
--> STOP_AND_VERIFY_NO_LISTENER
--> VERIFY_ATTEMPT_ARTIFACT_0.2
+VERIFY_CONTEXT_MANIFEST_DESCRIPTOR_AND_HANDLER_MAP
+-> SAMPLE_D10B_BEFORE
+-> for each FL-SCH-01..06:
+     PREPARE_CONTROLLED_ATTEMPT
+     START_AND_READY_INITIAL_RUNTIME_WEB
+     CONSTRUCT_OWNER_CLIENTS_ATTACH_PAGE_CALL_INITIAL_HANDLER_CONFIRM_AND_FINALIZE_BROWSER_PROOF
+     STOP_CHILDREN_VERIFY_PORTS_AND_SAMPLE_DURING
+     START_AND_READY_REOPEN_RUNTIME_WEB_ON_SAME_STORAGE
+     CONSTRUCT_OWNER_CLIENTS_ATTACH_PAGE_CALL_REOPEN_HANDLER_CONFIRM_AND_FINALIZE_BROWSER_PROOF
+     STOP_CHILDREN_VERIFY_PORTS_AND_SAMPLE_DURING
+-> CLEANUP_ALL_STARTED_CHILDREN
+-> SAMPLE_D10B_AFTER
+-> WRITE_AND_VERIFY_GATE_OBSERVATION
 ```
 
-Runtime、Web server、Chromium在每个attempt都必须是新进程；REOPEN再新建第二组进程，但只读同一attempt storage。不得复用进程、browser context、cookie、cache、service worker或端口listener。
+Runtime与Web server在每个cycle都必须是新进程；REOPEN只读同一attempt storage。spec handler只拥有本cycle由exact executable启动的fresh Chromium process/context/page及其实际关闭，不拥有Runtime/Web child、client factory或关闭证明判定；Runner只拥有Page事件监听、对象引用校验和证明接纳，不关闭Browser。父Node owner拥有Playwright test child最终终止。`confirmBrowserClosed()`返回不是最终proof；Runner必须等待handler settle，按`VERIFY_NO_LATE_EVENT -> CLOSE_SINK_AND_PRECONDITION_CLIENT -> REMOVE_ALL_SENTINELS -> MARK_BROWSER_PROOF_COMPLETE`完成最终接纳。D10B DURING只在handler成功、Browser proof完整、sink封闭、sentinel零残留、lifecycle终止Runtime/Web并验证端口释放后采样；Browser proof失败时当前DURING和可消费Gate Artifact均禁止。
 
 ### 6.4 Production Web
 
@@ -303,17 +298,17 @@ Web server只能从attempt-local exact `web-dist`提供静态/SPA内容并同源
 
 ## 7. 验收矩阵
 
-正例至少覆盖：16项映射exact equality、三个selector owner、9个BLOCKED分支、7个PASS分支、两个attempt、fresh进程、same storage REOPEN、exact JAR与Web tree复制复核、controlled bundle与Manifest四方join。
+正例至少覆盖：16项映射exact equality、三个selector owner、9个BLOCKED分支、7个PASS分支、两个attempt、fresh进程、same storage REOPEN、六方法sink、同Page网络观测、三类关闭事件与零pending证明、confirm后保留最小sentinel直到handler settle/sink关闭且最终零残留、exact JAR与Web tree复制复核、controlled bundle与Manifest四方join。
 
-反例至少覆盖：缺/extra/reorder case、错误selector、模糊/坐标selector、错误API operation/status/code、SETUP计入subject delta、错误baseline时机、JAR/Web override、checkout/Vite fallback、attempt root已存在、跨report root、REOPEN复用进程或换storage、controlled/production参数互用、symlink/hardlink、copy后SHA/tree drift、端口残留和placeholder artifact。
+反例至少覆盖：缺/extra/reorder case、错误selector、模糊/坐标selector、错误API operation/status/code、SETUP计入subject delta、错误baseline时机、JAR/Web override、checkout/Vite fallback、attempt root已存在、跨report root、REOPEN复用进程或换storage、controlled/production参数互用、symlink/hardlink、copy后SHA/tree drift、缺失/重复/late/cross-cycle attach、wait消费另一Page、错误对象或缺失/重复confirm、关闭事件/pending不闭合、confirm后迟到事件、监听空窗、sentinel提前移除或最终残留、端口残留和placeholder artifact。
 
 ## 8. 状态边界
 
 本设计冻结后：
 
-- Common Driver与controlled orchestration语义：`DESIGN_READY/v1.4`；
+- Common Driver与controlled orchestration语义：`DESIGN_READY/v1.11`；
 - Common Driver、三个selector、Fact删除入口与factory：`EXISTING_READ_ONLY_PREREQUISITE`；
-- controlled orchestration：`EMBEDDED_IN_17_PATH_SOURCE/NOT_STARTED`，`8=7 M+1 A`仅为职责子集，唯一可消费source delta为`17=14 M+3 A`；
-- Runner Source Set：`0.1/0.1.0/23 entries`，未升级；E2E Report：`0.2/runner_version 0.2.0`，未升级；
+- controlled orchestration：`BLOCKED_BY_STAGE_A_LIFECYCLE_IMPLEMENTATION`；历史`8=7 M+1 A`和`17=14 M+3 A`只作为origin职责来源，活动Build唯一按Final Production Source Chain的A/R stage；
+- Runner Source Set：`0.2/0.2.0/24 entries`，设计已升级、实现未开始；E2E Report：`0.2/runner_version 0.2.0`，未升级；
 - Manifest v02 producer/verifier：等待独立实现规格执行；
 - production `194/388`、E2E Report、`GATE-06-03`、Candidate、Activation、Capability、production与ISO证据：`NOT_RUN/NOT_ENABLED`。

@@ -133,7 +133,7 @@ golden_ref, critical_regions[]
 
 ### 6.5 公共 fixture/factory catalog
 
-> 历史适用边界：本节记录首轮Common Catalog `0.1.0`设计输入，保留用于解释既有历史Catalog，不再是活动02B Builder目标。当前机器Schema仍为`0.1`，活动完整Catalog固定为`catalog_version=0.2.0`，并由Visual Common Materialization `v1.4`承接五类index、8类UI step和43文件self-contained root；历史`0.1.0`不得覆盖或供新semantic verifier接受。
+> 历史适用边界：本节记录首轮Common Catalog `0.1.0`设计输入，保留用于解释既有历史Catalog。当前机器Schema仍为`0.1`，活动完整Catalog固定为`catalog_version=0.2.0`，并由Visual Common Materialization `v1.5`承接index/UI/43文件root及03C Adapter/Fault闭包；历史`0.1.0`不得覆盖或供新semantic verifier接受。
 
 本规格冻结时的后续实现必须新增唯一版本化 catalog：
 

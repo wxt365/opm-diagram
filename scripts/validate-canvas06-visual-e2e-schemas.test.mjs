@@ -234,6 +234,38 @@ test('Active E2E Attempt Artifact 0.2 closes Profile refs and the 16-entry index
   assert.equal(validateE2eArtifactV02(genericRawRef), false);
 });
 
+test('Active Attempt Artifact 0.2 accepts only the frozen Family and Common case ID forms', () => {
+  const familyCaseId = 'G-OPL-PROC-001.CONSUMPTION_OBJECT.PASS';
+  const familyPlan = faultPlan(familyCaseId);
+  familyPlan.schema_version = '0.2';
+  assert.equal(validateE2eArtifactV02(familyPlan), true, JSON.stringify(validateE2eArtifactV02.errors));
+  const familyMaterialization = fixtureMaterializationV02();
+  familyMaterialization.case_id = familyCaseId;
+  familyMaterialization.fixture_kind = 'FAMILY';
+  familyMaterialization.fixture_ref = archiveRef('family/base.json');
+  familyMaterialization.input_ref = archiveRef('family/input.json');
+  assert.equal(validateE2eArtifactV02(familyMaterialization), true, JSON.stringify(validateE2eArtifactV02.errors));
+
+  const familyFileRef = structuredClone(familyMaterialization);
+  familyFileRef.fixture_ref = ref('FIXTURE', 'family/base.json');
+  assert.equal(validateE2eArtifactV02(familyFileRef), false);
+  const commonArchiveRef = fixtureMaterializationV02();
+  commonArchiveRef.input_ref = archiveRef('common/input.json');
+  assert.equal(validateE2eArtifactV02(commonArchiveRef), false);
+
+  for (const invalidCaseId of [
+    'G-OPL-STATE-001.CASE.PASS',
+    'G-OPL-PROC-01.CASE.PASS',
+    'G-OPL-PROC-001.CASE',
+    'G-OPL-PROC-001.case.PASS',
+    'G-OPL-PROC-001.CASE.PASS.EXTRA'
+  ]) {
+    const invalid = faultPlan(invalidCaseId);
+    invalid.schema_version = '0.2';
+    assert.equal(validateE2eArtifactV02(invalid), false, invalidCaseId);
+  }
+});
+
 test('Token digest parity catalog matches the frozen JCS bytes and payload SHA', async () => {
   const catalog = JSON.parse(await readFile(resolve(root, 'tests/e2e/release/dev-canvas-06/fixtures/token-digest-v01-parity-vectors.json'), 'utf8'));
   assert.equal(validateTokenParityCatalog(catalog), true, JSON.stringify(validateTokenParityCatalog.errors));

@@ -1,8 +1,8 @@
 # DEV-CANVAS-06 E2E Fault Launcher 设计闭包 Checklist
 
-状态：`COMPLETE/DESIGN_FROZEN/IMPLEMENTATION_NOT_STARTED`
+状态：`COMPLETE/DESIGN_FROZEN/SOURCE_CHAIN_SUPERSEDED`
 
-后继实现入口：`specs/opm-dev-canvas-06-e2e-fault-launcher-implementation-task-spec.md`及`docs/checklists/opm-dev-canvas-06-e2e-fault-launcher-implementation-checklist.md`。Java Build当前`READY_FOR_BUILD/NOT_STARTED`；受控source commit为`BLOCKED_BY_BASE_INTAKE`，release重建还等待活动Manifest v02 producer/verifier。
+后继实现入口：产品语义由原实现规格承接，source identity与Build准入统一转到`specs/opm-dev-canvas-06-final-production-source-chain-closure-bugfix-task-spec.md`。旧base intake状态不再可消费。
 
 ## Spec Mapping
 

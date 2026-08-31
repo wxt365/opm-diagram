@@ -1,0 +1,137 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:opm:contract:dev-canvas-06-common-visual-adapter-request:0.2",
+  "title": "OPM DEV-CANVAS-06 Common Visual Adapter Request 0.2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_id", "schema_version", "request_version", "request_id", "plan_path", "plan_ref",
+    "common_fixture_root", "java_major_version", "java_executable_ref", "runtime_jar_path",
+    "runtime_jar_ref", "profile_asset_root", "profile_asset_tree_ref", "profile_asset_refs",
+    "work_root", "source_date_epoch"
+  ],
+  "properties": {
+    "schema_id": {"const": "OPM-DEV-CANVAS-06-COMMON-VISUAL-ADAPTER-REQUEST-001"},
+    "schema_version": {"const": "0.2"},
+    "request_version": {"const": "0.2.0"},
+    "request_id": {"type": "string", "pattern": "^dev-canvas-06\\.common-visual-adapter\\.[A-Za-z0-9._-]+$"},
+    "plan_path": {"$ref": "#/$defs/absolutePath"},
+    "plan_ref": {
+      "allOf": [
+        {"$ref": "#/$defs/fileRef"},
+        {"type": "object", "properties": {"kind": {"const": "CAPTURE_PLAN"}}}
+      ]
+    },
+    "common_fixture_root": {"$ref": "#/$defs/absolutePath"},
+    "java_major_version": {"const": 21},
+    "java_executable_ref": {"$ref": "#/$defs/javaExecutableRef"},
+    "runtime_jar_path": {"$ref": "#/$defs/absolutePath"},
+    "runtime_jar_ref": {
+      "allOf": [
+        {"$ref": "#/$defs/fileRef"},
+        {"type": "object", "properties": {"kind": {"const": "LOCAL_RUNTIME_JAR"}}}
+      ]
+    },
+    "profile_asset_root": {"$ref": "#/$defs/absolutePath"},
+    "profile_asset_tree_ref": {"$ref": "#/$defs/profileAssetTreeRef"},
+    "profile_asset_refs": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "prefixItems": [
+        {"$ref": "#/$defs/grammarAssetRef"},
+        {"$ref": "#/$defs/normalizationDataRef"},
+        {"$ref": "#/$defs/profilePackageRef"},
+        {"$ref": "#/$defs/ruleSetRef"},
+        {"$ref": "#/$defs/symbolAssetRef"}
+      ],
+      "items": false
+    },
+    "work_root": {"$ref": "#/$defs/absolutePath"},
+    "source_date_epoch": {"type": "integer", "minimum": 0, "maximum": 9007199254740991}
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "logicalPath": {"type": "string", "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*//).+$"},
+    "absolutePath": {"type": "string", "pattern": "^/(?!\\.\\.(?:/|$))(?!.*?/\\.\\.(?:/|$))(?!.*//).+$"},
+    "fileRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "path", "byte_length", "sha256"],
+      "properties": {
+        "kind": {"type": "string", "minLength": 1},
+        "path": {"$ref": "#/$defs/logicalPath"},
+        "byte_length": {"type": "integer", "minimum": 1, "maximum": 9007199254740991},
+        "sha256": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "javaExecutableRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "path", "byte_length", "sha256"],
+      "properties": {
+        "kind": {"const": "JAVA_EXECUTABLE"},
+        "path": {
+          "allOf": [
+            {"$ref": "#/$defs/absolutePath"},
+            {"type": "string", "pattern": "/bin/java$"}
+          ]
+        },
+        "byte_length": {"type": "integer", "minimum": 1, "maximum": 9007199254740991},
+        "sha256": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "profileAssetTreeRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "path", "byte_length", "sha256"],
+      "properties": {
+        "kind": {"const": "PROFILE_ASSET_TREE"},
+        "path": {"const": "profile/assets"},
+        "byte_length": {"type": "integer", "minimum": 1, "maximum": 9007199254740991},
+        "sha256": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "profileAssetRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "path", "byte_length", "sha256"],
+      "properties": {
+        "kind": {"enum": ["PROFILE_PACKAGE", "RULE_SET", "SYMBOL_ASSET", "GRAMMAR_ASSET", "NORMALIZATION_DATA"]},
+        "path": {"$ref": "#/$defs/logicalPath"},
+        "byte_length": {"type": "integer", "minimum": 1, "maximum": 9007199254740991},
+        "sha256": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "grammarAssetRef": {
+      "allOf": [
+        {"$ref": "#/$defs/profileAssetRef"},
+        {"type": "object", "properties": {"kind": {"const": "GRAMMAR_ASSET"}, "path": {"type": "string", "pattern": "^profile/assets/grammar/.+$"}}}
+      ]
+    },
+    "normalizationDataRef": {
+      "allOf": [
+        {"$ref": "#/$defs/profileAssetRef"},
+        {"type": "object", "properties": {"kind": {"const": "NORMALIZATION_DATA"}, "path": {"type": "string", "pattern": "^profile/assets/normalization/.+$"}}}
+      ]
+    },
+    "profilePackageRef": {
+      "allOf": [
+        {"$ref": "#/$defs/profileAssetRef"},
+        {"type": "object", "properties": {"kind": {"const": "PROFILE_PACKAGE"}, "path": {"type": "string", "const": "profile/assets/profile.json"}}}
+      ]
+    },
+    "ruleSetRef": {
+      "allOf": [
+        {"$ref": "#/$defs/profileAssetRef"},
+        {"type": "object", "properties": {"kind": {"const": "RULE_SET"}, "path": {"type": "string", "pattern": "^profile/assets/rules/.+$"}}}
+      ]
+    },
+    "symbolAssetRef": {
+      "allOf": [
+        {"$ref": "#/$defs/profileAssetRef"},
+        {"type": "object", "properties": {"kind": {"const": "SYMBOL_ASSET"}, "path": {"type": "string", "pattern": "^profile/assets/symbols/.+$"}}}
+      ]
+    }
+  }
+}

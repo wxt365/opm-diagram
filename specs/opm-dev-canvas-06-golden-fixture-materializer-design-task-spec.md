@@ -99,4 +99,4 @@
 
 无。实际 Bundle/JAR/fixture SHA、OS 路径和 materialized database SHA 必须由每次执行报告记录，不在设计中预填。
 
-> 历史快照说明（2026-08-07 更新指针）：本规格记录Materializer首轮设计冻结。当前唯一口径为Materializer `v1.5`、Verifier Catalog `v1.1`、Golden Authoring `v1.4`、Visual Common Materialization `v1.4`、Golden Environment `0.2`、03A当前implementation入口和冻结基线`v1.21`；03A受控实现通过不等于production 130项、Common 8/144或真实release evidence。
+> 历史快照说明（2026-08-26 更新指针）：本规格记录Materializer首轮设计冻结。当前唯一口径为Materializer `v1.5`、Verifier Catalog `v1.1`、Golden Authoring `v1.4`、Visual Common Materialization `v1.5`及03C Adapter/Fault闭包、Golden Environment `0.2`、03A当前implementation入口和冻结基线`v1.52`；03A受控实现通过或03C局部Java字节均不等于production 130项、Common 8/144或真实release evidence。

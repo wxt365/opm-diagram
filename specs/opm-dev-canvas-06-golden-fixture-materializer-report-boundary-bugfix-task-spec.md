@@ -152,4 +152,4 @@ Report 必须使用已验证 fixture bytes 取得的真实 `source_fixture_ref/f
 
 无。
 
-> 历史快照说明（2026-08-07 更新指针）：本规格记录当时的Report接纳边界。当前唯一口径为Materializer `v1.5`、Verifier Catalog `v1.1`、Golden Authoring `v1.4`、Visual Common Materialization `v1.4`、Golden Environment `0.2`和冻结基线`v1.21`；不得用本历史验收覆盖后续契约。
+> 历史快照说明（2026-08-26 更新指针）：本规格记录当时的Report接纳边界。当前唯一口径为Materializer `v1.5`、Verifier Catalog `v1.1`、Golden Authoring `v1.4`、Visual Common Materialization `v1.5`及03C Adapter/Fault闭包、Golden Environment `0.2`和冻结基线`v1.52`；不得用本历史验收覆盖后续契约。

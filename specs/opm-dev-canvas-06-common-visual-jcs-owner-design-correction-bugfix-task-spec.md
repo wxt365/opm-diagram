@@ -57,3 +57,5 @@ Root Cause 是设计审查把“已有局部算法”误记为“已有共享 ow
 事实：当前 Planner 第177行附近存在局部`jcs()`；Java releaseauthoring package已有`Rfc8785JsonCanonicalizer`；共享Node模块和parity vector尚不存在。
 
 本修正不构成02B/03C实现、fixture/SQLite/PNG/candidate、Gate READY、Capability启用、production release或ISO符合性证明。
+
+> 历史状态指针（2026-08-26）：第5节`NOT_STARTED`是本JCS修正验收时的历史状态。当前唯一状态源为Visual Common`v1.5`、03C Adapter/Fault闭包和冻结基线`v1.52`；03C局部Java materializer未被接纳，Node adapter/fault/8 base/144 clone仍未完成。

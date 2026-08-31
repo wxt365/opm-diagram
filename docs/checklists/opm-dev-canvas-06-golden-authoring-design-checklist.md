@@ -66,4 +66,4 @@
 - [x] 如需回退，只回退本规格允许文件中的 Golden Authoring 文档增量。
 - [x] 不删除、不覆盖现有 Visual/E2E 并行实现、证据或用户未提交改动。
 
-> 历史快照说明（2026-08-07 更新指针）：本 checklist 的勾选记录是首轮设计冻结快照。当前状态以Golden Authoring `v1.4`、Visual Common Materialization `v1.4`、Golden Environment `0.2`、Fixture Materializer `v1.5`、Verifier Catalog `v1.1`和冻结基线`v1.21`为准；02B/03C未实现、03B等待依赖，真实approved evidence仍待完成。
+> 历史快照说明（2026-08-26 更新指针）：本 checklist 的勾选记录是首轮设计冻结快照。当前状态以Golden Authoring `v1.4`、Visual Common Materialization `v1.5`及03C Adapter/Fault闭包、Golden Environment `0.2`、Fixture Materializer `v1.5`、Verifier Catalog `v1.1`和冻结基线`v1.52`为准；03C Node adapter/fault/8 base/144 clone未完成、03B等待依赖，真实approved evidence仍待完成。

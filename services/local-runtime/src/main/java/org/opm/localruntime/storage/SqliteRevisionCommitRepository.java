@@ -11,6 +11,8 @@ import org.opm.localruntime.command.RevisionCommitBundle;
 import org.opm.localruntime.command.RevisionCommitRepository;
 import org.opm.localruntime.releaseevidence.fault.E2EFaultContext;
 import org.opm.localruntime.releaseevidence.fault.E2EFaultPort;
+import org.opm.localruntime.releaseauthoring.visualcommon.VisualCommonCommitFaultContext;
+import org.opm.localruntime.releaseauthoring.visualcommon.VisualCommonCommitFaultPort;
 import org.opm.localruntime.semantic.SemanticRevision;
 import org.opm.localruntime.semantic.SemanticRevisionJsonWriter;
 import org.opm.localruntime.text.OplParagraph;
@@ -42,21 +44,31 @@ public final class SqliteRevisionCommitRepository implements RevisionCommitRepos
     private final ObjectMapper objectMapper;
     private final RecoverySqliteFaultPort recoveryFaultPort;
     private final E2EFaultPort e2eFaultPort;
+    private final VisualCommonCommitFaultPort visualCommonCommitFaultPort;
 
     public SqliteRevisionCommitRepository(Path databasePath) {
-        this(SqliteConnectionFactory.create(databasePath), new SemanticRevisionJsonWriter(), new ObjectMapper(), RecoverySqliteFaultPort.NOOP, E2EFaultPort.NOOP);
+        this(SqliteConnectionFactory.create(databasePath), new SemanticRevisionJsonWriter(), new ObjectMapper(), RecoverySqliteFaultPort.NOOP, E2EFaultPort.NOOP, VisualCommonCommitFaultPort.NOOP);
     }
 
     public SqliteRevisionCommitRepository(Path databasePath, E2EFaultPort e2eFaultPort) {
-        this(SqliteConnectionFactory.create(databasePath), new SemanticRevisionJsonWriter(), new ObjectMapper(), RecoverySqliteFaultPort.NOOP, e2eFaultPort);
+        this(SqliteConnectionFactory.create(databasePath), new SemanticRevisionJsonWriter(), new ObjectMapper(), RecoverySqliteFaultPort.NOOP, e2eFaultPort, VisualCommonCommitFaultPort.NOOP);
+    }
+
+    public SqliteRevisionCommitRepository(Path databasePath, E2EFaultPort e2eFaultPort, VisualCommonCommitFaultPort visualCommonCommitFaultPort) {
+        this(SqliteConnectionFactory.create(databasePath), new SemanticRevisionJsonWriter(), new ObjectMapper(), RecoverySqliteFaultPort.NOOP, e2eFaultPort, visualCommonCommitFaultPort);
     }
 
     public SqliteRevisionCommitRepository(DataSource dataSource, RecoverySqliteFaultPort faultPort) {
-        this(dataSource, new SemanticRevisionJsonWriter(), new ObjectMapper(), faultPort, E2EFaultPort.NOOP);
+        this(dataSource, new SemanticRevisionJsonWriter(), new ObjectMapper(), faultPort, E2EFaultPort.NOOP, VisualCommonCommitFaultPort.NOOP);
     }
 
     public SqliteRevisionCommitRepository(DataSource dataSource, RecoverySqliteFaultPort recoveryFaultPort, E2EFaultPort e2eFaultPort) {
-        this(dataSource, new SemanticRevisionJsonWriter(), new ObjectMapper(), recoveryFaultPort, e2eFaultPort);
+        this(dataSource, new SemanticRevisionJsonWriter(), new ObjectMapper(), recoveryFaultPort, e2eFaultPort, VisualCommonCommitFaultPort.NOOP);
+    }
+
+    public SqliteRevisionCommitRepository(DataSource dataSource, RecoverySqliteFaultPort recoveryFaultPort,
+                                          E2EFaultPort e2eFaultPort, VisualCommonCommitFaultPort visualCommonCommitFaultPort) {
+        this(dataSource, new SemanticRevisionJsonWriter(), new ObjectMapper(), recoveryFaultPort, e2eFaultPort, visualCommonCommitFaultPort);
     }
 
     private SqliteRevisionCommitRepository(
@@ -64,12 +76,14 @@ public final class SqliteRevisionCommitRepository implements RevisionCommitRepos
             SemanticRevisionJsonWriter revisionWriter,
             ObjectMapper objectMapper,
             RecoverySqliteFaultPort recoveryFaultPort,
-            E2EFaultPort e2eFaultPort) {
+            E2EFaultPort e2eFaultPort,
+            VisualCommonCommitFaultPort visualCommonCommitFaultPort) {
         this.dataSource = Objects.requireNonNull(dataSource, "dataSource must not be null");
         this.revisionWriter = Objects.requireNonNull(revisionWriter, "revisionWriter must not be null");
         this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper must not be null");
         this.recoveryFaultPort = Objects.requireNonNull(recoveryFaultPort, "recoveryFaultPort must not be null");
         this.e2eFaultPort = Objects.requireNonNull(e2eFaultPort, "e2eFaultPort must not be null");
+        this.visualCommonCommitFaultPort = Objects.requireNonNull(visualCommonCommitFaultPort, "visualCommonCommitFaultPort must not be null");
     }
 
     @Override
@@ -139,6 +153,9 @@ public final class SqliteRevisionCommitRepository implements RevisionCommitRepos
                             "baseRevisionId is not the current draft head", null);
                 }
                 e2eFaultPort.beforeRevisionInsert(context);
+                visualCommonCommitFaultPort.beforeRevisionInsert(new VisualCommonCommitFaultContext(
+                        bundle.command().commandId(), bundle.command().projectId(), bundle.command().modelId(),
+                        bundle.command().baseRevisionId(), bundle.revision().revisionId(), bundle.revision().revisionSequence()));
                 writeRevision(connection, bundle);
                 reach(RecoverySqliteStage.AFTER_REVISION_INSERT, bundle);
                 writeParent(connection, bundle);

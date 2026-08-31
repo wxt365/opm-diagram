@@ -69,4 +69,4 @@
 - [x] 如需回退，只回退本规格允许文件中的 Materializer 设计增量和同步状态。
 - [x] 不删除、不覆盖现有 Schema、Planner、release artifact、Handoff、Evidence Bundle、approved 资产或用户改动。
 
-> 历史快照说明（2026-08-07 更新指针）：本 checklist 记录首轮设计冻结。当前唯一口径为Materializer `v1.5`、Verifier Catalog `v1.1`、Golden Authoring `v1.4`、Visual Common Materialization `v1.4`、Golden Environment `0.2`、03A当前implementation checklist和冻结基线`v1.21`；本历史勾选不覆盖后续契约。
+> 历史快照说明（2026-08-26 更新指针）：本 checklist 记录首轮设计冻结。当前唯一口径为Materializer `v1.5`、Verifier Catalog `v1.1`、Golden Authoring `v1.4`、Visual Common Materialization `v1.5`及03C Adapter/Fault闭包、Golden Environment `0.2`、03A当前implementation checklist和冻结基线`v1.52`；本历史勾选不覆盖后续契约。

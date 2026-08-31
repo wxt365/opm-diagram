@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:opm:contract:dev-canvas-06-common-visual-capture-observed-result:0.1",
+  "title": "OPM DEV-CANVAS-06 Common Visual Capture Callback Observed Result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_id", "schema_version", "result_version", "request_id", "capture_id", "subject_id", "attempt_ordinal",
+    "ui_setup_status", "stability_status", "png_byte_length", "png_sha256", "width", "height",
+    "cell_geometry_sha256", "normalized_projection", "projection_sha256", "observed_cells",
+    "focus_target_id", "focus_anchor", "fault_observation"
+  ],
+  "properties": {
+    "schema_id": {"const": "OPM-DEV-CANVAS-06-COMMON-VISUAL-CAPTURE-OBSERVED-RESULT-001"},
+    "schema_version": {"const": "0.1"},
+    "result_version": {"const": "0.1.0"},
+    "request_id": {"type": "string", "pattern": "^dev-canvas-06\\.common-visual-adapter\\.[A-Za-z0-9._-]+$"},
+    "capture_id": {"type": "string", "minLength": 1},
+    "subject_id": {"$ref": "#/$defs/subject"},
+    "attempt_ordinal": {"enum": [1, 2]},
+    "ui_setup_status": {"const": "READY"},
+    "stability_status": {"const": "STABLE"},
+    "png_byte_length": {"type": "integer", "minimum": 1},
+    "png_sha256": {"$ref": "#/$defs/digest"},
+    "width": {"type": "integer", "minimum": 1},
+    "height": {"type": "integer", "minimum": 1},
+    "cell_geometry_sha256": {"$ref": "#/$defs/digest"},
+    "normalized_projection": {"$ref": "urn:opm:contract:dev-canvas-06-common-visual-fixture:0.1#/$defs/expectedProjection"},
+    "projection_sha256": {"$ref": "#/$defs/digest"},
+    "observed_cells": {"type": "integer", "minimum": 1},
+    "focus_target_id": {"type": "string", "minLength": 1},
+    "focus_anchor": {"enum": ["CENTER", "SOURCE", "TARGET", "LABEL", "JUNCTION"]},
+    "fault_observation": {"$ref": "#/$defs/faultObservation"}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"subject_id": {"const": "BLOCKED_FEEDBACK"}}, "required": ["subject_id"]},
+      "then": {
+        "properties": {
+          "fault_observation": {"properties": {"mode": {"const": "BLOCKED_FEEDBACK_ONE_SHOT"}, "trigger_count": {"const": 1}, "error_code": {"const": "PERSISTENCE_FAILED"}}}
+        }
+      },
+      "else": {
+        "properties": {
+          "fault_observation": {"properties": {"mode": {"const": "NONE"}, "trigger_count": {"const": 0}, "error_code": {"type": "null"}}}
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "subject": {"enum": ["STATE_ROLES", "LONG_LABELS", "FUNDAMENTAL_FAN", "CANDIDATE_LAYER", "INSPECTOR", "TOOLCHAIN_CATALOG", "FINDING_FOCUS", "BLOCKED_FEEDBACK"]},
+    "faultObservation": {
+      "type": "object", "additionalProperties": false,
+      "required": ["mode", "trigger_count", "error_code"],
+      "properties": {
+        "mode": {"enum": ["NONE", "BLOCKED_FEEDBACK_ONE_SHOT"]},
+        "trigger_count": {"type": "integer", "minimum": 0, "maximum": 1},
+        "error_code": {"anyOf": [{"const": "PERSISTENCE_FAILED"}, {"type": "null"}]}
+      }
+    }
+  }
+}

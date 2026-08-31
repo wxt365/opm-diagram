@@ -4,7 +4,9 @@
 
 设计修正状态：`COMPLETE`
 
-Build准入：`READY_FOR_BUILD/NOT_STARTED`
+Build准入：`ORIGIN_IMPLEMENTED/SUPERSEDED_FOR_FINAL_BUILD`
+
+活动后继：`opm-dev-canvas-06-final-production-source-chain-closure-bugfix-task-spec.md`已接纳本规格实际形成的`9048bb355aff18d5c00fbbaeb1660b979f4e6daa`为新生产链origin。本规格的`e598... -> 9048bb3...`与`17=14 M+3 A`仅作为origin intake继续有效；“最终source必须直接parent于e598且总delta仅17项”的限制已被取代，不得再作为Fault 2A、Runner、Manifest或Report的Build准入。
 
 ## Task Type
 

@@ -6,7 +6,7 @@
 
 实现准入：`EMBEDDED_IN_17_PATH_INTEGRATED_SOURCE/NOT_STANDALONE`
 
-活动后继：`opm-dev-canvas-06-common-orchestration-integrated-source-closure-bugfix-task-spec.md`
+活动后继：该规格的`0.1/23`决定只作为`9048bb3...` origin前历史职责闭包；Final R的活动Source Set已由`opm-dev-canvas-06-family-controlled-invocation-closure-bugfix-task-spec.md`升级为`0.2/24`。
 
 ## Task Type
 

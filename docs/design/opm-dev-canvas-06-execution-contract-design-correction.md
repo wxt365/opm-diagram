@@ -16,7 +16,7 @@
 
 | 修正项 | 活动契约 | 历史兼容 | 唯一Owner |
 | --- | --- | --- | --- |
-| 02B Empty Text Artifact | Visual Common Materialization `v1.4`（包含`v1.2`空工件和`v1.3` index/UI/source闭包） | Revision `MS-REV-001/0.2`不变 | [Visual Common设计](opm-dev-canvas-06-visual-common-materialization-design.md) |
+| 02B Empty Text Artifact | Visual Common Materialization `v1.5`（包含`v1.2`空工件、`v1.3` index/UI/source、`v1.4` E2E asset及`v1.5` Adapter/Fault闭包） | Revision `MS-REV-001/0.2`不变 | [Visual Common设计](opm-dev-canvas-06-visual-common-materialization-design.md) |
 | Recovery Launch | Launch Request `0.1`、Launch Proof union `0.1`、Recovery Execution `v1.5` | Recovery Manifest `0.1`只读、活动Manifest `0.2`不变 | [Recovery Execution设计](opm-dev-canvas-06-recovery-execution-design.md) |
 | E2E Java/Source Identity | E2E Report `0.2`、Runner Source Set `0.1`、Attempt Artifact设计`v1.3`（包含`v1.2` Java/source identity与Family identity/Fault Plan ordinal闭包） | E2E Manifest `0.1`不变、Report `0.1`只读 | [E2E Attempt Artifact设计](opm-dev-canvas-06-e2e-attempt-artifact-design.md) |
 

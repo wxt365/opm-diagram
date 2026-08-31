@@ -1,10 +1,10 @@
 # DEV-CANVAS-06 Visual Common Fixture Materialization 与 Color Profile 设计
 
-文档版本：`1.4`
+文档版本：`1.9`
 
 设计状态：`FROZEN`
 
-实现状态：`NOT_STARTED`
+实现状态：`IN_PROGRESS / NOT_ACCEPTED`
 
 责任：`DFR-021` / `GATE-06-03` Visual Golden Authoring
 
@@ -12,7 +12,7 @@
 
 本文是 8 个 Visual Common subject 从 fixture bytes 到 Runtime 可捕获状态的唯一设计口径，同时冻结 Capture Plan `srgb` 与 Golden Environment `sRGB IEC61966-2.1` 的唯一映射。Golden Authoring 主设计继续承接审批、发布和 approved evidence；本文只承接 Common materialization、UI setup、Projection join 和 color profile semantic join。
 
-本文冻结设计并发布Common Visual Fixture机器Schema；不表示Schema producer/contract test、factory、SQLite materializer、03B author、fixture/Catalog/Plan、source mirror、E2E asset、PNG、candidate或approved evidence已经生成。
+本文冻结设计并发布Common Visual Fixture、活动Adapter Request `0.2`、其余Adapter/Callback/Result、Adapter Test Input Bundle `0.1`、Clone Result及Runtime Ready机器Schema。活动Common 43文件root的实现状态由02B/Common E2E checklist承接；Adapter测试Builder/Verifier已有未接纳实现，但仍需修正Runtime source kind和Planner受控JDK环境。Java Base/Clone/Web局部实现和单个STATE_ROLES受控验证不表示03C Node adapter、8 base/144 clone或关闭矩阵已经验收，也不表示工作树中的局部one-shot fault字节已通过验收，且不表示03B author、新production Plan、PNG、candidate或approved evidence已经生成。
 
 ## 2. 冻结决策
 
@@ -29,18 +29,28 @@
 
 | 契约 | 版本 | Owner | 当前状态 |
 | --- | --- | --- | --- |
-| Common Fixture Catalog | Schema `0.1`；历史`0.1.0`/活动`0.2.0` | QA | 历史实体已实现；活动bytes/producer未实现 |
-| Common Visual Fixture | `0.1/0.1.0` | QA + Runtime | 设计与机器Schema已冻结，fixture bytes/producer/verifier未实现 |
-| Common Visual Materializer | `0.1.0` | Runtime | 设计冻结，未实现 |
+| Common Fixture Catalog | Schema `0.1`；历史`0.1.0`/活动`0.2.0` | QA | 活动43文件root已self-verified，production统一输入待重建 |
+| Common Visual Fixture | `0.1/0.1.0` | QA + Runtime | 机器Schema与活动fixture producer/verifier已形成，production消费待后继链 |
+| Common Visual Materializer/Fault Hook | `0.1.0` | Runtime | 局部Java与fault hook字节存在，未通过03C checklist |
+| Common Visual Adapter Request | 历史`0.1/0.1.0`；活动`0.2/0.2.0` | QA + Release | 活动Schema补齐Java/Profile受控输入，consumer未实现 |
+| Common Visual Capture Invocation/Observed Result | `0.1/0.1.0` | QA + Release | 两份机器Schema与callback契约已冻结，未实现 |
+| Common Visual Adapter Normalized Result | `0.1/0.1.0` | QA + Release | 机器Schema、顺序和摘要已冻结，未实现 |
+| Common Visual Adapter Test Input Bundle | `0.1/0.1.0` | QA + Release | Schema、原子Builder/Verifier、fresh 5/43/1242/72/144 exact join已冻结；实现存在但未符合Runtime/JDK修正，尚未接纳 |
+| Common Visual Clone Result | `0.1/0.1.0` | Runtime | 机器Schema、CLI和原子写入协议已冻结；Java局部实现有单例验证，完整03C未验收 |
+| Common Visual Runtime Ready | `0.1/0.1.0` | Runtime + Release | 机器Schema、动态端口、READY和关闭协议已冻结；Java局部实现有单例验证，Node消费与关闭矩阵未验收 |
 | Common Projection Normalizer | `0.1.0` | Frontend + QA | 设计冻结，未实现 |
 | Color Profile Mapping | `0.1.0` | QA + Release | 设计冻结，未实现 |
 | Common JCS/Parity Contract | `0.1.0` | QA + Runtime | 设计、共享Node模块和向量已实现；03C Java消费测试未实现 |
-| Capture Plan | `0.1/0.1.0` | QA | Schema/Planner 已存在，02B semantic join 修正未实现 |
+| Capture Plan | `0.1/0.1.0` | QA | Schema/Planner与Common semantic join代码已存在，真实新production Plan未生成 |
 
-目标 Schema 路径固定为：
+本设计直接拥有的目标 Schema 路径固定为：
 
 ```text
 docs/contracts/schemas/opm-dev-canvas-06-common-visual-fixture.schema.json
+docs/contracts/schemas/opm-dev-canvas-06-common-visual-adapter-request-v02.schema.json
+docs/contracts/schemas/opm-dev-canvas-06-common-visual-adapter-test-input-bundle.schema.json
+docs/contracts/schemas/opm-dev-canvas-06-common-visual-clone-result.schema.json
+docs/contracts/schemas/opm-dev-canvas-06-common-visual-runtime-ready.schema.json
 ```
 
 Common Catalog Schema只允许增加历史`0.1.0`/活动`0.2.0`已知版本枚举，字段形状不变；Capture Plan和Golden Environment既有Schema不得改写。内容闭包由新fixture Schema和semantic verifier承接。
@@ -498,6 +508,8 @@ max_invocations=1
 
 hook 只能由 03C 通过进程内受控启动参数绑定 exact command id；没有 HTTP/环境通配符/运行时切换入口，触发一次后自动禁用。其他 subject、Family、production 默认启动和 Visual validation runner 禁止装配该 hook。
 
+该hook的唯一Java机器边界由[`03C Node Adapter与一次性Fault Hook契约闭包规格`](../../specs/opm-dev-canvas-06-common-visual-adapter-and-one-shot-fault-contract-closure-bugfix-task-spec.md)第6节承接：独立`VisualCommonCommitFaultPort`默认NOOP，active实现为每进程一个`OneShotVisualCommonCommitFaultPort`；调用点固定在Candidate validation/Text generation及repository receipt/head recheck成功之后、`revision_document INSERT`之前。它与`E2EFaultPort`、`RecoverySqliteFaultPort`互斥且不共享接口、状态或计数。exact首次调用先原子转为`TRIGGERED`再抛`PERSISTENCE_FAILED`，事务delta为0；第二次相同command正常提交。任何partial guard不得静默降级为NOOP。
+
 ## 8. Common Projection Normalization
 
 ### 8.1 封闭 payload
@@ -720,8 +732,9 @@ Handoff `source_build.source_commit`只绑定上游DEV-CANVAS-05 clean build，�
 ### 11.2 03C Materializer
 
 ```text
-java -jar <exact-runtime.jar> \
+<request.java_executable_ref.path> -jar <exact-runtime.jar> \
   --spring.profiles.active=release-golden-authoring \
+  --opm.runtime.mode=RELEASE_GOLDEN_COMMON_BASE \
   --opm.release.golden-authoring=true \
   --opm.release.visual-common-materializer=true \
   --spring.main.web-application-type=none \
@@ -733,16 +746,83 @@ java -jar <exact-runtime.jar> \
 
 03B author CLI不增加 fixture选择参数；它只能从 Plan -> Catalog -> fixture exact refs派生 8 个输入，按本设计调用 03C。禁止传 subject override、expected projection override、skip setup、force、reuse storage 或 update golden 参数。
 
+03B到03C的唯一生产调用不是子进程stdout协议，而是静态ESM导入：
+
+```js
+import { runCommonVisualMaterialization } from './canvas06-common-visual-materialization.mjs';
+await runCommonVisualMaterialization(request, captureCallback);
+```
+
+`request`必须通过活动`0.2/0.2.0`机器Schema；每次`captureCallback(invocation)`输入、callback返回和最终normalized result继续通过三份`0.1/0.1.0`机器Schema：
+
+```text
+opm-dev-canvas-06-common-visual-adapter-request-v02.schema.json
+opm-dev-canvas-06-common-visual-capture-invocation.schema.json
+opm-dev-canvas-06-common-visual-capture-observed-result.schema.json
+opm-dev-canvas-06-common-visual-adapter-normalized-result.schema.json
+```
+
+活动Request `0.2`必须提供exact Java 21的absolute realpath/raw identity，以及Profile asset root、`profile/assets` tree ref和五项raw refs。`runtime_jar_ref.kind=LOCAL_RUNTIME_JAR`并与Handoff/Plan逐字段相等；Request physical path、Bundle staged ref与Runtime Ready继续表示`RUNTIME_JAR`副本，只按raw length/SHA闭合。adapter在创建base前固定执行`Request Schema -> Java path/type/realpath/raw/major -> Profile root/inventory/raw/tree/package/binding -> Plan/Catalog/fixture/Runtime JAR`；失败为`GOLDEN_COMMON_ADAPTER_INPUT_INVALID/2`且零base/clone/Runtime/callback/result。禁止PATH/父JAVA_HOME、环境变量、checkout fallback和目录扫描；Builder调用Planner时唯一允许从exact Java父两级推导JDK root，并显式注入固定五键子进程env。字段、tree公式和跨进程join由[`Adapter受控Java/Profile输入闭包规格`](../../specs/opm-dev-canvas-06-common-visual-adapter-controlled-java-profile-input-closure-bugfix-task-spec.md)及[`Runtime JAR Kind与Planner JDK环境闭包规格`](../../specs/opm-dev-canvas-06-common-visual-runtime-jar-kind-and-planner-jdk-env-closure-bugfix-task-spec.md)承接。
+
+adapter按Plan Common capture原序及attempt`1,2`串行调用恰`144`次；callback只负责production Web/browser、UI setup、稳定等待、Projection/geometry读取和PNG写入，不得选择/创建storage、修改base或注入fault。adapter只负责受控输入preflight、8 base/attestation、clone、Runtime、callback调度、关闭和base digest；它不接收candidate root且不写PNG/Report。完整字段、三项结果摘要、callback失败和CLI四种只读contract验证模式由上述闭包规格第3至5节唯一承接，本文不维护第二套形状。
+
+#### 11.2.1 受控测试输入Bundle
+
+03C实现测试不得分别手写Request、Profile、Plan或callback结果。唯一入口是`OPM-DEV-CANVAS-06-COMMON-VISUAL-ADAPTER-TEST-INPUT-BUNDLE-001/0.1/0.1.0`：同一原子root必须由clean source和exact Handoff生成fresh Profile 5、Common 43、完整Plan 1242/72、Request `0.2`以及144份完整Observed Result/测试PNG。固定callback只按`common_capture_ordinal/capture_id/subject_id/attempt_ordinal`在Bundle descriptor中exact lookup，禁止目录扫描、路径反推、动态补字段或observed反填。Builder/Verifier CLI、340文件布局、Profile/Common tree、Planner外置Common root、受控JDK env、Runtime source/staged ref、staging/final路径映射、fsync/rename/installed reverify和`19=8 M+11 A`后继allowlist由Builder闭包及Runtime/JDK修正规格共同承接。
+
+Bundle状态`READY_FOR_ADAPTER_TEST`只恢复受控03C测试资格。测试PNG与production candidate root物理隔离，不得进入Authoring Report、approved version、Visual Manifest或Gate；Bundle未实现并通过installed verifier前，Node adapter保持`BLOCKED_BY_ADAPTER_TEST_INPUT_BUILDER_IMPLEMENTATION`。
+
 唯一调用顺序：
 
 ```text
-verify Plan/Catalog/fixture/color mapping
+verify Request 0.2 Java/Profile -> Plan/Catalog/fixture/color mapping
 -> build 8 immutable bases
 -> verify 8 attestations
 -> for each Common capture and attempt clone/start/setup/normalize/capture/close
 -> verify all 144 results and base digests
 -> continue existing candidate Environment/Report transaction
 ```
+
+### 11.3 Clone CLI
+
+Clone不是Node文件复制helper，也不是进程内隐式调用。每个attempt必须以exact Java 21和exact outer Runtime JAR启动一次non-web有限任务，固定使用：
+
+```text
+--spring.profiles.active=release-golden-authoring
+--spring.main.web-application-type=none
+--opm.runtime.mode=RELEASE_GOLDEN_COMMON_CLONE
+--opm.release.visual-common.clone=true
+--opm.release.visual-common.request-id=<request-id>
+--opm.release.visual-common.capture-id=<capture-id>
+--opm.release.visual-common.subject-id=<subject-id>
+--opm.release.visual-common.attempt-ordinal=<1|2>
+--opm.release.visual-common.base-root=<verified-base-root>
+--opm.release.visual-common.base-attestation=<attestation.json>
+--opm.release.visual-common.attempt-storage-root=<fresh-root>
+--opm.release.visual-common.clone-result-out=<fresh-clone-result.json>
+--opm.release.source-date-epoch=<same-integer>
+```
+
+Runtime必须按`base ref/attestation/tree/sidecar -> fresh attempt -> copy -> database/integrity/FK/identity -> base tree不变 -> Clone Result原子提交`顺序执行。Clone Result唯一采用`OPM-DEV-CANVAS-06-COMMON-VISUAL-CLONE-RESULT-001/0.1/0.1.0`，状态固定`READY_FOR_RUNTIME`；payload SHA为删除自身摘要字段后的RFC 8785 JCS SHA-256。Node只能消费Schema-valid且与当前request/capture/subject/attempt逐字段闭合的结果，禁止从stdout、目录名或默认路径反推。
+
+完整参数集合、路径安全、raw ref、失败清理和正反例唯一由[`Common Visual Clone CLI与Web Runtime Protocol闭包规格`](../../specs/opm-dev-canvas-06-common-visual-clone-and-web-runtime-protocol-closure-bugfix-task-spec.md)第5节承接。
+
+### 11.4 Web Runtime启动、READY与关闭
+
+`release-golden-authoring`只表示隔离profile，不拥有进程生命周期。封闭launch mode为：
+
+```text
+RELEASE_GOLDEN_FIXTURE_MATERIALIZE -> none/有限任务
+RELEASE_GOLDEN_COMMON_BASE        -> none/有限任务
+RELEASE_GOLDEN_COMMON_CLONE       -> none/有限任务
+RELEASE_GOLDEN_COMMON_WEB         -> servlet/长驻服务
+```
+
+主入口只允许前三个有限mode在runner完成后调用`SpringApplication.exit`；`RELEASE_GOLDEN_COMMON_WEB`成功启动后必须长驻到Node关闭。Web唯一显式使用`server.address=127.0.0.1`、`server.port=0`、`management.server.address=127.0.0.1`、`management.server.port=0`、只暴露health并启用readiness probe，由OS分配两个互异loopback端口。Node禁止预选端口、扫描端口、解析日志或失败后换端口重试。
+
+Java在`ApplicationReadyEvent`、application/management两个WebServer均完成初始化，以及JAR/Profile/Clone/storage/fault全部复核后，原子写`OPM-DEV-CANVAS-06-COMMON-VISUAL-RUNTIME-READY-001/0.1/0.1.0`。Node以30秒monotonic deadline、100ms固定poll等待，并同时验证child PID、Ready artifact、management `/actuator/health/readiness`为`UP`及application `/opm-bootstrap.js`既有wire；四项未全部通过不得调用capture callback。
+
+callback完成或失败后固定发送一次SIGTERM并等待10秒；仍未退出时发送SIGKILL且当前attempt失败。退出后必须确认两个端口不可连接、SQLite无WAL/SHM、attempt tree可复算且base digest不变，才能写`runtime_shutdown_status=CLOSED`。完整Web命令、nonce、Ready字段、原子写入、错误边界和关闭矩阵唯一由上述闭包规格第6至7节承接。
 
 ## 12. 失败优先级与退出码
 
@@ -763,7 +843,13 @@ verify Plan/Catalog/fixture/color mapping
 | `GOLDEN_COMMON_CLONE_FAILED` | `3` | clone 或 base digest 变化 |
 | `GOLDEN_COMMON_UI_SETUP_FAILED` | `3` | 受控步骤、option、finding、feedback/fault 失败 |
 | `GOLDEN_COMMON_PROJECTION_MISMATCH` | `3` | payload/digest/focus/cell/geometry 不同 |
+| `GOLDEN_COMMON_ADAPTER_INPUT_INVALID` | `2` | adapter request、函数或contract CLI输入无效 |
+| `GOLDEN_COMMON_CAPTURE_CALLBACK_FAILED` | `3` | callback throw/reject或不是普通JSON |
+| `GOLDEN_COMMON_CAPTURE_RESULT_INVALID` | `3` | callback result Schema、identity或semantic join失败 |
+| `GOLDEN_COMMON_NORMALIZED_RESULT_INVALID` | `4` | normalized result Schema或摘要无法闭合 |
 | `GOLDEN_COMMON_INTERNAL_ERROR` | `4` | 未分类 I/O、serializer、digest 或进程异常 |
+
+`GoldenFixtureMaterializationException.exitCodeFor`是GFM与Common materialization唯一Java退出码owner；Base/Clone/Web runner不得保留局部switch。`GOLDEN_COMMON_UI_SETUP_FAILED`必须逐字符映射到`3`，通过runner、Spring启动异常cause chain和packaged JAR主入口三条路径结果一致。
 
 任何失败都不得产生 READY Authoring Report、Golden Environment、Approval、approved root 或 Visual Manifest。SQLite transaction失败必须 rollback；base 创建失败只清理本次 fresh root。已存在路径、非空路径和他人资产不得删除。
 
@@ -787,7 +873,7 @@ verify Plan/Catalog/fixture/color mapping
 
 ### 14.2 `GOLDEN-AUTHORING-03C`
 
-实现 release-only Java materializer、SQLite/index seed、attestation、8 base/clone verifier、one-shot fault hook和03B Common调用适配。完成后受控集成可通过，但不等于 production candidate。
+实现 release-only Java materializer、SQLite/index seed、attestation、8 base/clone verifier、独立one-shot fault hook和03B Common调用适配。Node adapter与fault必须逐项消费活动Adapter Request `0.2`、其余三份`0.1` Adapter/Callback/Result Schema、Clone Result/Runtime Ready `0.1` Schema、唯一ESM函数、受控Java/Profile preflight、Base/Clone/Web launch mode、144次callback顺序、normalized result摘要及`VisualCommonCommitFaultPort`契约；不得自行发明Java/Profile来源、CLI、端口、READY、callback/result字段或复用E2E/Recovery port。当前03C状态为`NODE_ADAPTER_BLOCKED_BY_ADAPTER_TEST_INPUT_BUILDER_IMPLEMENTATION`；设计输入已冻结，但受控测试输入Builder/Verifier已有实现但尚未符合Runtime/JDK修正并通过验收，Java局部实现仅有单例验证，Node consumer与完整验收尚未完成。完成后受控集成可通过，但不等于production candidate。
 
 ### 14.3 `GOLDEN-AUTHORING-03B`
 
@@ -805,6 +891,7 @@ verify Plan/Catalog/fixture/color mapping
 | Isolation | 72 capture x 2 fresh clone，base digest不变 | 共享Runtime/clone、跨attempt状态、写base |
 | UI setup | 真实Web/UI/API达到8个封闭终态 | DOM/Pinia/X6写注入、network mock、sleep替代状态 |
 | Fault | exact command的一次性process-local hook | 通配hook、HTTP开关、默认生产装配、多次触发 |
+| Adapter | 静态ESM函数、Request `0.2`受控Java/Profile preflight、`LOCAL_RUNTIME_JAR` source exact join、derived JDK/Planner五键env、其余三份Schema、144次串行callback和摘要闭合result | PATH/父JAVA_HOME、source/staged ref混用、checkout/env/扫描fallback、历史Request、dynamic callback、stdout协议、缺/多/乱序、部分result |
 | Projection | observed payload与fixture深度相等且digest相等 | 旧subject/focus占位hash、只比digest、candidate进入Revision |
 | Color | exact `srgb`/launch arg映射到canonical Environment | trim/case/别名/OS默认profile宽松接受 |
 | Transaction | 失败零READY输出、rollback/clean fresh root | 部分Report/Environment、覆盖旧Plan/candidate/approved |
@@ -819,6 +906,6 @@ verify Plan/Catalog/fixture/color mapping
 
 ## 17. 事实与非结论
 
-事实：当前8个历史fixture没有`schema_id/revision_document/index_seed/capture_setup/expected_projection`；源目录存在16组历史E2E base/input，但它们不在活动02B输出根且不能作为活动ref目标；Common Visual Fixture `0.1`机器Schema已新增并冻结，但producer/verifier、完整Visual fixture、32个活动E2E asset和43文件root尚不存在；当前Plan的Common projection hash是历史占位算法；当前Environment Schema固定canonical值但跨Plan映射尚未实现；共享Node JCS模块和vector已存在，03C Java consumer test尚未实现；source mirror尚未生成。
+事实：活动Common输入重建状态继续由02B/Common E2E相关实现规格记录；本设计不以历史快照覆盖其实际结果。03C活动Adapter Request `0.2`、其余三份`0.1`机器Schema、Clone Result/Runtime Ready两份`0.1`机器Schema、模块/CLI/callback/result契约、四种launch mode、动态端口/READY/关闭协议和独立一次性fault port契约已经冻结；当前存在Java Base/Clone/Web局部实现、单个STATE_ROLES受控验证和未接纳的fault hook字节。Adapter/Fault原14项职责基线已由测试输入Builder闭包扩为后继`19=8 M+11 A`总范围；测试输入Builder/Verifier实现已出现，但尚未符合Runtime kind与Planner JDK env修正规格，Node adapter和fault hook也未完成该19项范围与集成验收；8 base/144 clone和通过checklist的受控集成仍未完成。
 
-本文不构成02B/03C/03B实现、8个base、144个attempt、新Plan、PNG、candidate、Approval、approved version、Visual Manifest/Report、GATE READY、Capability enablement、生产发布或ISO符合性证明。
+本文不构成03C/03B实现验收、8个base、144个attempt、新Plan、PNG、candidate、Approval、approved version、Visual Manifest/Report、GATE READY、Capability enablement、生产发布或ISO符合性证明；02B/Common root的实际状态仅由其实现规格和checklist判定。

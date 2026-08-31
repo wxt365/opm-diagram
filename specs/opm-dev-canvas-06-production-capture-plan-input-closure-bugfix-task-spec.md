@@ -39,7 +39,7 @@ catalog_id = "dev-canvas-06.common-fixtures." + source_binding.binding_digest[0:
 catalog_version = "0.1.0"
 ```
 
-> 历史适用边界：以上`catalog_version=0.1.0`只定义并证明本规格已执行的历史Catalog与Capture Plan bytes。当前02B活动完整Catalog必须按Visual Common Materialization `v1.4`生成fresh `catalog_version=0.2.0`和43文件self-contained root；不得把本节公式作为活动Builder输入，也不得改写下文历史SHA。
+> 历史适用边界：以上`catalog_version=0.1.0`只定义并证明本规格已执行的历史Catalog与Capture Plan bytes。当前活动完整Catalog必须按Visual Common Materialization `v1.5`保持`catalog_version=0.2.0`和43文件self-contained root；不得把本节公式作为活动Builder输入，也不得改写下文历史SHA。
 
 `catalog_id`表示绑定域，不表示source commit。`generator_ref`、fixture/factory refs和Catalog raw SHA继续闭合具体bytes。同一`catalog_id + catalog_version`内容不可变；fixture、factory、顺序或生成策略发生语义变化时必须发布新`catalog_version`，不得借source commit变化原地改写身份。
 

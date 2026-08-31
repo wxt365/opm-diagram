@@ -2,6 +2,8 @@
 
 状态：`FROZEN/COMPLETE`
 
+活动边界：契约语义不变；受控Manifest与evidence必须绑定final production source-chain的新Stage A，旧`586d6de...`不得作为活动base。
+
 ## Task Type
 
 - [x] `bugfix`
@@ -23,6 +25,7 @@
 | D10A/D10B | 10、11 | P43~P56 |
 | 首错/实现包/原子事务 | 12、13 | P57~P68 |
 | 验收/回滚/事实 | 14~16 | P69~P76 |
+| 2A唯一CLI/Manifest D05/Preflight Report/evidence root/Invocation Context | 17 | P77~P102 |
 
 ## Checklist
 
@@ -72,13 +75,13 @@
 - [x] P44 live fixed Handoff、activation root realpath与activation input set证据已冻结。
 - [x] P45 空 activation set SHA 固定为 `4f53cda1...b945`。
 - [x] P46 snapshot payload SHA 公式已冻结。
-- [x] P47 Gate observer 固定为 parent Runner 内部只读 owner。
+- [x] P47 Gate observation算法固定为单一只读契约：Node父owner执行D10A；controlled spec只调用Runner lifecycle接口，D10B采样与writer唯一归该接口；不增加第三个helper或第二条IPC。
 - [x] P48 observer 禁止新增公共 API 或修改 production wire。
 - [x] P49 旧 `FLCP-D10-GATE` 已废止。
 - [x] P50 preflight 第十项固定为 `FLCP-D10A-GATE-PREFLIGHT`。
 - [x] P51 dependency result 仍恰 10 项。
 - [x] P52 D10B 明确不属于 preflight dependency。
-- [x] P53 BEFORE/DURING/AFTER 计数固定为 `1/12/1`。
+- [x] P53 成功分支BEFORE/DURING/AFTER计数固定为`1/12/1`；DURING只能在spec-owned Page已attach、同Page网络观测闭合、Browser/Context/Page以相同对象临时confirm，Runner保持sentinel到handler settle并完成零迟到事件、sink关闭、全部sentinel移除和最终proof，随后回收Runtime/Web及释放端口后采样；Browser proof失败固定事务失败且不得采样当前DURING，业务提前失败只允许真实有序前缀并仍取得AFTER。
 - [x] P54 Gate Observation Artifact `0.1` 字段和摘要已冻结。
 - [x] P55 成功必须 `14` 项一致且 mutation count 为 `0`。
 - [x] P56 Gate 漂移稳定错误、立即停机和首错保留规则已冻结。
@@ -86,9 +89,9 @@
 - [x] P58 参数错误 exit `2` 与依赖阻断 exit `3` 已分离。
 - [x] P59 BLOCKED 零执行/零输出副作用保持不变。
 - [x] P60 READY 不得预写 D10B 或宣称 PASS。
-- [x] P61 2A 状态已改为 descriptor contract implementation 阻断。
-- [x] P62 `0dcaa27...` 继续作为 36 raw refs 来源，不再是 2A 直接 parent。
-- [x] P63 后继 contract commit 必须先形成新 clean base intake。
+- [x] P61 历史Schema conformance `2 M`已形成`586d6de.../HISTORICAL_READY_NOT_CONSUMABLE`；活动C/S/A仍未创建。
+- [x] P62 `0dcaa27...`只保留为历史36 raw refs来源；活动origin已改为`9048bb3...`。
+- [x] P63 活动A必须以新S为唯一parent并提交`4=2 M+2 A`；`586d6de...`不得消费。
 - [x] P64 后继 allowlist 固定为 `12=4 M+8 A`。
 - [x] P65 12 个路径逐字符冻结。
 - [x] P66 活动 Manifest/Report/Source Set/Fault Plan/36 baseline 均禁止修改。
@@ -102,11 +105,39 @@
 - [x] P74 Gate/Candidate/Activation/Capability/ISO 状态未提升。
 - [x] P75 事实与待实现已分栏。
 - [x] P76 Spec Mapping 覆盖目标、范围、非目标、约束、验收、验证和回滚。
+- [x] P77 2A唯一业务CLI冻结为`--run-controlled`，不再拆分preflight和execution命令。
+- [x] P78 `node --test`仅用于定向测试，不接受业务输入。
+- [x] P79 旧`--preflight/--mode=preflight`及candidate/Runtime/Web/browser override固定拒绝。
+- [x] P80 actual Manifest唯一定位冻结为`--manifest-root`加固定basename token。
+- [x] P81 Manifest raw/JCS形状和活动v02 controlled verifier固定先于D05字段级join。
+- [x] P82 D05三个Manifest case的suite/expectation/viewport/zoom/driver/transaction/assertion和raw refs已冻结。
+- [x] P83 attempt ordinal、process cycle、port明确只来自Descriptor并与Manifest case交叉验证。
+- [x] P84 Runtime按跨root raw identity比较，禁止错误要求path逐字符相等；Web只由Manifest verifier闭合。
+- [x] P85 Preflight Report `0.1`在真实产物前废止，活动版本冻结为`0.2`。
+- [x] P86 report固定记录origin/contract/candidate三段commit身份及可空Manifest/Descriptor refs。
+- [x] P87 D01活动链为`O -> C -> S -> A`；`implementation_delta`固定四项`M/M/A/A`，Report字段和版本不增加。
+- [x] P88 controlled run ID固定使用Manifest与Descriptor raw SHA前12位。
+- [x] P89 evidence staging/final路径和恰好两个最终JSON文件已冻结。
+- [x] P90 preflight report必须原字节镜像，禁止重新序列化。
+- [x] P91 Gate Observation PASS与FAILED条件分支、真实DURING前缀和首错规则已冻结。
+- [x] P92 fixed temp、file fsync、no-replace rename、directory fsync顺序已冻结。
+- [x] P93 staging verifier、postorder fsync、root rename、parent fsync、installed verifier顺序已冻结。
+- [x] P94 exit `0/1/2/3/4`及事务失败稳定stderr已冻结。
+- [x] P95 事务失败final不存在、staging保留不可消费；post-install失败final保留但禁止消费。
+- [x] P96 2A仍只允许两个新增文件，Gate artifact writer/verifier不得扩为第三个source owner。
+- [x] P97 Playwright跨进程输入固定为process-control root内的封闭Invocation Context，不允许依赖父进程内存或环境变量集合。
+- [x] P98 Context字段、12项execution schedule、payload SHA、raw ref环境值和child复核规则已冻结。
+- [x] P99 Context固定按tmp/file fsync/raw复核/no-replace rename/parent fsync写入，失败为`EVIDENCE_TRANSACTION/4`且零Playwright启动。
+- [x] P100 child环境只允许`OPM_CANVAS06_FAULT_CONTROL_CONTEXT_REF`一个前缀键，所有业务输入均从已验证Context取得；D10B sampler与Gate Artifact writer唯一归Runner lifecycle接口，spec/父进程不得直写。
+- [x] P101 2A spec固定命名为`fault-launcher.controlled.release.spec.ts`，与既有`**/*.release.spec.ts` testMatch闭合且不修改只读配置。
+- [x] P102 lifecycle接口实现与Runner测试完成前，只允许继续D01~D10A验证，禁止A commit与D10B。
 
 ## 当前门状态
 
 - 设计修正：`COMPLETE`。
-- Preflight Contract 实现：`FROZEN_FOR_IMPLEMENTATION/NOT_STARTED`。
-- Fault Launcher 2A：`BLOCKED_BY_PREFLIGHT_DESCRIPTOR_CONTRACT_IMPLEMENTATION`。
+- Preflight Contract候选：`63851f8878dcf6da86e99d5ffa7795ac48200920/REJECTED_AS_2A_CONTRACT_BASE/SCHEMA_CONFORMANCE_DEFECT`。
+- 历史Contract Base Schema修正：`586d6dee1b07c6634267aeb344e8826adb1ddb4b/HISTORICAL_READY_NOT_CONSUMABLE`。
+- 活动D01父链：由Final Production Source Chain固定为`9048bb3... -> C -> S -> A`。
+- Fault Launcher 2A：`BLOCKED_BY_FINAL_PRODUCTION_SOURCE_CHAIN_IMPLEMENTATION`。
 - Controlled Playwright：`NOT_RUN`。
 - `GATE-06-03`：`BLOCKED/NOT_RUN`。

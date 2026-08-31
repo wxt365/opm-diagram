@@ -1,6 +1,8 @@
 # Checklist: DEV-CANVAS-06 E2E Manifest v02 Producer/Verifier实现
 
-状态：`FROZEN/NOT_STARTED`
+状态：`NODE_CLOSURE_COMPLETE / PRODUCTION_REBUILD_PENDING`
+
+Production准入：`READY_FOR_CLEAN_R_EXTERNAL_STORE_REBUILD`。`9048bb3...`既有194-case Manifest仅为origin build证据，最终Manifest必须绑定最终Runner commit `R=4b30d269...`。
 
 ## Task Type
 
@@ -70,15 +72,16 @@
 - [x] C40 production Producer/Verifier在读取目标版本根前精确检查同source12 final marker和temp residual，任一存在即`E2E_MANIFEST_INPUT_QUARANTINED/3`。
 - [x] C41 marker guard禁止目录扫描、latest、mtime、follow link、cleanup、移动和覆盖；controlled mode不得读取production quarantine目录。
 - [ ] C42 exact marker/temp/link/directory/截断/Schema-invalid/lstat failure/其他source12隔离正反例通过。
-- [x] C43 production source唯一为17项集成final commit；独立9项External Store commit和8项Common commit均禁止消费。
-- [x] C44 final commit唯一parent固定为完整`e598b305a44ebb9c9845c1f5563bc36c3a89a2b4`，composite固定`17=14 M+3 A`。
-- [ ] C45 Handoff、Intake解析Handoff、Manifest、source HEAD、Report runner identity与17项final commit六方逐字符相等。
-- [ ] C46 从同一final commit依序重建Handoff/Intake/Runtime/Web/Common和Manifest，并完成external Unified Verifier与Manifest staging/installed双Verifier。
+- [x] C43 `17=14 M+3 A`集成commit只作为`9048bb3...` origin来源；独立9项External Store commit和8项Common commit均禁止消费。
+- [x] C44 最终production source唯一为Final Production Source Chain的R；链为`O->C->S->A->R0->R`，每一段均为single-parent，A不得冒充最终source。
+- [ ] C45 Handoff、Intake解析Handoff、Manifest、source HEAD、Report runner identity与R六方逐字符相等。当前Report尚未生成，保持未完成。
+- [x] C46 从fresh clean R依序重建Handoff/Intake/Runtime/Web/Common和Manifest，并完成external Unified Verifier与Manifest staging/installed双Verifier：Manifest SHA=`6692e32d...989c`。
 
 ## 当前状态
 
 - 设计与实现边界：`FROZEN_FOR_IMPLEMENTATION`。
-- Java/Node实现：`NOT_STARTED`。
+- Java/Node实现：`NODE_CONTROLLED_CLOSURE_COMPLETE`。v02 Producer、只读 Verifier、五资产 Staging、four-driver 和 `137/57` 聚合已实现；受控构建、重复字节稳定和 Verifier tree-digest 不变由 `release:canvas06:e2e:manifest:v02:test` 覆盖。
 - Common root self-verification：`READY`。
-- Production重建：`BLOCKED_BY_17_PATH_INTEGRATED_SOURCE_IMPLEMENTATION`；不得从含installed输入的source worktree运行Producer，也不得消费独立9项或8项commit。
+- Production重建：`COMPLETE/INSTALLED_VERIFIED`；final Unified Input与Manifest均从clean R、fresh external store生成。Report及六方join仍不得消费其他root或历史commit。
+- Runner 回归：`CLOSED`。Runner 规格允许的 `canvas06-e2e-run-input.test.mjs` fixture 已补齐第四 driver 和五资产 Profile 闭合；`release:canvas06:e2e:runner:test` 已通过`47/47`。
 - `GATE-06-03`：`NOT_RUN`。

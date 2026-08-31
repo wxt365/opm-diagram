@@ -145,6 +145,16 @@ async function activeManifest(profileRoot) {
     manifest_version: '0.2.0',
     generated_at: '2026-07-01T00:00:00Z',
     generator_identity: { ...source.generator_identity, runner_version: '0.2.0' },
+    driver_catalog: [
+      ...source.driver_catalog.map(item => ({ ...item, source_ref: { ...item.source_ref, kind: 'E2E_DRIVER_SOURCE' } })),
+      {
+        driver_id: 'DRIVER-COMMON',
+        source_ref: {
+          kind: 'E2E_DRIVER_SOURCE', path: 'inputs/drivers/common-driver.mjs',
+          byte_length: 1, sha256: digest(Buffer.from('common-driver'))
+        }
+      }
+    ],
     profile_asset_tree_ref: {
       kind: 'PROFILE_ASSET_TREE', path: relativeRoot,
       byte_length: refs.reduce((total, ref) => total + ref.byte_length, 0),

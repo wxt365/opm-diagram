@@ -20,6 +20,7 @@ import org.opm.localruntime.storage.ProjectDatabaseFactory;
 import org.opm.localruntime.storage.ProjectDatabaseOpenResult;
 import org.opm.localruntime.storage.SqliteRevisionCommitRepository;
 import org.opm.localruntime.releaseevidence.fault.E2EFaultPort;
+import org.opm.localruntime.releaseauthoring.visualcommon.VisualCommonCommitFaultPort;
 import org.opm.localruntime.text.OplGenerationResult;
 import org.opm.localruntime.text.OplGrammar;
 import org.opm.localruntime.text.OplTextGenerationService;
@@ -57,19 +58,26 @@ public class LocalApiService {
     private final SemanticRevisionValidator semanticValidator = new SemanticRevisionValidator();
     private final ProfilePackageAssembler profilePackageAssembler;
     private final E2EFaultPort e2eFaultPort;
+    private final VisualCommonCommitFaultPort visualCommonCommitFaultPort;
 
     public LocalApiService(ProjectDatabaseFactory databaseFactory) {
-        this(databaseFactory, new FileProfilePackageLoader(Path.of("packages/profiles")), E2EFaultPort.NOOP);
+        this(databaseFactory, new FileProfilePackageLoader(Path.of("packages/profiles")), E2EFaultPort.NOOP, VisualCommonCommitFaultPort.NOOP);
     }
 
     public LocalApiService(ProjectDatabaseFactory databaseFactory, FileProfilePackageLoader profilePackageLoader) {
-        this(databaseFactory, profilePackageLoader, E2EFaultPort.NOOP);
+        this(databaseFactory, profilePackageLoader, E2EFaultPort.NOOP, VisualCommonCommitFaultPort.NOOP);
+    }
+
+    public LocalApiService(ProjectDatabaseFactory databaseFactory, FileProfilePackageLoader profilePackageLoader, E2EFaultPort e2eFaultPort) {
+        this(databaseFactory, profilePackageLoader, e2eFaultPort, VisualCommonCommitFaultPort.NOOP);
     }
 
     @Autowired
-    public LocalApiService(ProjectDatabaseFactory databaseFactory, FileProfilePackageLoader profilePackageLoader, E2EFaultPort e2eFaultPort) {
+    public LocalApiService(ProjectDatabaseFactory databaseFactory, FileProfilePackageLoader profilePackageLoader, E2EFaultPort e2eFaultPort,
+                           VisualCommonCommitFaultPort visualCommonCommitFaultPort) {
         this.databaseFactory = databaseFactory;
         this.e2eFaultPort = e2eFaultPort;
+        this.visualCommonCommitFaultPort = visualCommonCommitFaultPort;
         this.profilePackageAssembler = new ProfilePackageAssembler(profilePackageLoader, e2eFaultPort);
     }
 
@@ -646,7 +654,7 @@ public class LocalApiService {
         SemanticRevision candidate = applyP0Command(projectId, modelId, current.revision(), required(request, "command_type"), requiredMap(request, "payload"));
         CandidateRevisionCommand command = new CandidateRevisionCommand(projectId, modelId, commandId, baseRevisionId, current.revision(), candidate,
                 binding(current.revision()), grammar(current.revision()), requestDigest(request), "P0_EDIT", Instant.now());
-        CommitResult result = new CandidateRevisionCommitter(new SqliteRevisionCommitRepository(databaseFactory.databasePath(projectId), e2eFaultPort), profilePackageAssembler, e2eFaultPort).commit(command);
+        CommitResult result = new CandidateRevisionCommitter(new SqliteRevisionCommitRepository(databaseFactory.databasePath(projectId), e2eFaultPort, visualCommonCommitFaultPort), profilePackageAssembler, e2eFaultPort).commit(command);
         if (result instanceof CommitResult.Rejected rejected) throw rejected(rejected.code());
         String committed = result instanceof CommitResult.Committed value ? value.committedRevisionId() : ((CommitResult.Replayed) result).committedRevisionId();
         List<String> traces = result instanceof CommitResult.Committed value ? value.traceIds() : List.of();

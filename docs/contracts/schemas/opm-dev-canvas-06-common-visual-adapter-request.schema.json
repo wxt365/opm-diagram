@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:opm:contract:dev-canvas-06-common-visual-adapter-request:0.1",
+  "title": "OPM DEV-CANVAS-06 Common Visual Adapter Request",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_id", "schema_version", "request_version", "request_id", "plan_path", "plan_ref",
+    "common_fixture_root", "runtime_jar_path", "runtime_jar_ref", "work_root", "source_date_epoch"
+  ],
+  "properties": {
+    "schema_id": {"const": "OPM-DEV-CANVAS-06-COMMON-VISUAL-ADAPTER-REQUEST-001"},
+    "schema_version": {"const": "0.1"},
+    "request_version": {"const": "0.1.0"},
+    "request_id": {"type": "string", "pattern": "^dev-canvas-06\\.common-visual-adapter\\.[A-Za-z0-9._-]+$"},
+    "plan_path": {"$ref": "#/$defs/absolutePath"},
+    "plan_ref": {"allOf": [{"$ref": "#/$defs/fileRef"}, {"properties": {"kind": {"const": "CAPTURE_PLAN"}}}]},
+    "common_fixture_root": {"$ref": "#/$defs/absolutePath"},
+    "runtime_jar_path": {"$ref": "#/$defs/absolutePath"},
+    "runtime_jar_ref": {"allOf": [{"$ref": "#/$defs/fileRef"}, {"properties": {"kind": {"const": "RUNTIME_JAR"}}}]},
+    "work_root": {"$ref": "#/$defs/absolutePath"},
+    "source_date_epoch": {"type": "integer", "minimum": 0}
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "logicalPath": {"type": "string", "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*//).+$"},
+    "absolutePath": {"type": "string", "pattern": "^/(?!\\.\\.(?:/|$))(?!.*?/\\.\\.(?:/|$))(?!.*//).+$"},
+    "fileRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "path", "byte_length", "sha256"],
+      "properties": {
+        "kind": {"type": "string", "minLength": 1},
+        "path": {"$ref": "#/$defs/logicalPath"},
+        "byte_length": {"type": "integer", "minimum": 1},
+        "sha256": {"$ref": "#/$defs/digest"}
+      }
+    }
+  }
+}

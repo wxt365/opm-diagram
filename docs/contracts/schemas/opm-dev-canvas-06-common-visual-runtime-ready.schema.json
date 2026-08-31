@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:opm:contract:dev-canvas-06-common-visual-runtime-ready:0.1",
+  "title": "OPM DEV-CANVAS-06 Common Visual Runtime Ready",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_id", "schema_version", "ready_version", "status", "request_id", "capture_id", "subject_id",
+    "attempt_ordinal", "launch_nonce", "process_id", "server_address", "server_port", "management_server_port",
+    "runtime_base_url", "management_base_url", "readiness_path", "bootstrap_path", "runtime_jar_ref",
+    "profile_asset_refs", "profile_asset_tree_sha256", "clone_result_ref", "attempt_database_ref",
+    "attempt_tree_sha256_before", "ready_payload_sha256"
+  ],
+  "properties": {
+    "schema_id": {"const": "OPM-DEV-CANVAS-06-COMMON-VISUAL-RUNTIME-READY-001"},
+    "schema_version": {"const": "0.1"},
+    "ready_version": {"const": "0.1.0"},
+    "status": {"const": "READY"},
+    "request_id": {"type": "string", "pattern": "^dev-canvas-06\\.common-visual-adapter\\.[A-Za-z0-9._-]+$"},
+    "capture_id": {"type": "string", "minLength": 1},
+    "subject_id": {"$ref": "#/$defs/subject"},
+    "attempt_ordinal": {"enum": [1, 2]},
+    "launch_nonce": {"$ref": "#/$defs/digest"},
+    "process_id": {"type": "integer", "minimum": 1},
+    "server_address": {"const": "127.0.0.1"},
+    "server_port": {"$ref": "#/$defs/port"},
+    "management_server_port": {"$ref": "#/$defs/port"},
+    "runtime_base_url": {"type": "string", "pattern": "^http://127\\.0\\.0\\.1:[1-9][0-9]{0,4}$"},
+    "management_base_url": {"type": "string", "pattern": "^http://127\\.0\\.0\\.1:[1-9][0-9]{0,4}$"},
+    "readiness_path": {"const": "/actuator/health/readiness"},
+    "bootstrap_path": {"const": "/opm-bootstrap.js"},
+    "runtime_jar_ref": {"allOf": [{"$ref": "#/$defs/fileRef"}, {"type": "object", "properties": {"kind": {"const": "RUNTIME_JAR"}}}]},
+    "profile_asset_refs": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "prefixItems": [
+        {"allOf": [{"$ref": "#/$defs/fileRef"}, {"type": "object", "properties": {"kind": {"const": "GRAMMAR_ASSET"}}}]},
+        {"allOf": [{"$ref": "#/$defs/fileRef"}, {"type": "object", "properties": {"kind": {"const": "NORMALIZATION_DATA"}}}]},
+        {"allOf": [{"$ref": "#/$defs/fileRef"}, {"type": "object", "properties": {"kind": {"const": "PROFILE_PACKAGE"}}}]},
+        {"allOf": [{"$ref": "#/$defs/fileRef"}, {"type": "object", "properties": {"kind": {"const": "RULE_SET"}}}]},
+        {"allOf": [{"$ref": "#/$defs/fileRef"}, {"type": "object", "properties": {"kind": {"const": "SYMBOL_ASSET"}}}]}
+      ],
+      "items": false
+    },
+    "profile_asset_tree_sha256": {"$ref": "#/$defs/digest"},
+    "clone_result_ref": {"allOf": [{"$ref": "#/$defs/fileRef"}, {"type": "object", "properties": {"kind": {"const": "COMMON_CLONE_RESULT"}}}]},
+    "attempt_database_ref": {"allOf": [{"$ref": "#/$defs/fileRef"}, {"type": "object", "properties": {"kind": {"const": "PROJECT_DB"}}}]},
+    "attempt_tree_sha256_before": {"$ref": "#/$defs/digest"},
+    "ready_payload_sha256": {"$ref": "#/$defs/digest"}
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "port": {"type": "integer", "minimum": 1, "maximum": 65535},
+    "logicalPath": {"type": "string", "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*//).+$"},
+    "subject": {"enum": ["STATE_ROLES", "LONG_LABELS", "FUNDAMENTAL_FAN", "CANDIDATE_LAYER", "INSPECTOR", "TOOLCHAIN_CATALOG", "FINDING_FOCUS", "BLOCKED_FEEDBACK"]},
+    "fileRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "path", "byte_length", "sha256"],
+      "properties": {
+        "kind": {"type": "string", "minLength": 1},
+        "path": {"$ref": "#/$defs/logicalPath"},
+        "byte_length": {"type": "integer", "minimum": 1},
+        "sha256": {"$ref": "#/$defs/digest"}
+      }
+    }
+  }
+}

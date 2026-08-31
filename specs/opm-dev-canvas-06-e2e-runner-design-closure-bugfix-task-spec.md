@@ -105,4 +105,4 @@ Visual/E2E 总契约先冻结了 Gate 的外部结果和 Schema，后续 E2E Man
 
 本规格不构成 `GATE-06-03` handoff、Candidate、Activation、Capability enablement、生产发布或 ISO 19450:2024 符合性证明。
 
-> 历史状态指针（2026-08-17）：本规格记录发现`DFR-021`缺口时的快照。当前唯一状态源为冻结基线`v1.21`、Visual Common Materialization`v1.4`、E2E Attempt Artifact`v1.3`、Family Identity Catalog`0.1/0.1.0`、活动Report`0.2`和Runner Source Set`0.1`；口径为`32=22+10/READY_FOR_DEVELOPMENT`。E2E Manifest Family Catalog适配、E2E Java/source/artifact producer、02B/03C/03B和production Gate仍未完成。
+> 历史状态指针（2026-08-26更新）：本规格记录发现`DFR-021`缺口时的快照。当前唯一状态源为冻结基线`v1.52`、Visual Common Materialization`v1.5`及03C Adapter/Fault闭包、E2E Attempt Artifact`v1.3`、Family Identity Catalog`0.1/0.1.0`、活动Report`0.2`和Runner Source Set`0.1`；口径为`32=22+10/READY_FOR_DEVELOPMENT`。03C Node adapter/fault/8 base/144 clone、03B和production Gate仍未完成。

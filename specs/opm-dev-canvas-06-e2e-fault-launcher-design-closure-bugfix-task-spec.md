@@ -2,6 +2,8 @@
 
 文档状态：`FROZEN_FOR_IMPLEMENTATION`
 
+活动后继：产品launcher/port语义继续有效；source identity、Build准入与实现顺序已由`opm-dev-canvas-06-final-production-source-chain-closure-bugfix-task-spec.md`取代。旧`READY_FOR_BUILD/BLOCKED_BY_BASE_INTAKE`仅为历史记录。
+
 ## Task Type
 
 `bugfix`

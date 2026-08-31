@@ -19,6 +19,7 @@ import org.opm.localruntime.text.OplGrammar;
 import org.opm.localruntime.assets.ProfilePackageDescriptor;
 import org.opm.localruntime.releaseevidence.fault.E2EFaultContext;
 import org.opm.localruntime.releaseevidence.fault.E2EFaultPort;
+import org.opm.localruntime.releaseauthoring.visualcommon.VisualCommonCommitFaultPort;
 
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
@@ -134,6 +135,25 @@ class SqliteRevisionCommitRepositoryTest {
         assertRejectedWithoutWrites(database, result, CommitFailureCode.PERSISTENCE_FAILED);
         assertEquals(1, e2eCalls.get());
         assertEquals(0, recoveryCalls.get());
+    }
+
+    @Test
+    void visualCommonHookRunsAfterTheE2eHookAndBeforeAnyPersistedWrite() throws Exception {
+        Path database = initializedDatabase();
+        SemanticRevision base = base();
+        AtomicInteger visualCalls = new AtomicInteger();
+        VisualCommonCommitFaultPort visual = context -> {
+            visualCalls.incrementAndGet();
+            throw new CommitPersistenceException(CommitFailureCode.PERSISTENCE_FAILED, "Visual Common persistence fault", null);
+        };
+        SqliteRevisionCommitRepository repository = new SqliteRevisionCommitRepository(SqliteConnectionFactory.create(database),
+                RecoverySqliteFaultPort.NOOP, E2EFaultPort.NOOP, visual);
+
+        CommitResult result = new CandidateRevisionCommitter(repository)
+                .commit(command(base, candidate(base), "command.visual.persistence", "digest-visual-persistence"));
+
+        assertRejectedWithoutWrites(database, result, CommitFailureCode.PERSISTENCE_FAILED);
+        assertEquals(1, visualCalls.get());
     }
 
     @Test

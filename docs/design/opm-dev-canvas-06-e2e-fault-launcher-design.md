@@ -1,10 +1,10 @@
 # DEV-CANVAS-06 E2E Fault Launcher 设计
 
-文档版本：`v1.2`
+文档版本：`v1.9`
 
 文档状态：`FROZEN_INCLUDED`
 
-更新时间：2026-08-26
+更新时间：2026-08-28
 
 ## 1. 定位
 
@@ -14,7 +14,11 @@
 
 后继代码实现唯一入口为`specs/opm-dev-canvas-06-e2e-fault-launcher-implementation-task-spec.md`及对应implementation checklist。该规格已冻结精确source delta、Spring Boot注册、显式context、Recovery隔离、Common重建和分层测试；不得继续从本文自行选择文件集合。
 
-受控执行输入与 Gate 时序由`specs/opm-dev-canvas-06-e2e-fault-launcher-preflight-descriptor-and-gate-observation-closure-bugfix-task-spec.md`后继修正：Fault Launcher lane只接受Controlled Bundle `0.2`对Preflight Descriptor `0.1`的不可变raw ref，原D10拆为preflight `D10A`和Playwright执行期`D10B`。本文的child/port产品语义不变。
+受控执行输入与 Gate 时序由`specs/opm-dev-canvas-06-e2e-fault-launcher-preflight-descriptor-and-gate-observation-closure-bugfix-task-spec.md`后继修正：Fault Launcher lane只接受Controlled Bundle `0.2`对Preflight Descriptor `0.1`的不可变raw ref，原D10拆为preflight `D10A`和Playwright执行期`D10B`；第17章进一步冻结唯一`--run-controlled`入口、actual Manifest v02字段级D05 join、Preflight Report `0.2`、父到Playwright的单一raw-ref Invocation Context和controlled evidence root原子事务。旧候选`63851f8...`及其`2 M`后继`586d6de...`只保留为Schema修正与patch对照，不得作为活动2A base。活动D01按Final Production Source Chain验证`O -> C -> S -> A`且不增加Preflight Report字段。本文的child/port产品语义不变。
+
+最终production source identity由`specs/opm-dev-canvas-06-final-production-source-chain-closure-bugfix-task-spec.md`后继取代：活动链唯一为`9048bb3... -> rebuilt Fault contract C -> rebuilt schema conformance S -> Fault 2A A -> final Runner R`。旧`0dcaa27.../63851f8.../586d6de...`仅保留历史语义与patch对照；36项raw-ref字段表、两个controlled新增路径、D10A/D10B和本文launcher/port语义不变。活动A-stage allowlist固定为`4=2 M+2 A`。C/S/A/R均未创建，不得从旧链继续Build。
+
+Stage A lifecycle由`specs/opm-dev-canvas-06-stage-a-controlled-lifecycle-interface-closure-bugfix-task-spec.md`进一步收紧：唯一接口为`runControlledLifecycleSession()`；Runtime/Web lifecycle、exact READY、INITIAL/REOPEN、Common Driver client factory、Runtime/Web child cleanup、12个唯一端口去重计数、D10B sampler和Gate Artifact writer均归Runner owner。controlled spec只提供预绑定handler、只接收origin与六方法observation sink；每cycle必须在route/navigation/API前通过`attachBrowserPage(page)`绑定真实Page，并在`finally`关闭fresh Chromium process/context/page后以相同对象调用`confirmBrowserClosed({browser,context,page})`。Runner只接纳同Page网络观测、对象引用和Page/Context/Browser关闭事件证明，不接管Browser。confirm初步接纳后立即冻结业务观测并移除采样监听，但必须无间隙保留仅置位`late_event_detected`的Page/Context/Browser sentinel，直到handler settle、零迟到事件复核和sink关闭；此后才移除全部sentinel并接纳最终proof。confirm后迟到事件、监听空窗、sentinel提前移除或最终残留均视为证明不闭合，固定为`E2E_ORCHESTRATION_BROWSER_PROOF_INVALID -> EVIDENCE_TRANSACTION/4`，不得采样当前DURING或提交可消费Artifact。父Node只终止Playwright test child。接口完成前禁止A commit与D10B。
 
 ## 2. 设计原则
 
@@ -348,4 +352,4 @@ stderr第一行固定：
 
 ## 13. 发布边界
 
-Java launcher/port的36项产品基线已进入`0dcaa27...`且保持只读。受控Playwright的逻辑delta仍为`2 A`，但其Build状态为`BLOCKED_BY_PREFLIGHT_DESCRIPTOR_CONTRACT_IMPLEMENTATION`：必须先实现Bundle `0.2`、Descriptor/JarIT/Gate Observation `0.1`及producer/verifier，并接纳新的clean base intake。活动Manifest v02 producer/verifier仍是后续release重建依赖，禁止以历史v01替代。只有contract、2A、受控测试、production `194/388`和E2E Report分别完成，才能按Gate规格判断`GATE-06-03`；设计、Schema或局部测试均不能提升Gate、Candidate、Activation、Capability或ISO状态。
+Java launcher/port的36项产品基线已从新origin `9048bb3...`逐项复算，集合摘要仍为`69491a...b411e`。Stage C固定`20=12 M+8 A`，S固定`2 M`，A固定`4=2 M+2 A`：两个Runner owner ref允许修改，其余34项不变，并新增两个controlled文件。Preflight Report仍只记录origin、contract base和candidate，`implementation_delta`固定四项`M/M/A/A`；中间commit由Git parent推导。Stage R仍修改两个Runner owner以扩展production行为，但必须保持A阶段controlled回归。controlled evidence只绑定A，不得冒充绑定R的production E2E Report。C/S/A/R、受控测试、production `194/388`和Report分别完成前，不提升Gate、Candidate、Activation、Capability或ISO状态。

@@ -11,9 +11,9 @@
 
 ## Input Gate
 
-- [x] Golden Authoring `v1.4`、Visual Common Materialization `v1.4`、Materializer `v1.5` 和 Verifier Catalog `v1.1` 均为 `FROZEN`。
+- [x] Golden Authoring `v1.4`、Visual Common Materialization `v1.5`、Materializer `v1.5` 和 Verifier Catalog `v1.1` 均为 `FROZEN`。
 - [ ] 02B Common Visual Fixture Contract/Planner checklist 全部通过，新 Plan拒绝历史占位Projection。
-- [ ] 03C Common Visual Materializer checklist全部通过，8 base/144 clone/fault hook受控集成可用。
+- [ ] 03C Common Visual Materializer checklist全部通过，四份adapter机器契约、唯一ESM/144次callback、8 base/144 clone/独立fault hook受控集成可用。
 - [ ] Plan READY，130 项 materialization 通过 `--require-materialized`。
 - [ ] clean source 与 exact Node/npm/Java/Playwright/Chromium/JAR/font 输入可用；Golden Environment `0.2` Schema/离线 verifier 已可用。
 - [ ] 受控 test 输入与真实 release 输入已分开。
@@ -22,7 +22,7 @@
 
 - [x] Authoring Report `0.2` Schema 和正反 contract test 完成：三种状态、130/130 materialization、2484/18 attempt、Candidate/Approved/Blocked 引用边界、report ID 和额外字段反例均由定向 AJV test 覆盖。
 - [ ] CLI、clean build、environment/font verifier 和单 lane author 完成。
-- [ ] Family clone/Common 03C adapter、稳定等待和双 attempt 完成。
+- [ ] Family clone/Common 03C adapter、Schema-valid normalized result、稳定等待和双 attempt 完成。
 - [ ] candidate Golden Environment `0.2` writer、refs/fingerprint verifier 完成。
 - [ ] READY/BLOCKED Report atomic writer、payload SHA 和 candidate 只读边界完成。
 - [ ] runner 对 Approval/approved/Manifest 保持零写入。
@@ -41,7 +41,7 @@
 ## Risks And Residuals
 
 - [x] Golden Environment `0.2` Schema、正反例和离线 semantic verifier 已完成；03B 仍需在 author 运行时复核 browser executable/font bytes、实际字体解析和 Capture Plan join，不能把离线 verifier 作为这些运行时证据。
-- [x] Common Runtime Materialization设计缺口已由Visual Common Materialization `v1.4`关闭：唯一采用release-only SQLite V1、空Text Artifact/`1/1/0`计数、五类index逐列映射、8类UI step、43文件self-contained root、8 base/144 fresh clone和完整normalized Projection；其余实现由02B/03C承接。
+- [x] Common Runtime Materialization设计缺口已由Visual Common Materialization `v1.5`关闭：唯一采用release-only SQLite V1、空Text Artifact/`1/1/0`计数、五类index逐列映射、8类UI step、43文件self-contained root、四份adapter机器Schema、静态ESM/144次callback、独立one-shot fault port、8 base/144 fresh clone和完整normalized Projection；其余实现由03C承接。
 - [x] `color_profile`跨契约冲突已关闭：Plan raw `srgb`和exact Chromium arg唯一映射到Environment canonical `sRGB IEC61966-2.1`，禁止alias；实现由02B/03B承接。
 - [ ] 当前等待02B/03C实现依赖，不得以设计冻结替代Schema/factory/materializer/attestation/clone证据。
 - [ ] 未把受控全量测试写成真实 release candidate。

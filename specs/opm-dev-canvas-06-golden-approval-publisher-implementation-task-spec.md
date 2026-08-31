@@ -15,7 +15,7 @@
 
 ## 2. 设计输入
 
-唯一事实源为 Golden Authoring `v1.4`、Visual Common Materialization `v1.4`、Golden Environment `0.2` 设计修正、Materializer `v1.5`、Verifier Catalog `v1.1`、Capture Plan `0.1`、Authoring Report `0.2` 和 Materialization Report `0.1`。实现不得改变 Approval 字段、candidate/new set SHA、INITIAL/SUPERSEDE、目录、错误码、性能或不可变边界。
+唯一事实源为 Golden Authoring `v1.4`、Visual Common Materialization `v1.5`及03C Adapter/Fault闭包、Golden Environment `0.2` 设计修正、Materializer `v1.5`、Verifier Catalog `v1.1`、Capture Plan `0.1`、Authoring Report `0.2` 和 Materialization Report `0.1`。实现不得改变 Approval 字段、candidate/new set SHA、INITIAL/SUPERSEDE、目录、错误码、性能或不可变边界。
 
 ## 3. 前置条件
 

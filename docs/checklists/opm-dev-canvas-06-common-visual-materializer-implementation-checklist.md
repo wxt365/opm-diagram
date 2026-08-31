@@ -1,6 +1,6 @@
 # Checklist: GOLDEN-AUTHORING-03C Common Visual Materializer 实现
 
-状态：`IN_PROGRESS`。仅共享 JCS parity 前置已完成；SQLite materializer 仍等待完整02B fixture/Catalog。
+状态：`IN_PROGRESS / NODE_ADAPTER_BLOCKED_BY_ADAPTER_TEST_INPUT_BUILDER_IMPLEMENTATION`。共享JCS parity、adapter/fault、Clone/Web Runtime、Adapter Request `0.2`及Adapter Test Input Bundle `0.1`设计已冻结；Java Base/Clone/Web mode、Clone Result和Runtime Ready已有受控实现与局部验证。测试Builder/Verifier实现已出现但尚未符合Runtime kind/Planner JDK env修正，Node adapter完整144次调度尚未完成。
 
 ## Spec Mapping
 
@@ -17,38 +17,53 @@
 
 - [ ] 02B checklist 全部通过，新 fixture/Catalog 通过只读 verifier。
 - [ ] 全局开发门为 `READY_FOR_DEVELOPMENT`。
-- [ ] exact Java 21 Runtime JAR、active binding 和 fresh work root 可用。
+- [x] 受控Java 21、Maven产出的Runtime JAR、active binding和临时fresh work root已用于Java定向验证；其身份不构成production authoring输入。
 - [x] 02B共用JCS parity vector存在且通过Node verifier。
-- [x] Visual Common`v1.4`已冻结五类index逐列映射、固定ID/时间/状态/null、Revision到SQLite唯一编码和活动43文件输入root。
+- [x] Visual Common`v1.9`已冻结五类index逐列映射、固定ID/时间/状态/null、Revision到SQLite唯一编码和活动43文件输入root。
+- [x] Visual Common`v1.9`及后继闭包规格已冻结活动Adapter Request `0.2`、Adapter Test Input Bundle `0.1`、Runtime source/staged kind、Planner derived JDK env、其余三份adapter `0.1`、两份Clone/READY机器Schema、唯一ESM函数/CLI、144次callback、四种launch mode、动态端口/READY/关闭协议和独立one-shot fault port。
 - [ ] 受控输入与 production authoring root 已隔离。
 
 ## Build
 
-- [ ] release-only/non-web 条件装配与 command-line source guard 完成。
+- [x] GFM/Base/Clone/Web四种launch mode、profile隔离与command-line source guard完成。
+- [x] 主入口只退出三个有限mode，Common Web在READY后保持servlet长驻。
 - [ ] 8 subject SQLite V1 transaction seed、rollback、reopen verifier 完成。
 - [ ] attestation atomic writer 与只读 semantic verifier 完成。
 - [ ] 8 immutable base、72 capture x 2 attempt 的 144 fresh clone完成。
-- [ ] 默认 no-op commit hook 和 `BLOCKED_FEEDBACK` 一次性 release-only hook 完成。
-- [ ] 03B Common adapter、固定顺序和禁止 override 守卫完成。
+- [x] packaged-JAR Clone CLI与Clone Result原子writer完成；完整篡改矩阵仍待Node adapter闭合。
+- [x] Web Runtime动态loopback端口与Runtime Ready原子writer完成；完整篡改与关闭矩阵仍待Node adapter闭合。
+- [ ] 独立默认NOOP `VisualCommonCommitFaultPort`和`BLOCKED_FEEDBACK`一次性release-only实现完成；当前仅有未提交局部字节，尚未满足完整验收。
+- [ ] 03B Common adapter、四份Schema、唯一ESM函数、144次callback、normalized result摘要和禁止override守卫完成。
+- [ ] Node adapter按Request `0.2`完成exact Java 21与Profile root/五raw refs/tree/package/binding preflight，且零fallback。
+- [ ] Adapter Test Input Builder/Verifier按`LOCAL_RUNTIME_JAR` source exact join、staged `RUNTIME_JAR` raw join和derived JDK/Planner五键env，原子生成并复核Profile 5、Common 43、Plan 1242/72、Request `0.2`和144份完整Observed/PNG；当前实现未接纳。
 - [ ] default Runtime、公共 API、03A Family、SQLite V1 和产品配置保持不变。
 
 ## Verify
 
 - [ ] guard 缺失/冲突/来源/Web/default/03A 反例全部通过。
+- [ ] GFM/Base/Clone/Web lifecycle与web type正反例全部通过。
 - [ ] 8 fixture identity、Revision JCS/raw digest、固定时间、五类index逐列/顺序/null、Projection、integrity/FK/sidecar闭合。
 - [x] Java现有canonicalizer对10项共用vector的canonical JSON text/SHA与Node完全相等，safe integer边界、UTF-16 key排序、lone surrogate及其他非法值拒绝。
 - [ ] migration/seed/commit/reopen/attestation/clone 故障稳定 rollback 且不触碰已有资产。
 - [ ] `8/72/144`、顺序、路径、base digest 和 attempt 隔离通过。
+- [ ] Clone Result和Runtime Ready的Schema/payload/ref/identity/nonce/PID/端口单变量篡改全部拒绝。
+- [ ] 30秒READY、health/bootstrap、SIGTERM/10秒/SIGKILL、端口与SQLite sidecar关闭矩阵通过。
+- [ ] `GOLDEN_COMMON_UI_SETUP_FAILED`经runner、Spring cause chain及packaged JAR均exit `3`，Java无第二份映射owner。
 - [ ] fault hook 只对 exact subject/command 首次触发，第二次及其他模式为正常/no-op。
+- [ ] adapter request/invocation/observed/normalized Schema正反例、CLI四模式、callback首错和`8/144`顺序通过。
 - [ ] exact packaged JAR integration 通过，不使用 exploded classpath。
 - [ ] P95/总时长/RSS 满足 `5 s/30 s/1 s/512 MiB`。
 - [ ] Maven、Node 定向命令、contract/backend 和 `git diff --check` 通过。
 
 ## Risks And Residuals
 
+- [x] 受控 packaged-JAR 已完成一个 `STATE_ROLES` Base -> Clone -> Web 实测：READY公布不同的动态loopback应用/management端口，readiness为`200/UP`，Bootstrap为`200/application/javascript`，随后SIGTERM退出。该单例不替代8 base、144 clone/Runtime或production证据。
+- [x] Adapter Request `0.2`已冻结exact Java 21 path/identity及Web所需Profile root/五raw refs/tree digest；设计缺口已关闭。
+- [ ] Adapter Test Input Builder/Verifier已有实现字节，但Runtime kind与Planner JDK env不符合修正规格；Request `0.2`consumer/preflight尚未完整验收，故仍阻塞真实144次调度。
 - [ ] 03C 完成只恢复 03B 实现依赖，不生成 production candidate。
-- [ ] 真实 UI setup、144 次浏览器 capture、PNG determinism 和 Authoring Report 由 03B 承接。
+- [ ] 真实UI setup由03C Web Runtime执行；144次PNG写入、PNG determinism和Authoring Report仍由03B callback/candidate transaction承接。
 - [ ] production 8 base/144 clone、GATE-06-03、Candidate、Activation、Capability 和 ISO 状态不得提升。
+- [ ] 现有局部`visualcommon` Java及fault hook字节不等于03C已实现，必须以本checklist逐项验收。
 
 ## Rollback
 

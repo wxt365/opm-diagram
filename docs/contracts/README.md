@@ -18,6 +18,10 @@ migrations/sqlite/             SQLite Flyway V1 和验证 SQL
 3. OpenAPI 冻结 P01-P03 和完整画布 `API-EDT-001/002` 的 0.2 目标输入；未列入的应用操作继续以 `opm-modeling-tool-application-api-contract.md` 为上游。
 4. V1 SQL 是 SQLite 设计基线；开发工程落盘后由 Flyway 执行。当前目录不会自动修改任何用户数据库。
 5. 设计语义由 `docs/design/opm-design-freeze-baseline.md` 冻结；文件名或内部版本带 `draft/representative` 时表示机器发布或覆盖状态，不表示设计门仍开放。首次产品发布前仍须锁定 digest、生成客户端并完成兼容性和运行验证。
+6. `opm-dev-canvas-06-common-visual-adapter-request.schema.json`是历史`0.1/0.1.0`，只读且不得进入production adapter；活动Request为`opm-dev-canvas-06-common-visual-adapter-request-v02.schema.json`的`0.2/0.2.0`，新增exact Java 21 executable及Profile root/五raw refs/tree必填输入，并固定`runtime_jar_ref.kind=LOCAL_RUNTIME_JAR`以与READY Handoff/Capture Plan逐字段闭合。Request physical path、Bundle staged ref及Runtime Ready继续使用`RUNTIME_JAR`副本身份，只按raw length/SHA闭合。Capture Invocation、Observed Result、Normalized Result继续为`0.1/0.1.0`。这些Schema只冻结03B/03C进程内机器边界，不升级Capture Plan、Common Fixture或Authoring Report，也不证明Node adapter、未接纳的局部one-shot fault字节、8 base/144 clone已经完成验收。
+7. `opm-dev-canvas-06-common-visual-clone-result/runtime-ready`两份`0.1` Schema冻结03C packaged-JAR Clone与长驻Web Runtime的进程间边界。Runtime Ready的application/management端口互异、URL与端口逐字段相等、raw ref/root containment及跨artifact exact join由语义verifier负责，不能仅凭JSON Schema通过认定READY；两份Schema存在不表示CLI、Runtime或144次调度已实现。
+8. `opm-dev-canvas-06-common-visual-adapter-test-input-bundle.schema.json`冻结受控03C测试输入Bundle `0.1/0.1.0`：同一原子root锁定exact source/Handoff/Java/Runtime、fresh Profile 5、Common 43、Plan 1242/72、Request `0.2`及144份Observed/测试PNG。Schema只封闭形状和基数；路径映射、raw/tree/package/binding及跨文件exact join必须由独立Builder/Verifier实现。Bundle READY不得进入Candidate、Authoring Report、approved root、Gate或production证据。
+9. Family Controlled Invocation闭包已冻结后继Schema `opm-dev-canvas-06-e2e-controlled-invocation-context.schema.json/0.1`及Runner Source Set `0.2/0.2.0/24`目标：Context承载194 case/388 attempt有序schedule，Source Set第20项纳入唯一production Playwright bridge。当前Schema bytes、producer/verifier、bridge和24项aggregate尚未实现；现存Source Set `0.1/23`只读，不能作为Final Stage R输入。
 
 ## 验证要求
 

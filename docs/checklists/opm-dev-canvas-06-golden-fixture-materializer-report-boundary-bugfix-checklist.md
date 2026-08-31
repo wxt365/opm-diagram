@@ -70,4 +70,4 @@
 - [x] 仅回退本规格允许的文档增量和版本说明。
 - [x] 不回退或覆盖工作树中的 Schema、Java、Node、测试及其他用户改动。
 
-> 历史快照说明（2026-08-07 更新指针）：本 checklist 只证明当时的Report接纳边界。当前唯一口径为Materializer `v1.5`、Verifier Catalog `v1.1`、Golden Authoring `v1.4`、Visual Common Materialization `v1.4`、Golden Environment `0.2`和冻结基线`v1.21`；后续契约必须按当前implementation checklist重验。
+> 历史快照说明（2026-08-26 更新指针）：本 checklist 只证明当时的Report接纳边界。当前唯一口径为Materializer `v1.5`、Verifier Catalog `v1.1`、Golden Authoring `v1.4`、Visual Common Materialization `v1.5`及03C Adapter/Fault闭包、Golden Environment `0.2`和冻结基线`v1.52`；后续契约必须按当前implementation checklist重验。

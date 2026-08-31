@@ -11,7 +11,7 @@
 
 ## Input Gate
 
-- [x] Golden Authoring `v1.4`、Visual Common Materialization `v1.4`、Materializer `v1.5` 和 Verifier Catalog `v1.1` 仍为 `FROZEN`。
+- [x] Golden Authoring `v1.4`、Visual Common Materialization `v1.5`及03C Adapter/Fault闭包、Materializer `v1.5` 和 Verifier Catalog `v1.1` 仍为 `FROZEN`。
 - [ ] 03A/03B verifier 已完成，candidate exact READY 且只读。
 - [ ] 外部 Applicant/Approver/reason/time/approval authority 可用。
 

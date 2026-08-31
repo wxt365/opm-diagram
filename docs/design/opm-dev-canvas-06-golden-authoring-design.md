@@ -20,7 +20,7 @@
 4. Visual Manifest/Report、`GATE-06-03`、Candidate 或 Activation 已 READY；
 5. 任一 Capability 已启用或 ISO 19450:2024 符合性已证明。
 
-当前已实现范围包括三类 `0.1` Schema、正反 contract test、`GOLDEN-AUTHORING-02` Capture Planner、`GOLDEN-AUTHORING-03A` Materializer `v1.5` 与 Verifier Catalog `v1.1` 63/63闭环，以及 Authoring Report、Approval Record、Golden Environment、Visual Manifest `0.2` Schema 的定向 contract test和只读 Environment verifier。03A的pending预验证、唯一四阶段quarantine、受控130项串行/并发4和完整contract/backend重验已通过；production 130项Materialization尚未执行。Visual Common Materialization `v1.4` 已冻结8 subject、唯一空Text Artifact、SQLite V1 `1/1/0`计数、144 fresh clone、normalized Projection、`srgb -> sRGB IEC61966-2.1`映射、五类index逐列映射、8类UI step/exact subject数组，以及`43=1 Catalog+8 Visual+32 E2E+2 source mirror`自包含输出树和唯一Node JCS owner/Node-Java parity vector；共享模块和向量已存在，02B/03C实现仍为`NOT_STARTED`。Family Identity Catalog适配、版本化Handoff及fixed postverify均已闭合，Family Materializer可进入实现；03B仍等待02B/03C。历史旧Bundle缺 replay report并继续被生产Planner拒绝；`clean-b940ac9bb734` Handoff/Bundle和历史Plan保持不可变，旧Common Projection使用`HISTORICAL_PLACEHOLDER`，不得供新03B消费。production 130项、Common 8 base/144 clone及下游authoring均未执行。
+当前已实现范围包括三类 `0.1` Schema、正反 contract test、`GOLDEN-AUTHORING-02` Capture Planner、`GOLDEN-AUTHORING-03A` Materializer `v1.5` 与 Verifier Catalog `v1.1` 63/63闭环，以及 Authoring Report、Approval Record、Golden Environment、Visual Manifest `0.2` Schema 的定向 contract test和只读 Environment verifier。03A的pending预验证、唯一四阶段quarantine、受控130项串行/并发4和完整contract/backend重验已通过；production 130项Materialization尚未执行。Visual Common Materialization `v1.5` 已冻结8 subject、唯一空Text Artifact、SQLite V1 `1/1/0`计数、五类index、8类UI step、43文件root、四份adapter/callback/result Schema、静态ESM/144次callback、独立one-shot fault port、normalized Projection、Color映射和JCS parity；当前只有局部未接纳的03C Java materializer字节，Node adapter、fault hook、8 base/144 clone及03C checklist未完成。Family Identity Catalog适配、版本化Handoff及fixed postverify均已闭合；03B仍等待03C。历史旧Bundle与Plan保持不可变且不得供新03B消费。production 130项、Common 8 base/144 clone及下游authoring均未执行。
 
 ## 2. 目标与边界
 
@@ -207,7 +207,7 @@ coverage_ref?, golden_manifest_ref?, golden_replay_ref?, symbol_ref?,
 common_fixture_catalog_ref?
 ```
 
-Family `expected_projection_sha256` 按对应 replay Projection 的 RFC 8785 JCS 计算；Common `expected_projection_sha256=sha256(JCS(fixture.expected_projection))`。Common JCS 只能通过 Visual Common Materialization `v1.4` 第 8.3 节冻结的 `scripts/canvas06-rfc8785.mjs` 计算，并由 Node/Java 共用 parity vector 验证；03B只消费02B/03C通过后的结果，不得复制 canonicalizer。Common 还必须满足 payload 深度闭包及 `expected_cells=committed_cells.length+transient_cells.length`，旧 `{subject_id,focus_target_id}` digest 固定为 `HISTORICAL_PLACEHOLDER` 并由新 author semantic preflight拒绝。文件 raw SHA 与派生 JCS SHA 不得混用。Capture Plan 不含 `golden_ref`、PNG SHA、像素结果或 observed 字段。
+Family `expected_projection_sha256` 按对应 replay Projection 的 RFC 8785 JCS 计算；Common `expected_projection_sha256=sha256(JCS(fixture.expected_projection))`。Common JCS 只能通过 Visual Common Materialization `v1.5` 第 8.3 节冻结的 `scripts/canvas06-rfc8785.mjs` 计算，并由 Node/Java 共用 parity vector 验证；03B只消费03C通过后的Schema-valid normalized result，不得复制 canonicalizer或重定义callback/result。Common 还必须满足 payload 深度闭包及 `expected_cells=committed_cells.length+transient_cells.length`，旧 `{subject_id,focus_target_id}` digest 固定为 `HISTORICAL_PLACEHOLDER` 并由新 author semantic preflight拒绝。文件 raw SHA 与派生 JCS SHA 不得混用。Capture Plan 不含 `golden_ref`、PNG SHA、像素结果或 observed 字段。
 
 ### 5.4 Plan digest
 
@@ -663,12 +663,12 @@ Golden Authoring 设计完成的定义是本文所有字段、算法、命令、
 
 1. 当前 Visual 基线是 `378` case、`756` attempt、`1242` capture、`2484` attempt capture；
 2. 当前 family exact coverage 是 `130` PASS、`48` BLOCKED，Visual family 只由 130 PASS 派生；
-3. 当前 Common Fixture Catalog 已有 `8` 个 Visual subject 和 `16` 个 E2E case，但8个Visual fixture仍是历史元数据形状，32个历史E2E资产不在活动02B输出根；Common Visual Fixture Schema已冻结，8个完整Visual、32个活动E2E、两份source mirror、43文件root及新Catalog producer/verifier为`NOT_STARTED`；
+3. 当前活动Common `0.2.0` 43文件root已完成self-verification，但统一production输入和真实Golden authoring不得由此推导；
 4. 当前 Capture Plan/Approval/Authoring Report `0.1` Schema 和 Capture Planner 已实现；03A Materialization Report `0.1` Schema、Materializer `v1.5`、pending预验证、唯一四阶段quarantine、Verifier Catalog `v1.1` 63/63与受控130项重验已闭环，production 130项尚未执行；
 5. 当前 Golden Environment `0.1` Schema 与生产 `0.2` Schema/离线 verifier 已实现；真实实体、browser/font 运行时验证和 PNG 不存在；
 6. 当前 Authoring Report/Approval Record/Golden Environment/Visual Manifest `0.2` Schema 已有定向 contract test；candidate author、approval/publisher、Visual builder、生产 Golden Verifier 和 approved evidence 未实现；
 7. 当前 Visual Manifest `0.1` Schema 没有 `golden_authoring_report_ref`，不能作为生产 Visual Gate Manifest；
-8. 当前 production Plan 的 Common digest 是 `HISTORICAL_PLACEHOLDER`；02B/03C/03B实现、8个base、144个clone和新Plan均不存在；
+8. 历史production Plan 的 Common digest仍是`HISTORICAL_PLACEHOLDER`且禁止新03B消费；03C已有局部未接纳Java materializer与fault hook字节，Node adapter未实现，fault hook未完成冻结范围和集成验收，8个base、144个clone、03B candidate和真实新production Plan均未完成；
 9. 当前 validation runner 的冻结边界是 golden 只读。
 
 ### 16.2 假设

@@ -4,9 +4,11 @@
 
 设计修正状态：`COMPLETE`
 
-后继状态：`SUPERSEDED_FOR_BUILD_BY_PREFLIGHT_DESCRIPTOR_CLOSURE`
+后继状态：`SUPERSEDED_FOR_BUILD_BY_FINAL_PRODUCTION_SOURCE_CHAIN`
 
-Build准入：`BLOCKED_BY_PREFLIGHT_DESCRIPTOR_CONTRACT_IMPLEMENTATION`
+Build准入：`HISTORICAL_NOT_CONSUMABLE`
+
+活动后继：`opm-dev-canvas-06-final-production-source-chain-closure-bugfix-task-spec.md`已把`0dcaa27...`降为历史不可消费origin，并从`9048bb3...`重新复算相同的36项raw-ref基线及集合摘要。本文36项字段表和两个controlled新增路径继续作为历史来源；活动A-stage allowlist已扩为`4=2 M+2 A`，两个Runner `M`只由后继规格授权。旧commit链和本文原`2 A` delta不得作为后继2A或Runner的Build输入。
 
 ## Task Type
 
@@ -22,13 +24,13 @@ Build准入：`BLOCKED_BY_PREFLIGHT_DESCRIPTOR_CONTRACT_IMPLEMENTATION`
 旧Fault Launcher实现规格把38个逻辑路径全部定义为可修改source delta，同时把clean base intake保留为`BLOCKED_BY_BASE_INTAKE`。当前Git事实已经变化：commit `0dcaa27a92693feaf28b731ebed2f81a9ccea02c`包含旧38项中的36项，只有以下两项不存在：
 
 ```text
-tests/e2e/release/dev-canvas-06/fault-launcher.controlled.spec.ts
+tests/e2e/release/dev-canvas-06/fault-launcher.controlled.release.spec.ts
 scripts/canvas06-e2e-fault-launcher-controlled.test.mjs
 ```
 
 继续按旧38项allowlist实现，会允许为补两个受控测试而静默改写已经进入clean base的36项产品、Runner和测试bytes，无法区分“补测试”与“修基线缺陷”。旧规格还只用自然语言记录controlled Playwright的`BLOCKED_BY_DEPENDENCY`，未冻结机器输出、依赖顺序、退出码和零执行边界。
 
-后继修正说明：本规格继续作为`0dcaa27...`与`36 READ_ONLY_BASELINE + 2 A`的历史冻结来源；当前受控输入、D10拆分和Build准入唯一以`opm-dev-canvas-06-e2e-fault-launcher-preflight-descriptor-and-gate-observation-closure-bugfix-task-spec.md`为准。后继contract commit形成新clean base前，不得从本规格的旧READY结论启动2A。
+后继修正说明：本规格继续作为`0dcaa27...`与`36 READ_ONLY_BASELINE + 2 A`的历史冻结来源；当前受控输入、D10拆分和Build准入以Preflight Descriptor/Gate Observation闭包及其Contract Base Schema Conformance后继规格为准。候选`63851f8...`因Schema conformance缺陷被拒绝，其`2 M` single-parent后继形成并接纳前，不得从本规格的旧READY结论启动2A。
 
 ## 2. Root Cause
 
@@ -104,7 +106,7 @@ commit对象存在不替代worktree clean证明；当前dirty main、既有relea
 只允许新增：
 
 ```text
-A tests/e2e/release/dev-canvas-06/fault-launcher.controlled.spec.ts
+A tests/e2e/release/dev-canvas-06/fault-launcher.controlled.release.spec.ts
 A scripts/canvas06-e2e-fault-launcher-controlled.test.mjs
 ```
 
@@ -184,117 +186,18 @@ baseline_raw_refs_sha256
 5. 只有新bugfix完成并形成新的clean base intake后，才能重开2A任务并重新计算36项基线集合；
 6. 禁止用测试内mock、skip、条件分支、动态patch、checkout fallback或放宽断言绕过基线缺陷。
 
-## 8. Controlled Playwright依赖与机器输出
+## 8. Controlled Playwright历史协议（已废止）
 
-### 8.1 唯一预检入口
+本章原有独立preflight CLI、`base_source_commit/candidate_source_commit`两段身份、Preflight Report `0.1`和“READY后由外部再启动Playwright”的协议已全部废止，不再构成Build输入。历史协议无法表达`origin -> contract -> 2A`三段source链，也没有controlled evidence output root。
 
-`scripts/canvas06-e2e-fault-launcher-controlled.test.mjs`必须同时承接Node定向测试和以下显式预检入口；不得修改`package.json`：
+活动唯一口径为后继`opm-dev-canvas-06-e2e-fault-launcher-preflight-descriptor-and-gate-observation-closure-bugfix-task-spec.md`第17章：
 
-```text
-node scripts/canvas06-e2e-fault-launcher-controlled.test.mjs --preflight \
-  --source-root <absolute-clean-final-source-root> \
-  --controlled-bundle-root <absolute-read-only-e2e-controlled-bundle-root> \
-  --manifest-root <absolute-read-only-manifest-v02-root> \
-  --manifest dev-canvas-06-e2e-manifest.json \
-  --java-home <absolute-jdk21-home> \
-  --browser-executable <absolute-chromium-143.0.7499.4-file> \
-  --fixed-handoff <absolute-current-fixed-handoff-json> \
-  --production-activation-root <absolute-read-only-production-activation-input-root> \
-  --attempt-parent <absolute-fresh-attempt-parent> \
-  --process-control-parent <absolute-fresh-control-parent>
-```
-
-参数必须各恰好一次；拒绝未知、重复、空值、`--x=y`、位置参数、相对路径和root包含。参数形状错误返回`2`且零机器状态；依赖缺失属于可报告阻断，不能退化为参数错误。
-
-### 8.2 十项可执行前置
-
-`dependency_results[]`顺序固定如下：
-
-| dependency_id | READY条件 | 非READY detail_code |
-| --- | --- | --- |
-| `FLCP-D01-SOURCE` | source HEAD为single-parent 2A commit，parent=`0dcaa27...`，porcelain为空 | `SOURCE_COMMIT_NOT_READY` |
-| `FLCP-D02-BASELINE` | 36项raw ref及集合SHA逐项相等 | `BASELINE_RAW_REF_DRIFT` |
-| `FLCP-D03-RUNTIME` | JDK 21、JarIT已通过、Manifest final exact Runtime JAR raw ref闭合 | `RUNTIME_JAR_NOT_READY` |
-| `FLCP-D04-BUNDLE` | E2E controlled bundle完整通过既有verifier，`approved_version_ref=null` | `CONTROLLED_BUNDLE_NOT_READY` |
-| `FLCP-D05-MANIFEST` | Manifest `0.2/0.2.0`有效、source commit等于2A commit、三个fault case与两次attempt schedule闭合 | `MANIFEST_V02_NOT_READY` |
-| `FLCP-D06-WEB` | Manifest production Web tree闭合，无Vite/HMR/checkout fallback | `PRODUCTION_WEB_NOT_READY` |
-| `FLCP-D07-BROWSER` | Playwright `1.57.0`、Chromium `143.0.7499.4`普通文件及raw SHA闭合 | `BROWSER_NOT_READY` |
-| `FLCP-D08-ORCHESTRATION` | `prepareControlledAttempt`、fault launch/READY、Common driver和INITIAL/REOPEN路径均来自基线raw refs | `ORCHESTRATION_NOT_READY` |
-| `FLCP-D09-ISOLATION` | attempt/control parents fresh且物理隔离，loopback端口可用，零既有listener/storage | `ISOLATION_NOT_READY` |
-| `FLCP-D10A-GATE-PREFLIGHT` | Bundle `0.2`锁定的执行前快照与parent当前只读观测exact相等，均为`DISABLED + [] + NOT_ACTIVE` | `PRODUCTION_GATE_PREFLIGHT_MISMATCH` |
-
-三类case固定为`ASSET_MISSING/PERSISTENCE_FAILED/READONLY`，每类两个fresh attempt，每个attempt执行`INITIAL`与same-storage新进程`REOPEN`，因此预期`6 attempts/12 process cycles`。任一依赖非READY时禁止启动任何cycle。
-
-`FLCP-D10B-GATE-EXECUTION`不属于上述十项preflight dependency。它由Playwright执行artifact记录`1 BEFORE + 12 DURING + 1 AFTER`共14项Gate观测；任一漂移固定为`PRODUCTION_GATE_MUTATED_DURING_CONTROLLED_RUN`并立即停止后续cycle。完整字段、摘要和首错规则只以后继Preflight Descriptor/Gate Observation闭包规格为准。
-
-### 8.3 封闭机器对象
-
-预检stdout唯一为`RFC8785_JCS(report) + LF`。report顶层字段及顺序语义固定为：
-
-```text
-schema_id
-schema_version
-status
-base_source_commit
-candidate_source_commit
-baseline_raw_refs_sha256
-implementation_delta
-dependency_results
-blocking_dependency_ids
-playwright_command
-report_payload_sha256
-```
-
-字段契约：
-
-| 字段 | 唯一规则 |
-| --- | --- |
-| `schema_id` | `OPM-DEV-CANVAS-06-E2E-FAULT-LAUNCHER-CONTROLLED-PREFLIGHT-001` |
-| `schema_version` | `0.1` |
-| `status` | `BLOCKED_BY_DEPENDENCY`或`READY_TO_RUN` |
-| `base_source_commit` | 完整`0dcaa27...` |
-| `candidate_source_commit` | 已验证2A commit的40位SHA；无法取得时为`null` |
-| `baseline_raw_refs_sha256` | 固定`69491a...b411e` |
-| `implementation_delta` | 两个固定path的封闭数组，每项`path/expected_status=A/observed_status`；observed只允许`A/ABSENT/DRIFT` |
-| `dependency_results` | 恰10项，每项封闭为`dependency_id/status/detail_code/evidence_refs`；status只允许`READY/MISSING/MISMATCH`，READY时`detail_code=READY` |
-| `blocking_dependency_ids` | 全部非READY依赖ID，保持D01~D09、D10A顺序，无重复 |
-| `playwright_command` | BLOCKED时为`null`；READY时为第8.4节token数组 |
-| `report_payload_sha256` | SHA-256(JCS(删除本字段后的report)) |
-
-`evidence_refs[]`只允许`path/byte_length/sha256`普通file ref或既有封闭tree ref；不存在的证据使用空数组，不得使用占位SHA、路径字符串冒充ref或从checkout fallback。
-
-### 8.4 BLOCKED与READY边界
-
-任一依赖非READY：
-
-```text
-status=BLOCKED_BY_DEPENDENCY
-runnable=false（由status和blocking_dependency_ids推导，不新增字段）
-playwright_command=null
-exit=3
-stderr第一行=E2E_FAULT_LAUNCHER_CONTROLLED_BLOCKED\tDEPENDENCY_PREFLIGHT
-```
-
-此时只允许读取输入并输出机器对象；必须零Runtime/Web/Browser子进程、零SQLite、零attempt/control目录创建、零Manifest/Report/release文件写入。`BLOCKED_BY_DEPENDENCY`不是PASS、skip或实现完成证据。
-
-十项全部READY时：
-
-```text
-status=READY_TO_RUN
-blocking_dependency_ids=[]
-exit=0
-playwright_command=[
-  "node",
-  "node_modules/@playwright/test/cli.js",
-  "test",
-  "tests/e2e/release/dev-canvas-06/fault-launcher.controlled.spec.ts",
-  "--config=tests/e2e/release/dev-canvas-06/playwright.release.config.ts",
-  "--workers=1",
-  "--retries=0"
-]
-```
-
-READY只授权父Runner执行该命令，不表示Playwright已经通过。测试内禁止`skip/fixme/only/retry`、dev server、Vite/HMR、mock产品错误或observed反填。实际通过必须取得三类case、6 attempts、12 cycles、零skip/retry和既有Artifact/事务/REOPEN断言。
+1. 单一`--run-controlled`命令完成preflight与execution；
+2. actual Manifest由`--manifest-root`和固定basename传入，并先通过活动v02 controlled verifier；
+3. D05区分Manifest三个case字段与Descriptor两次attempt/12 cycle；
+4. Preflight Report活动版本为`0.2`，记录origin/contract/candidate三段身份；
+5. D10B写入由Manifest/Descriptor raw SHA确定的fresh controlled evidence root，并执行staging/installed双重验证；
+6. 本规格第4至7章的origin base、36项raw ref和`2 A`边界继续有效，任何旧CLI或Report字段均不得实现。
 
 ## 9. 验收与验证
 
@@ -323,7 +226,7 @@ git diff --check
 
 回滚本设计修正后必须恢复Fault Launcher切片为`BLOCKED_BY_ALLOWLIST_AMBIGUITY`，不得恢复“38项均可修改”路线后继续Build。
 
-本规格完成只冻结36项基线和2A逻辑边界；后继descriptor contract未实现前，2A不得进入Build。当前contract、2A、controlled Playwright、production `194/388`、E2E Report、`GATE-06-03`、Candidate、Activation、Capability、production和ISO证据均为`NOT_CREATED/NOT_RUN`。
+本规格完成只冻结36项基线和2A逻辑边界；候选contract `63851f8...`已形成但不可接纳，其Schema conformance后继base未实现前，2A不得进入Build。当前conformant successor、2A、controlled Playwright、production `194/388`、E2E Report、`GATE-06-03`、Candidate、Activation、Capability、production和ISO证据均为`NOT_CREATED/NOT_RUN`。
 
 ## 11. 事实与待实现
 
@@ -337,4 +240,4 @@ git diff --check
 
 ### 11.2 待实现
 
-2A final commit、两个新增raw ref、2A patch SHA、真实preflight机器对象和controlled Playwright结果只能由后继实现产生，不得在设计文档中预填。
+Schema conformance后继base、2A final commit、两个新增raw ref、2A patch SHA、真实preflight机器对象和controlled Playwright结果只能由后继实现产生，不得在设计文档中预填。

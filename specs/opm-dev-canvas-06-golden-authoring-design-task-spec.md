@@ -103,4 +103,4 @@
 
 无。机器资产名称、版本、目录、状态和算法均在本任务内作为设计决定冻结。
 
-> 历史快照说明（2026-08-07 更新指针）：本规格记录首轮设计冻结当时状态。当前状态以Golden Authoring `v1.4`、Visual Common Materialization `v1.4`、Fixture Materializer `v1.5`、Verifier Catalog `v1.1`和冻结基线`v1.21`为准；共享Node JCS模块/vector已存在，02B/03C仍未实现且03B等待依赖，不得用本历史Spec覆盖当前分栏状态。
+> 历史快照说明（2026-08-26 更新指针）：本规格记录首轮设计冻结当时状态。当前状态以Golden Authoring `v1.4`、Visual Common Materialization `v1.5`及03C Adapter/Fault闭包、Fixture Materializer `v1.5`、Verifier Catalog `v1.1`和冻结基线`v1.52`为准；03C只有局部未接纳Java字节，Node adapter/fault/8 base/144 clone未完成且03B等待依赖，不得用本历史Spec覆盖当前分栏状态。

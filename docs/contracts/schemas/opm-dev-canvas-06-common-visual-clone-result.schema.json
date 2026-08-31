@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:opm:contract:dev-canvas-06-common-visual-clone-result:0.1",
+  "title": "OPM DEV-CANVAS-06 Common Visual Clone Result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_id", "schema_version", "result_version", "status", "request_id", "capture_id", "subject_id",
+    "attempt_ordinal", "source_date_epoch", "base_attestation_ref", "base_database_ref",
+    "base_tree_sha256_before", "base_tree_sha256_after", "attempt_database_ref", "attempt_tree_sha256",
+    "result_payload_sha256"
+  ],
+  "properties": {
+    "schema_id": {"const": "OPM-DEV-CANVAS-06-COMMON-VISUAL-CLONE-RESULT-001"},
+    "schema_version": {"const": "0.1"},
+    "result_version": {"const": "0.1.0"},
+    "status": {"const": "READY_FOR_RUNTIME"},
+    "request_id": {"type": "string", "pattern": "^dev-canvas-06\\.common-visual-adapter\\.[A-Za-z0-9._-]+$"},
+    "capture_id": {"type": "string", "minLength": 1},
+    "subject_id": {"$ref": "#/$defs/subject"},
+    "attempt_ordinal": {"enum": [1, 2]},
+    "source_date_epoch": {"type": "integer", "minimum": 0},
+    "base_attestation_ref": {"allOf": [{"$ref": "#/$defs/fileRef"}, {"type": "object", "properties": {"kind": {"const": "COMMON_BASE_ATTESTATION"}}}]},
+    "base_database_ref": {"allOf": [{"$ref": "#/$defs/fileRef"}, {"type": "object", "properties": {"kind": {"const": "PROJECT_DB"}}}]},
+    "base_tree_sha256_before": {"$ref": "#/$defs/digest"},
+    "base_tree_sha256_after": {"$ref": "#/$defs/digest"},
+    "attempt_database_ref": {"allOf": [{"$ref": "#/$defs/fileRef"}, {"type": "object", "properties": {"kind": {"const": "PROJECT_DB"}}}]},
+    "attempt_tree_sha256": {"$ref": "#/$defs/digest"},
+    "result_payload_sha256": {"$ref": "#/$defs/digest"}
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "logicalPath": {"type": "string", "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*//).+$"},
+    "subject": {"enum": ["STATE_ROLES", "LONG_LABELS", "FUNDAMENTAL_FAN", "CANDIDATE_LAYER", "INSPECTOR", "TOOLCHAIN_CATALOG", "FINDING_FOCUS", "BLOCKED_FEEDBACK"]},
+    "fileRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "path", "byte_length", "sha256"],
+      "properties": {
+        "kind": {"type": "string", "minLength": 1},
+        "path": {"$ref": "#/$defs/logicalPath"},
+        "byte_length": {"type": "integer", "minimum": 1},
+        "sha256": {"$ref": "#/$defs/digest"}
+      }
+    }
+  }
+}

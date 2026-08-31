@@ -1,3 +1,6 @@
+import { copyFile, lstat, mkdir, open, readFile, rm } from 'node:fs/promises';
+import { dirname, relative, resolve, sep } from 'node:path';
+
 /** 活动 E2E Manifest 0.2 的唯一 CLI 与矩阵守卫。 */
 export class E2eManifestV02Error extends Error {
   constructor(code, stage, message) {
@@ -10,7 +13,7 @@ export class E2eManifestV02Error extends Error {
 }
 
 const PRODUCER_COMMON = Object.freeze(['input-mode', 'source-root', 'source-date-epoch', 'common-fixture-root', 'profile-asset-root', 'output-root', 'out']);
-const VERIFIER_COMMON = Object.freeze(['input-mode', 'manifest-root', 'manifest', 'profile-asset-root']);
+const VERIFIER_COMMON = Object.freeze(['input-mode', 'source-root', 'manifest-root', 'manifest', 'profile-asset-root']);
 const PRODUCTION = Object.freeze(['handoff-root', 'intake-report', 'require-production']);
 const CONTROLLED = Object.freeze(['controlled-bundle-root']);
 const DRIVER_CATALOG = Object.freeze([
@@ -18,6 +21,14 @@ const DRIVER_CATALOG = Object.freeze([
   ['DRIVER-CONTROL', 'inputs/drivers/control-driver.mjs'],
   ['DRIVER-STRUCTURAL', 'inputs/drivers/structural-driver.mjs'],
   ['DRIVER-COMMON', 'inputs/drivers/common-driver.mjs']
+]);
+
+export const PROFILE_SOURCE_ASSETS = Object.freeze([
+  ['packages/profiles/profile.iso19450.2024.draft/0.2.0/profile.json', 'profile.json'],
+  ['packages/profiles/profile.iso19450.2024.draft/0.2.0/rules/representative-rule-set.json', 'rules/representative-rule-set.json'],
+  ['packages/profiles/profile.iso19450.2024.draft/0.2.0/grammar/representative-opl-grammar.json', 'grammar/representative-opl-grammar.json'],
+  ['packages/profiles/profile.iso19450.2024.draft/0.2.0/symbols/representative-symbol-catalog.json', 'symbols/representative-symbol-catalog.json'],
+  ['packages/profiles/profile.iso19450.2024.draft/0.2.0/normalization/representative-normalization.json', 'normalization/representative-normalization.json']
 ]);
 
 export function parseProducerOptions(argv) {
@@ -85,6 +96,41 @@ export function assertCaseDriverClosure(cases) {
   }
 }
 
+/** 从 clean source 的五个分散资产逐字节创建唯一的临时 Profile 根。 */
+export async function materializeProfileAssetStaging({ sourceRoot, stagingRoot }) {
+  const source = resolve(sourceRoot);
+  const target = resolve(stagingRoot);
+  if (overlaps(source, target)) fail('E2E_MANIFEST_TRANSACTION_INVALID', 'PROFILE_STAGING', 'profile-asset-root must not overlap source-root.');
+  await requireAbsent(target, 'PROFILE_STAGING');
+  try {
+    await mkdir(target, { recursive: false });
+    for (const [sourcePath, logicalPath] of PROFILE_SOURCE_ASSETS) {
+      const input = inside(source, sourcePath);
+      const output = inside(target, logicalPath);
+      await assertSingleFile(input, 'PROFILE_5_RAW');
+      await mkdir(dirname(output), { recursive: true });
+      await copyFile(input, output, COPYFILE_EXCL);
+      await assertSingleFile(output, 'PROFILE_STAGING');
+      const [left, right] = await Promise.all([readFile(input), readFile(output)]);
+      if (!left.equals(right)) fail('E2E_MANIFEST_PROFILE_ASSET_INVALID', 'PROFILE_STAGING', `Profile asset copy differs: ${logicalPath}.`);
+    }
+    await fsyncProfileTree(target);
+  } catch (error) {
+    await rm(target, { recursive: true, force: true });
+    throw error;
+  }
+  return target;
+}
+
+export async function removeProfileAssetStaging(stagingRoot) {
+  const target = resolve(stagingRoot);
+  try {
+    await rm(target, { recursive: true, force: false });
+    await fsync(target === dirname(target) ? target : dirname(target));
+  }
+  catch { fail('E2E_MANIFEST_IO_FAILED', 'PROFILE_STAGING_CLEANUP', 'Profile staging root cannot be removed.'); }
+}
+
 function parseOptions(argv, common, role) {
   const values = new Map();
   const allowed = new Set([...common, ...PRODUCTION, ...CONTROLLED]);
@@ -114,6 +160,58 @@ function parseOptions(argv, common, role) {
   for (const name of inactive) if (values.has(name)) fail('E2E_MANIFEST_INPUT_CLASS_INVALID', 'MODE', `--${name} is invalid for ${mode}.`);
   if (role === 'producer') formatSourceDateEpoch(values.get('source-date-epoch'));
   return Object.freeze(Object.fromEntries(values));
+}
+
+const COPYFILE_EXCL = 1;
+
+async function requireAbsent(path, stage) {
+  try {
+    await lstat(path);
+    fail('E2E_MANIFEST_TRANSACTION_INVALID', stage, 'Target must not exist before this invocation.');
+  } catch (error) {
+    if (error?.code !== 'ENOENT') throw error;
+  }
+}
+
+async function assertSingleFile(path, stage) {
+  try {
+    const details = await lstat(path);
+    if (details.isSymbolicLink() || !details.isFile() || details.nlink !== 1) throw new Error('unsafe');
+  } catch {
+    fail('E2E_MANIFEST_PROFILE_ASSET_INVALID', stage, 'Profile asset must be a single-link regular file.');
+  }
+}
+
+async function fsyncProfileTree(root) {
+  const directories = new Set([root]);
+  for (const [, logicalPath] of PROFILE_SOURCE_ASSETS) {
+    const path = inside(root, logicalPath);
+    directories.add(dirname(path));
+    await fsync(path);
+  }
+  for (const path of [...directories].sort((left, right) => right.length - left.length)) await fsync(path);
+}
+
+async function fsync(path) {
+  try {
+    const handle = await open(path, 'r');
+    try { await handle.sync(); } finally { await handle.close(); }
+  } catch {
+    fail('E2E_MANIFEST_IO_FAILED', 'PROFILE_STAGING', 'Profile staging fsync failed.');
+  }
+}
+
+function inside(root, value) {
+  const target = resolve(root, value);
+  const relation = relative(root, target);
+  if (!relation || relation === '..' || relation.startsWith(`..${sep}`)) fail('E2E_MANIFEST_ARGUMENT_INVALID', 'ARGS', 'Path escapes its root.');
+  return target;
+}
+
+function overlaps(left, right) {
+  const a = resolve(left);
+  const b = resolve(right);
+  return a === b || a.startsWith(`${b}${sep}`) || b.startsWith(`${a}${sep}`);
 }
 
 function exitCodeFor(code) {
