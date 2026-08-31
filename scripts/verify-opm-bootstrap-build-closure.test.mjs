@@ -46,6 +46,28 @@ test('SOURCE 拒绝 module Bootstrap、派生配置和错误 Node', async t => {
   );
 });
 
+test('仅跳过四个精确非构建根，仍拒绝其他 ignored 输入', async t => {
+  const root = await createFixture();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  for (const path of ['.codegraph/codegraph.db', '.codex/README.md', '.harness/repo-profile.md', 'reference/ISO+19450-2024.pdf']) {
+    await writeFixture(root, path, 'local-only');
+  }
+  await verifyBootstrapBuildClosure({ root, phase: 'SOURCE', nodeVersion: 'v22.22.0', npmVersion: '10.9.4' });
+  await writeFixture(root, '.DS_Store', 'finder-metadata');
+  await assert.rejects(
+    verifyBootstrapBuildClosure({ root, phase: 'SOURCE', nodeVersion: 'v22.22.0', npmVersion: '10.9.4' }),
+    error => error instanceof BootstrapBuildClosureError && error.code === 'BOOTSTRAP_BUILD_DERIVED_OUTPUT_INVALID' && error.stage === 'INVENTORY'
+  );
+  await rm(resolve(root, '.DS_Store'));
+  await writeFixture(root, '.local-production-ignore', 'ignored-local');
+  await writeFile(resolve(root, '.gitignore'), 'node_modules/\napps/web/dist/\nservices/**/target/\n.codegraph/\n.codex\n.harness\nreference/\n.local-production-ignore\n');
+  await commitAll(root, 'ignore local metadata');
+  await assert.rejects(
+    verifyBootstrapBuildClosure({ root, phase: 'SOURCE', nodeVersion: 'v22.22.0', npmVersion: '10.9.4' }),
+    error => error instanceof BootstrapBuildClosureError && error.code === 'BOOTSTRAP_BUILD_DERIVED_OUTPUT_INVALID' && error.stage === 'INVENTORY'
+  );
+});
+
 test('POST 拒绝 dist Bootstrap 资产或 inline response', async t => {
   const root = await createFixture();
   t.after(() => rm(root, { recursive: true, force: true }));
@@ -61,7 +83,7 @@ const SOURCE_HTML = '<div id="app"></div><script src="/opm-bootstrap.js"></scrip
 
 async function createFixture() {
   const root = await mkdtemp(resolve(tmpdir(), 'opm-bootstrap-build-'));
-  await writeFixture(root, '.gitignore', 'node_modules/\napps/web/dist/\nservices/**/target/\n');
+  await writeFixture(root, '.gitignore', 'node_modules/\napps/web/dist/\nservices/**/target/\n.codegraph/\n.codex\n.harness\nreference/\n');
   await writeFixture(root, 'package.json', '{"packageManager":"npm@10.9.4"}');
   await writeFixture(root, 'package-lock.json', '{}');
   await writeFixture(root, 'apps/web/index.html', SOURCE_HTML);

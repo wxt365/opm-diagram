@@ -15,6 +15,7 @@ const CRITICAL_SOURCE_FILES = Object.freeze([
   'apps/web/src/env.d.ts'
 ]);
 const FORBIDDEN_CONFIG_OUTPUTS = Object.freeze(['apps/web/vite.config.js', 'apps/web/vite.config.d.ts']);
+const NON_BUILD_ROOTS = new Set(['.codegraph', '.codex', '.harness', 'reference']);
 
 export class BootstrapBuildClosureError extends Error {
   constructor(code, stage, message) {
@@ -111,6 +112,7 @@ async function assertDerivedRootsAbsent(root) {
 async function assertTreeClosed(root, tracked) {
   await visit(root, '', async (path, info, logicalPath) => {
     if (logicalPath === '.git' || logicalPath.startsWith('.git/')) return false;
+    if (isNonBuildPath(logicalPath)) return false;
     if (isAllowedDerivedPath(logicalPath)) return false;
     if (info.isSymbolicLink() || (info.isFile() && info.nlink !== 1)) fail('BOOTSTRAP_BUILD_DERIVED_OUTPUT_INVALID', 'INVENTORY', `source 范围存在非普通单链接实体：${logicalPath}`);
     if (info.isFile() && !tracked.has(logicalPath)) fail('BOOTSTRAP_BUILD_DERIVED_OUTPUT_INVALID', 'INVENTORY', `allowlist 外存在非跟踪实体：${logicalPath}`);
@@ -188,6 +190,10 @@ function isAllowedDerivedPath(path) {
     || path === 'apps/web/node_modules' || path.startsWith('apps/web/node_modules/')
     || path === 'apps/web/dist' || path.startsWith('apps/web/dist/')
     || /^services\/[^/]+\/target(?:\/|$)/.test(path);
+}
+
+function isNonBuildPath(path) {
+  return NON_BUILD_ROOTS.has(path.split('/', 1)[0]);
 }
 
 async function assertSingleLinkRegularFile(path, code, stage) {
