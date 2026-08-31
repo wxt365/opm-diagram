@@ -3456,14 +3456,60 @@ export function createFamilyObservationSink({
         || reopenMode && reopen_expectation !== null && reopenVerificationState !== 'VERIFIED'
         || requiresPrecondition && !(commonMutationComplete || commonDirectComplete || familyComplete)
         || !requiresPrecondition && !reopenMode && preconditionState !== 'READY') {
+      const proofState = familyProofState({
+        bound, confirmed, pendingCaptureError, pendingCaptures, waiters, networkRequests,
+        reopenMode, subjectBeforeState, subjectTransactionBaselineRevision, commonMode,
+        resolvedSetupBaseline, reopen_expectation, reopenVerificationState, requiresPrecondition,
+        preconditionState, preconditionComplete: commonMutationComplete || commonDirectComplete || familyComplete
+      });
       close();
-      browserProofFailure('Family handler settled without complete Browser/API proof.');
+      const error = browserProofFailureValue('Family handler settled without complete Browser/API proof.');
+      error.proof_state = proofState;
+      throw error;
     }
     finalizedNetworkRequests = deepFreeze(structuredClone(networkRequests));
     finalizedNetworkCounters = deepFreeze({ ...networkCounters });
     finalizedConsoleEvents = deepFreeze(structuredClone(consoleEvents));
     close();
   }
+}
+
+function familyProofState({
+  bound, confirmed, pendingCaptureError, pendingCaptures, waiters, networkRequests,
+  reopenMode, subjectBeforeState, subjectTransactionBaselineRevision, commonMode,
+  resolvedSetupBaseline, reopen_expectation, reopenVerificationState, requiresPrecondition,
+  preconditionState, preconditionComplete
+}) {
+  const state = {
+    bound: bound !== null,
+    confirmed,
+    sentinel_active: bound?.sentinel_active === true,
+    late_event_detected: bound?.late_event_detected === true,
+    pending_capture_count: pendingCaptures.size,
+    pending_capture_error: pendingCaptureError !== null,
+    waiter_count: waiters.length,
+    unresolved_network_count: networkRequests.filter(item => item.status === null && item.failure_code === null).length,
+    reopen_mode: reopenMode,
+    subject_before_bound: subjectBeforeState !== null,
+    subject_baseline_matches: subjectBeforeState?.revision_id === subjectTransactionBaselineRevision,
+    common_mode: commonMode,
+    resolved_setup_baseline: resolvedSetupBaseline !== null,
+    reopen_expectation_required: reopen_expectation !== null,
+    reopen_verification_state: proofStateCode(reopenVerificationState, ['NOT_REQUIRED', 'READY', 'IN_FLIGHT', 'VERIFIED', 'FAILED']),
+    requires_precondition: requiresPrecondition,
+    precondition_state: proofStateCode(preconditionState, ['READY', 'IN_FLIGHT', 'CONSUMED', 'CLOSED']),
+    precondition_complete: preconditionComplete
+  };
+  if (Object.values(state).some(value => typeof value !== 'boolean' && (!Number.isSafeInteger(value) || value < 0))) {
+    throw evidenceTransaction('Family proof diagnostic state is invalid.');
+  }
+  return Object.freeze(state);
+}
+
+function proofStateCode(value, values) {
+  const index = values.indexOf(value);
+  if (index < 0) throw evidenceTransaction('Family proof diagnostic enum is invalid.');
+  return index;
 }
 
 export async function writeFamilyApiExchangeIndex({ attempt_root, case_id, attempt_ordinal, exchanges, precondition_receipts }) {

@@ -1409,7 +1409,17 @@ test('Family REOPEN sink一次性复核exact Runtime JAR五类StateDigests', asy
   await assert.rejects(() => failedSink.api.verifyReopen(), error => error.code === 'EVIDENCE_TRANSACTION');
   failedBrowser.closeTree();
   await failedSink.api.confirmBrowserClosed(failedBrowser.refs);
-  await assert.rejects(() => failedSink.finalizeProof(), error => error.code === 'E2E_ORCHESTRATION_BROWSER_PROOF_INVALID');
+  await assert.rejects(() => failedSink.finalizeProof(), error => {
+    assert.equal(error.code, 'E2E_ORCHESTRATION_BROWSER_PROOF_INVALID');
+    assert.deepEqual(error.proof_state, {
+      bound: true, confirmed: true, sentinel_active: true, late_event_detected: false,
+      pending_capture_count: 0, pending_capture_error: false, waiter_count: 0, unresolved_network_count: 0,
+      reopen_mode: true, subject_before_bound: false, subject_baseline_matches: false, common_mode: true,
+      resolved_setup_baseline: false, reopen_expectation_required: true, reopen_verification_state: 4,
+      requires_precondition: false, precondition_state: 0, precondition_complete: false
+    });
+    return Object.isFrozen(error.proof_state);
+  });
 });
 
 test('Family Browser Context拒绝版本漂移且INITIAL与REOPEN身份独立', async () => {
@@ -1438,7 +1448,7 @@ test('Family Browser Context拒绝版本漂移且INITIAL与REOPEN身份独立', 
   drift.refs.browser.version = () => '143.0.7499.5';
   assert.throws(
     () => initial.api.attachBrowserPage(drift.page),
-    error => error.code === 'E2E_ORCHESTRATION_BROWSER_PROOF_INVALID' && error.exitCode === 4
+    error => error.code === 'E2E_ORCHESTRATION_BROWSER_PROOF_INVALID' && error.exitCode === 4 && error.proof_state === undefined
   );
 });
 
