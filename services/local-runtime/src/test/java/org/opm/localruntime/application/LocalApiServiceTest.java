@@ -309,7 +309,7 @@ class LocalApiServiceTest {
         String currentRevision = revision;
         ApiException duplicate = assertThrows(ApiException.class, () -> service.edit(projectId, modelId, contextId,
                 editRequest("request.control.duplicate.001", "command.control.duplicate.001", currentRevision, "UPDATE_FACT", update)));
-        assertEquals(ApiErrorCode.DOMAIN_REJECTED, duplicate.code());
+        assertEquals(ApiErrorCode.MODIFIER_COMBINATION_INVALID, duplicate.code());
     }
 
     @Test
@@ -352,14 +352,14 @@ class LocalApiServiceTest {
         String effectRevision = revision;
         ApiException processOutput = assertThrows(ApiException.class, () -> service.edit(projectId, modelId, contextId,
                 editRequest("request.control-guard.process-output.001", "command.control-guard.process-output.001", effectRevision, "UPDATE_FACT", update)));
-        assertEquals(ApiErrorCode.DOMAIN_REJECTED, processOutput.code());
+        assertEquals(ApiErrorCode.MODIFIER_COMBINATION_INVALID, processOutput.code());
 
         update.put("replacement", map("modifiers", List.of(
                 map("modifier_id", "control.capability", "value", "CAP-ISO-CTRL-002"),
                 map("modifier_id", "control.segment", "value", "PROCESS_INPUT"))));
         ApiException baseMismatch = assertThrows(ApiException.class, () -> service.edit(projectId, modelId, contextId,
                 editRequest("request.control-guard.base-mismatch.001", "command.control-guard.base-mismatch.001", effectRevision, "UPDATE_FACT", update)));
-        assertEquals(ApiErrorCode.DOMAIN_REJECTED, baseMismatch.code());
+        assertEquals(ApiErrorCode.MODIFIER_COMBINATION_INVALID, baseMismatch.code());
 
         update.put("replacement", map("modifiers", List.of(
                 map("modifier_id", "control.capability", "value", "CAP-ISO-CTRL-001"),
@@ -367,7 +367,7 @@ class LocalApiServiceTest {
                 map("modifier_id", "control.segment", "value", "PROCESS_INPUT"))));
         ApiException eventAndCondition = assertThrows(ApiException.class, () -> service.edit(projectId, modelId, contextId,
                 editRequest("request.control-guard.event-condition.001", "command.control-guard.event-condition.001", effectRevision, "UPDATE_FACT", update)));
-        assertEquals(ApiErrorCode.DOMAIN_REJECTED, eventAndCondition.code());
+        assertEquals(ApiErrorCode.MODIFIER_COMBINATION_INVALID, eventAndCondition.code());
 
         revision = committed(service.edit(projectId, modelId, contextId, editRequest("request.control-guard.advance.001", "command.control-guard.advance.001", revision,
                 "CREATE_ELEMENT", map("kind", "OBJECT", "element_id", "element.control-guard.advance.001", "name", "Advance", "layout", map("x", 40, "y", 180)))));
@@ -378,6 +378,64 @@ class LocalApiServiceTest {
         ApiException staleOption = assertThrows(ApiException.class, () -> service.edit(projectId, modelId, contextId,
                 editRequest("request.control-guard.stale-option.001", "command.control-guard.stale-option.001", advancedRevision, "UPDATE_FACT", update)));
         assertEquals(ApiErrorCode.DOMAIN_REJECTED, staleOption.code());
+    }
+
+    @Test
+    void mapsOnlyFrozenStructuralModifierCombinationsToTheirStableCode() {
+        LocalApiService service = new LocalApiService(new ProjectDatabaseFactory(temporaryDirectory));
+        String projectId = string(data(service.createProject(projectRequest("request.project.structural-errors.001", "command.project.structural-errors.001"))).get("project_id"));
+        Map<String, Object> model = data(service.createModel(projectId, modelRequest("request.model.structural-errors.001", "command.model.structural-errors.001")));
+        String modelId = string(model.get("model_id"));
+        String revision = string(model.get("head_revision"));
+        String contextId = string(data(service.workspace("request.workspace.structural-errors.001", projectId, modelId)).get("root_context_id"));
+        for (String suffix : List.of("source", "target")) {
+            revision = committed(service.edit(projectId, modelId, contextId, editRequest("request.structural-errors.object." + suffix,
+                    "command.structural-errors.object." + suffix, revision, "CREATE_ELEMENT",
+                    map("kind", "OBJECT", "element_id", "element.structural-errors." + suffix, "name", suffix, "layout", map("x", 40, "y", 40)))));
+        }
+        List<String> objectEndpoints = List.of("element.structural-errors.source", "element.structural-errors.target");
+        String structuralRevision = revision;
+
+        Map<String, Object> missingForward = structuralFactPayload(service, projectId, modelId, revision, contextId,
+                "CAP-ISO-STRUCT-001", "fact.structural-errors.001", objectEndpoints, List.of(), "NOT_APPLICABLE");
+        ApiException forward = assertThrows(ApiException.class, () -> service.edit(projectId, modelId, contextId,
+                editRequest("request.structural-errors.001", "command.structural-errors.001", structuralRevision, "CREATE_FACT", missingForward)));
+        assertEquals(ApiErrorCode.MODIFIER_COMBINATION_INVALID, forward.code());
+
+        Map<String, Object> missingReverse = structuralFactPayload(service, projectId, modelId, revision, contextId,
+                "CAP-ISO-STRUCT-003", "fact.structural-errors.003", objectEndpoints, List.of(), "NOT_APPLICABLE");
+        ApiException reverse = assertThrows(ApiException.class, () -> service.edit(projectId, modelId, contextId,
+                editRequest("request.structural-errors.003", "command.structural-errors.003", structuralRevision, "CREATE_FACT", missingReverse)));
+        assertEquals(ApiErrorCode.MODIFIER_COMBINATION_INVALID, reverse.code());
+
+        Map<String, Object> invalidCompleteness = structuralFactPayload(service, projectId, modelId, revision, contextId,
+                "CAP-ISO-STRUCT-008", "fact.structural-errors.008", objectEndpoints, List.of(), "COMPLETE");
+        ApiException completeness = assertThrows(ApiException.class, () -> service.edit(projectId, modelId, contextId,
+                editRequest("request.structural-errors.008", "command.structural-errors.008", structuralRevision, "CREATE_FACT", invalidCompleteness)));
+        assertEquals(ApiErrorCode.MODIFIER_COMBINATION_INVALID, completeness.code());
+
+        Map<String, Object> duplicateLabel = structuralFactPayload(service, projectId, modelId, revision, contextId,
+                "CAP-ISO-STRUCT-001", "fact.structural-errors.duplicate", objectEndpoints, List.of(
+                        map("slot_id", "forward_tag", "text", "contains"),
+                        map("slot_id", "forward_tag", "text", "includes")), "NOT_APPLICABLE");
+        ApiException duplicate = assertThrows(ApiException.class, () -> service.edit(projectId, modelId, contextId,
+                editRequest("request.structural-errors.duplicate", "command.structural-errors.duplicate", structuralRevision, "CREATE_FACT", duplicateLabel)));
+        assertEquals(ApiErrorCode.DOMAIN_REJECTED, duplicate.code());
+
+        revision = committed(service.edit(projectId, modelId, contextId, editRequest("request.structural-errors.state.source",
+                "command.structural-errors.state.source", revision, "CREATE_STATE",
+                statePayload(contextId, "element.structural-errors.source", "state.structural-errors.source", "Source state"))));
+        revision = committed(service.edit(projectId, modelId, contextId, editRequest("request.structural-errors.state.target",
+                "command.structural-errors.state.target", revision, "CREATE_STATE",
+                statePayload(contextId, "element.structural-errors.target", "state.structural-errors.target", "Target state"))));
+        Map<String, Object> bidirectionalNullTag = structuralFactPayload(service, projectId, modelId, revision, contextId,
+                "CAP-ISO-STRUCT-010", "fact.structural-errors.010",
+                List.of("state.structural-errors.source", "state.structural-errors.target"), List.of(), "NOT_APPLICABLE");
+        bidirectionalNullTag.put("direction", "BIDIRECTIONAL");
+        String stateRevision = revision;
+        ApiException nullTag = assertThrows(ApiException.class, () -> service.edit(projectId, modelId, contextId,
+                editRequest("request.structural-errors.010", "command.structural-errors.010", stateRevision, "CREATE_FACT", bidirectionalNullTag)));
+        assertEquals(ApiErrorCode.MODIFIER_COMBINATION_INVALID, nullTag.code());
     }
 
     @Test
@@ -671,11 +729,22 @@ class LocalApiServiceTest {
                 "CREATE_STATE", statePayload(contextId, "element.material.001", "state.material.ready", "Ready"))));
         revision = committed(service.edit(projectId, modelId, contextId, editRequest("request.presentation.suppress.001", "command.presentation.suppress.001", revision,
                 "STATE_SUPPRESS", statePresentationPayload(contextId, "state.material.ready"))));
-        assertFalse(hasConstruct(service, projectId, modelId, contextId, revision, "state.material.ready"));
+        Map<String, Object> suppressedProjection = data(service.projection("request.projection.presentation.suppressed.001", projectId, modelId, contextId, revision));
+        assertFalse(((java.util.List<?>) suppressedProjection.get("constructs")).stream().map(Map.class::cast)
+                .anyMatch(value -> "state.material.ready".equals(value.get("target_id"))));
+        Map<?, ?> suppressed = (Map<?, ?>) ((java.util.List<?>) suppressedProjection.get("suppressed_states")).getFirst();
+        assertEquals("state.material.ready", suppressed.get("state_id"));
+        assertEquals(Map.of("target_kind", "ELEMENT", "target_id", "element.material.001"), suppressed.get("owner_ref"));
+        assertEquals("Ready", suppressed.get("name_or_value"));
+        assertEquals(java.util.List.of("INITIAL"), suppressed.get("state_roles"));
+        assertEquals("SUPPRESSED", suppressed.get("explicitness"));
 
         revision = committed(service.edit(projectId, modelId, contextId, editRequest("request.presentation.explicit.001", "command.presentation.explicit.001", revision,
                 "STATE_EXPLICIT", statePresentationPayload(contextId, "state.material.ready"))));
-        Map<?, ?> explicitState = construct(service, projectId, modelId, contextId, revision, "state.material.ready");
+        Map<String, Object> explicitProjection = data(service.projection("request.projection.presentation.explicit.001", projectId, modelId, contextId, revision));
+        assertTrue(((java.util.List<?>) explicitProjection.get("suppressed_states")).isEmpty());
+        Map<?, ?> explicitState = ((java.util.List<?>) explicitProjection.get("constructs")).stream().map(Map.class::cast)
+                .filter(value -> "state.material.ready".equals(value.get("target_id"))).findFirst().orElseThrow();
         assertEquals("EXPLICIT", explicitState.get("explicitness"));
         assertEquals("UNFOLDED", explicitState.get("fold_state"));
 

@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:opm:contract:dev-canvas-06:e2e-fault-launcher-jarit-report:0.1",
+  "title": "OPM DEV-CANVAS-06 E2E Fault Launcher JarIT Report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "report_id", "generated_at", "source_commit", "runtime_jar_ref", "java_version", "java_executable_ref", "build_command_tokens", "jarit_command_tokens", "surefire_xml_ref", "test_class", "test_method_ids", "test_count", "passed_count", "failed_count", "skipped_count", "report_status", "report_payload_sha256"],
+  "properties": {
+    "schema_id": {"const": "OPM-DEV-CANVAS-06-E2E-FAULT-LAUNCHER-JARIT-REPORT-001"},
+    "schema_version": {"const": "0.1"},
+    "report_id": {"pattern": "^dev-canvas-06\\.fault-launcher-jarit\\.[a-f0-9]{12}\\.[a-f0-9]{12}$"},
+    "generated_at": {"type": "string", "format": "date-time"},
+    "source_commit": {"$ref": "#/$defs/digest40"},
+    "runtime_jar_ref": {"$ref": "#/$defs/fileRef"},
+    "java_version": {"const": "21"},
+    "java_executable_ref": {"$ref": "#/$defs/executableRef"},
+    "build_command_tokens": {"type": "array", "minItems": 6, "items": {"type": "string", "minLength": 1}},
+    "jarit_command_tokens": {"type": "array", "minItems": 4, "items": {"type": "string", "minLength": 1}},
+    "surefire_xml_ref": {"allOf": [{"$ref": "#/$defs/fileRef"}, {"properties": {"kind": {"const": "SUREFIRE_XML"}, "path": {"const": "fault-launcher/reports/TEST-org.opm.localruntime.releaseevidence.fault.E2EFaultLauncherJarIT.xml"}}}]},
+    "test_class": {"const": "org.opm.localruntime.releaseevidence.fault.E2EFaultLauncherJarIT"},
+    "test_method_ids": {"type": "array", "minItems": 6, "maxItems": 6, "items": {"type": "string", "minLength": 1}},
+    "test_count": {"const": 6}, "passed_count": {"const": 6}, "failed_count": {"const": 0}, "skipped_count": {"const": 0}, "report_status": {"const": "PASS"}, "report_payload_sha256": {"$ref": "#/$defs/digest"}
+  },
+  "$defs": {"digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"}, "digest40": {"type": "string", "pattern": "^[a-f0-9]{40}$"}, "safeRelativePath": {"type": "string", "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))[A-Za-z0-9][A-Za-z0-9._-]*(?:/[A-Za-z0-9][A-Za-z0-9._-]*)*$"}, "fileRef": {"type": "object", "additionalProperties": false, "required": ["kind", "path", "byte_length", "sha256"], "properties": {"kind": {"type": "string", "minLength": 1}, "path": {"$ref": "#/$defs/safeRelativePath"}, "byte_length": {"type": "integer", "minimum": 1}, "sha256": {"$ref": "#/$defs/digest"}}}, "executableRef": {"type": "object", "additionalProperties": false, "required": ["realpath", "byte_length", "sha256"], "properties": {"realpath": {"type": "string", "minLength": 1}, "byte_length": {"type": "integer", "minimum": 1}, "sha256": {"$ref": "#/$defs/digest"}}}}
+}

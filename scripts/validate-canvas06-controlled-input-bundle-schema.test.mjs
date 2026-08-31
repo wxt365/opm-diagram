@@ -7,6 +7,8 @@ import Ajv2020 from 'ajv/dist/2020.js';
 const root = resolve('.');
 const schema = JSON.parse(await readFile(resolve(root, 'docs/contracts/schemas/opm-dev-canvas-06-controlled-input-bundle.schema.json'), 'utf8'));
 const validate = new Ajv2020({ allErrors: true, strict: false }).compile(schema);
+const schemaV02 = JSON.parse(await readFile(resolve(root, 'docs/contracts/schemas/opm-dev-canvas-06-controlled-input-bundle-v02.schema.json'), 'utf8'));
+const validateV02 = new Ajv2020({ allErrors: true, strict: false }).compile(schemaV02);
 
 test('受控 descriptor 接受 Visual 的 exact approved version 对象', () => {
   assert.equal(validate(descriptor(approvedVersionRef())), true, JSON.stringify(validate.errors));
@@ -44,6 +46,13 @@ test('受控 descriptor 拒绝非法 bundle ID、未知字段和不安全引用�
   const unsafeRef = descriptor(null);
   unsafeRef.evidence_bundle_ref.path = '/evidence/bundle.zip';
   assert.equal(validate(unsafeRef), false);
+});
+
+test('Fault Launcher Bundle 0.2 只接受固定的 preflight descriptor raw ref', () => {
+  const value = { ...descriptor(null), schema_version: '0.2', preflight_descriptor_ref: ref('FAULT_LAUNCHER_PREFLIGHT_DESCRIPTOR', 'fault-launcher/preflight-descriptor.json') };
+  assert.equal(validateV02(value), true, JSON.stringify(validateV02.errors));
+  value.preflight_descriptor_ref.path = 'fault-launcher/other.json';
+  assert.equal(validateV02(value), false);
 });
 
 function descriptor(approved_version_ref) {

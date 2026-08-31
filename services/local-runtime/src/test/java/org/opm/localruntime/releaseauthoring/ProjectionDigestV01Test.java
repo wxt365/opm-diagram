@@ -49,6 +49,53 @@ class ProjectionDigestV01Test {
         }
     }
 
+    @Test
+    void validatesCurrentApiProjectionAndKeepsTheFrozenDigestView() {
+        Map<String, Object> digestView = Map.of("context_id", "context.snapshot", "constructs", List.of());
+        Map<String, Object> apiData = Map.of(
+                "context_id", "context.snapshot",
+                "constructs", List.of(),
+                "suppressed_states", List.of(Map.of(
+                        "state_id", "state.suppressed",
+                        "owner_ref", Map.of("target_kind", "ELEMENT", "target_id", "object.owner"),
+                        "name_or_value", "draft",
+                        "state_roles", List.of("INITIAL"),
+                        "explicitness", "SUPPRESSED")));
+
+        assertEquals(digestView, ProjectionDigestV01.apiProjectionDigestView(apiData));
+        assertEquals(ProjectionDigestV01.sha256(digestView),
+                ProjectionDigestV01.sha256(ProjectionDigestV01.apiProjectionDigestView(apiData)));
+    }
+
+    @Test
+    void rejectsApiProjectionTopLevelDriftAndInvalidSuppressedState() {
+        Map<String, Object> extra = new LinkedHashMap<>();
+        extra.put("context_id", "context.snapshot");
+        extra.put("constructs", List.of());
+        extra.put("suppressed_states", List.of());
+        extra.put("unknown", true);
+        ProjectionDigestV01.ProjectionDigestV01Exception extraFailure = assertThrows(
+                ProjectionDigestV01.ProjectionDigestV01Exception.class,
+                () -> ProjectionDigestV01.apiProjectionDigestView(extra));
+        assertEquals("PROJECTION_DIGEST_SCHEMA_MISMATCH", extraFailure.code());
+        assertEquals("/data/unknown", extraFailure.jsonPointer());
+
+        Map<String, Object> invalid = Map.of(
+                "context_id", "context.snapshot",
+                "constructs", List.of(),
+                "suppressed_states", List.of(Map.of(
+                        "state_id", "state.suppressed",
+                        "owner_ref", Map.of("target_kind", "ELEMENT", "target_id", "object.owner"),
+                        "name_or_value", "draft",
+                        "state_roles", List.of("INITIAL", "INITIAL"),
+                        "explicitness", "SUPPRESSED")));
+        ProjectionDigestV01.ProjectionDigestV01Exception roleFailure = assertThrows(
+                ProjectionDigestV01.ProjectionDigestV01Exception.class,
+                () -> ProjectionDigestV01.apiProjectionDigestView(invalid));
+        assertEquals("PROJECTION_DIGEST_SCHEMA_MISMATCH", roleFailure.code());
+        assertEquals("/data/suppressed_states/0/state_roles", roleFailure.jsonPointer());
+    }
+
     private static JsonNode readVectors() throws Exception {
         String raw = Files.readString(Path.of("../../tests/e2e/release/dev-canvas-06/fixtures/projection-digest-v01-parity-vectors.json"));
         return OBJECT_MAPPER.readTree(raw);

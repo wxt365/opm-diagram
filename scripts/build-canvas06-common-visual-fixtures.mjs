@@ -5,10 +5,12 @@ import { basename, dirname, relative, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import Ajv2020 from 'ajv/dist/2020.js';
 import { buildCommonVisualFixture, e2eCases, e2eFixture, visualSubjects } from '../tests/e2e/release/dev-canvas-06/fixtures/factories/common-fixture-factory.mjs';
+import { buildCommonSetupPlan, COMMON_DRIVER_SOURCE_PATH, COMMON_SETUP_PLAN_PATH } from './canvas06-e2e-common-setup-plan.mjs';
 
 const root = resolve('.');
 const generatorPath = fileURLToPath(import.meta.url);
 const factoryPath = fileURLToPath(new URL('../tests/e2e/release/dev-canvas-06/fixtures/factories/common-fixture-factory.mjs', import.meta.url));
+const commonDriverPath = fileURLToPath(new URL('../tests/e2e/release/dev-canvas-06/drivers/common-driver.mjs', import.meta.url));
 
 if (resolve(process.argv[1] ?? '') === generatorPath) await main();
 
@@ -40,6 +42,7 @@ export async function buildCommonVisualFixtures({ handoffPath, target, epoch }, 
   await requireNoResidual(target);
   await assertSourceOwner(generatorPath, 'scripts/build-canvas06-common-visual-fixtures.mjs');
   await assertSourceOwner(factoryPath, 'tests/e2e/release/dev-canvas-06/fixtures/factories/common-fixture-factory.mjs');
+  await assertSourceOwner(commonDriverPath, COMMON_DRIVER_SOURCE_PATH);
   const handoff = await json(handoffPath);
   if (handoff.handoff_status !== 'READY_FOR_DEV_CANVAS_06' || !handoff.active_binding) fail('GOLDEN_COMMON_INPUT_INVALID', 2, 'READY Handoff is required.');
   const staging = `${target}.staging-${process.pid}`;
@@ -53,6 +56,15 @@ export async function buildCommonVisualFixtures({ handoffPath, target, epoch }, 
     await mirror(staging, factoryPath, 'sources/tests/e2e/release/dev-canvas-06/fixtures/factories/common-fixture-factory.mjs');
     const catalog = await catalogFor(staging, handoff.active_binding, epoch, fixtures);
     await writeJson(resolve(staging, 'dev-canvas-06-common-fixture-catalog.json'), catalog);
+    const plan = buildCommonSetupPlan({
+      generatedAt: new Date(epoch * 1000).toISOString(),
+      sourceBinding: handoff.active_binding,
+      generatorRef: catalog.generator_ref,
+      commonFixtureCatalogRef: await fileRef(staging, 'dev-canvas-06-common-fixture-catalog.json', 'COMMON_FIXTURE_CATALOG'),
+      commonDriverRef: await externalFileRef(commonDriverPath, COMMON_DRIVER_SOURCE_PATH, 'E2E_DRIVER_SOURCE'),
+      catalogCases: catalog.e2e_cases
+    });
+    await writeJson(resolve(staging, COMMON_SETUP_PLAN_PATH), plan);
     await runtime.fsyncTree(staging);
     await runtime.verifyStaging({ handoffPath, staging });
     await runtime.rename(staging, target);
@@ -125,6 +137,7 @@ function cacheE2eFixtures() {
 }
 
 async function fileRef(base, path, kind) { const target = resolveInside(base, path); const info = await stat(target); return { kind, path, byte_length: info.size, sha256: sha(await readFile(target)) }; }
+async function externalFileRef(target, path, kind) { const info = await stat(target); return { kind, path, byte_length: info.size, sha256: sha(await readFile(target)) }; }
 async function writeJson(path, value) { await mkdir(dirname(path), { recursive: true }); await writeFile(path, `${JSON.stringify(value, null, 2)}\n`, 'utf8'); }
 async function json(path) { return JSON.parse(await readFile(path, 'utf8')); }
 async function requireFreshTarget(path) { try { await lstat(path); fail('GOLDEN_COMMON_INPUT_INVALID', 2, `Output already exists: ${path}`); } catch (error) { if (error.code !== 'ENOENT') throw error; } }

@@ -1,8 +1,11 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
+import { mkdtemp } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { resolve } from 'node:path';
 import test from 'node:test';
 
-import { composeE2eReport, semanticComparisonDigest } from './canvas06-e2e-run-report.mjs';
+import { composeE2eReport, readE2eAttemptObservations, semanticComparisonDigest } from './canvas06-e2e-run-report.mjs';
 
 test('aggregates the frozen 194/388 matrix into a schema-valid READY report', () => {
   const { manifest, capabilities } = fixtureInput();
@@ -12,7 +15,7 @@ test('aggregates the frozen 194/388 matrix into a schema-valid READY report', ()
   assert.deepEqual(report.summary, {
     case_count: 194, family_case_count: 178, family_pass_expectation_count: 130,
     family_blocked_expectation_count: 48, common_case_count: 16, attempt_count: 388,
-    pass_matched_count: 146, blocked_matched_count: 48, failed_count: 0, skipped_count: 0, retry_count: 0
+    pass_matched_count: 137, blocked_matched_count: 57, failed_count: 0, skipped_count: 0, retry_count: 0
   });
   assert.equal(report.capability_results.length, 34);
   assert.equal(report.failures.length, 0);
@@ -40,12 +43,31 @@ test('rejects an incomplete attempt matrix before report construction', () => {
   );
 });
 
+test('attempt 投影在缺失首个固定 artifact 时零副作用拒绝', async () => {
+  const { manifest } = fixtureInput();
+  const root = await mkdtemp(resolve(tmpdir(), 'canvas06-e2e-report-projection-'));
+  await assert.rejects(
+    () => readE2eAttemptObservations({ reportRoot: root, manifest }),
+    error => error.code === 'E2E_RUN_CASE_SET_INVALID'
+  );
+});
+
 test('uses the shared RFC 8785 canonicalizer for semantic comparison digests', () => {
   const base = observationForCanonicalization();
   const reordered = observationForCanonicalization();
   base.transaction = { '\ue000': 2, '😀': 1, a: 0 };
   reordered.transaction = { a: 0, '😀': 1, '\ue000': 2 };
   assert.equal(semanticComparisonDigest(base), semanticComparisonDigest(reordered));
+});
+
+test('semantic comparison digest排除attempt证据路径但保留断言结果', () => {
+  const first = observationForCanonicalization();
+  const second = observationForCanonicalization();
+  first.assertion_results = [{ assertion_id: 'ASSERT-001', status: 'PASS', evidence_refs: [ref('ASSERTION_EVIDENCE', 'attempts/case/1/api-exchanges/index.json')] }];
+  second.assertion_results = [{ assertion_id: 'ASSERT-001', status: 'PASS', evidence_refs: [ref('ASSERTION_EVIDENCE', 'attempts/case/2/api-exchanges/index.json')] }];
+  assert.equal(semanticComparisonDigest(first), semanticComparisonDigest(second));
+  second.assertion_results[0].status = 'FAILED';
+  assert.notEqual(semanticComparisonDigest(first), semanticComparisonDigest(second));
 });
 
 function fixtureInput() {
@@ -65,15 +87,18 @@ function fixtureInput() {
       assertion_ids: ['ASSERT-001']
     };
   });
-  const commonCases = Array.from({ length: 16 }, (_, index) => ({
+  const commonCases = Array.from({ length: 16 }, (_, index) => {
+    const expectation = index < 7 ? 'PASS' : 'BLOCKED';
+    return {
     case_id: `E2E-CANVAS-001.COMMON-${String(index).padStart(3, '0')}`,
     suite_id: 'E2E-CANVAS-001',
-    expectation: 'PASS',
+    expectation,
     fixture_ref: ref('FIXTURE', `common/${index}.base.json`, digest(`common-base-${index}`)),
     input_ref: ref('INPUT', `common/${index}.input.json`, digest(`common-input-${index}`)),
-    expected_transaction: transaction(true),
+    expected_transaction: transaction(expectation === 'PASS'),
     assertion_ids: ['ASSERT-001']
-  }));
+    };
+  });
   const byCapability = new Map();
   for (const item of familyCases) byCapability.set(item.capability_id, [...(byCapability.get(item.capability_id) ?? []), item.coverage_key]);
   for (const capability of capabilities) capability.covered_coverage_keys = byCapability.get(capability.capability_id);
@@ -106,12 +131,12 @@ function attempt(entry, ordinal) {
     observed_status: entry.expectation === 'PASS' ? 'PASS_MATCHED' : 'BLOCKED_MATCHED',
     top_error_code: null,
     detail_error_code: null,
+    revision_document_before_sha256: digest('revision-before'), revision_document_after_sha256: digest('revision-after'), revision_document_reopen_sha256: digest('revision-after'),
     projection_before_sha256: digest('projection-before'), projection_after_sha256: digest('projection-after'), projection_reopen_sha256: digest('projection-after'),
     opl_before_sha256: digest('opl-before'), opl_after_sha256: digest('opl-after'), opl_reopen_sha256: digest('opl-after'),
     token_before_sha256: digest('token-before'), token_after_sha256: digest('token-after'), token_reopen_sha256: digest('token-after'),
     trace_before_sha256: digest('trace-before'), trace_after_sha256: digest('trace-after'), trace_reopen_sha256: digest('trace-after'),
     transaction: entry.expected_transaction,
-    reopen_matches: true,
     assertion_results: [{ assertion_id: 'ASSERT-001', status: 'PASS' }],
     artifact_refs: [ref('ARTIFACT', `attempts/${entry.case_id}/${ordinal}/artifact-index.json`, digest(`${entry.case_id}-${ordinal}`))]
   };
@@ -121,8 +146,18 @@ function attempt(entry, ordinal) {
 
 function fixtureBase() {
   return {
-    generated_at: '2026-08-04T00:00:00.000Z',
-    runner_identity: { runner_version: '0.1.0', source_commit: 'a'.repeat(40), node_version: 'v22.0.0', playwright_version: '1.57.0', chromium_version: '143.0.7499.4', os: 'darwin-arm64', command: 'npm run release:canvas06:e2e:run', runner_source_sha256: digest('runner') },
+    generated_at: '2026-08-04T00:00:00Z',
+    runner_identity: {
+      runner_version: '0.2.0', source_commit: 'a'.repeat(40), node_version: 'v22.0.0', playwright_version: '1.57.0', chromium_version: '143.0.7499.4', os: 'darwin-arm64', command: 'npm run release:canvas06:e2e:run', runner_source_sha256: digest('runner'),
+      runner_source_set_ref: ref('E2E_RUNNER_SOURCE_SET', 'inputs/runner/runner-source-set.json', digest('runner-source-set')),
+      java_executable: {
+        evidence_version: '0.1.0', major_version: 21, executable_basename: 'java',
+        mirror_ref: ref('E2E_JAVA_EXECUTABLE_MIRROR', `inputs/runner/toolchain/java/${digest('java')}/java`, digest('java')),
+        version_output_ref: ref('E2E_JAVA_VERSION_OUTPUT', `inputs/runner/toolchain/java/${digest('java')}/java-version.txt`, digest('java-version')),
+        release_metadata_ref: ref('E2E_JAVA_RELEASE_METADATA', `inputs/runner/toolchain/java/${digest('java')}/release`, digest('java-release')),
+        os_arch: 'darwin/arm64', image_payload_sha256: digest('java-image')
+      }
+    },
     manifest_ref: ref('E2E_MANIFEST', 'inputs/manifest/dev-canvas-06-e2e-manifest.json', digest('manifest')),
     intake_report_ref: ref('INTAKE_REPORT', 'inputs/raw/intake/report.json', digest('intake')),
     handoff_ref: ref('HANDOFF', 'inputs/raw/handoff/handoff.json', digest('handoff')),
@@ -138,6 +173,7 @@ function observationForCanonicalization() {
     project_id: 'project', model_id: 'model', context_id: 'context', base_revision: 'base', head_revision: 'head',
     committed_revision: null, command_id: null, option_id: null, impact_token_id: null, observed_status: 'PASS_MATCHED',
     top_error_code: null, detail_error_code: null,
+    revision_document_before_sha256: digest('revision-before'), revision_document_after_sha256: digest('revision-after'), revision_document_reopen_sha256: digest('revision-reopen'),
     projection_before_sha256: digest('projection-before'), projection_after_sha256: digest('projection-after'), projection_reopen_sha256: digest('projection-reopen'),
     opl_before_sha256: digest('opl-before'), opl_after_sha256: digest('opl-after'), opl_reopen_sha256: digest('opl-reopen'),
     token_before_sha256: digest('token-before'), token_after_sha256: digest('token-after'), token_reopen_sha256: digest('token-reopen'),

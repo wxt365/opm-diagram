@@ -1,9 +1,12 @@
 import { createHash } from 'node:crypto';
 import { copyFile, mkdir, readFile, stat, writeFile } from 'node:fs/promises';
-import { spawnSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { relative, resolve } from 'node:path';
 
+import { sourceEpoch } from './canvas06-unified-production-input.mjs';
+
 const root = resolve('.');
+const generatedAt = sourceEpoch(execFileSync('git', ['show', '-s', '--format=%ct', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim());
 const target = resolve('services/local-runtime/target');
 const contractRoot = resolve(target, 'golden-contract');
 const traceRoot = resolve(target, 'trace-closure');
@@ -84,7 +87,7 @@ async function report({ gateId, status, command, sources, raw, summary }) {
     schema_version: '0.1',
     gate_id: gateId,
     status,
-    generated_at: new Date().toISOString(),
+    generated_at: generatedAt,
     command,
     source_refs: await Promise.all(sources.map(path => ref(resolve(path), 'SOURCE'))),
     raw_result: await ref(raw, 'TEST_RESULT'),

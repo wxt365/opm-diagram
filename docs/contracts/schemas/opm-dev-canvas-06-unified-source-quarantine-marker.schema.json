@@ -4,54 +4,15 @@
   "title": "OPM DEV-CANVAS-06 Unified Source Quarantine Marker",
   "type": "object",
   "additionalProperties": false,
-  "required": [
-    "schema_id",
-    "schema_version",
-    "status",
-    "input_root",
-    "source_commit",
-    "pre_quarantine_tree_sha256",
-    "failure_code",
-    "failure_stage"
-  ],
+  "required": ["schema_id", "schema_version", "status", "input_root", "source_commit", "pre_quarantine_tree_sha256", "failure_code", "failure_stage"],
   "properties": {
-    "schema_id": {
-      "const": "OPM-DEV-CANVAS-06-UNIFIED-SOURCE-QUARANTINE-MARKER-001"
-    },
-    "schema_version": {
-      "const": "0.1"
-    },
-    "status": {
-      "const": "QUARANTINED"
-    },
-    "input_root": {
-      "type": "string",
-      "pattern": "^releases/clean-[a-f0-9]{12}$"
-    },
-    "source_commit": {
-      "type": "string",
-      "pattern": "^[a-f0-9]{40}$"
-    },
-    "pre_quarantine_tree_sha256": {
-      "type": "string",
-      "pattern": "^[a-f0-9]{64}$"
-    },
-    "failure_code": {
-      "enum": [
-        "CANVAS06_UNIFIED_HANDOFF_INVALID",
-        "CANVAS06_UNIFIED_INTAKE_INVALID",
-        "CANVAS06_UNIFIED_WEB_TREE_INVALID",
-        "CANVAS06_UNIFIED_COMMON_INVALID",
-        "CANVAS06_UNIFIED_JOIN_MISMATCH",
-        "CANVAS06_UNIFIED_TRANSACTION_FAILED"
-      ]
-    },
-    "failure_stage": {
-      "enum": [
-        "FSYNC_RELEASES_PARENT",
-        "SPAWN_INDEPENDENT_INSTALLED_VERIFIER",
-        "INSTALLED_REVERIFY_HANDOFF_INTAKE_WEB_COMMON"
-      ]
-    }
+    "schema_id": { "const": "OPM-DEV-CANVAS-06-UNIFIED-SOURCE-QUARANTINE-MARKER-001" },
+    "schema_version": { "const": "0.1" },
+    "status": { "const": "QUARANTINED" },
+    "input_root": { "type": "string", "pattern": "^releases/clean-[a-f0-9]{12}$" },
+    "source_commit": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "pre_quarantine_tree_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "failure_code": { "enum": ["CANVAS06_UNIFIED_HANDOFF_INVALID", "CANVAS06_UNIFIED_INTAKE_INVALID", "CANVAS06_UNIFIED_WEB_TREE_INVALID", "CANVAS06_UNIFIED_COMMON_INVALID", "CANVAS06_UNIFIED_JOIN_MISMATCH", "CANVAS06_UNIFIED_TRANSACTION_FAILED"] },
+    "failure_stage": { "enum": ["FSYNC_RELEASES_PARENT", "SPAWN_INDEPENDENT_INSTALLED_VERIFIER", "INSTALLED_REVERIFY_HANDOFF_INTAKE_WEB_COMMON"] }
   }
 }

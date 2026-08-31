@@ -32,6 +32,7 @@ export function buildE2eManifestV02(input) {
     upstream_input_refs: input.upstream_input_refs,
     input_materialization: input.input_materialization,
     common_fixture_catalog_ref: input.common_fixture_catalog_ref,
+    common_setup_plan_ref: input.common_setup_plan_ref,
     environment_policy: { locale: 'zh-CN', timezone: 'Asia/Shanghai', color_scheme: 'light', reduced_motion: 'reduce', device_scale_factor: 1 },
     fixture_refs: input.fixture_refs,
     driver_catalog: input.driver_catalog,

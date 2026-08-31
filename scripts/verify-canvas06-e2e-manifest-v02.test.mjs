@@ -1,10 +1,13 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import test from 'node:test';
+import { resolve } from 'node:path';
 
-import { parseVerifierOptions } from './canvas06-e2e-manifest-v02-input.mjs';
+const root = resolve('.');
+const runner = resolve('scripts/verify-canvas06-e2e-manifest-v02.mjs');
 
-test('v0.2 verifier requires an explicit source root and exact final Profile root input', () => {
-  const args = ['--input-mode', 'CONTROLLED_TEST', '--controlled-bundle-root', 'bundle', '--source-root', 'source', '--manifest-root', 'manifest', '--manifest', 'dev-canvas-06-e2e-manifest.json', '--profile-asset-root', 'manifest/inputs/upstream/profile-assets'];
-  assert.equal(parseVerifierOptions(args)['source-root'], 'source');
-  assert.throws(() => parseVerifierOptions(args.filter(value => value !== 'source')), error => error.code === 'E2E_MANIFEST_ARGUMENT_INVALID');
+test('verifier 缺少完整 CLI 时在读取前稳定拒绝', () => {
+  const result = spawnSync(process.execPath, [runner], { cwd: root, encoding: 'utf8' });
+  assert.equal(result.status, 2);
+  assert.equal(result.stderr.split('\n')[0], 'E2E_MANIFEST_ARGUMENT_INVALID\tARGS');
 });

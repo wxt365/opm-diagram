@@ -5,11 +5,11 @@ import { createServer } from 'node:net';
 import { basename, relative, resolve } from 'node:path';
 import { promisify } from 'node:util';
 
-import { E2eRunInputError, safeRelativePath } from './canvas06-e2e-run-input.mjs';
+import { E2eRunInputError, loadActiveAttemptManifest, safeRelativePath } from './canvas06-e2e-run-input.mjs';
 import { verifyCommonFixtureInput } from './canvas06-e2e-common-fixtures.mjs';
-import { loadControlledReadyTrustChain, loadReadyTrustChain } from './canvas06-e2e-manifest-v01-trust.mjs';
+import { loadControlledReadyTrustChain, loadProductionReadyTrustChain } from './canvas06-e2e-manifest-v01-trust.mjs';
 import { assertDirectory, assertRegularFile, readJson, resolveInside } from './canvas06-e2e-manifest-v01-support.mjs';
-import { main as verifyManifest } from './verify-canvas06-e2e-manifest-v01.mjs';
+import { main as verifyManifest } from './verify-canvas06-e2e-manifest-v02.mjs';
 
 const execFile = promisify(execFileCallback);
 const CHROMIUM_VERSION = '143.0.7499.4';
@@ -19,21 +19,19 @@ export async function preflightE2eRun(options, dependencies = {}) {
   await assertDirectory(manifestRoot, 'E2E_RUN_MANIFEST_INVALID');
   if (basename(manifestRoot).startsWith('.')) fail('E2E_RUN_MANIFEST_INVALID', 'Manifest root cannot be staging.');
 
-  const verifier = dependencies.verifyManifest ?? verifyManifest;
-  await verifier(manifestVerifierArgs(options), dependencies.manifestDependencies ?? {});
-  const manifest = await readJson(resolveInside(manifestRoot, options.manifest, 'E2E_RUN_MANIFEST_INVALID'), 'E2E_RUN_MANIFEST_INVALID');
   const trust = await loadTrust(options, dependencies);
-  const common = await verifyManifestCommonFixtureInput({
+  const verifier = dependencies.verifyManifest ?? verifyManifest;
+  await verifier(manifestVerifierArgs(options));
+  const manifestInput = await loadActiveAttemptManifest({
     manifestRoot,
-    manifest,
-    activeBinding: trust.handoff.value.active_binding,
-    verify: dependencies.verifyCommonFixtureInput ?? verifyCommonFixtureInput
+    manifest: options.manifest,
+    profileAssetRoot: options['profile-asset-root']
   });
-  const source = await inspectSource({ sourceRoot: options['source-root'], expectedCommit: manifest.source_build.source_commit, exec: dependencies.exec });
+  const source = await inspectSource({ sourceRoot: options['source-root'], expectedCommit: manifestInput.manifest.source_build.source_commit, exec: dependencies.exec });
   const runtime = await inspectRuntime({ javaHome: options['java-home'], browserExecutable: options['browser-executable'], exec: dependencies.exec });
   const capabilities = assertCapabilityClosure(trust.handoff.value.capability_evidence);
   await (dependencies.assertPorts ?? assertPortsFree)([Number(options['runtime-port']), Number(options['web-port'])]);
-  return Object.freeze({ manifest, trust, common, source, runtime, capabilities });
+  return Object.freeze({ manifest: manifestInput.manifest, manifestInput, trust, source, runtime, capabilities });
 }
 
 export async function verifyManifestCommonFixtureInput({ manifestRoot, manifest, activeBinding, verify = verifyCommonFixtureInput }) {
@@ -101,11 +99,16 @@ export function assertCapabilityClosure(entries) {
   return Object.freeze(result);
 }
 
-function manifestVerifierArgs(options) {
+export function manifestVerifierArgs(options) {
   const args = ['--input-mode', options['input-mode']];
   if (options['input-mode'] === 'PRODUCTION_HANDOFF') args.push('--handoff-root', options['handoff-root'], '--intake-report', options['intake-report']);
   else args.push('--controlled-bundle-root', options['controlled-bundle-root']);
-  args.push('--manifest-root', options['manifest-root'], '--manifest', options.manifest);
+  args.push(
+    '--source-root', options['source-root'],
+    '--manifest-root', options['manifest-root'],
+    '--manifest', options.manifest,
+    '--profile-asset-root', options['profile-asset-root']
+  );
   if (options['input-mode'] === 'PRODUCTION_HANDOFF') args.push('--require-production');
   return args;
 }
@@ -114,7 +117,7 @@ async function loadTrust(options, dependencies) {
   if (options['input-mode'] === 'CONTROLLED_TEST') return (dependencies.loadControlledTrust ?? loadControlledReadyTrustChain)({ bundleRoot: options['controlled-bundle-root'] });
   const root = resolve(options['handoff-root']);
   const intake = await readJson(resolveInside(root, options['intake-report'], 'E2E_RUN_INPUT_CLASS_INVALID'), 'E2E_RUN_INPUT_CLASS_INVALID');
-  return (dependencies.loadProductionTrust ?? loadReadyTrustChain)({ root, intakePath: options['intake-report'], handoffPath: intake.handoff_ref?.path });
+  return (dependencies.loadProductionTrust ?? loadProductionReadyTrustChain)({ root, intakePath: options['intake-report'], handoffPath: intake.handoff_ref?.path });
 }
 
 async function assertPortsFree(ports) {

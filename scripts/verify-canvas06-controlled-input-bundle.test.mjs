@@ -32,6 +32,16 @@ test('controlled verifier rejects invalid consumer and Visual/E2E approved-versi
   await rejectsInput(() => verifyControlledInputBundle({ bundleRoot: e2e.root, consumer: 'VISUAL' }));
 });
 
+test('Fault Launcher consumer accepts only Bundle 0.2 with an exact descriptor ref', async t => {
+  const work = await testRoot(t);
+  const legacy = await createBundle(work, { consumer: 'E2E' });
+  const fault = await createBundle(work, { consumer: 'FAULT_LAUNCHER' });
+  await rejectsInput(() => verifyControlledInputBundle({ bundleRoot: legacy.root, consumer: 'FAULT_LAUNCHER' }));
+  const verified = await verifyControlledInputBundle({ bundleRoot: fault.root, consumer: 'FAULT_LAUNCHER' });
+  assert.equal(verified.descriptor.schema_version, '0.2');
+  assert.equal(verified.preflight_descriptor.absolute_path, resolve(fault.root, 'fault-launcher/preflight-descriptor.json'));
+});
+
 test('controlled verifier rejects identity/basename mismatches and raw archive tampering', async t => {
   const work = await testRoot(t);
   const identityMismatch = await createBundle(work, { consumer: 'E2E', mutate: descriptor => { descriptor.bundle_identity_sha256 = digest('wrong'); } });
@@ -74,15 +84,22 @@ async function createBundle(work, { consumer, mutate } = {}) {
         authoring_report_ref: await writeRef(work, 'approved/versions/1.2.3/authoring-report.json', 'authoring')
       }
     : null;
-  const identity = digest(jcs({ bundle_class: 'CONTROLLED_TEST', ...refs, approved_version_ref }));
+  const preflight_descriptor_ref = consumer === 'FAULT_LAUNCHER'
+    ? { kind: 'FAULT_LAUNCHER_PREFLIGHT_DESCRIPTOR', path: 'fault-launcher/preflight-descriptor.json', byte_length: 2, sha256: digest('{}') }
+    : null;
+  const identity = digest(jcs({ bundle_class: 'CONTROLLED_TEST', ...refs, approved_version_ref, ...(preflight_descriptor_ref ? { preflight_descriptor_ref } : {}) }));
   const root = resolve(work, `canvas06-controlled-${identity}`);
   await mkdir(root);
   for (const ref of Object.values(refs)) await copyRef(work, root, ref);
+  if (preflight_descriptor_ref) {
+    await mkdir(resolve(root, 'fault-launcher'), { recursive: true });
+    await writeFile(resolve(root, preflight_descriptor_ref.path), '{}');
+  }
   if (approved_version_ref) await copyRef(work, root, approved_version_ref.authoring_report_ref);
   if (approved_version_ref) await mkdir(resolve(root, approved_version_ref.path), { recursive: true });
   const descriptor = {
-    schema_id: 'OPM-DEV-CANVAS-06-CONTROLLED-INPUT-BUNDLE-001', schema_version: '0.1', bundle_class: 'CONTROLLED_TEST',
-    bundle_id: basename(root), bundle_identity_sha256: identity, ...refs, approved_version_ref
+    schema_id: 'OPM-DEV-CANVAS-06-CONTROLLED-INPUT-BUNDLE-001', schema_version: consumer === 'FAULT_LAUNCHER' ? '0.2' : '0.1', bundle_class: 'CONTROLLED_TEST',
+    bundle_id: basename(root), bundle_identity_sha256: identity, ...refs, approved_version_ref, ...(preflight_descriptor_ref ? { preflight_descriptor_ref } : {})
   };
   mutate?.(descriptor);
   await writeFile(resolve(root, 'controlled-bundle.json'), JSON.stringify(descriptor));

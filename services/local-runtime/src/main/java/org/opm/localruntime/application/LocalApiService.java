@@ -325,7 +325,20 @@ public class LocalApiService {
             }
             constructs.add(construct);
         }
-        return queryResult(requestId, revisionId, revision.profileBinding().profile().version(), revision.profileBinding().ruleSet().version(), freshness(projectId, modelId, revisionId), Map.of("context_id", contextId, "constructs", constructs), false);
+        List<Map<String, Object>> suppressedStates = revision.states().stream()
+                .filter(state -> {
+                    SemanticRevision.StatePresentation presentation = presentations.get(state.id());
+                    return presentation != null && presentation.explicitness() == SemanticRevision.StateExplicitness.SUPPRESSED;
+                })
+                .sorted(java.util.Comparator.comparing(SemanticRevision.State::id))
+                .map(state -> Map.<String, Object>of(
+                        "state_id", state.id(),
+                        "owner_ref", Map.of("target_kind", state.ownerTargetKind().name(), "target_id", state.ownerElementId()),
+                        "name_or_value", state.name().localName(),
+                        "state_roles", state.roles().stream().map(Enum::name).toList(),
+                        "explicitness", SemanticRevision.StateExplicitness.SUPPRESSED.name()))
+                .toList();
+        return queryResult(requestId, revisionId, revision.profileBinding().profile().version(), revision.profileBinding().ruleSet().version(), freshness(projectId, modelId, revisionId), Map.of("context_id", contextId, "constructs", constructs, "suppressed_states", suppressedStates), false);
     }
 
     public Map<String, Object> capabilities(String requestId, String projectId, String modelId, String revisionId) {
@@ -928,7 +941,10 @@ public class LocalApiService {
             List<SemanticRevision.Layout> layouts) {
         Map<String, Object> capabilityRef = requiredMap(payload, "capability_ref");
         String capabilityId = required(capabilityRef, "capability_id");
-        ProceduralLinkCatalog.Descriptor descriptor = ProceduralLinkCatalog.find(capabilityId).orElseThrow(this::profileForbidden);
+        ProceduralLinkCatalog.Descriptor descriptor = ProceduralLinkCatalog.find(capabilityId).orElseGet(() -> {
+            if (ControlLinkCatalog.find(capabilityId).isPresent()) throw modifierCombinationInvalid("Control 不能作为独立 Fact 创建");
+            throw profileForbidden();
+        });
         if (!descriptor.family().name().equals(required(payload, "fact_family")) || !"DIRECTED".equals(required(payload, "direction"))) {
             throw domain("过程关系的 Fact family 或方向不符合 Capability");
         }
@@ -1086,7 +1102,13 @@ public class LocalApiService {
             if (bySlot.put(slot, required(value, "text")) != null) throw domain("结构关系标签槽位不能重复");
         }
         if (descriptor.labelsRequired() && descriptor.direction() != SemanticRevision.Direction.PROFILE_DEFINED
-                && !bySlot.keySet().containsAll(descriptor.labelSlots())) throw domain("结构关系缺少必填标签槽位");
+                && !bySlot.keySet().containsAll(descriptor.labelSlots())) {
+            if (bySlot.isEmpty() && ("CAP-ISO-STRUCT-001".equals(descriptor.capabilityId())
+                    || "CAP-ISO-STRUCT-003".equals(descriptor.capabilityId()))) {
+                throw modifierCombinationInvalid("结构关系缺少必填标签槽位");
+            }
+            throw domain("结构关系缺少必填标签槽位");
+        }
         return bySlot.entrySet().stream().map(entry -> new SemanticRevision.Label(entry.getKey(), entry.getValue())).toList();
     }
 
@@ -1096,7 +1118,12 @@ public class LocalApiService {
             if (!"COMPLETE".equals(value) && !"INCOMPLETE".equals(value)) throw domain("该结构 fan 必须声明 COMPLETE 或 INCOMPLETE");
             return SemanticRevision.CollectionCompleteness.valueOf(value);
         }
-        if (value != null && !"NOT_APPLICABLE".equals(value)) throw domain("该结构关系不支持完整性标记");
+        if (value != null && !"NOT_APPLICABLE".equals(value)) {
+            if ("CAP-ISO-STRUCT-008".equals(descriptor.capabilityId()) && "COMPLETE".equals(value)) {
+                throw modifierCombinationInvalid("该结构关系不支持完整性标记");
+            }
+            throw domain("该结构关系不支持完整性标记");
+        }
         return SemanticRevision.CollectionCompleteness.NOT_APPLICABLE;
     }
 
@@ -1115,7 +1142,13 @@ public class LocalApiService {
         if (direction != SemanticRevision.Direction.DIRECTED && direction != SemanticRevision.Direction.BIDIRECTIONAL) throw domain("State-specified Tagged 方向不受支持");
         boolean hasForward = labels.stream().anyMatch(label -> "forward_tag".equals(label.slotId()));
         boolean hasReverse = labels.stream().anyMatch(label -> "reverse_tag".equals(label.slotId()));
-        if (!hasForward || direction == SemanticRevision.Direction.BIDIRECTIONAL != hasReverse) throw domain("State-specified Tagged 的标签与方向不匹配");
+        if (!hasForward || direction == SemanticRevision.Direction.BIDIRECTIONAL != hasReverse) {
+            if ("CAP-ISO-STRUCT-010".equals(descriptor.capabilityId())
+                    && direction == SemanticRevision.Direction.BIDIRECTIONAL && labels.isEmpty()) {
+                throw modifierCombinationInvalid("State-specified Tagged 的标签与方向不匹配");
+            }
+            throw domain("State-specified Tagged 的标签与方向不匹配");
+        }
         return direction;
     }
 
@@ -1164,7 +1197,7 @@ public class LocalApiService {
 
     private void validateControlFactOption(String projectId, String modelId, SemanticRevision base, Map<String, Object> payload,
                                            String factId, String baseCapabilityId, List<String> endpointIds, ControlLinkCatalog.Descriptor control) {
-        if (!control.baseCapabilityIds().contains(baseCapabilityId)) throw domain("Control Capability 与基础 Fact 不匹配");
+        if (!control.baseCapabilityIds().contains(baseCapabilityId)) throw modifierCombinationInvalid("Control Capability 与基础 Fact 不匹配");
         String queryId = capabilityQueryId(projectId, modelId, base.revisionId(), factId, "UPDATE_FACT", endpointIds);
         if (!queryId.equals(required(payload, "capability_query_id"))
                 || !controlFactOptionId(queryId, control.capabilityId()).equals(required(payload, "selected_option_id"))) {
@@ -1187,25 +1220,25 @@ public class LocalApiService {
                 .filter(modifier -> ControlLinkCatalog.CONTROL_CAPABILITY_MODIFIER.equals(optional(modifier, "modifier_id")))
                 .map(modifier -> required(modifier, "value"))
                 .toList();
-        if (values.size() != 1) throw domain("Control Modifier 必须包含唯一 control.capability");
-        return ControlLinkCatalog.find(values.getFirst()).orElseThrow(() -> domain("Control Capability 不受当前 Profile 支持"));
+        if (values.size() != 1) throw modifierCombinationInvalid("Control Modifier 必须包含唯一 control.capability");
+        return ControlLinkCatalog.find(values.getFirst()).orElseThrow(() -> modifierCombinationInvalid("Control Capability 不受当前 Profile 支持"));
     }
 
     private List<SemanticRevision.Modifier> controlModifiers(Map<String, Object> replacement, ControlLinkCatalog.Descriptor control) {
         List<Map<String, Object>> values = objectList(replacement.get("modifiers"), "replacement.modifiers");
-        if (values.size() != 2) throw domain("Control Modifier 必须为完整原子对");
+        if (values.size() != 2) throw modifierCombinationInvalid("Control Modifier 必须为完整原子对");
         Map<String, String> controls = new LinkedHashMap<>();
         for (Map<String, Object> value : values) {
             String modifierId = required(value, "modifier_id");
             String modifierValue = required(value, "value");
             if (!ControlLinkCatalog.CONTROL_CAPABILITY_MODIFIER.equals(modifierId) && !ControlLinkCatalog.CONTROL_SEGMENT_MODIFIER.equals(modifierId)) {
-                throw domain("Control Modifier 包含不受支持字段");
+                throw modifierCombinationInvalid("Control Modifier 包含不受支持字段");
             }
-            if (controls.put(modifierId, modifierValue) != null) throw domain("Control Modifier 不能重复");
+            if (controls.put(modifierId, modifierValue) != null) throw modifierCombinationInvalid("Control Modifier 不能重复");
         }
         if (!control.capabilityId().equals(controls.get(ControlLinkCatalog.CONTROL_CAPABILITY_MODIFIER))
                 || !ControlLinkCatalog.PROCESS_INPUT.equals(controls.get(ControlLinkCatalog.CONTROL_SEGMENT_MODIFIER))) {
-            throw domain("Control Modifier 值或 Process 输入段不匹配");
+            throw modifierCombinationInvalid("Control Modifier 值或 Process 输入段不匹配");
         }
         return List.of(
                 new SemanticRevision.Modifier(ControlLinkCatalog.CONTROL_CAPABILITY_MODIFIER, control.capabilityId()),
@@ -1460,6 +1493,7 @@ public class LocalApiService {
     private SemanticRevision.Normalization core() { return new SemanticRevision.Normalization(SemanticRevision.NormalizationLevel.CORE); }
     private ApiException rejected(CommitFailureCode code) { return switch (code) { case REVISION_CONFLICT -> new ApiException(ApiErrorCode.REVISION_CONFLICT, 409, false, "基础修订不是当前草稿"); case READ_ONLY_REVISION -> new ApiException(ApiErrorCode.READ_ONLY_REVISION, 409, false, "当前修订为只读"); case IDEMPOTENCY_MISMATCH -> new ApiException(ApiErrorCode.IDEMPOTENCY_MISMATCH, 409, false, "command_id 已绑定不同请求"); case RULE_VERSION_CONFLICT -> new ApiException(ApiErrorCode.RULE_VERSION_CONFLICT, 409, false, "Profile 或 Rule 版本不匹配"); case VALIDATION_BLOCKED -> new ApiException(ApiErrorCode.VALIDATION_BLOCKED, 422, false, "候选修订未通过校验"); case MODIFIER_COMBINATION_INVALID -> new ApiException(ApiErrorCode.MODIFIER_COMBINATION_INVALID, 422, false, "Control 修饰组合无效"); case TEXT_GENERATION_BLOCKED -> new ApiException(ApiErrorCode.TEXT_GENERATION_BLOCKED, 422, false, "无法生成 OPL 文本"); default -> new ApiException(ApiErrorCode.PERSISTENCE_FAILED, 500, true, "修订提交失败"); }; }
     private ApiException profileForbidden() { return new ApiException(ApiErrorCode.PROFILE_FORBIDDEN, 422, false, "当前 Profile 不支持该 P0 命令"); }
+    private ApiException modifierCombinationInvalid(String message) { return new ApiException(ApiErrorCode.MODIFIER_COMBINATION_INVALID, 422, false, message); }
     private ApiException domain(String message) { return new ApiException(ApiErrorCode.DOMAIN_REJECTED, 422, false, message); }
     private ApiException notFound(String message) { return new ApiException(ApiErrorCode.NOT_FOUND, 404, false, message); }
     private ApiException persistence(Exception exception) { return new ApiException(ApiErrorCode.PERSISTENCE_FAILED, 500, true, "本地持久化失败"); }

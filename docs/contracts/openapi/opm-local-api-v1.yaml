@@ -635,7 +635,7 @@ components:
         meta: {$ref: "#/components/schemas/QueryMeta"}
         data:
           type: object
-          required: [context_id, constructs]
+          required: [context_id, constructs, suppressed_states]
           properties:
             context_id: {$ref: "#/components/schemas/StableId"}
             constructs:
@@ -659,6 +659,20 @@ components:
                   labels: {type: array, items: {type: object, additionalProperties: true}}
                   collection_completeness: {type: string, enum: [COMPLETE, INCOMPLETE, NOT_APPLICABLE]}
                   layout: {type: object, additionalProperties: true}
+            suppressed_states:
+              type: array
+              items:
+                $ref: "#/components/schemas/SuppressedState"
+    SuppressedState:
+      type: object
+      additionalProperties: false
+      required: [state_id, owner_ref, name_or_value, state_roles, explicitness]
+      properties:
+        state_id: {$ref: "#/components/schemas/StableId"}
+        owner_ref: {$ref: "#/components/schemas/TargetLocator"}
+        name_or_value: {type: string, minLength: 1, maxLength: 4000}
+        state_roles: {$ref: "#/components/schemas/StateRoles"}
+        explicitness: {const: SUPPRESSED}
     CommandCapabilitiesResult:
       type: object
       additionalProperties: false
@@ -947,6 +961,7 @@ components:
       required: [context_id, owner_ref, capability_ref, name_or_value, state_roles, occurrence, layout, capability_query_id, selected_option_id]
       properties:
         context_id: {$ref: "#/components/schemas/StableId"}
+        state_id: {$ref: "#/components/schemas/StableId"}
         owner_ref: {$ref: "#/components/schemas/TargetLocator"}
         capability_ref: {$ref: "#/components/schemas/CapabilityReference"}
         name_or_value: {type: string, minLength: 1, maxLength: 4000}
@@ -992,6 +1007,7 @@ components:
       required: [context_id, capability_ref, fact_family, normalized_endpoints, direction, labels, modifiers, logical_groups, occurrence, layout, capability_query_id, selected_option_id]
       properties:
         context_id: {$ref: "#/components/schemas/StableId"}
+        fact_id: {$ref: "#/components/schemas/StableId"}
         capability_ref: {$ref: "#/components/schemas/CapabilityReference"}
         fact_family: {type: string, enum: [PROCEDURAL, CONTROL, STRUCTURAL, TRANSFORMATION, ENABLING, PROFILE_FACT]}
         normalized_endpoints: {type: array, minItems: 2, items: {$ref: "#/components/schemas/NormalizedEndpoint"}}
@@ -1258,6 +1274,7 @@ components:
             - RULE_VERSION_CONFLICT
             - PROFILE_FORBIDDEN
             - DOMAIN_REJECTED
+            - MODIFIER_COMBINATION_INVALID
             - VALIDATION_BLOCKED
             - TEXT_GENERATION_BLOCKED
             - PERSISTENCE_FAILED

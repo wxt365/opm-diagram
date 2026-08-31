@@ -16,6 +16,7 @@ import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -257,12 +258,13 @@ class E2EFixtureMaterializerCliTest {
             Map<String, Object> catalog = E2EFixtureMaterializerCliTest.catalog(fixtureSha, otherSha);
             Path catalogPath = writeJson(attemptRoot.resolve("inputs/materializer/family-catalog.json"), catalog);
             Map<String, Object> catalogRef = ref("FAMILY_FIXTURE_IDENTITY_CATALOG", "inputs/upstream/catalogs/family-catalog.json", catalogPath);
-            Map<String, Object> fixtureRef = ref("FAMILY_BASE", "inputs/upstream/fixtures/family-proc.json", fixture);
-            Map<String, Object> otherFixtureRef = Map.of("kind", "FAMILY_BASE", "path", "inputs/upstream/fixtures/family-struct.json", "byte_length", 1, "sha256", otherSha);
+            Map<String, Object> fixtureRef = archiveRef("inputs/upstream/fixtures/family-proc.json", fixture);
+            Map<String, Object> otherFixtureRef = Map.of("path", "inputs/upstream/fixtures/family-struct.json", "byte_length", 1,
+                    "sha256", otherSha, "bundle_sha256", "c".repeat(64), "archive_entry_path", "archive/family-struct.json");
 
             List<Map<String, Object>> cases = new ArrayList<>();
-            for (int index = 0; index < 178; index++) cases.add(caseValue("FAMILY-" + index, true, index % 2 == 0 ? fixtureRef : otherFixtureRef));
-            for (int index = 0; index < 16; index++) cases.add(caseValue("COMMON-" + index, false, fixtureRef));
+            for (int index = 0; index < 178; index++) cases.add(caseValue(familyCaseId(index), true, index % 2 == 0 ? fixtureRef : otherFixtureRef));
+            for (int index = 0; index < 16; index++) cases.add(caseValue("E2E-CANVAS-001.COMMON_" + index, false, fixtureRef));
             Map<String, Object> manifest = new LinkedHashMap<>();
             manifest.put("schema_id", "OPM-DEV-CANVAS-06-E2E-MANIFEST-001");
             manifest.put("schema_version", "0.2");
@@ -273,22 +275,22 @@ class E2EFixtureMaterializerCliTest {
             manifest.put("profile_asset_tree_ref", treeRef);
             manifest.put("profile_asset_refs", profileRefs);
             Path manifestRoot = Files.createDirectories(attemptRoot.resolve("inputs/manifest"));
-            Path manifestInput = writeJson(manifestRoot.resolve("inputs/upstream/inputs/family-0.json"), Map.of("action", "FAMILY-0"));
-            Map<String, Object> inputRef = ref("FAMILY_INPUT", "inputs/upstream/inputs/family-0.json", manifestInput);
+            Path manifestInput = writeJson(manifestRoot.resolve("inputs/upstream/inputs/family-0.json"), Map.of("action", familyCaseId(0)));
+            Map<String, Object> inputRef = archiveRef("inputs/upstream/inputs/family-0.json", manifestInput);
             for (Map<String, Object> caseValue : cases) caseValue.put("input_ref", inputRef);
             writeJson(manifestRoot.resolve("manifest.json"), manifest);
 
-            Path inputCopy = writeJson(attemptRoot.resolve("inputs/materializer/input.raw"), Map.of("action", "FAMILY-0"));
+            Path inputCopy = writeJson(attemptRoot.resolve("inputs/materializer/input.raw"), Map.of("action", familyCaseId(0)));
             Map<String, Object> faultPlan = new LinkedHashMap<>();
             faultPlan.put("schema_id", "OPM-DEV-CANVAS-06-E2E-FAULT-PLAN-001");
             faultPlan.put("schema_version", "0.2");
-            faultPlan.put("case_id", "FAMILY-0");
+            faultPlan.put("case_id", familyCaseId(0));
             faultPlan.put("attempt_ordinal", 1);
             faultPlan.put("fault_kind", "NONE");
             faultPlan.put("target", "NONE");
             faultPlan.put("trigger_count", 0);
             faultPlan.put("nonce", "a".repeat(64));
-            Map<String, Object> planPreimage = Map.of("case_id", "FAMILY-0", "attempt_ordinal", 1, "fault_kind", "NONE", "target", "NONE", "trigger_count", 0, "nonce", "a".repeat(64));
+            Map<String, Object> planPreimage = Map.of("case_id", familyCaseId(0), "attempt_ordinal", 1, "fault_kind", "NONE", "target", "NONE", "trigger_count", 0, "nonce", "a".repeat(64));
             faultPlan.put("plan_sha256", sha(Rfc8785JsonCanonicalizer.canonicalize(planPreimage).getBytes(StandardCharsets.UTF_8)));
             faultPlan.put("artifact_payload_sha256", sha(Rfc8785JsonCanonicalizer.canonicalize(faultPlan).getBytes(StandardCharsets.UTF_8)));
             Path faultPlanPath = writeJson(attemptRoot.resolve("fault-plan.json"), faultPlan);
@@ -354,12 +356,13 @@ class E2EFixtureMaterializerCliTest {
                     "sha256", sha(Rfc8785JsonCanonicalizer.canonicalize(treePreimage).getBytes(StandardCharsets.UTF_8)));
             manifest.set("profile_asset_tree_ref", JSON.valueToTree(treeRef));
             ArrayNode fixtureRefs = (ArrayNode) manifest.get("fixture_refs");
-            Map<String, Object> actualFixtureRef = ref("FAMILY_BASE", "inputs/upstream/fixtures/family-proc.json", fixture.fixture);
+            Map<String, Object> actualFixtureRef = archiveRef("inputs/upstream/fixtures/family-proc.json", fixture.fixture);
             fixtureRefs.set(0, JSON.valueToTree(actualFixtureRef));
             fixtureRefs.set(2, JSON.valueToTree(ref("FAMILY_FIXTURE_IDENTITY_CATALOG", "inputs/upstream/catalogs/family-catalog.json", fixture.catalog)));
             for (JsonNode value : manifest.required("cases")) {
                 String caseId = value.required("case_id").asText();
-                if (caseId.startsWith("FAMILY-") && Integer.parseInt(caseId.substring("FAMILY-".length())) % 2 == 0) {
+                if (caseId.startsWith("G-OPL-PROC-001.CASE_")
+                        && Integer.parseInt(caseId.substring("G-OPL-PROC-001.CASE_".length(), caseId.length() - ".PASS".length())) % 2 == 0) {
                     ((ObjectNode) value).set("fixture_ref", JSON.valueToTree(actualFixtureRef));
                 }
             }
@@ -380,13 +383,15 @@ class E2EFixtureMaterializerCliTest {
             selected.put("case_id", caseId);
             selected.remove("capability_id");
             selected.set("fixture_ref", JSON.valueToTree(ref("FIXTURE", "inputs/common/e2e/common.base.json", fixture.fixture)));
+            selected.set("input_ref", JSON.valueToTree(ref("INPUT", "inputs/upstream/inputs/family-0.json",
+                    fixture.manifestRoot.resolve("inputs/upstream/inputs/family-0.json"))));
             writeJson(fixture.manifestRoot.resolve("manifest.json"), manifest);
             rewriteFaultPlan(fixture.faultPlan, caseId);
             return fixture;
         }
 
         String[] arguments() {
-            return new String[] {"--guard", "RELEASE_E2E_ONLY", "--fixture-kind", "FAMILY", "--case-id", "FAMILY-0", "--fixture", fixture.toString(),
+            return new String[] {"--guard", "RELEASE_E2E_ONLY", "--fixture-kind", "FAMILY", "--case-id", familyCaseId(0), "--fixture", fixture.toString(),
                     "--family-identity-catalog", catalog.toString(), "--manifest-root", manifestRoot.toString(), "--manifest", "manifest.json",
                     "--input", inputCopy.toString(),
                     "--profile-asset-root", profileRoot.toString(), "--binding", binding.toString(), "--fault-plan", faultPlan.toString(),
@@ -469,6 +474,16 @@ class E2EFixtureMaterializerCliTest {
     private static Map<String, Object> ref(String kind, String path, Path file) throws Exception {
         byte[] bytes = Files.readAllBytes(file);
         return Map.of("kind", kind, "path", path, "byte_length", bytes.length, "sha256", sha(bytes));
+    }
+
+    private static Map<String, Object> archiveRef(String path, Path file) throws Exception {
+        byte[] bytes = Files.readAllBytes(file);
+        return Map.of("path", path, "byte_length", bytes.length, "sha256", sha(bytes), "bundle_sha256", "c".repeat(64),
+                "archive_entry_path", "archive/" + file.getFileName());
+    }
+
+    private static String familyCaseId(int index) {
+        return "G-OPL-PROC-001.CASE_" + String.format(Locale.ROOT, "%03d", index) + ".PASS";
     }
 
     private static String packageDigest(List<Map<String, Object>> entries) {

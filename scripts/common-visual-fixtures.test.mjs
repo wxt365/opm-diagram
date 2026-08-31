@@ -11,7 +11,7 @@ const builder = resolve('scripts/build-canvas06-common-visual-fixtures.mjs');
 const verifier = resolve('scripts/verify-canvas06-common-visual-fixtures.mjs');
 const handoff = resolve('packages/profiles/profile.iso19450.2024.draft/0.2.0/handoff/dev-canvas-05-handoff.json');
 
-test('Common Visual builder publishes and verifies the exact 43-file root', async () => {
+test('Common Visual builder publishes and verifies the exact 44-file root', async () => {
   const temporary = await mkdtemp(resolve(tmpdir(), 'opm-common-visual-'));
   const fixtureRoot = resolve(temporary, 'fixtures');
   try {
@@ -22,7 +22,7 @@ test('Common Visual builder publishes and verifies the exact 43-file root', asyn
     assert.equal(catalog.visual_subjects.length, 8);
     assert.equal(catalog.e2e_cases.length, 16);
     const files = await fileCount(fixtureRoot);
-    assert.equal(files, 43);
+    assert.equal(files, 44);
     const verified = run(verifier, ['--handoff', handoff, '--fixture-root', fixtureRoot, '--catalog', 'dev-canvas-06-common-fixture-catalog.json']);
     assert.equal(verified.status, 0, verified.stderr);
   } finally { await rm(temporary, { recursive: true, force: true }); }
@@ -144,7 +144,7 @@ test('Common Visual builder permits a fresh output root whose parent does not ex
   try {
     const built = run(builder, ['--handoff', handoff, '--fixture-root', fixtureRoot, '--source-date-epoch', '1782864000']);
     assert.equal(built.status, 0, built.stderr);
-    assert.equal(await fileCount(fixtureRoot), 43);
+    assert.equal(await fileCount(fixtureRoot), 44);
   } finally { await rm(temporary, { recursive: true, force: true }); }
 });
 

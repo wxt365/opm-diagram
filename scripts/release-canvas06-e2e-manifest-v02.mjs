@@ -1,210 +1,319 @@
-import { execFile as execFileCallback } from 'node:child_process';
-import { lstat, mkdir, mkdtemp, readFile, rename, rm } from 'node:fs/promises';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { mkdtemp, mkdir, readFile, readdir, rename, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { basename, dirname, relative, resolve, sep } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { promisify } from 'node:util';
+import { basename, dirname, relative, resolve } from 'node:path';
 import Ajv2020 from 'ajv/dist/2020.js';
 import addFormats from 'ajv-formats';
 
 import { listSafeArchiveEntries, materializeArchiveEntries } from './canvas06-e2e-manifest-v01-archive.mjs';
-import { collectFixtureRefs, deriveCommonCases, deriveFamilyCases, verifyFamilyFixtureIdentityCatalog } from './canvas06-e2e-manifest-v01-input.mjs';
-import { loadControlledReadyTrustChain, loadReadyTrustChain, readJsonRef } from './canvas06-e2e-manifest-v01-trust.mjs';
-import { archiveEntryPath, archiveRef, copyRegularFile, copyTree, fileRef, fsyncPath, fsyncTree, jcs, readJson, resolveInside, sha256, treeRef, verifyFileRef, writeBytes } from './canvas06-e2e-manifest-v01-support.mjs';
+import { verifyCommonFixtureInput } from './canvas06-e2e-common-fixtures.mjs';
+import { collectFixtureRefs, deriveCommonCases, deriveFamilyCases, resolveSymbolLogicalPath, verifyFamilyFixtureIdentityCatalog } from './canvas06-e2e-manifest-v01-input.mjs';
+import { loadControlledReadyTrustChain, loadProductionReadyTrustChain, readJsonRef } from './canvas06-e2e-manifest-v01-trust.mjs';
+import { archiveEntryPath, archiveRef, assertDirectory, copyRegularFile, copyTree, fileRef, fsyncPath, fsyncTree, jcs, listTree, readJson, resolveInside, sha256, verifyFileRef, writeBytes } from './canvas06-e2e-manifest-v01-support.mjs';
 import { composeE2eManifestV02, manifestBytes } from './canvas06-e2e-manifest-v02-compose.mjs';
-import { fail, formatSourceDateEpoch, materializeProfileAssetStaging, parseProducerOptions, removeProfileAssetStaging } from './canvas06-e2e-manifest-v02-input.mjs';
+import { assertProfileAssetSourceSetStable, assertProfileAssetThreeWayJoin, E2eManifestV02Error, fail, formatSourceDateEpoch, materializeProfileAssetStaging, parseProducerOptions, readProfileAssetSourceSet, removeProfileAssetStaging } from './canvas06-e2e-manifest-v02-input.mjs';
 import { loadProfileAssetClosure } from './canvas06-e2e-manifest-v02-profile.mjs';
-import { verifyStagingRoot } from './verify-canvas06-e2e-manifest-v02.mjs';
+import { rebaseCommonSetupPlanRefs } from './canvas06-e2e-common-setup-plan.mjs';
 
-const execFile = promisify(execFileCallback);
-const workspaceRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const COMMON_SCHEMA = JSON.parse(await readFile(new URL('../docs/contracts/schemas/opm-dev-canvas-06-common-fixture-catalog.schema.json', import.meta.url), 'utf8'));
-const FAMILY_SCHEMA = JSON.parse(await readFile(new URL('../docs/contracts/schemas/opm-dev-canvas-06-e2e-family-fixture-identity-catalog.schema.json', import.meta.url), 'utf8'));
+const workspaceRoot = resolve(dirname(new URL(import.meta.url).pathname), '..');
+const commonCatalogName = 'dev-canvas-06-common-fixture-catalog.json';
+const commonCatalogSchema = JSON.parse(await readFile(new URL('../docs/contracts/schemas/opm-dev-canvas-06-common-fixture-catalog.schema.json', import.meta.url), 'utf8'));
+const familyIdentitySchema = JSON.parse(await readFile(new URL('../docs/contracts/schemas/opm-dev-canvas-06-e2e-family-fixture-identity-catalog.schema.json', import.meta.url), 'utf8'));
 const ajv = new Ajv2020({ allErrors: true, strict: false });
 addFormats(ajv);
-const validateCommon = ajv.compile(COMMON_SCHEMA);
-const validateFamily = ajv.compile(FAMILY_SCHEMA);
-const DRIVER_FILES = Object.freeze([
-  ['DRIVER-PROCEDURAL', 'procedural-driver.mjs'],
-  ['DRIVER-CONTROL', 'control-driver.mjs'],
-  ['DRIVER-STRUCTURAL', 'structural-driver.mjs'],
-  ['DRIVER-COMMON', 'common-driver.mjs']
-]);
+const validateCommonCatalog = ajv.compile(commonCatalogSchema);
+const validateFamilyIdentity = ajv.compile(familyIdentitySchema);
 
 export async function main(argv = process.argv.slice(2), dependencies = {}) {
   const options = parseProducerOptions(argv);
-  if (options['input-mode'] === 'PRODUCTION_HANDOFF') await assertQuarantine(options['handoff-root']);
+  const paths = await validatePaths(options);
   const trust = await loadTrust(options);
-  const source = await inspectSource(options['source-root'], dependencies);
-  const manifestId = `dev-canvas-06.e2e.${source.commit.slice(0, 12)}.${trust.intake.ref.sha256.slice(0, 12)}`;
-  const expectedOut = `dev-canvas-06/e2e/manifests/${manifestId}/dev-canvas-06-e2e-manifest.json`;
-  if (options.out !== expectedOut) fail('E2E_MANIFEST_ARGUMENT_INVALID', 'ARGS', 'out must be derived from the source commit and Intake raw ref.');
-  const outputRoot = resolve(options['output-root']);
-  await ensureDirectory(outputRoot, 'ARGS');
-  const finalRoot = safeResolve(outputRoot, dirname(expectedOut));
-  await assertOutputFresh(finalRoot);
-  const profileStaging = resolve(options['profile-asset-root']);
-  assertSeparate(profileStaging, [source.root, outputRoot, resolve(options['common-fixture-root']), trust.root]);
-  const runtime = await javaRuntime(dependencies.runtime);
-  const archive = await loadArchive({ trust, runtime });
-  const common = await loadCommon({ root: resolve(options['common-fixture-root']), handoffPath: trust.handoffPath });
-  const profileRoot = await materializeProfileAssetStaging({ sourceRoot: source.root, stagingRoot: profileStaging });
+  const source = await inspectSource(paths.sourceRoot, trust.handoff.value, dependencies);
+  const expectedId = `dev-canvas-06.e2e.${source.commit.slice(0, 12)}.${trust.intake.ref.sha256.slice(0, 12)}`;
+  const expectedOut = `dev-canvas-06/e2e/manifests/${expectedId}/dev-canvas-06-e2e-manifest.json`;
+  if (options.out !== expectedOut) fail('E2E_MANIFEST_ARGUMENT_INVALID', 'ARGS', 'out must be the exact path derived from source commit and Intake raw SHA.');
+  const finalRoot = resolve(paths.outputRoot, dirname(options.out));
+  if (!relative(paths.outputRoot, finalRoot) || relative(paths.outputRoot, finalRoot).startsWith('..')) fail('E2E_MANIFEST_ARGUMENT_INVALID', 'ARGS', 'out escapes output-root.');
+  await assertFresh(finalRoot, expectedId);
+  const runtime = await resolveJava(dependencies.runtime);
+  const archive = await loadArchive(trust, runtime.jarPath);
+  const materialized = await materializeFamily(archive, runtime, trust.handoff.value.active_binding);
+  const common = await loadCommon(paths.commonRoot, trust.handoff.value.active_binding);
+  const sourceProfile = await readProfileAssetSourceSet(paths.sourceRoot);
+  let profileStagingRoot;
+  let staging;
   try {
-    const profile = await loadProfileAssetClosure({ assetRoot: profileRoot, activeBinding: trust.handoff.value.active_binding });
-    const staging = await createStaging(finalRoot);
-    try {
-      const staged = await stage({ staging, source, trust, archive, runtime, common, profileRoot, profile });
-      const cases = [...deriveFamilyCases(staged.family), ...deriveCommonCases({ catalog: common.catalog, materializedRefs: staged.commonRefs })];
-      const manifest = composeE2eManifestV02({
-        source_date_epoch: options['source-date-epoch'], node_version: process.version, playwright_version: source.playwrightVersion,
-        chromium_version: source.chromiumVersion, os: `${process.platform}-${process.arch}`, command: normalizedCommand(options),
-        runner_source_sha256: source.runnerSha, intake_report_ref: staged.intakeRef, handoff_ref: staged.handoffRef,
-        upstream_source_build: trust.handoff.value.source_build, source_build: staged.sourceBuild, upstream_input_refs: staged.upstreamRefs,
-        input_materialization: staged.materialization, common_fixture_catalog_ref: staged.commonCatalogRef,
-        fixture_refs: collectFixtureRefs(cases, [staged.familyCatalogRef]), driver_catalog: staged.drivers, cases,
-        profile_asset_tree_ref: profile.profile_asset_tree_ref, profile_asset_refs: profile.profile_asset_refs
-      });
-      await writeBytes({ bytes: Buffer.from(manifestBytes(manifest), 'utf8'), destinationRoot: staging, destination: 'dev-canvas-06-e2e-manifest.json', kind: 'E2E_MANIFEST', code: 'E2E_MANIFEST_IO_FAILED' });
-      await removeProfileAssetStaging(profileRoot);
-      await verifyStagingRoot(stagingArgs(options, staging), { runtime });
-      await fsyncTree(staging);
-      await rename(staging, finalRoot);
-      try { await fsyncPath(dirname(finalRoot)); }
-      catch { fail('E2E_MANIFEST_IO_FAILED', 'PARENT_FSYNC', 'Final root was renamed but its parent cannot be fsynced.'); }
-      const manifestPath = resolve(finalRoot, 'dev-canvas-06-e2e-manifest.json');
-      const bytes = await readFile(manifestPath);
-      return { path: manifestPath, sha256: sha256(bytes) };
-    } catch (error) {
-      await rm(staging, { recursive: true, force: true });
-      throw error;
-    }
+    profileStagingRoot = await materializeProfileAssetStaging({
+      sourceSet: sourceProfile,
+      profileAssetRoot: paths.profileStagingRoot,
+      isolatedRoots: [paths.sourceRoot, paths.commonRoot, paths.outputRoot, trust.root]
+    });
+    await fsyncTree(profileStagingRoot);
+    const profileStaging = await loadProfileAssetClosure({ assetRoot: profileStagingRoot, activeBinding: trust.handoff.value.active_binding });
+    const recheckedSource = await readProfileAssetSourceSet(paths.sourceRoot);
+    assertProfileAssetSourceSetStable(sourceProfile, recheckedSource);
+    assertProfileAssetThreeWayJoin(recheckedSource, profileStaging, profileStaging);
+    staging = await createStaging(finalRoot);
+    const staged = await stageInputs({ staging, paths, trust, source, archive, materialized, common, sourceProfile: recheckedSource, profileStaging, profileStagingRoot });
+    const familyCases = deriveFamilyCases({
+      coverage: materialized.coverage,
+      goldenManifest: materialized.goldenManifest,
+      replay: materialized.replay,
+      materializedEntries: staged.familyEntries
+    });
+    verifyFamilyFixtureIdentityCatalog({
+      catalog: materialized.familyIdentity,
+      goldenManifest: materialized.goldenManifest,
+      goldenManifestBytes: materialized.bytes.get(materialized.goldenManifestEntry),
+      fixtureBytesByEntry: materialized.familyFixtureBytes
+    });
+    const commonCases = deriveCommonCases({ catalog: common.catalog, materializedRefs: staged.commonEntries });
+    const cases = [...familyCases, ...commonCases];
+    const manifest = composeE2eManifestV02({
+      source_date_epoch: options['source-date-epoch'],
+      node_version: process.version,
+      playwright_version: source.playwrightVersion,
+      chromium_version: source.chromiumVersion,
+      os: `${process.platform}-${process.arch}`,
+      command: normalizedCommand(options),
+      runner_source_sha256: source.runnerSha,
+      intake_report_ref: staged.intakeRef,
+      handoff_ref: staged.handoffRef,
+      upstream_source_build: trust.handoff.value.source_build,
+      source_build: staged.sourceBuild,
+      upstream_input_refs: [
+        { input_kind: 'COVERAGE_CATALOG', ref: staged.coverageRef },
+        { input_kind: 'GOLDEN_MANIFEST', ref: staged.goldenManifestRef },
+        { input_kind: 'GOLDEN_REPLAY_REPORT', ref: staged.replayRef },
+        { input_kind: 'SYMBOL_CATALOG', ref: staged.symbolRef },
+        { input_kind: 'HANDOFF_EVIDENCE_BUNDLE', ref: staged.bundleRef }
+      ],
+      input_materialization: {
+        bundle_ref: staged.bundleRef,
+        java_version: runtime.version,
+        entry_allowlist: materialized.allowlist,
+        materialized_count: materialized.allowlist.length,
+        aggregate_sha256: sha256(Buffer.from(jcs(staged.archiveRefs.sort((a, b) => a.archive_entry_path.localeCompare(b.archive_entry_path, 'en')).map(item => ({ archive_entry_path: item.archive_entry_path, path: item.path, byte_length: item.byte_length, sha256: item.sha256 }))), 'utf8')),
+        temporary_directory_cleaned: true
+      },
+      common_fixture_catalog_ref: staged.commonCatalogRef,
+      common_setup_plan_ref: staged.commonSetupPlanRef,
+      fixture_refs: collectFixtureRefs(cases, [staged.familyIdentityRef]),
+      driver_catalog: staged.drivers,
+      cases,
+      profile_asset_tree_ref: staged.profile.profile_asset_tree_ref,
+      profile_asset_refs: staged.profile.profile_asset_refs
+    });
+    const manifestRef = await writeBytes({ bytes: Buffer.from(manifestBytes(manifest), 'utf8'), destinationRoot: staging, destination: 'dev-canvas-06-e2e-manifest.json', kind: 'E2E_MANIFEST', code: 'E2E_MANIFEST_IO_FAILED' });
+    await verifyCopiedInputs({ staging, manifest, common, sourceProfile: recheckedSource, profileStaging });
+    await removeProfileAssetStaging(profileStagingRoot, fsyncPath);
+    profileStagingRoot = undefined;
+    await fsyncTree(staging);
+    await rename(staging, finalRoot);
+    try { await fsyncPath(dirname(finalRoot)); }
+    catch (error) { fail('E2E_MANIFEST_IO_FAILED', 'PARENT_FSYNC', error.message); }
+    return { path: resolve(finalRoot, manifestRef.path), sha256: manifestRef.sha256 };
+  } catch (error) {
+    if (staging) await rm(staging, { recursive: true, force: true });
+    if (profileStagingRoot) await rm(profileStagingRoot, { recursive: true, force: true });
+    throw normalize(error);
   } finally {
-    await removeIfPresent(profileRoot);
-    await rm(archive.temp, { recursive: true, force: true });
+    await rm(materialized.temporary, { recursive: true, force: true });
   }
+}
+
+async function validatePaths(options) {
+  const sourceRoot = resolve(options['source-root']);
+  const commonRoot = resolve(options['common-fixture-root']);
+  const profileStagingRoot = resolve(options['profile-asset-root']);
+  const outputRoot = resolve(options['output-root']);
+  await assertDirectory(sourceRoot, 'E2E_MANIFEST_SOURCE_BUILD_INVALID');
+  await assertDirectory(commonRoot, 'E2E_MANIFEST_COMMON_FIXTURE_INVALID');
+  await mkdir(outputRoot, { recursive: true });
+  await assertDirectory(outputRoot, 'E2E_MANIFEST_IO_FAILED');
+  for (const [left, right] of [[sourceRoot, commonRoot], [sourceRoot, outputRoot], [commonRoot, outputRoot]]) {
+    if (left === right || left.startsWith(`${right}/`) || right.startsWith(`${left}/`)) fail('E2E_MANIFEST_INPUT_CLASS_INVALID', 'PATHS', 'Source, Common, and output roots must be independent.');
+  }
+  return { sourceRoot, commonRoot, profileStagingRoot, outputRoot };
 }
 
 async function loadTrust(options) {
   if (options['input-mode'] === 'CONTROLLED_TEST') {
     const chain = await loadControlledReadyTrustChain({ bundleRoot: options['controlled-bundle-root'] });
-    return { root: chain.bundle.root, intake: chain.intake, handoff: chain.handoff, handoffPath: chain.bundle.references.handoff_ref.absolute_path,
-      raw: { intake: chain.bundle.references.intake_report_ref, handoff: chain.bundle.references.handoff_ref, archive: chain.bundle.references.evidence_bundle_ref } };
+    return { root: chain.bundle.root, intake: chain.intake, handoff: chain.handoff, handoffPath: resolve(chain.bundle.root, chain.bundle.descriptor.handoff_ref.path), raw: { intake: chain.bundle.references.intake_report_ref, handoff: chain.bundle.references.handoff_ref, archive: chain.bundle.references.evidence_bundle_ref } };
   }
   const root = resolve(options['handoff-root']);
   const intake = await readJsonRef(root, options['intake-report'], 'INTAKE_REPORT');
-  const chain = await loadReadyTrustChain({ root, intakePath: options['intake-report'], handoffPath: intake.value.handoff_ref?.path });
-  const archives = chain.handoff.value.build_artifacts?.filter(item => item.kind === 'EVIDENCE_BUNDLE') ?? [];
-  if (archives.length !== 1) fail('E2E_MANIFEST_INTAKE_INVALID', 'EXTERNAL_TRUST', 'Handoff must contain one Evidence Bundle.');
-  return { root, intake: chain.intake, handoff: chain.handoff, handoffPath: resolveInside(root, chain.handoff.ref.path), raw: { intake: chain.intake.ref, handoff: chain.handoff.ref, archive: archives[0] } };
+  const chain = await loadProductionReadyTrustChain({ root, intakePath: options['intake-report'], handoffPath: intake.value.handoff_ref?.path });
+  const archive = oneArtifact(chain.handoff.value, 'EVIDENCE_BUNDLE');
+  return { root, intake: chain.intake, handoff: chain.handoff, handoffPath: resolve(root, chain.handoff.ref.path), raw: { intake: chain.intake.ref, handoff: chain.handoff.ref, archive } };
 }
 
-async function inspectSource(rootValue, dependencies) {
-  const root = resolve(rootValue);
-  await ensureDirectory(root, 'SOURCE_CLEAN_HEAD');
-  const git = dependencies.git ?? (async (cwd, args) => (await execFile('git', ['-C', cwd, ...args])).stdout.trim());
-  const commit = await git(root, ['rev-parse', '--verify', 'HEAD']);
-  if (!/^[a-f0-9]{40}$/.test(commit) || (await git(root, ['status', '--porcelain'])).trim()) fail('E2E_MANIFEST_SOURCE_BUILD_INVALID', 'SOURCE_CLEAN_HEAD', 'source-root must be a clean Git commit.');
-  const runtimeJar = safeResolve(root, 'services/local-runtime/target/local-runtime-0.1.0-SNAPSHOT.jar');
-  const webDist = safeResolve(root, 'apps/web/dist');
-  const lockfile = safeResolve(root, 'package-lock.json');
-  const runner = safeResolve(root, 'scripts/release-canvas06-e2e-manifest-v02.mjs');
-  for (const path of [runtimeJar, lockfile, runner]) await regular(path, 'SOURCE_ROOT_FIXED_PATHS');
-  await ensureDirectory(webDist, 'SOURCE_ROOT_FIXED_PATHS');
-  const packageJson = await readJson(safeResolve(root, 'node_modules/@playwright/test/package.json'), 'E2E_MANIFEST_SOURCE_BUILD_INVALID');
-  const browsers = await readJson(safeResolve(root, 'node_modules/playwright-core/browsers.json'), 'E2E_MANIFEST_SOURCE_BUILD_INVALID');
+async function inspectSource(sourceRoot, handoff, dependencies) {
+  const git = dependencies.git ?? ((root, args) => execFileSync('git', ['-C', root, ...args], { encoding: 'utf8' }).trim());
+  const commit = await git(sourceRoot, ['rev-parse', 'HEAD']);
+  if (!/^[a-f0-9]{40}$/.test(commit) || commit !== handoff.source_build?.source_commit) fail('E2E_MANIFEST_SOURCE_BUILD_INVALID', 'SOURCE_CLEAN_HEAD', 'source-root HEAD must exactly match Handoff source build.');
+  if ((await git(sourceRoot, ['status', '--porcelain'])).trim()) fail('E2E_MANIFEST_SOURCE_BUILD_INVALID', 'SOURCE_CLEAN_HEAD', 'source-root must be clean.');
+  const lockfile = resolveInside(sourceRoot, 'package-lock.json', 'E2E_MANIFEST_SOURCE_BUILD_INVALID');
+  const runner = resolveInside(sourceRoot, 'scripts/release-canvas06-e2e-manifest-v02.mjs', 'E2E_MANIFEST_SOURCE_BUILD_INVALID');
+  const packageJson = await readJson(resolveInside(sourceRoot, 'node_modules/@playwright/test/package.json', 'E2E_MANIFEST_SOURCE_BUILD_INVALID'), 'E2E_MANIFEST_SOURCE_BUILD_INVALID');
+  const browsers = await readJson(resolveInside(sourceRoot, 'node_modules/playwright-core/browsers.json', 'E2E_MANIFEST_SOURCE_BUILD_INVALID'), 'E2E_MANIFEST_SOURCE_BUILD_INVALID');
   const chromium = browsers.browsers?.find(item => item.name === 'chromium');
-  if (!packageJson.version || !chromium?.revision) fail('E2E_MANIFEST_SOURCE_BUILD_INVALID', 'SOURCE_ROOT_FIXED_PATHS', 'Playwright and Chromium metadata are required.');
-  const drivers = DRIVER_FILES.map(([id, file]) => ({ id, file, source: safeResolve(root, `tests/e2e/release/dev-canvas-06/drivers/${file}`) }));
-  for (const driver of drivers) await regular(driver.source, 'FOUR_DRIVERS');
-  return { root, commit, runtimeJar, webDist, lockfile, runner, drivers, playwrightVersion: packageJson.version, chromiumVersion: String(chromium.revision), runnerSha: sha256(await readFile(runner)) };
+  if (!packageJson.version || !chromium?.revision) fail('E2E_MANIFEST_SOURCE_BUILD_INVALID', 'LOCKFILE', 'Playwright and Chromium metadata are required.');
+  return { commit, lockfile, runnerSha: sha256(await readFile(runner)), playwrightVersion: packageJson.version, chromiumVersion: String(chromium.revision) };
 }
 
-async function loadArchive({ trust, runtime }) {
+async function loadArchive(trust, jarPath) {
+  const expected = oneArtifact(trust.handoff.value, 'EVIDENCE_BUNDLE');
   const external = await verifyFileRef({ root: trust.root, reference: trust.raw.archive, code: 'E2E_MANIFEST_INTAKE_INVALID' });
-  const temp = await mkdtemp(resolve(tmpdir(), 'canvas06-e2e-v02-archive-'));
-  const active = trust.handoff.value.active_binding;
-  const prefix = `packages/profiles/${active.profile.id}/${active.profile.version}`;
-  const entries = await listSafeArchiveEntries({ jarPath: runtime.jarPath, archivePath: external.path });
-  const required = [`${prefix}/golden/opm-opl-coverage-catalog.json`, `${prefix}/golden/opm-opl-golden-manifest.json`, `${prefix}/golden/opm-e2e-family-fixture-identity-catalog.json`, `${prefix}/handoff/reports/golden-replay.json`];
-  for (const entry of required) if (!entries.includes(entry)) fail('E2E_MANIFEST_FAMILY_IDENTITY_INVALID', 'FAMILY_IDENTITY', 'Evidence Bundle is missing a required family input.');
-  const first = await materializeArchiveEntries({ jarPath: runtime.jarPath, archivePath: external.path, entries: required, destination: temp, allowExisting: true });
-  const golden = JSON.parse(first.get(required[1]).toString('utf8'));
-  const fixtureEntries = [...new Set(golden.cases.flatMap(item => [item.base_revision_fixture, item.input_revision_fixture]).map(path => `${prefix}/${path}`))].sort();
-  for (const entry of fixtureEntries) if (!entries.includes(entry)) fail('E2E_MANIFEST_FAMILY_IDENTITY_INVALID', 'FAMILY_IDENTITY', 'Evidence Bundle fixture closure is incomplete.');
-  const rest = await materializeArchiveEntries({ jarPath: runtime.jarPath, archivePath: external.path, entries: fixtureEntries, destination: temp, allowExisting: true });
-  return { temp, prefix, ref: trust.raw.archive, bytes: external.bytes, entries: required.concat(fixtureEntries).sort(), bytesByEntry: new Map([...first, ...rest]), golden, required, fixtureEntries };
+  if (external.bytes.length !== expected.byte_length || sha256(external.bytes) !== expected.sha256) fail('E2E_MANIFEST_INTAKE_INVALID', 'EXTERNAL_TRUST', 'Evidence Bundle differs from Handoff artifact.');
+  return { path: external.path, bytes: external.bytes, ref: trust.raw.archive, entries: await listSafeArchiveEntries({ jarPath, archivePath: external.path }) };
 }
 
-async function loadCommon({ root, handoffPath }) {
-  await ensureDirectory(root, 'COMMON_0.2.0_43_VERIFY');
-  try { await execFile(process.execPath, [resolve(workspaceRoot, 'scripts/verify-canvas06-common-visual-fixtures.mjs'), '--handoff', handoffPath, '--fixture-root', root, '--catalog', 'dev-canvas-06-common-fixture-catalog.json'], { cwd: workspaceRoot }); }
-  catch { fail('E2E_MANIFEST_COMMON_FIXTURE_INVALID', 'COMMON_0.2.0_43_VERIFY', 'Common Fixture root did not pass the active verifier.'); }
-  const catalog = await readJson(resolve(root, 'dev-canvas-06-common-fixture-catalog.json'), 'E2E_MANIFEST_COMMON_FIXTURE_INVALID');
-  if (!validateCommon(catalog) || catalog.catalog_version !== '0.2.0') fail('E2E_MANIFEST_COMMON_FIXTURE_INVALID', 'COMMON_0.2.0_43_VERIFY', 'Common Fixture Catalog is invalid.');
-  return { root, catalog };
+async function materializeFamily(archive, runtime, activeBinding) {
+  const temporary = await mkdtemp(resolve(tmpdir(), 'opm-canvas06-e2e-v02-'));
+  const prefix = `packages/profiles/${activeBinding.profile.id}/${activeBinding.profile.version}`;
+  const profileEntry = `${prefix}/profile.json`;
+  const coverageEntry = `${prefix}/golden/opm-opl-coverage-catalog.json`;
+  const goldenManifestEntry = `${prefix}/golden/opm-opl-golden-manifest.json`;
+  const familyIdentityEntry = `${prefix}/golden/opm-e2e-family-fixture-identity-catalog.json`;
+  const replayEntry = `${prefix}/handoff/reports/golden-replay.json`;
+  const initial = [profileEntry, coverageEntry, goldenManifestEntry, familyIdentityEntry, replayEntry];
+  requireEntries(archive.entries, initial);
+  const initialBytes = await materializeArchiveEntries({ jarPath: runtime.jarPath, archivePath: archive.path, entries: initial, destination: temporary, allowExisting: true });
+  const profile = json(initialBytes.get(profileEntry), 'E2E_MANIFEST_FAMILY_IDENTITY_INVALID', 'FAMILY_IDENTITY');
+  const symbolEntry = `${prefix}/${resolveSymbolLogicalPath({ profile, activeBinding })}`;
+  const goldenManifest = json(initialBytes.get(goldenManifestEntry), 'E2E_MANIFEST_FAMILY_IDENTITY_INVALID', 'FAMILY_IDENTITY');
+  const familyIdentity = json(initialBytes.get(familyIdentityEntry), 'E2E_MANIFEST_FAMILY_IDENTITY_INVALID', 'FAMILY_IDENTITY');
+  if (!validateFamilyIdentity(familyIdentity) || familyIdentity.catalog_version !== '0.1.0') fail('E2E_MANIFEST_FAMILY_IDENTITY_INVALID', 'FAMILY_IDENTITY', 'Family Identity Catalog is not active 0.1.0.');
+  const fixtureEntries = [...new Set(goldenManifest.cases?.flatMap(item => [item.base_revision_fixture, item.input_revision_fixture]).map(item => `${prefix}/${item}`))].sort((a, b) => a.localeCompare(b, 'en'));
+  const remaining = [symbolEntry, ...fixtureEntries];
+  requireEntries(archive.entries, remaining);
+  const remainingBytes = await materializeArchiveEntries({ jarPath: runtime.jarPath, archivePath: archive.path, entries: remaining, destination: temporary, allowExisting: true });
+  const bytes = new Map([...initialBytes, ...remainingBytes]);
+  return { temporary, prefix, profileEntry, coverageEntry, goldenManifestEntry, familyIdentityEntry, replayEntry, symbolEntry, fixtureEntries, allowlist: [...initial, ...remaining].sort((a, b) => a.localeCompare(b, 'en')), bytes, coverage: json(bytes.get(coverageEntry), 'E2E_MANIFEST_FAMILY_IDENTITY_INVALID', 'FAMILY_IDENTITY'), goldenManifest, replay: json(bytes.get(replayEntry), 'E2E_MANIFEST_FAMILY_IDENTITY_INVALID', 'FAMILY_IDENTITY'), familyIdentity, familyFixtureBytes: new Map(fixtureEntries.filter(item => goldenManifest.cases.some(value => `${prefix}/${value.base_revision_fixture}` === item)).map(item => [item.slice(`${prefix}/`.length), bytes.get(item)])) };
 }
 
-async function stage({ staging, source, trust, archive, runtime, common, profileRoot, profile }) {
-  const intakeBytes = (await verifyFileRef({ root: trust.root, reference: trust.raw.intake })).bytes;
-  const handoffBytes = (await verifyFileRef({ root: trust.root, reference: trust.raw.handoff })).bytes;
-  const intakeRef = await writeBytes({ bytes: intakeBytes, destinationRoot: staging, destination: 'inputs/trust/intake-report.json', kind: 'INTAKE_REPORT' });
-  const handoffRef = await writeBytes({ bytes: handoffBytes, destinationRoot: staging, destination: 'inputs/trust/handoff.json', kind: 'HANDOFF' });
-  const bundleRef = await writeBytes({ bytes: archive.bytes, destinationRoot: staging, destination: 'inputs/trust/evidence-bundle.zip', kind: 'EVIDENCE_BUNDLE' });
+async function loadCommon(root, activeBinding) {
+  let verified;
+  try { verified = await verifyCommonFixtureInput({ commonRoot: root, catalogPath: commonCatalogName, activeBinding }); }
+  catch { fail('E2E_MANIFEST_COMMON_FIXTURE_INVALID', 'COMMON_0.2.0_44_VERIFY', 'Common fixture root did not pass the active 44-file verifier.'); }
+  const entries = await listTree(root, 'E2E_MANIFEST_COMMON_FIXTURE_INVALID');
+  if (entries.length !== 44) fail('E2E_MANIFEST_COMMON_FIXTURE_INVALID', 'COMMON_0.2.0_44_VERIFY', 'Common fixture root must contain exactly 44 files.');
+  const catalog = await readJson(resolveInside(root, commonCatalogName, 'E2E_MANIFEST_COMMON_FIXTURE_INVALID'), 'E2E_MANIFEST_COMMON_FIXTURE_INVALID');
+  if (!validateCommonCatalog(catalog) || catalog.catalog_version !== '0.2.0') fail('E2E_MANIFEST_COMMON_FIXTURE_INVALID', 'COMMON_0.2.0_44_VERIFY', 'Common Fixture Catalog is not active 0.2.0.');
+  return { catalog, plan: verified.plan, digest: sha256(Buffer.from(jcs(entries), 'utf8')) };
+}
+
+async function stageInputs({ staging, paths, trust, source, archive, materialized, common, sourceProfile, profileStaging, profileStagingRoot }) {
+  const bundleRef = await writeBytes({ bytes: archive.bytes, destinationRoot: staging, destination: 'inputs/trust/evidence-bundle.zip', kind: 'EVIDENCE_BUNDLE', code: 'E2E_MANIFEST_IO_FAILED' });
+  const intakeRef = await copyExternal(trust.root, trust.raw.intake, staging, 'inputs/trust/intake-report.json', 'INTAKE_REPORT');
+  const handoffRef = await copyExternal(trust.root, trust.raw.handoff, staging, 'inputs/trust/handoff.json', 'HANDOFF');
+  const lockfileRef = await copyRegularFile({ source: source.lockfile, destinationRoot: staging, destination: 'inputs/build/package-lock.json', kind: 'NPM_LOCKFILE', code: 'E2E_MANIFEST_SOURCE_BUILD_INVALID' });
+  const jarRef = await copyRegularFile({ source: resolveInside(paths.sourceRoot, 'services/local-runtime/target/local-runtime-0.1.0-SNAPSHOT.jar', 'E2E_MANIFEST_SOURCE_BUILD_INVALID'), destinationRoot: staging, destination: 'inputs/build/local-runtime.jar', kind: 'LOCAL_RUNTIME_JAR', code: 'E2E_MANIFEST_SOURCE_BUILD_INVALID' });
+  const expectedJar = oneArtifact(trust.handoff.value, 'LOCAL_RUNTIME_JAR');
+  if (jarRef.byte_length !== expectedJar.byte_length || jarRef.sha256 !== expectedJar.sha256) fail('E2E_MANIFEST_SOURCE_BUILD_INVALID', 'RUNTIME_JAR', 'Runtime JAR differs from Handoff artifact.');
+  const webRef = await copyTree({ sourceRoot: resolveInside(paths.sourceRoot, 'apps/web/dist', 'E2E_MANIFEST_SOURCE_BUILD_INVALID'), destinationRoot: staging, destination: 'inputs/build/web-dist', code: 'E2E_MANIFEST_SOURCE_BUILD_INVALID' });
+  const expectedWeb = oneArtifact(trust.handoff.value, 'WEB_DIST_TREE');
+  if (webRef.byte_length !== expectedWeb.byte_length || webRef.sha256 !== expectedWeb.sha256) fail('E2E_MANIFEST_SOURCE_BUILD_INVALID', 'WEB_DIST', 'Web dist differs from Handoff artifact.');
+  const profile = await stageProfile(profileStagingRoot, staging, sourceProfile, profileStaging, trust.handoff.value.active_binding);
+  const copyArchive = async (entry, destination) => {
+    const bytes = materialized.bytes.get(entry);
+    if (!bytes) fail('E2E_MANIFEST_FAMILY_IDENTITY_INVALID', 'FAMILY_IDENTITY_DEEP_JOIN', 'Required Family archive entry is missing.');
+    await writeBytes({ bytes, destinationRoot: staging, destination, kind: 'ARCHIVE_INPUT', code: 'E2E_MANIFEST_IO_FAILED' });
+    return archiveRef({ destination, bytes, bundleSha256: bundleRef.sha256, archiveEntry: entry });
+  };
+  const coverageRef = await copyArchive(materialized.coverageEntry, 'inputs/upstream/family/coverage-catalog.json');
+  const goldenManifestRef = await copyArchive(materialized.goldenManifestEntry, 'inputs/upstream/family/golden-manifest.json');
+  await copyArchive(materialized.profileEntry, 'inputs/upstream/family/profile.json');
+  const familyIdentityArchiveRef = await copyArchive(materialized.familyIdentityEntry, 'inputs/upstream/family-identity-catalog.json');
+  const familyIdentityRef = await fileRef(resolveInside(staging, familyIdentityArchiveRef.path, 'E2E_MANIFEST_FAMILY_IDENTITY_INVALID'), staging, 'FAMILY_FIXTURE_IDENTITY_CATALOG', 'E2E_MANIFEST_FAMILY_IDENTITY_INVALID');
+  const replayRef = await copyArchive(materialized.replayEntry, 'inputs/upstream/family/golden-replay.json');
+  const symbolRef = await copyArchive(materialized.symbolEntry, 'inputs/upstream/family/symbol-catalog.json');
+  const archiveRefs = [coverageRef, goldenManifestRef, familyIdentityArchiveRef, replayRef, symbolRef];
   const familyEntries = new Map();
-  const refs = new Map();
-  for (const entry of archive.entries) {
-    const destination = entry.includes('/golden/fixtures/') ? archiveEntryPath(entry) : `inputs/upstream/family/${basename(entry)}`;
-    const bytes = archive.bytesByEntry.get(entry);
-    const reference = await writeBytes({ bytes, destinationRoot: staging, destination, kind: 'ARCHIVE_INPUT' });
-    const archiveReference = archiveRef({ destination, bytes, bundleSha256: bundleRef.sha256, archiveEntry: entry });
-    refs.set(entry, archiveReference);
-    if (entry.includes('/golden/fixtures/')) familyEntries.set(entry.slice(`${archive.prefix}/`.length), archiveReference);
-    void reference;
-  }
-  const familyCatalogRef = await fileRef(resolve(staging, 'inputs/upstream/family/opm-e2e-family-fixture-identity-catalog.json'), staging, 'FAMILY_FIXTURE_IDENTITY_CATALOG');
-  const catalog = JSON.parse(archive.bytesByEntry.get(`${archive.prefix}/golden/opm-e2e-family-fixture-identity-catalog.json`).toString('utf8'));
-  if (!validateFamily(catalog) || catalog.catalog_version !== '0.1.0') fail('E2E_MANIFEST_FAMILY_IDENTITY_INVALID', 'FAMILY_IDENTITY', 'Family identity catalog is invalid.');
-  const baseBytes = new Map(archive.fixtureEntries.filter(entry => archive.golden.cases.some(item => `${archive.prefix}/${item.base_revision_fixture}` === entry)).map(entry => [entry.slice(`${archive.prefix}/`.length), archive.bytesByEntry.get(entry)]));
-  verifyFamilyFixtureIdentityCatalog({ catalog, goldenManifest: archive.golden, goldenManifestBytes: archive.bytesByEntry.get(`${archive.prefix}/golden/opm-opl-golden-manifest.json`), fixtureBytesByEntry: baseBytes });
-  const coverage = JSON.parse(archive.bytesByEntry.get(`${archive.prefix}/golden/opm-opl-coverage-catalog.json`).toString('utf8'));
-  const replay = JSON.parse(archive.bytesByEntry.get(`${archive.prefix}/handoff/reports/golden-replay.json`).toString('utf8'));
-  const commonTree = await copyTree({ sourceRoot: common.root, destinationRoot: staging, destination: 'inputs/common', code: 'E2E_MANIFEST_COMMON_FIXTURE_INVALID' });
-  const commonCatalogRef = await fileRef(resolve(staging, 'inputs/common/dev-canvas-06-common-fixture-catalog.json'), staging, 'COMMON_FIXTURE_CATALOG');
-  const commonRefs = new Map();
-  for (const item of common.catalog.e2e_cases) for (const ref of [item.base_fixture_ref, item.input_ref]) commonRefs.set(ref.path, await fileRef(resolve(staging, `inputs/common/${ref.path}`), staging, ref.kind));
-  const profileDestination = 'inputs/upstream/profile-assets';
-  await copyTree({ sourceRoot: profileRoot, destinationRoot: staging, destination: profileDestination, code: 'E2E_MANIFEST_PROFILE_ASSET_INVALID' });
-  const finalProfile = await loadProfileAssetClosure({ assetRoot: resolve(staging, profileDestination), activeBinding: profile.active_binding });
-  if (JSON.stringify(finalProfile.profile_asset_refs) !== JSON.stringify(profile.profile_asset_refs) || JSON.stringify(finalProfile.profile_asset_tree_ref) !== JSON.stringify(profile.profile_asset_tree_ref)) fail('E2E_MANIFEST_PROFILE_ASSET_INVALID', 'PROFILE_TREE', 'Staged Profile assets differ from the materialized root.');
-  const localRuntimeJar = await copyRegularFile({ source: source.runtimeJar, destinationRoot: staging, destination: 'inputs/build/local-runtime.jar', kind: 'LOCAL_RUNTIME_JAR', code: 'E2E_MANIFEST_SOURCE_BUILD_INVALID' });
-  const webDist = await copyTree({ sourceRoot: source.webDist, destinationRoot: staging, destination: 'inputs/build/web-dist', code: 'E2E_MANIFEST_SOURCE_BUILD_INVALID' });
-  const lock = await copyRegularFile({ source: source.lockfile, destinationRoot: staging, destination: 'inputs/build/package-lock.json', kind: 'NPM_LOCKFILE' });
+  for (const entry of materialized.fixtureEntries) { const ref = await copyArchive(entry, archiveEntryPath(entry)); archiveRefs.push(ref); familyEntries.set(entry.slice(`${materialized.prefix}/`.length), ref); }
+  await copyTree({ sourceRoot: paths.commonRoot, destinationRoot: staging, destination: 'inputs/common', code: 'E2E_MANIFEST_COMMON_FIXTURE_INVALID' });
+  const copiedCommon = sha256(Buffer.from(jcs(await listTree(resolveInside(staging, 'inputs/common', 'E2E_MANIFEST_COMMON_FIXTURE_INVALID'), 'E2E_MANIFEST_COMMON_FIXTURE_INVALID')), 'utf8'));
+  if (copiedCommon !== common.digest) fail('E2E_MANIFEST_COMMON_FIXTURE_INVALID', 'COPY_ALL_INPUTS', 'Common tree changed during copy.');
+  const commonCatalogRef = await fileRef(resolveInside(staging, `inputs/common/${commonCatalogName}`, 'E2E_MANIFEST_COMMON_FIXTURE_INVALID'), staging, 'COMMON_FIXTURE_CATALOG', 'E2E_MANIFEST_COMMON_FIXTURE_INVALID');
+  const commonSetupPlanRef = await fileRef(resolveInside(staging, 'inputs/common/dev-canvas-06-common-setup-plan.json', 'E2E_MANIFEST_COMMON_FIXTURE_INVALID'), staging, 'COMMON_SETUP_PLAN', 'E2E_MANIFEST_COMMON_FIXTURE_INVALID');
+  const commonEntries = new Map();
+  for (const item of common.catalog.e2e_cases) for (const ref of [item.base_fixture_ref, item.input_ref]) commonEntries.set(ref.path, await finalCommonRef(staging, ref));
   const drivers = [];
-  for (const driver of source.drivers) drivers.push({ driver_id: driver.id, source_ref: await copyRegularFile({ source: driver.source, destinationRoot: staging, destination: `inputs/drivers/${driver.file}`, kind: 'E2E_DRIVER_SOURCE', code: 'E2E_MANIFEST_DRIVER_INVALID' }) });
-  const sourceBuild = { source_commit: source.commit, dirty_before_build: false, build_command: 'npm ci --ignore-scripts && npm run build', node_version: process.version, lockfile_sha256: lock.sha256, web_dist: webDist, local_runtime_jar: localRuntimeJar };
-  return { intakeRef, handoffRef, sourceBuild, commonCatalogRef, familyCatalogRef, commonRefs, drivers, family: { coverage, goldenManifest: archive.golden, replay, materializedEntries: familyEntries },
-    upstreamRefs: [
-      { input_kind: 'COVERAGE_CATALOG', ref: refs.get(`${archive.prefix}/golden/opm-opl-coverage-catalog.json`) },
-      { input_kind: 'GOLDEN_MANIFEST', ref: refs.get(`${archive.prefix}/golden/opm-opl-golden-manifest.json`) },
-      { input_kind: 'GOLDEN_REPLAY_REPORT', ref: refs.get(`${archive.prefix}/handoff/reports/golden-replay.json`) },
-      { input_kind: 'SYMBOL_CATALOG', ref: profile.profile_asset_refs.find(item => item.kind === 'SYMBOL_ASSET') },
-      { input_kind: 'HANDOFF_EVIDENCE_BUNDLE', ref: bundleRef }
-    ],
-    materialization: { bundle_ref: bundleRef, java_version: runtime.javaVersion, entry_allowlist: archive.entries, materialized_count: archive.entries.length, aggregate_sha256: sha256(Buffer.from(jcs([...refs.values()].map(ref => ({ archive_entry_path: ref.archive_entry_path, path: ref.path, byte_length: ref.byte_length, sha256: ref.sha256 })).sort((a, b) => a.archive_entry_path.localeCompare(b.archive_entry_path))), 'utf8')), temporary_directory_cleaned: true }, commonTree };
+  for (const [driver_id, file] of [['DRIVER-PROCEDURAL', 'procedural-driver.mjs'], ['DRIVER-CONTROL', 'control-driver.mjs'], ['DRIVER-STRUCTURAL', 'structural-driver.mjs'], ['DRIVER-COMMON', 'common-driver.mjs']]) {
+    drivers.push({ driver_id, source_ref: await copyRegularFile({ source: resolveInside(paths.sourceRoot, `tests/e2e/release/dev-canvas-06/drivers/${file}`, 'E2E_MANIFEST_DRIVER_INVALID'), destinationRoot: staging, destination: `inputs/drivers/${file}`, kind: 'E2E_DRIVER_SOURCE', code: 'E2E_MANIFEST_DRIVER_INVALID' }) });
+  }
+  return { intakeRef, handoffRef, bundleRef, coverageRef, goldenManifestRef, replayRef, symbolRef, familyIdentityRef, archiveRefs, familyEntries, commonCatalogRef, commonSetupPlanRef, commonEntries, drivers, profile, sourceBuild: { source_commit: source.commit, dirty_before_build: false, build_command: 'npm ci --ignore-scripts && npm run build', node_version: process.version, lockfile_sha256: lockfileRef.sha256, web_dist: webRef, local_runtime_jar: jarRef } };
 }
 
-function stagingArgs(options, staging) { return options['input-mode'] === 'CONTROLLED_TEST'
-  ? ['--input-mode', 'CONTROLLED_TEST', '--controlled-bundle-root', options['controlled-bundle-root'], '--source-root', options['source-root'], '--manifest-root', staging, '--manifest', 'dev-canvas-06-e2e-manifest.json', '--profile-asset-root', resolve(staging, 'inputs/upstream/profile-assets')]
-  : ['--input-mode', 'PRODUCTION_HANDOFF', '--handoff-root', options['handoff-root'], '--intake-report', options['intake-report'], '--require-production', '--source-root', options['source-root'], '--manifest-root', staging, '--manifest', 'dev-canvas-06-e2e-manifest.json', '--profile-asset-root', resolve(staging, 'inputs/upstream/profile-assets')]; }
-function normalizedCommand(options) { return `node scripts/release-canvas06-e2e-manifest-v02.mjs --input-mode ${options['input-mode']}`; }
-async function javaRuntime(override) { if (override) return override; const home = process.env.JAVA_HOME; if (!home) fail('E2E_MANIFEST_SOURCE_BUILD_INVALID', 'RUNTIME', 'JAVA_HOME is required.'); const javaPath = resolve(home, 'bin/java'); const jarPath = resolve(home, 'bin/jar'); try { const result = await execFile(javaPath, ['-version']); const output = `${result.stdout}\n${result.stderr}`; if (!/(?:java|openjdk) version "?21(?:\.|\")/.test(output)) throw new Error(); return { jarPath, javaVersion: output.trim() }; } catch { fail('E2E_MANIFEST_SOURCE_BUILD_INVALID', 'RUNTIME', 'Java 21 is required.'); } }
-async function assertQuarantine(handoffRoot) { const root = resolve(handoffRoot); const match = /^clean-([a-f0-9]{12})$/.exec(basename(root)); if (!match) fail('E2E_MANIFEST_ARGUMENT_INVALID', 'EXACT_QUARANTINE_SIDECAR_GUARD', 'handoff-root must be a clean-<source12> version root.'); for (const path of [resolve(dirname(root), 'quarantine', `clean-${match[1]}.json`), resolve(dirname(root), 'quarantine', `.clean-${match[1]}.json.tmp`)]) { try { await lstat(path); fail('E2E_MANIFEST_INPUT_QUARANTINED', 'EXACT_QUARANTINE_SIDECAR_GUARD', 'Version input is quarantined.'); } catch (error) { if (error?.code !== 'ENOENT') { if (error?.code) throw error; } } } }
-async function createStaging(finalRoot) { const parent = dirname(finalRoot); await mkdir(parent, { recursive: true }); const path = resolve(parent, `.${basename(finalRoot)}.tmp-${process.pid}`); try { await lstat(path); fail('E2E_MANIFEST_TRANSACTION_INVALID', 'CREATE_STAGING', 'Staging residual already exists.'); } catch (error) { if (error?.code !== 'ENOENT') throw error; } await mkdir(path); return path; }
-async function assertOutputFresh(finalRoot) { try { await lstat(finalRoot); fail('E2E_MANIFEST_TRANSACTION_INVALID', 'OUTPUT_FRESH', 'Final root already exists.'); } catch (error) { if (error?.code !== 'ENOENT') throw error; } }
-async function ensureDirectory(path, stage) { try { const info = await lstat(path); if (info.isSymbolicLink() || !info.isDirectory()) throw new Error(); } catch { fail('E2E_MANIFEST_SOURCE_BUILD_INVALID', stage, 'Expected a non-symlink directory.'); } }
-async function regular(path, stage) { try { const info = await lstat(path); if (info.isSymbolicLink() || !info.isFile() || info.nlink !== 1) throw new Error(); } catch { fail('E2E_MANIFEST_SOURCE_BUILD_INVALID', stage, 'Expected a single-link regular file.'); } }
-function safeResolve(root, value) { const target = resolve(root, value); const relation = relative(resolve(root), target); if (!relation || relation === '..' || relation.startsWith(`..${sep}`)) fail('E2E_MANIFEST_ARGUMENT_INVALID', 'ARGS', 'Path escapes its root.'); return target; }
-function assertSeparate(value, roots) { for (const root of roots) { const left = resolve(value); const right = resolve(root); if (left === right || left.startsWith(`${right}${sep}`) || right.startsWith(`${left}${sep}`)) fail('E2E_MANIFEST_TRANSACTION_INVALID', 'PROFILE_STAGING', 'Profile staging root overlaps another input root.'); } }
-async function removeIfPresent(path) { try { await lstat(path); await rm(path, { recursive: true, force: true }); } catch (error) { if (error?.code !== 'ENOENT') throw error; } }
+async function stageProfile(profileStagingRoot, staging, sourceSet, profileStaging, activeBinding) {
+  for (const reference of sourceSet.profile_asset_refs) {
+    const sourceRelative = reference.path.slice('inputs/upstream/profile-assets/'.length);
+    await copyRegularFile({ source: resolveInside(profileStagingRoot, sourceRelative, 'E2E_MANIFEST_PROFILE_ASSET_INVALID'), destinationRoot: staging, destination: reference.path, kind: reference.kind, code: 'E2E_MANIFEST_PROFILE_ASSET_INVALID' });
+  }
+  const target = await loadProfileAssetClosure({ assetRoot: resolveInside(staging, 'inputs/upstream/profile-assets', 'E2E_MANIFEST_PROFILE_ASSET_INVALID'), activeBinding });
+  assertProfileAssetThreeWayJoin(sourceSet, profileStaging, target);
+  return target;
+}
 
-if (import.meta.url === new URL(process.argv[1], 'file:').href) main().then(result => process.stdout.write(`${result.path}\t${result.sha256}\n`)).catch(error => { process.stderr.write(`${error.code ?? 'E2E_MANIFEST_IO_FAILED'}\t${error.stage ?? 'INTERNAL'}\n`); process.exitCode = error.exitCode ?? 4; });
+async function verifyCopiedInputs({ staging, manifest, common, sourceProfile, profileStaging }) {
+  const finalProfile = await loadProfileAssetClosure({ assetRoot: resolveInside(staging, 'inputs/upstream/profile-assets', 'E2E_MANIFEST_PROFILE_ASSET_INVALID'), activeBinding: profileStaging.active_binding });
+  assertProfileAssetThreeWayJoin(sourceProfile, profileStaging, finalProfile);
+  if (manifest.profile_asset_tree_ref.path !== 'inputs/upstream/profile-assets' || JSON.stringify(manifest.profile_asset_refs) !== JSON.stringify(finalProfile.profile_asset_refs)) fail('E2E_MANIFEST_PROFILE_ASSET_INVALID', 'INTERNAL_SEMANTIC_VERIFY', 'Profile refs are not closed.');
+  const targetCommon = await listTree(resolveInside(staging, 'inputs/common', 'E2E_MANIFEST_COMMON_FIXTURE_INVALID'), 'E2E_MANIFEST_COMMON_FIXTURE_INVALID');
+  if (targetCommon.length !== 44 || sha256(Buffer.from(jcs(targetCommon), 'utf8')) !== common.digest) fail('E2E_MANIFEST_COMMON_FIXTURE_INVALID', 'INTERNAL_SEMANTIC_VERIFY', 'Common root is not exact.');
+  const commonDriverRef = manifest.driver_catalog.find(item => item.driver_id === 'DRIVER-COMMON')?.source_ref;
+  try { rebaseCommonSetupPlanRefs({ plan: common.plan, manifestCatalogRef: manifest.common_fixture_catalog_ref, manifestCommonDriverRef: commonDriverRef }); }
+  catch (error) { fail('E2E_MANIFEST_JOIN_MISMATCH', 'COMMON_SETUP_PLAN_JOIN', error.message); }
+  for (const ref of [...manifest.driver_catalog.map(item => item.source_ref), manifest.source_build.local_runtime_jar, manifest.common_fixture_catalog_ref, manifest.common_setup_plan_ref, ...manifest.profile_asset_refs]) await verifyFileRef({ root: staging, reference: ref, code: 'E2E_MANIFEST_JOIN_MISMATCH' });
+  if (manifest.cases.length !== 194 || manifest.cases.filter(item => item.capability_id).length !== 178 || manifest.cases.filter(item => !item.capability_id).length !== 16) fail('E2E_MANIFEST_JOIN_MISMATCH', 'INTERNAL_SEMANTIC_VERIFY', 'Case set is incomplete.');
+}
+
+async function copyExternal(root, reference, staging, destination, kind) {
+  const source = await verifyFileRef({ root, reference, code: 'E2E_MANIFEST_INTAKE_INVALID' });
+  return writeBytes({ bytes: source.bytes, destinationRoot: staging, destination, kind, code: 'E2E_MANIFEST_IO_FAILED' });
+}
+
+async function finalCommonRef(staging, reference) {
+  const actual = await fileRef(resolveInside(staging, `inputs/common/${reference.path}`, 'E2E_MANIFEST_COMMON_FIXTURE_INVALID'), staging, reference.kind, 'E2E_MANIFEST_COMMON_FIXTURE_INVALID');
+  if (actual.byte_length !== reference.byte_length || actual.sha256 !== reference.sha256) fail('E2E_MANIFEST_COMMON_FIXTURE_INVALID', 'COPY_ALL_INPUTS', 'Common raw ref differs from Catalog.');
+  return actual;
+}
+
+async function createStaging(finalRoot) {
+  const parent = dirname(finalRoot);
+  await mkdir(parent, { recursive: true });
+  const staging = resolve(parent, `.${basename(finalRoot)}.tmp-${process.pid}-${Date.now()}`);
+  try { await mkdir(staging, { recursive: false }); } catch (error) { fail('E2E_MANIFEST_IO_FAILED', 'CREATE_STAGING', error.message); }
+  return staging;
+}
+
+async function assertFresh(finalRoot, id) {
+  try { await readdir(finalRoot); fail('E2E_MANIFEST_TRANSACTION_INVALID', 'OUTPUT_FRESH', 'Final root already exists.'); } catch (error) { if (error instanceof E2eManifestV02Error) throw error; if (error?.code !== 'ENOENT') fail('E2E_MANIFEST_IO_FAILED', 'OUTPUT_FRESH', error.message); }
+  const parent = dirname(finalRoot);
+  try { if ((await readdir(parent)).some(name => name.startsWith(`.${id}.tmp-`))) fail('E2E_MANIFEST_TRANSACTION_INVALID', 'OUTPUT_FRESH', 'Abandoned staging root must be isolated first.'); } catch (error) { if (error instanceof E2eManifestV02Error) throw error; if (error?.code !== 'ENOENT') fail('E2E_MANIFEST_IO_FAILED', 'OUTPUT_FRESH', error.message); }
+}
+
+async function resolveJava(override) {
+  if (override) return override;
+  const home = process.env.JAVA_HOME;
+  if (!home) fail('E2E_MANIFEST_SOURCE_BUILD_INVALID', 'RUNTIME_JAR', 'JAVA_HOME is required for archive verification.');
+  const javaPath = resolve(home, 'bin/java');
+  const jarPath = resolve(home, 'bin/jar');
+  const result = spawnSync(javaPath, ['-version'], { encoding: 'utf8' });
+  const output = `${result.stdout ?? ''}\n${result.stderr ?? ''}`;
+  if (result.status !== 0) fail('E2E_MANIFEST_SOURCE_BUILD_INVALID', 'RUNTIME_JAR', 'Java version command failed.');
+  if (!/(?:java|openjdk) version "?21(?:\.|\")/.test(output)) fail('E2E_MANIFEST_SOURCE_BUILD_INVALID', 'RUNTIME_JAR', 'Java 21 is required.');
+  return { jarPath, version: output.trim().replace(/\s+/g, ' ') };
+}
+
+function oneArtifact(handoff, kind) { const values = handoff.build_artifacts?.filter(item => item.kind === kind) ?? []; if (values.length !== 1) fail('E2E_MANIFEST_INTAKE_INVALID', 'EXTERNAL_TRUST', `Handoff must contain one ${kind} artifact.`); return values[0]; }
+function requireEntries(entries, expected) { const actual = new Set(entries); for (const entry of expected) if (!actual.has(entry)) fail('E2E_MANIFEST_FAMILY_IDENTITY_INVALID', 'FAMILY_IDENTITY_DEEP_JOIN', 'Evidence Bundle is missing a required Family entry.'); }
+function json(bytes, code, stage) { try { return JSON.parse(bytes.toString('utf8')); } catch { fail(code, stage, 'Input JSON is invalid.'); } }
+function normalizedCommand(options) { const common = [['input-mode', options['input-mode']], ['source-root', '<source-root>'], ['source-date-epoch', options['source-date-epoch']], ['common-fixture-root', '<common-fixture-root>'], ['profile-asset-root', '<profile-asset-root>'], ['output-root', '<output-root>'], ['out', options.out]]; const trust = options['input-mode'] === 'PRODUCTION_HANDOFF' ? [['handoff-root', '<handoff-root>'], ['intake-report', options['intake-report']], ['require-production', null]] : [['controlled-bundle-root', '<controlled-bundle-root>']]; return [...common.slice(0, 1), ...trust, ...common.slice(1)].map(([key, value]) => value === null ? `--${key}` : `--${key} ${value}`).join(' '); }
+function normalize(error) { if (error instanceof E2eManifestV02Error) return error; return new E2eManifestV02Error('E2E_MANIFEST_IO_FAILED', 'INTERNAL', error.message); }
+
+if (import.meta.url === new URL(process.argv[1], 'file:').href) {
+  main().then(result => process.stdout.write(`${result.path}\t${result.sha256}\n`)).catch(error => { const value = normalize(error); process.stderr.write(`${value.code}\t${value.stage}\n${value.message}\n`); process.exitCode = value.exitCode; });
+}

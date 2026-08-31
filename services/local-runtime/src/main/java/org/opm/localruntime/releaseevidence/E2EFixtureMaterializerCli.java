@@ -234,8 +234,9 @@ public final class E2EFixtureMaterializerCli {
             throw input("E2E_MANIFEST_PROFILE_ASSET_INVALID", "attempt-local Profile 资产无法装配：" + exception.getMessage());
         }
 
+        Path materializedBaseRoot = result.arguments().storage().resolve("materialized-base");
         GoldenFixtureSeedRepository.MaterializedFixture materialized = new GoldenFixtureSeedRepository().materialize(
-                result.arguments().storage(), revisionBytes, sha256(revisionBytes), result.sourceDateEpoch(),
+                materializedBaseRoot, revisionBytes, sha256(revisionBytes), result.sourceDateEpoch(),
                 new GoldenFixtureSeedRepository.SeedIdentity(result.identity().projectId(),
                         "COMMON".equals(result.arguments().fixtureKind()) ? "E2E Common Fixture" : "E2E Family Fixture",
                         "COMMON".equals(result.arguments().fixtureKind()) ? "Release E2E Common fixture." : "Release E2E Family fixture."), activeBinding);
@@ -244,6 +245,8 @@ public final class E2EFixtureMaterializerCli {
         }
 
         ProjectDatabaseFactory databaseFactory = new ProjectDatabaseFactory(result.arguments().storage());
+        Path workingDatabase = databaseFactory.databasePath(materialized.projectId());
+        cloneWorkingDatabase(materialized.databasePath(), workingDatabase);
         LocalApiService api = new LocalApiService(databaseFactory,
                 FileProfilePackageLoader.forVerifiedDirectPackageRoot(result.arguments().profileAssetRoot(), directFiles));
         @SuppressWarnings("unchecked") Map<String, Object> projection = (Map<String, Object>) api.projection(
@@ -253,13 +256,14 @@ public final class E2EFixtureMaterializerCli {
                 .flatMap(paragraph -> paragraph.sentences().stream()).flatMap(sentence -> sentence.tokens().stream()).toList();
         OplGoldenArtifactCanonicalWriter artifactWriter = new OplGoldenArtifactCanonicalWriter();
 
-        Map<String, Object> storage = storage(result.arguments(), materialized.databasePath());
+        Map<String, Object> storage = storage(result.arguments(), materialized.databasePath(), workingDatabase);
         Map<String, Object> identity = Map.of("project_id", materialized.projectId(), "model_id", materialized.modelId(),
                 "context_id", result.identity().contextId(), "base_revision", materialized.revisionId(), "head_revision", materialized.revisionId());
         Map<String, Object> materializerIdentity = Map.of("main_class", E2EFixtureMaterializerCli.class.getName(),
                 "runtime_jar_ref", runtimeJar.reference().asMap(), "source_sha256", runtimeJar.sourceSha256());
         Map<String, Object> stateDigests = Map.of("revision_document_sha256", sha256(fixtureBytes),
-                "projection_sha256", ProjectionDigestV01.sha256(projection), "opl_sha256", artifactWriter.sha256(generated.artifact()),
+                "projection_sha256", ProjectionDigestV01.sha256(ProjectionDigestV01.apiProjectionDigestView(projection)),
+                "opl_sha256", artifactWriter.sha256(generated.artifact()),
                 "token_sha256", new TokenCanonicalWriter().sha256(revision.revisionId(), tokens),
                 "trace_sha256", artifactWriter.sha256Traces(revision.revisionId(), generated.traces()));
         List<Map<String, Object>> artifactProfileRefs = result.profileAssets().refs().stream()
@@ -271,7 +275,8 @@ public final class E2EFixtureMaterializerCli {
         artifact.put("case_id", result.caseId());
         artifact.put("attempt_ordinal", result.attemptOrdinal());
         artifact.put("fixture_kind", result.arguments().fixtureKind());
-        artifact.put("fixture_ref", AssetRef.from(manifestCase(result.manifest(), result.caseId()).path("fixture_ref"), "E2E_FIXTURE_MISMATCH").asMap());
+        artifact.put("fixture_ref", ManifestRawRef.from(manifestCase(result.manifest(), result.caseId()).path("fixture_ref"),
+                result.arguments().fixtureKind(), "FIXTURE", "E2E_FIXTURE_MISMATCH").asMap());
         artifact.put("input_ref", result.inputRef().manifestRef().asMap());
         artifact.put("active_binding", bindingMap(activeBinding));
         artifact.put("identity", identity);
@@ -331,7 +336,52 @@ public final class E2EFixtureMaterializerCli {
         return Map.of("kind", "PROFILE_ASSET_TREE", "path", "profile/assets", "byte_length", length, "sha256", sha256Jcs(preimage));
     }
 
-    private static Map<String, Object> storage(Arguments arguments, Path database) throws Exception {
+    private static void cloneWorkingDatabase(Path baseDatabase, Path workingDatabase) throws Exception {
+        if (!isSingleLinkRegularFile(baseDatabase) || Files.exists(workingDatabase, LinkOption.NOFOLLOW_LINKS)) {
+            throw new IllegalStateException("Materialized base或working SQLite freshness不合法。");
+        }
+        Files.createDirectories(workingDatabase.getParent());
+        Path temporary = Files.createTempFile(workingDatabase.getParent(), ".project-db-clone-", ".tmp");
+        try {
+            Files.copy(baseDatabase, temporary, StandardCopyOption.REPLACE_EXISTING);
+            try (FileChannel channel = FileChannel.open(temporary, StandardOpenOption.WRITE)) {
+                channel.force(true);
+            }
+            if (!isSingleLinkRegularFile(temporary) || Files.mismatch(baseDatabase, temporary) != -1) {
+                throw new IllegalStateException("Working SQLite初始clone与base不一致。");
+            }
+            Files.move(temporary, workingDatabase, StandardCopyOption.ATOMIC_MOVE);
+            try (FileChannel directory = FileChannel.open(workingDatabase.getParent(), StandardOpenOption.READ)) {
+                directory.force(true);
+            }
+        } finally {
+            Files.deleteIfExists(temporary);
+        }
+        if (!isSingleLinkRegularFile(workingDatabase) || Files.mismatch(baseDatabase, workingDatabase) != -1) {
+            throw new IllegalStateException("Working SQLite原子提交后与base不一致。");
+        }
+    }
+
+    private static Map<String, Object> storage(Arguments arguments, Path baseDatabase, Path workingDatabase) throws Exception {
+        verifyDatabaseIntegrity(baseDatabase);
+        verifyDatabaseIntegrity(workingDatabase);
+        RawFileObservation base = observeRawFile(baseDatabase);
+        RawFileObservation working = observeRawFile(workingDatabase);
+        if (base.byteLength() != working.byteLength() || !base.sha256().equals(working.sha256())
+                || Files.isSameFile(baseDatabase, workingDatabase)) {
+            throw new IllegalStateException("Materialized base与working SQLite初始身份不闭合。");
+        }
+        Path attemptRoot = arguments.out().getParent();
+        String basePath = attemptRoot.relativize(baseDatabase).toString().replace(baseDatabase.getFileSystem().getSeparator(), "/");
+        String workingPath = attemptRoot.relativize(workingDatabase).toString().replace(workingDatabase.getFileSystem().getSeparator(), "/");
+        return Map.of("storage_root", "storage", "materialized_base_root", "storage/materialized-base",
+                "project_db_ref", new AssetRef("PROJECT_DB", basePath, base.byteLength(), base.sha256()).asMap(),
+                "working_project_db_path", workingPath, "working_clone_byte_length", working.byteLength(),
+                "working_clone_sha256", working.sha256(), "storage_schema_version", "1.0", "sqlite_quick_check", "ok",
+                "foreign_key_check_count", 0, "sidecar_absent", true);
+    }
+
+    private static void verifyDatabaseIntegrity(Path database) throws Exception {
         String quickCheck;
         int foreignKeyCount = 0;
         try (Connection connection = DriverManager.getConnection("jdbc:sqlite:" + database.toAbsolutePath())) {
@@ -349,10 +399,6 @@ public final class E2EFixtureMaterializerCli {
                 throw new IllegalStateException("SQLite sidecar 未清除。");
             }
         }
-        Path attemptRoot = arguments.out().getParent();
-        return Map.of("storage_root", "storage", "project_db_ref", new AssetRef("PROJECT_DB",
-                attemptRoot.relativize(database).toString().replace(database.getFileSystem().getSeparator(), "/"), Files.size(database), sha256(Files.readAllBytes(database))).asMap(),
-                "storage_schema_version", "1.0", "sqlite_quick_check", quickCheck, "foreign_key_check_count", foreignKeyCount, "sidecar_absent", true);
     }
 
     private static String sha256Jcs(Map<String, ?> value) {
@@ -362,7 +408,7 @@ public final class E2EFixtureMaterializerCli {
     private static void writeArtifactAtomically(Path out, Map<String, Object> artifact) throws IOException {
         Path temporary = Files.createTempFile(out.getParent(), ".fixture-materialization-", ".tmp");
         try {
-            byte[] bytes = (JSON.writeValueAsString(artifact) + "\n").getBytes(StandardCharsets.UTF_8);
+            byte[] bytes = (Rfc8785JsonCanonicalizer.canonicalize(artifact) + "\n").getBytes(StandardCharsets.UTF_8);
             try (FileChannel channel = FileChannel.open(temporary, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING)) {
                 channel.write(ByteBuffer.wrap(bytes));
                 channel.force(true);
@@ -406,7 +452,7 @@ public final class E2EFixtureMaterializerCli {
 
     private static InputRef validateInput(JsonNode manifest, Arguments arguments) throws IOException {
         JsonNode selectedCase = manifestCase(manifest, arguments.caseId());
-        AssetRef ref = AssetRef.from(selectedCase.path("input_ref"), "E2E_INPUT_INVALID");
+        ManifestRawRef ref = ManifestRawRef.from(selectedCase.path("input_ref"), arguments.fixtureKind(), "INPUT", "E2E_INPUT_INVALID");
         Path source = resolveManifestInput(arguments.manifestRoot(), ref.path());
         if (!isSingleLinkRegularFile(source) || !isSingleLinkRegularFile(arguments.inputPath())) {
             throw input("E2E_INPUT_INVALID", "Materializer input 不是受控普通文件。");
@@ -551,7 +597,7 @@ public final class E2EFixtureMaterializerCli {
         try {
         JsonNode selectedCase = manifestCase(manifest, arguments.caseId());
         if (!selectedCase.hasNonNull("capability_id")) throw input("E2E_FIXTURE_MISMATCH", "FAMILY case 缺少 capability_id。");
-        AssetRef fixtureRef = AssetRef.from(selectedCase.path("fixture_ref"), "E2E_FIXTURE_MISMATCH");
+        ManifestRawRef fixtureRef = ManifestRawRef.from(selectedCase.path("fixture_ref"), "FAMILY", "FIXTURE", "E2E_FIXTURE_MISMATCH");
         byte[] fixtureBytes = Files.readAllBytes(arguments.fixturePath());
         if (fixtureBytes.length != fixtureRef.byteLength() || !sha256(fixtureBytes).equals(fixtureRef.sha256())
                 || !"MS-REV-001".equals(text(fixture, "schema_id")) || !"0.2".equals(text(fixture, "schema_version"))) {
@@ -612,7 +658,7 @@ public final class E2EFixtureMaterializerCli {
         if (selectedCase.hasNonNull("capability_id") || !"FIXTURE".equals(text(selectedCase.path("fixture_ref"), "kind"))) {
             throw input("E2E_FIXTURE_MISMATCH", "COMMON case 必须使用无 capability 的 FIXTURE base ref。");
         }
-        AssetRef fixtureRef = AssetRef.from(selectedCase.path("fixture_ref"), "E2E_FIXTURE_MISMATCH");
+        ManifestRawRef fixtureRef = ManifestRawRef.from(selectedCase.path("fixture_ref"), "COMMON", "FIXTURE", "E2E_FIXTURE_MISMATCH");
         byte[] fixtureBytes = Files.readAllBytes(arguments.fixturePath());
         if (fixtureBytes.length != fixtureRef.byteLength() || !sha256(fixtureBytes).equals(fixtureRef.sha256())
                 || !arguments.caseId().equals(text(fixture, "case_id")) || !"BASE".equals(text(fixture, "fixture_kind"))) {
@@ -679,7 +725,8 @@ public final class E2EFixtureMaterializerCli {
     private static AssetRef catalogRef(JsonNode manifest) {
         AssetRef result = null;
         for (JsonNode value : manifest.path("fixture_refs")) {
-            if ("FAMILY_FIXTURE_IDENTITY_CATALOG".equals(text(value, "kind"))) {
+            if (value.path("kind").isTextual()
+                    && "FAMILY_FIXTURE_IDENTITY_CATALOG".equals(value.path("kind").asText())) {
                 if (result != null) throw input("E2E_FIXTURE_MISMATCH", "Manifest Family Catalog ref 不唯一。");
                 result = AssetRef.from(value, "E2E_FIXTURE_MISMATCH");
             }
@@ -794,9 +841,33 @@ public final class E2EFixtureMaterializerCli {
                            ProfileAssets profileAssets, InputRef inputRef) { }
     record FixtureIdentity(String projectId, String modelId, String contextId, String baseRevision) { }
     record ProfileAssets(AssetRef profilePackage, List<AssetRef> refs, String packageDigest, SemanticRevision.ProfileBinding activeBinding) { }
-    record InputRef(AssetRef manifestRef, Path sourcePath) { }
+    record InputRef(ManifestRawRef manifestRef, Path sourcePath) { }
     record RuntimeJarIdentity(AssetRef reference, String sourceSha256) { }
     record RawFileObservation(long byteLength, String sha256) { }
+
+    record ManifestRawRef(Map<String, Object> value, String path, long byteLength, String sha256) {
+        static ManifestRawRef from(JsonNode node, String fixtureKind, String commonKind, String code) {
+            if (!node.isObject()) throw input(code, "Manifest raw ref 必须是对象。");
+            Set<String> fields = new HashSet<>();
+            node.fieldNames().forEachRemaining(fields::add);
+            Set<String> archiveFields = Set.of("path", "byte_length", "sha256", "bundle_sha256", "archive_entry_path");
+            Set<String> fileFields = Set.of("kind", "path", "byte_length", "sha256");
+            if ("FAMILY".equals(fixtureKind)) {
+                if (!fields.equals(archiveFields) || !text(node, "bundle_sha256").matches("[a-f0-9]{64}")) {
+                    throw input(code, "Family raw ref 不是封闭 ArchiveEntryRef。");
+                }
+                text(node, "archive_entry_path");
+            } else if (!"COMMON".equals(fixtureKind) || !fields.equals(fileFields) || !commonKind.equals(text(node, "kind"))) {
+                throw input(code, "Common raw ref 不是固定 kind 的封闭 FileRef。");
+            }
+            String sha = text(node, "sha256");
+            if (!sha.matches("[a-f0-9]{64}")) throw input(code, "Manifest raw ref SHA 不合法。");
+            @SuppressWarnings("unchecked") Map<String, Object> raw = JSON.convertValue(node, LinkedHashMap.class);
+            return new ManifestRawRef(Map.copyOf(raw), text(node, "path"), longValue(node, "byte_length"), sha);
+        }
+
+        Map<String, Object> asMap() { return value; }
+    }
 
     record AssetRef(String kind, String path, long byteLength, String sha256) {
         static AssetRef from(JsonNode value, String code) {

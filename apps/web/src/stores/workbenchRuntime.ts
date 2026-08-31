@@ -6,6 +6,7 @@ import {
   localRuntimeApi,
   type NavigationNodeWire,
   type ProjectionConstructWire,
+  type SuppressedStateWire,
 } from "@/shared/api/localRuntimeApi";
 import type { ApiEdtCommandCapabilityOption, ApiEdtStateRole } from "@/shared/api/generated/apiEdtContract";
 import type { BottomTab, ConsumptionRelation, OpdNode, ResourceState } from "@/shared/types/modeling";
@@ -31,6 +32,7 @@ export const useWorkbenchRuntimeStore = defineStore("workbench-runtime", () => {
   const profileLabel = ref("");
   const contexts = ref<RuntimeContext[]>([]);
   const textLines = ref<RuntimeTextLine[]>([]);
+  const suppressedStates = ref<SuppressedStateWire[]>([]);
   const revisions = ref<Array<{ id: string; sequence: number; kind: string; createdAt: string }>>([]);
   const allowedCommands = ref<string[]>([]);
   const stateCreateOption = ref<ApiEdtCommandCapabilityOption | null>(null);
@@ -65,6 +67,11 @@ export const useWorkbenchRuntimeStore = defineStore("workbench-runtime", () => {
   const isReadonly = computed(() => workbench.accessMode === "readonly");
   const selectedNode = computed(() => workbench.nodes.find((node) => node.id === workbench.selectedId));
   const selectedRelation = computed(() => workbench.relations.find((relation) => relation.id === workbench.selectedId));
+  const selectedObjectSuppressedStates = computed(() => {
+    const selected = selectedNode.value;
+    if (!selected || selected.kind !== "object") return [];
+    return suppressedStates.value.filter((state) => state.owner_ref.target_kind === "ELEMENT" && state.owner_ref.target_id === selected.id);
+  });
   const activeContext = computed(() => contexts.value.find((context) => context.id === workbench.activeContextId));
 
   async function load(nextProjectId: string, nextModelId: string, requestedContext?: string, requestedRevision?: string) {
@@ -95,6 +102,7 @@ export const useWorkbenchRuntimeStore = defineStore("workbench-runtime", () => {
       workbench.accessMode = session.data.model.access_mode === "EDITABLE_DRAFT" ? "editable" : "readonly";
       contexts.value = toContexts(navigation.data, contextId);
       applyProjection(projection.data.constructs);
+      suppressedStates.value = projection.data.suppressed_states;
       allowedCommands.value = capabilities.data.allowed;
       textLines.value = toTextLines(text.data.sentences, text.data.traces);
       revisions.value = history.map((item) => ({ id: item.revision_id, sequence: item.sequence, kind: item.kind, createdAt: item.created_at }));
@@ -461,6 +469,12 @@ export const useWorkbenchRuntimeStore = defineStore("workbench-runtime", () => {
     await execute({ commandType, payload: { context_id: workbench.activeContextId, state_id: state.id } });
   }
 
+  async function makeSuppressedStateExplicit(stateId: string) {
+    const state = selectedObjectSuppressedStates.value.find((item) => item.state_id === stateId);
+    if (!state) return block("该抑制 State 不属于当前选择的 Object。");
+    await execute({ commandType: "STATE_EXPLICIT", payload: { context_id: workbench.activeContextId, state_id: state.state_id } });
+  }
+
   async function deleteSelectedState() {
     const state = selectedNode.value;
     const option = stateDeleteOption.value;
@@ -576,7 +590,7 @@ export const useWorkbenchRuntimeStore = defineStore("workbench-runtime", () => {
     }
   }
 
-  return { projectId, modelId, projectName, modelName, profileLabel, contexts, textLines, revisions, workbench, isReadonly, selectedNode, selectedRelation, stateCreateOption, stateDeleteOption, factDeleteOption, stateCandidate, stateEditor, relationCandidate, controlCandidate, structuralUpdateCandidate, load, selectContext, selectConstruct, setBottomTab, setViewportZoom, addElement, addFeature, addConsumption, armRelationCreation, cancelRelationCandidate, resolveRelationCandidates, submitRelationCandidate, chooseRelationCandidate, armControlUpdate, cancelControlCandidate, submitControlCandidate, armStructuralUpdate, cancelStructuralUpdate, submitStructuralUpdate, armStateCreation, placeState, cancelStateCandidate, submitStateCandidate, saveSelectedState, changeStatePresentation, deleteSelectedState, deleteSelectedFact, runValidation, locateText, unavailable };
+  return { projectId, modelId, projectName, modelName, profileLabel, contexts, textLines, revisions, workbench, isReadonly, selectedNode, selectedRelation, selectedObjectSuppressedStates, stateCreateOption, stateDeleteOption, factDeleteOption, stateCandidate, stateEditor, relationCandidate, controlCandidate, structuralUpdateCandidate, load, selectContext, selectConstruct, setBottomTab, setViewportZoom, addElement, addFeature, addConsumption, armRelationCreation, cancelRelationCandidate, resolveRelationCandidates, submitRelationCandidate, chooseRelationCandidate, armControlUpdate, cancelControlCandidate, submitControlCandidate, armStructuralUpdate, cancelStructuralUpdate, submitStructuralUpdate, armStateCreation, placeState, cancelStateCandidate, submitStateCandidate, saveSelectedState, changeStatePresentation, makeSuppressedStateExplicit, deleteSelectedState, deleteSelectedFact, runValidation, locateText, unavailable };
 });
 
 function toContexts(data: { process_tree: NavigationNodeWire[]; object_forest: NavigationNodeWire[]; views: NavigationNodeWire[] }, fallbackId: string): RuntimeContext[] {

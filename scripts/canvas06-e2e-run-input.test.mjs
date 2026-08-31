@@ -13,22 +13,26 @@ import {
   parseRunOptions,
   parseVerifyOptions,
   resolveReportRoot,
-  resolveVerifierReport
+  resolveVerifierReport,
+  selectAttemptInputs,
+  selectCommonAttemptInputs
 } from './canvas06-e2e-run-input.mjs';
 import { canonicalizeJcs } from './canvas06-rfc8785.mjs';
 import { verifyE2eAttemptRoot } from './verify-canvas06-e2e-report.mjs';
 
 const controlledRun = [
   '--input-mode', 'CONTROLLED_TEST', '--controlled-bundle-root', '/bundle', '--manifest-root', '/manifest',
-  '--manifest', 'dev-canvas-06-e2e-manifest.json', '--source-root', '/source', '--java-home', '/java',
+  '--manifest', 'dev-canvas-06-e2e-manifest.json', '--profile-asset-root', '/profile-assets', '--source-root', '/source', '--java-home', '/java',
   '--browser-executable', '/chromium', '--runtime-port', '17850', '--web-port', '5176',
+  '--process-control-parent', '/process-control',
   '--output-root', '/output', '--out', 'dev-canvas-06/e2e/reports/dev-canvas-06.e2e-report.aaaaaaaaaaaa.bbbbbbbbbbbb/dev-canvas-06-e2e-report.json'
 ];
 
 const productionRun = [
   '--input-mode', 'PRODUCTION_HANDOFF', '--handoff-root', '/handoff', '--intake-report', 'reports/intake.json',
-  '--manifest-root', '/manifest', '--manifest', 'dev-canvas-06-e2e-manifest.json', '--source-root', '/source',
+  '--manifest-root', '/manifest', '--manifest', 'dev-canvas-06-e2e-manifest.json', '--profile-asset-root', '/profile-assets', '--source-root', '/source',
   '--java-home', '/java', '--browser-executable', '/chromium', '--runtime-port', '17850', '--web-port', '5176',
+  '--process-control-parent', '/process-control',
   '--output-root', '/output', '--out', 'dev-canvas-06/e2e/reports/dev-canvas-06.e2e-report.aaaaaaaaaaaa.bbbbbbbbbbbb/dev-canvas-06-e2e-report.json',
   '--require-production'
 ];
@@ -45,6 +49,8 @@ test('rejects mixed modes, skipped guard flags, equal ports and unsafe report pa
   expectInputError(() => parseRunOptions(controlledRun.concat('--require-production')), 'E2E_RUN_INPUT_CLASS_INVALID');
   expectInputError(() => parseRunOptions(controlledRun.map(value => value === 'CONTROLLED_TEST' ? 'PRODUCTION_HANDOFF' : value)), 'E2E_RUN_ARGUMENT_INVALID');
   expectInputError(() => parseRunOptions(controlledRun.map(value => value === '5176' ? '17850' : value)), 'E2E_RUN_ARGUMENT_INVALID');
+  expectInputError(() => parseRunOptions(controlledRun.map(value => value === '/process-control' ? 'process-control' : value)), 'E2E_RUN_ARGUMENT_INVALID');
+  expectInputError(() => parseRunOptions(controlledRun.filter(value => value !== '--profile-asset-root' && value !== '/profile-assets')), 'E2E_RUN_ARGUMENT_INVALID');
   expectInputError(() => resolveReportRoot({ outputRoot: '/output', out: '../report.json', reportId: 'dev-canvas-06.e2e-report.aaaaaaaaaaaa.bbbbbbbbbbbb' }), 'E2E_RUN_ARGUMENT_INVALID');
   expectInputError(() => resolveVerifierReport({ evidenceRoot: '/evidence', report: '../report.json' }), 'E2E_RUN_ARGUMENT_INVALID');
 });
@@ -54,12 +60,19 @@ test('requires production verifier guards and computes the only report path', ()
   assert.equal(fixedReportPath(reportId), `dev-canvas-06/e2e/reports/${reportId}/dev-canvas-06-e2e-report.json`);
   const production = parseVerifyOptions([
     '--scope', 'REPORT', '--input-mode', 'PRODUCTION_HANDOFF', '--handoff-root', '/handoff', '--intake-report', 'reports/intake.json',
-    '--evidence-root', '/evidence', '--report', fixedReportPath(reportId), '--require-production', '--require-ready'
+    '--evidence-root', '/evidence', '--manifest-root', '/manifest', '--manifest', 'dev-canvas-06-e2e-manifest.json', '--profile-asset-root', '/profile-assets',
+    '--report', fixedReportPath(reportId), '--require-production', '--require-ready'
   ]);
   assert.equal(production['require-ready'], true);
   expectInputError(() => parseVerifyOptions([
     '--scope', 'REPORT', '--input-mode', 'PRODUCTION_HANDOFF', '--handoff-root', '/handoff', '--intake-report', 'reports/intake.json',
-    '--evidence-root', '/evidence', '--report', fixedReportPath(reportId)
+    '--evidence-root', '/evidence', '--manifest-root', '/manifest', '--manifest', 'dev-canvas-06-e2e-manifest.json', '--profile-asset-root', '/profile-assets',
+    '--report', fixedReportPath(reportId)
+  ]), 'E2E_RUN_ARGUMENT_INVALID');
+  expectInputError(() => parseVerifyOptions([
+    '--scope', 'REPORT', '--input-mode', 'CONTROLLED_TEST', '--controlled-bundle-root', '/bundle',
+    '--evidence-root', '/evidence', '--manifest-root', '/manifest', '--manifest', 'dev-canvas-06-e2e-manifest.json',
+    '--report', fixedReportPath(reportId)
   ]), 'E2E_RUN_ARGUMENT_INVALID');
 });
 
@@ -93,6 +106,30 @@ test('loads the active Manifest and exact five-file Profile input without a fall
   assert.equal(input.sourceDateEpoch, 1782864000);
   assert.equal(input.profileAssetRefs.length, 5);
   assert.equal(input.profilePackageDigest, input.activeBinding.profile.sha256);
+  const commonCase = input.manifest.cases.find(entry => entry.driver_id === 'DRIVER-COMMON');
+  const selected = selectCommonAttemptInputs({ manifestInput: input, caseEntry: commonCase });
+  assert.equal(selected.fixtureKind, 'COMMON');
+  assert.equal(selected.familyIdentityCatalogRef, null);
+  assert.equal(selected.drivers.length, 4);
+  assert.equal(selected.runtimeJarRef.path, 'inputs/build/local-runtime.jar');
+  assert.equal(selected.webDistRef.path, 'inputs/build/web-dist');
+  assert.throws(
+    () => selectCommonAttemptInputs({ manifestInput: input, caseEntry: input.manifest.cases.find(entry => entry.driver_id !== 'DRIVER-COMMON') }),
+    error => error.code === 'E2E_ORCHESTRATION_INPUT_INVALID'
+  );
+  const familyCase = input.manifest.cases.find(entry => entry.driver_id !== 'DRIVER-COMMON');
+  const family = selectAttemptInputs({ manifestInput: input, caseEntry: familyCase });
+  assert.equal(family.fixtureKind, 'FAMILY');
+  assert.equal(family.fixtureRef.sha256, familyCase.fixture_ref.sha256);
+  assert.equal(family.inputRef.sha256, familyCase.input_ref.sha256);
+  assert.equal(family.familyIdentityCatalogRef.kind, 'FAMILY_FIXTURE_IDENTITY_CATALOG');
+  assert.equal(family.manifestRef.sha256, input.manifestRef.sha256);
+  assert.equal(family.activeBinding.binding_digest, input.activeBinding.binding_digest);
+  assert.equal(Object.isFrozen(family.activeBinding.profile), true);
+  assert.throws(
+    () => selectCommonAttemptInputs({ manifestInput: input, caseEntry: { ...commonCase, expectation: 'BLOCKED' } }),
+    error => error.code === 'E2E_ORCHESTRATION_INPUT_INVALID'
+  );
 
   await writeFile(resolve(profileRoot, 'symbols/representative-symbol-catalog.json'), 'tampered\n');
   await assert.rejects(
@@ -146,15 +183,22 @@ async function activeManifest(profileRoot) {
     generated_at: '2026-07-01T00:00:00Z',
     generator_identity: { ...source.generator_identity, runner_version: '0.2.0' },
     driver_catalog: [
-      ...source.driver_catalog.map(item => ({ ...item, source_ref: { ...item.source_ref, kind: 'E2E_DRIVER_SOURCE' } })),
+      ...source.driver_catalog.map(driver => ({
+        ...driver,
+        source_ref: { ...driver.source_ref, kind: 'E2E_DRIVER_SOURCE' }
+      })),
       {
         driver_id: 'DRIVER-COMMON',
         source_ref: {
           kind: 'E2E_DRIVER_SOURCE', path: 'inputs/drivers/common-driver.mjs',
-          byte_length: 1, sha256: digest(Buffer.from('common-driver'))
+          byte_length: 1, sha256: 'a'.repeat(64)
         }
       }
     ],
+    common_setup_plan_ref: {
+      kind: 'COMMON_SETUP_PLAN', path: 'inputs/common/dev-canvas-06-common-setup-plan.json',
+      byte_length: 1, sha256: 'b'.repeat(64)
+    },
     profile_asset_tree_ref: {
       kind: 'PROFILE_ASSET_TREE', path: relativeRoot,
       byte_length: refs.reduce((total, ref) => total + ref.byte_length, 0),

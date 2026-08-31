@@ -21,6 +21,22 @@ export class ProjectionDigestV01Error extends Error {
   }
 }
 
+export function projectionDigestViewV01(apiProjectionData) {
+  const violations = [];
+  const source = object(apiProjectionData, '/data', ['context_id', 'constructs', 'suppressed_states'],
+    ['context_id', 'constructs', 'suppressed_states'], violations);
+  if (!source) {
+    throwFirst(violations);
+    throw new Error('Projection API data validation produced no first error.');
+  }
+  const contextId = string(source, 'context_id', '/data', true, violations);
+  const constructs = array(source, 'constructs', '/data', violations);
+  const suppressedStates = array(source, 'suppressed_states', '/data', violations);
+  if (suppressedStates) suppressedStates.forEach((item, index) => validateSuppressedState(item, `/data/suppressed_states/${index}`, violations));
+  throwFirst(violations);
+  return { context_id: contextId, constructs };
+}
+
 export function buildProjectionDigestPreimageV01(projectionData) {
   const violations = [];
   const data = normalizeProjectionData(projectionData, '/data', violations);
@@ -102,6 +118,22 @@ function normalizeConstruct(value, pointer, violations) {
   if (Object.hasOwn(source, 'modifiers')) normalized.modifiers = normalizeStringPairs(source.modifiers, `${pointer}/modifiers`, 'modifier_id', 'value', false, violations);
   if (Object.hasOwn(source, 'labels')) normalized.labels = normalizeStringPairs(source.labels, `${pointer}/labels`, 'slot_id', 'text', false, violations);
   return normalized;
+}
+
+function validateSuppressedState(value, pointer, violations) {
+  const source = object(value, pointer, ['state_id', 'owner_ref', 'name_or_value', 'state_roles', 'explicitness'],
+    ['state_id', 'owner_ref', 'name_or_value', 'state_roles', 'explicitness'], violations);
+  if (!source) return;
+  string(source, 'state_id', pointer, true, violations);
+  string(source, 'name_or_value', pointer, true, violations);
+  enumString(source, 'explicitness', pointer, ['SUPPRESSED'], violations);
+  const roles = normalizeStringArray(source.state_roles, `${pointer}/state_roles`, ['INITIAL', 'DEFAULT', 'FINAL'], violations);
+  if (new Set(roles).size !== roles.length) issue(violations, 'PROJECTION_DIGEST_SCHEMA_MISMATCH', 2, `${pointer}/state_roles`, 'State roles must be unique.');
+  const owner = object(source.owner_ref, `${pointer}/owner_ref`, ['target_kind', 'target_id', 'occurrence_id'], ['target_kind', 'target_id'], violations);
+  if (!owner) return;
+  enumString(owner, 'target_kind', `${pointer}/owner_ref`, ['ELEMENT', 'STATE', 'FACT', 'FEATURE', 'CONTEXT'], violations);
+  string(owner, 'target_id', `${pointer}/owner_ref`, true, violations);
+  if (Object.hasOwn(owner, 'occurrence_id')) string(owner, 'occurrence_id', `${pointer}/owner_ref`, true, violations);
 }
 
 function normalizeLayout(value, pointer, violations) {

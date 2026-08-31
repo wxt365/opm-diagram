@@ -1,162 +1,162 @@
-import { lstat, readFile } from 'node:fs/promises';
-import { basename, relative, resolve, sep } from 'node:path';
+import { execFileSync } from 'node:child_process';
+import { readFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import Ajv2020 from 'ajv/dist/2020.js';
 import addFormats from 'ajv-formats';
 
-import { collectFixtureRefs, deriveCommonCases, deriveFamilyCases, verifyFamilyFixtureIdentityCatalog } from './canvas06-e2e-manifest-v01-input.mjs';
-import { loadControlledReadyTrustChain, loadReadyTrustChain, readJsonRef } from './canvas06-e2e-manifest-v01-trust.mjs';
-import { archiveEntryPath, fileRef, listTree, readJson, resolveInside, sha256, treeRef, verifyFileRef } from './canvas06-e2e-manifest-v01-support.mjs';
-import { assertCaseDriverClosure, assertDriverCatalog, fail, parseVerifierOptions, PROFILE_SOURCE_ASSETS } from './canvas06-e2e-manifest-v02-input.mjs';
+import { assertCaseDriverClosure, assertDriverCatalog, assertProfileAssetThreeWayJoin, E2eManifestV02Error, fail, parseVerifierOptions, readProfileAssetSourceSet } from './canvas06-e2e-manifest-v02-input.mjs';
 import { loadProfileAssetClosure } from './canvas06-e2e-manifest-v02-profile.mjs';
+import { loadControlledReadyTrustChain, loadProductionReadyTrustChain, readJsonRef } from './canvas06-e2e-manifest-v01-trust.mjs';
+import { assertDirectory, fileRef, jcs, listTree, readJson, resolveInside, sha256, treeRef, verifyFileRef } from './canvas06-e2e-manifest-v01-support.mjs';
+import { verifyCommonFixtureInput } from './canvas06-e2e-common-fixtures.mjs';
+import { rebaseCommonSetupPlanRefs } from './canvas06-e2e-common-setup-plan.mjs';
 
 const schema = JSON.parse(await readFile(new URL('../docs/contracts/schemas/opm-dev-canvas-06-e2e-manifest-v02.schema.json', import.meta.url), 'utf8'));
 const commonSchema = JSON.parse(await readFile(new URL('../docs/contracts/schemas/opm-dev-canvas-06-common-fixture-catalog.schema.json', import.meta.url), 'utf8'));
-const familySchema = JSON.parse(await readFile(new URL('../docs/contracts/schemas/opm-dev-canvas-06-e2e-family-fixture-identity-catalog.schema.json', import.meta.url), 'utf8'));
 const ajv = new Ajv2020({ allErrors: true, strict: false });
 addFormats(ajv);
-const validateManifest = ajv.compile(schema);
+const validate = ajv.compile(schema);
 const validateCommon = ajv.compile(commonSchema);
-const validateFamily = ajv.compile(familySchema);
-const DRIVER_FILES = Object.freeze([
-  ['DRIVER-PROCEDURAL', 'procedural-driver.mjs'], ['DRIVER-CONTROL', 'control-driver.mjs'],
-  ['DRIVER-STRUCTURAL', 'structural-driver.mjs'], ['DRIVER-COMMON', 'common-driver.mjs']
-]);
 
-export async function main(argv = process.argv.slice(2), dependencies = {}) {
+export async function main(argv = process.argv.slice(2)) {
   const options = parseVerifierOptions(argv);
-  if (options['input-mode'] === 'PRODUCTION_HANDOFF') await assertQuarantine(options['handoff-root']);
   const root = resolve(options['manifest-root']);
-  await directory(root, 'ROOT_TYPE');
+  await assertDirectory(root, 'E2E_MANIFEST_TRANSACTION_INVALID');
   const before = await digest(root);
-  const expectedProfileRoot = resolve(root, 'inputs/upstream/profile-assets');
-  if (resolve(options['profile-asset-root']) !== expectedProfileRoot) fail('E2E_MANIFEST_ARGUMENT_INVALID', 'ARGS', 'profile-asset-root must be the exact final Profile root.');
   const manifestPath = resolveInside(root, options.manifest, 'E2E_MANIFEST_ARGUMENT_INVALID');
-  const manifest = await readJson(manifestPath, 'E2E_MANIFEST_SCHEMA_INVALID');
-  if (!validateManifest(manifest)) fail('E2E_MANIFEST_SCHEMA_INVALID', 'SCHEMA_0.2', JSON.stringify(validateManifest.errors));
+  const raw = await verifyFileRef({ root, reference: await rawRef(root, options.manifest, 'E2E_MANIFEST'), code: 'E2E_MANIFEST_SCHEMA_INVALID' });
+  const manifest = parse(raw.bytes);
+  if (!validate(manifest)) fail('E2E_MANIFEST_SCHEMA_INVALID', 'SCHEMA_0.2', JSON.stringify(validate.errors));
   const trust = await loadTrust(options);
-  await verifyRoot({ root, manifest, trust, sourceRoot: resolve(options['source-root']), dependencies });
+  await verifyTrustCopies(root, manifest, trust);
+  await verifyBuild(root, manifest, trust, options['source-root']);
+  await verifyDrivers(root, manifest, options['source-root']);
+  await verifyCommon(root, manifest, trust.handoff.value.active_binding);
+  await verifyProfile(root, manifest, options, trust.handoff.value.active_binding);
+  await verifyCases(root, manifest);
+  await verifyExactTree(root, manifest, options.manifest);
   const after = await digest(root);
-  if (before !== after) fail('E2E_MANIFEST_TRANSACTION_INVALID', 'TREE_DIGEST_AFTER', 'Verifier must not mutate the final Manifest root.');
-  return { path: manifestPath, sha256: sha256(await readFile(manifestPath)) };
+  if (before !== after) fail('E2E_MANIFEST_TRANSACTION_INVALID', 'TREE_DIGEST_AFTER', 'Verifier must not observe a changed manifest tree.');
+  return { path: manifestPath, sha256: raw.bytes.length === manifestPath.length ? sha256(raw.bytes) : sha256(raw.bytes) };
 }
 
-export async function verifyStagingRoot(argv, dependencies = {}) { return main(argv, dependencies); }
-
-async function verifyRoot({ root, manifest, trust, sourceRoot }) {
-  const expectedId = `dev-canvas-06.e2e.${manifest.source_build.source_commit.slice(0, 12)}.${manifest.intake_report_ref.sha256.slice(0, 12)}`;
-  if (manifest.manifest_id !== expectedId || manifest.generator_identity.runner_version !== '0.2.0') fail('E2E_MANIFEST_JOIN_MISMATCH', 'ID_PATH', 'Manifest identity is invalid.');
-  await rawTrustCopies({ root, manifest, trust });
-  await verifySourceBuild({ root, manifest, sourceRoot });
-  await verifyDrivers({ root, manifest, sourceRoot });
-  const profile = await verifyProfile({ root, manifest, sourceRoot, binding: trust.handoff.value.active_binding });
-  const expected = await deriveExpected({ root, manifest, binding: trust.handoff.value.active_binding });
-  assertDriverCatalog(manifest.driver_catalog);
-  assertCaseDriverClosure(manifest.cases);
-  if (!isDeepStrictEqual(manifest.cases, expected.cases) || !isDeepStrictEqual(manifest.fixture_refs, collectFixtureRefs(expected.cases, [expected.familyCatalogRef]))) {
-    fail('E2E_MANIFEST_JOIN_MISMATCH', 'CASE_ORDER', 'Manifest case derivation is not reproducible.');
+async function loadTrust(options) {
+  if (options['input-mode'] === 'CONTROLLED_TEST') {
+    const chain = await loadControlledReadyTrustChain({ bundleRoot: options['controlled-bundle-root'] });
+    return { root: chain.bundle.root, intake: chain.intake, handoff: chain.handoff, raw: { intake: chain.bundle.references.intake_report_ref, handoff: chain.bundle.references.handoff_ref, archive: chain.bundle.references.evidence_bundle_ref } };
   }
-  if (manifest.coverage_summary.family_case_count !== 178 || manifest.coverage_summary.pass_expectation_count !== 130 || manifest.coverage_summary.blocked_expectation_count !== 48 || manifest.coverage_summary.common_case_count !== 16) {
-    fail('E2E_MANIFEST_JOIN_MISMATCH', 'EXPECTATION', 'Coverage summary is invalid.');
-  }
-  await exactTree({ root, manifest, expected, profile });
+  const root = resolve(options['handoff-root']);
+  const intake = await readJsonRef(root, options['intake-report'], 'INTAKE_REPORT');
+  const chain = await loadProductionReadyTrustChain({ root, intakePath: options['intake-report'], handoffPath: intake.value.handoff_ref?.path });
+  const evidence = exactArtifact(chain.handoff.value, 'EVIDENCE_BUNDLE');
+  return { root, intake: chain.intake, handoff: chain.handoff, raw: { intake: chain.intake.ref, handoff: chain.handoff.ref, archive: evidence } };
 }
 
-async function rawTrustCopies({ root, manifest, trust }) {
-  for (const [external, final] of [[trust.raw.intake, manifest.intake_report_ref], [trust.raw.handoff, manifest.handoff_ref]]) {
-    const source = await verifyFileRef({ root: trust.root, reference: external, code: 'E2E_MANIFEST_INTAKE_INVALID' });
-    const target = await verifyFileRef({ root, reference: final, code: 'E2E_MANIFEST_INTAKE_INVALID' });
-    if (!source.bytes.equals(target.bytes)) fail('E2E_MANIFEST_JOIN_MISMATCH', 'RAW_COPIES', 'Trust input raw bytes differ from final copies.');
-  }
-  if (!isDeepStrictEqual(manifest.upstream_source_build, trust.handoff.value.source_build)) fail('E2E_MANIFEST_JOIN_MISMATCH', 'EXTERNAL_TRUST', 'Handoff source build differs.');
+async function verifyTrustCopies(root, manifest, trust) {
+  await sameExternal(root, manifest.intake_report_ref, trust.root, trust.raw.intake, 'E2E_MANIFEST_INTAKE_INVALID');
+  await sameExternal(root, manifest.handoff_ref, trust.root, trust.raw.handoff, 'E2E_MANIFEST_INTAKE_INVALID');
   const bundle = manifest.input_materialization.bundle_ref;
-  const source = await verifyFileRef({ root: trust.root, reference: trust.raw.archive, code: 'E2E_MANIFEST_INTAKE_INVALID' });
-  const target = await verifyFileRef({ root, reference: bundle, code: 'E2E_MANIFEST_INTAKE_INVALID' });
-  if (!source.bytes.equals(target.bytes) || !isDeepStrictEqual(manifest.upstream_input_refs[4]?.ref, bundle)) fail('E2E_MANIFEST_JOIN_MISMATCH', 'RAW_COPIES', 'Evidence Bundle copy differs.');
+  if (!isDeepStrictEqual(bundle, manifest.upstream_input_refs[4]?.ref)) fail('E2E_MANIFEST_JOIN_MISMATCH', 'EXTERNAL_TRUST', 'Evidence Bundle ref must occur once in upstream inputs.');
+  await sameExternal(root, bundle, trust.root, trust.raw.archive, 'E2E_MANIFEST_INTAKE_INVALID');
+  if (!isDeepStrictEqual(manifest.upstream_source_build, trust.handoff.value.source_build)) fail('E2E_MANIFEST_JOIN_MISMATCH', 'EXTERNAL_TRUST', 'upstream_source_build must equal Handoff source_build.');
 }
 
-async function verifySourceBuild({ root, manifest, sourceRoot }) {
-  await directory(sourceRoot, 'SOURCE_BUILD');
-  const runtime = resolve(sourceRoot, 'services/local-runtime/target/local-runtime-0.1.0-SNAPSHOT.jar');
-  const web = resolve(sourceRoot, 'apps/web/dist');
-  const lock = resolve(sourceRoot, 'package-lock.json');
-  for (const path of [runtime, lock]) await regular(path, 'SOURCE_BUILD');
-  await directory(web, 'SOURCE_BUILD');
-  const [sourceRuntime, finalRuntime] = await Promise.all([readFile(runtime), verifyFileRef({ root, reference: manifest.source_build.local_runtime_jar, code: 'E2E_MANIFEST_SOURCE_BUILD_INVALID' })]);
-  if (!sourceRuntime.equals(finalRuntime.bytes)) fail('E2E_MANIFEST_JOIN_MISMATCH', 'SOURCE_BUILD', 'Runtime JAR differs from source-root.');
-  const [sourceWeb, finalWeb] = await Promise.all([treeRef(sourceRoot, 'apps/web/dist', 'E2E_MANIFEST_SOURCE_BUILD_INVALID'), treeRef(root, 'inputs/build/web-dist', 'E2E_MANIFEST_SOURCE_BUILD_INVALID')]);
-  if (sourceWeb.byte_length !== finalWeb.byte_length || sourceWeb.sha256 !== finalWeb.sha256 || !isDeepStrictEqual(finalWeb, manifest.source_build.web_dist)) fail('E2E_MANIFEST_JOIN_MISMATCH', 'SOURCE_BUILD', 'Web dist differs from source-root.');
-  const lockBytes = await readFile(lock);
-  if (sha256(lockBytes) !== manifest.source_build.lockfile_sha256 || manifest.source_build.source_commit.length !== 40 || manifest.source_build.dirty_before_build !== false) fail('E2E_MANIFEST_SOURCE_BUILD_INVALID', 'SOURCE_BUILD', 'Source build identity is invalid.');
-}
-
-async function verifyDrivers({ root, manifest, sourceRoot }) {
-  const expected = [];
-  for (const [driverId, file] of DRIVER_FILES) {
-    const source = resolve(sourceRoot, `tests/e2e/release/dev-canvas-06/drivers/${file}`);
-    await regular(source, 'FOUR_DRIVER_REFS');
-    const target = await fileRef(resolve(root, `inputs/drivers/${file}`), root, 'E2E_DRIVER_SOURCE', 'E2E_MANIFEST_DRIVER_INVALID');
-    if (!Buffer.from(await readFile(source)).equals(Buffer.from(await readFile(resolve(root, target.path))))) fail('E2E_MANIFEST_JOIN_MISMATCH', 'FOUR_DRIVER_REFS', 'Driver source differs from source-root.');
-    expected.push({ driver_id: driverId, source_ref: target });
+async function verifyBuild(root, manifest, trust, sourceRootOption) {
+  const sourceRoot = resolve(sourceRootOption);
+  await assertDirectory(sourceRoot, 'E2E_MANIFEST_SOURCE_BUILD_INVALID');
+  const commit = execFileSync('git', ['-C', sourceRoot, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+  const dirty = execFileSync('git', ['-C', sourceRoot, 'status', '--porcelain'], { encoding: 'utf8' }).trim();
+  if (!/^[a-f0-9]{40}$/.test(commit) || dirty || commit !== manifest.source_build.source_commit || commit !== trust.handoff.value.source_build.source_commit) {
+    fail('E2E_MANIFEST_SOURCE_BUILD_INVALID', 'SOURCE_CLEAN_HEAD', 'source-root must be the exact clean source build.');
   }
-  if (!isDeepStrictEqual(manifest.driver_catalog, expected)) fail('E2E_MANIFEST_DRIVER_INVALID', 'FOUR_DRIVER_REFS', 'Driver catalog is not exact.');
+  const lock = await rawRef(root, 'inputs/build/package-lock.json', 'NPM_LOCKFILE');
+  if (lock.sha256 !== manifest.source_build.lockfile_sha256) fail('E2E_MANIFEST_SOURCE_BUILD_INVALID', 'SOURCE_BUILD', 'Lockfile digest differs from source_build.');
+  const sourceLock = await rawRef(sourceRoot, 'package-lock.json', 'NPM_LOCKFILE');
+  if (sourceLock.sha256 !== lock.sha256) fail('E2E_MANIFEST_SOURCE_BUILD_INVALID', 'SOURCE_BUILD', 'Source lockfile differs from staged bytes.');
+  const jar = await verifyFileRef({ root, reference: manifest.source_build.local_runtime_jar, code: 'E2E_MANIFEST_SOURCE_BUILD_INVALID' });
+  const expectedJar = exactArtifact(trust.handoff.value, 'LOCAL_RUNTIME_JAR');
+  if (jar.bytes.length !== expectedJar.byte_length || sha256(jar.bytes) !== expectedJar.sha256) fail('E2E_MANIFEST_SOURCE_BUILD_INVALID', 'SOURCE_BUILD', 'Runtime JAR differs from Handoff.');
+  const sourceJar = await fileRef(resolveInside(sourceRoot, 'services/local-runtime/target/local-runtime-0.1.0-SNAPSHOT.jar', 'E2E_MANIFEST_SOURCE_BUILD_INVALID'), sourceRoot, 'LOCAL_RUNTIME_JAR', 'E2E_MANIFEST_SOURCE_BUILD_INVALID');
+  if (sourceJar.byte_length !== jar.bytes.length || sourceJar.sha256 !== sha256(jar.bytes)) fail('E2E_MANIFEST_SOURCE_BUILD_INVALID', 'SOURCE_BUILD', 'Source Runtime JAR differs from staged bytes.');
+  const web = await treeRef(root, 'inputs/build/web-dist', 'E2E_MANIFEST_SOURCE_BUILD_INVALID');
+  if (!isDeepStrictEqual(web, manifest.source_build.web_dist)) fail('E2E_MANIFEST_SOURCE_BUILD_INVALID', 'SOURCE_BUILD', 'Web tree ref differs from staged bytes.');
+  const expectedWeb = exactArtifact(trust.handoff.value, 'WEB_DIST_TREE');
+  if (web.byte_length !== expectedWeb.byte_length || web.sha256 !== expectedWeb.sha256) fail('E2E_MANIFEST_SOURCE_BUILD_INVALID', 'SOURCE_BUILD', 'Web tree differs from Handoff.');
+  const sourceWeb = await treeRef(sourceRoot, 'apps/web/dist', 'E2E_MANIFEST_SOURCE_BUILD_INVALID');
+  if (sourceWeb.byte_length !== web.byte_length || sourceWeb.sha256 !== web.sha256) fail('E2E_MANIFEST_SOURCE_BUILD_INVALID', 'SOURCE_BUILD', 'Source Web tree differs from staged bytes.');
+  if (manifest.source_build.source_commit !== trust.handoff.value.source_build.source_commit || manifest.source_build.dirty_before_build !== false || manifest.source_build.node_version !== process.version || manifest.source_build.build_command !== 'npm ci --ignore-scripts && npm run build') fail('E2E_MANIFEST_SOURCE_BUILD_INVALID', 'SOURCE_BUILD', 'Source build identity is invalid.');
 }
 
-async function verifyProfile({ root, manifest, sourceRoot, binding }) {
-  const final = await loadProfileAssetClosure({ assetRoot: resolve(root, 'inputs/upstream/profile-assets'), activeBinding: binding });
-  if (!isDeepStrictEqual(final.profile_asset_refs, manifest.profile_asset_refs) || !isDeepStrictEqual(final.profile_asset_tree_ref, manifest.profile_asset_tree_ref)) fail('E2E_MANIFEST_PROFILE_ASSET_INVALID', 'FINAL_PROFILE_5', 'Final Profile closure differs from Manifest.');
-  for (const [sourcePath, logical] of PROFILE_SOURCE_ASSETS) {
-    const [left, right] = await Promise.all([readFile(resolve(sourceRoot, sourcePath)), readFile(resolve(root, 'inputs/upstream/profile-assets', logical))]);
-    if (!left.equals(right)) fail('E2E_MANIFEST_PROFILE_ASSET_INVALID', 'SOURCE_FINAL_PROFILE_RAW_AND_TREE_JOIN', 'Source and final Profile bytes differ.');
+async function verifyDrivers(root, manifest, sourceRootOption) {
+  const sourceRoot = resolve(sourceRootOption);
+  assertDriverCatalog(manifest.driver_catalog);
+  for (const driver of manifest.driver_catalog) {
+    const staged = await verifyFileRef({ root, reference: driver.source_ref, code: 'E2E_MANIFEST_DRIVER_INVALID' });
+    const filename = driver.source_ref.path.slice('inputs/drivers/'.length);
+    const source = await fileRef(resolveInside(sourceRoot, `tests/e2e/release/dev-canvas-06/drivers/${filename}`, 'E2E_MANIFEST_DRIVER_INVALID'), sourceRoot, 'E2E_DRIVER_SOURCE', 'E2E_MANIFEST_DRIVER_INVALID');
+    if (source.byte_length !== staged.bytes.length || source.sha256 !== sha256(staged.bytes)) fail('E2E_MANIFEST_DRIVER_INVALID', 'FOUR_DRIVERS', 'Source driver differs from staged bytes.');
   }
-  return final;
 }
 
-async function deriveExpected({ root, manifest, binding }) {
-  const familyRoot = resolve(root, 'inputs/upstream/family');
-  const coverage = await readJson(resolve(familyRoot, 'opm-opl-coverage-catalog.json'), 'E2E_MANIFEST_FAMILY_IDENTITY_INVALID');
-  const goldenManifest = await readJson(resolve(familyRoot, 'opm-opl-golden-manifest.json'), 'E2E_MANIFEST_FAMILY_IDENTITY_INVALID');
-  const replay = await readJson(resolve(familyRoot, 'golden-replay.json'), 'E2E_MANIFEST_FAMILY_IDENTITY_INVALID');
-  const catalog = await readJson(resolve(familyRoot, 'opm-e2e-family-fixture-identity-catalog.json'), 'E2E_MANIFEST_FAMILY_IDENTITY_INVALID');
-  if (!validateFamily(catalog) || catalog.catalog_version !== '0.1.0') fail('E2E_MANIFEST_FAMILY_IDENTITY_INVALID', 'FAMILY_IDENTITY', 'Family catalog is invalid.');
-  const entries = new Map();
-  const bytes = new Map();
-  for (const item of goldenManifest.cases) for (const fixture of [item.base_revision_fixture, item.input_revision_fixture]) {
-    const path = archiveEntryPath(`packages/profiles/${binding.profile.id}/${binding.profile.version}/${fixture}`);
-    const ref = manifest.fixture_refs.find(value => value.path === path);
-    if (!ref) fail('E2E_MANIFEST_FAMILY_IDENTITY_INVALID', 'FIXTURE_REFS', 'Family fixture ref is missing.');
-    entries.set(fixture, ref);
-    if (fixture === item.base_revision_fixture) bytes.set(fixture, await readFile(resolve(root, path)));
+async function verifyCommon(root, manifest, activeBinding) {
+  const commonRoot = resolveInside(root, 'inputs/common', 'E2E_MANIFEST_COMMON_FIXTURE_INVALID');
+  const entries = await listTree(commonRoot, 'E2E_MANIFEST_COMMON_FIXTURE_INVALID');
+  if (entries.length !== 44) fail('E2E_MANIFEST_COMMON_FIXTURE_INVALID', 'COMMON_44', 'Common root must contain exactly 44 files.');
+  const catalogRef = await rawRef(root, `inputs/common/dev-canvas-06-common-fixture-catalog.json`, 'COMMON_FIXTURE_CATALOG');
+  if (!isDeepStrictEqual(catalogRef, manifest.common_fixture_catalog_ref)) fail('E2E_MANIFEST_COMMON_FIXTURE_INVALID', 'COMMON_44', 'Common catalog ref is not the exact staged raw ref.');
+  const setupPlanRef = await rawRef(root, 'inputs/common/dev-canvas-06-common-setup-plan.json', 'COMMON_SETUP_PLAN');
+  if (!isDeepStrictEqual(setupPlanRef, manifest.common_setup_plan_ref)) fail('E2E_MANIFEST_COMMON_FIXTURE_INVALID', 'COMMON_44', 'Common Setup Plan ref is not the exact staged raw ref.');
+  const catalog = await readJson(resolveInside(root, catalogRef.path, 'E2E_MANIFEST_COMMON_FIXTURE_INVALID'), 'E2E_MANIFEST_COMMON_FIXTURE_INVALID');
+  if (!validateCommon(catalog) || catalog.catalog_version !== '0.2.0' || !isDeepStrictEqual(catalog.source_binding, activeBinding)) fail('E2E_MANIFEST_COMMON_FIXTURE_INVALID', 'COMMON_44', 'Common catalog is not active and bound to the Handoff.');
+  for (const item of catalog.e2e_cases) for (const reference of [item.base_fixture_ref, item.input_ref]) {
+    const staged = await rawRef(root, `inputs/common/${reference.path}`, reference.kind);
+    if (staged.byte_length !== reference.byte_length || staged.sha256 !== reference.sha256) fail('E2E_MANIFEST_COMMON_FIXTURE_INVALID', 'COMMON_44', 'Common fixture raw ref differs from Catalog.');
   }
-  verifyFamilyFixtureIdentityCatalog({ catalog, goldenManifest, goldenManifestBytes: await readFile(resolve(familyRoot, 'opm-opl-golden-manifest.json')), fixtureBytesByEntry: bytes });
-  const familyCases = deriveFamilyCases({ coverage, goldenManifest, replay, materializedEntries: entries });
-  const familyCatalogRef = await fileRef(resolve(familyRoot, 'opm-e2e-family-fixture-identity-catalog.json'), root, 'FAMILY_FIXTURE_IDENTITY_CATALOG');
-  const commonRoot = resolve(root, 'inputs/common');
-  const commonCatalogRef = await fileRef(resolve(commonRoot, 'dev-canvas-06-common-fixture-catalog.json'), root, 'COMMON_FIXTURE_CATALOG');
-  if (!isDeepStrictEqual(manifest.common_fixture_catalog_ref, commonCatalogRef)) fail('E2E_MANIFEST_COMMON_FIXTURE_INVALID', 'COMMON_43', 'Common Catalog ref differs.');
-  const common = await readJson(resolve(commonRoot, 'dev-canvas-06-common-fixture-catalog.json'), 'E2E_MANIFEST_COMMON_FIXTURE_INVALID');
-  if (!validateCommon(common) || common.catalog_version !== '0.2.0' || !isDeepStrictEqual(common.source_binding, binding)) fail('E2E_MANIFEST_COMMON_FIXTURE_INVALID', 'COMMON_43', 'Common Catalog is invalid.');
-  const commonRefs = new Map();
-  for (const item of common.e2e_cases) for (const ref of [item.base_fixture_ref, item.input_ref]) commonRefs.set(ref.path, await fileRef(resolve(commonRoot, ref.path), root, ref.kind));
-  return { cases: [...familyCases, ...deriveCommonCases({ catalog: common, materializedRefs: commonRefs })], familyCatalogRef, commonRoot };
+  let verified;
+  try { verified = await verifyCommonFixtureInput({ commonRoot, catalogPath: 'dev-canvas-06-common-fixture-catalog.json', activeBinding }); }
+  catch (error) { fail('E2E_MANIFEST_COMMON_FIXTURE_INVALID', 'COMMON_44', error.message); }
+  const commonDriverRef = manifest.driver_catalog.find(item => item.driver_id === 'DRIVER-COMMON')?.source_ref;
+  try { rebaseCommonSetupPlanRefs({ plan: verified.plan, manifestCatalogRef: catalogRef, manifestCommonDriverRef: commonDriverRef }); }
+  catch (error) { fail('E2E_MANIFEST_JOIN_MISMATCH', 'COMMON_SETUP_PLAN_JOIN', error.message); }
 }
 
-async function exactTree({ root, manifest, expected, profile }) {
-  const files = new Set(['dev-canvas-06-e2e-manifest.json']);
-  for (const ref of [manifest.intake_report_ref, manifest.handoff_ref, manifest.input_materialization.bundle_ref, manifest.source_build.local_runtime_jar, ...manifest.fixture_refs, ...manifest.profile_asset_refs, ...manifest.driver_catalog.map(item => item.source_ref)]) files.add(ref.path);
-  files.add('inputs/build/package-lock.json');
-  for (const entry of await listTree(resolve(root, 'inputs/build/web-dist'))) files.add(`inputs/build/web-dist/${entry.path}`);
-  for (const entry of await listTree(expected.commonRoot)) files.add(`inputs/common/${entry.path}`);
-  for (const ref of manifest.upstream_input_refs.slice(0, 3).map(item => item.ref)) files.add(ref.path);
-  const actual = await listTree(root);
-  if (actual.length !== files.size || actual.some(entry => !files.has(entry.path))) fail('E2E_MANIFEST_JOIN_MISMATCH', 'EXACT_TREE', 'Final Manifest root has an extra or missing file.');
-  void profile;
+async function verifyProfile(root, manifest, options, activeBinding) {
+  if (options['profile-asset-root'] !== resolveInside(root, 'inputs/upstream/profile-assets', 'E2E_MANIFEST_PROFILE_ASSET_INVALID')) fail('E2E_MANIFEST_PROFILE_ASSET_INVALID', 'PROFILE_5', 'profile-asset-root must be the final profile asset tree.');
+  const closure = await loadProfileAssetClosure({ assetRoot: options['profile-asset-root'], activeBinding });
+  if (!isDeepStrictEqual(closure.profile_asset_refs, manifest.profile_asset_refs) || !isDeepStrictEqual(closure.profile_asset_tree_ref, manifest.profile_asset_tree_ref)) fail('E2E_MANIFEST_PROFILE_ASSET_INVALID', 'PROFILE_5', 'Profile five-asset closure differs from Manifest.');
+  const source = await readProfileAssetSourceSet(options['source-root']);
+  assertProfileAssetThreeWayJoin(source, closure, closure);
 }
 
-async function loadTrust(options) { if (options['input-mode'] === 'CONTROLLED_TEST') { const chain = await loadControlledReadyTrustChain({ bundleRoot: options['controlled-bundle-root'] }); return { root: chain.bundle.root, intake: chain.intake, handoff: chain.handoff, raw: { intake: chain.bundle.references.intake_report_ref, handoff: chain.bundle.references.handoff_ref, archive: chain.bundle.references.evidence_bundle_ref } }; } const root = resolve(options['handoff-root']); const intake = await readJsonRef(root, options['intake-report'], 'INTAKE_REPORT'); const chain = await loadReadyTrustChain({ root, intakePath: options['intake-report'], handoffPath: intake.value.handoff_ref?.path }); const items = chain.handoff.value.build_artifacts?.filter(item => item.kind === 'EVIDENCE_BUNDLE') ?? []; if (items.length !== 1) fail('E2E_MANIFEST_INTAKE_INVALID', 'EXTERNAL_TRUST', 'Handoff Evidence Bundle is invalid.'); return { root, intake: chain.intake, handoff: chain.handoff, raw: { intake: chain.intake.ref, handoff: chain.handoff.ref, archive: items[0] } }; }
-async function assertQuarantine(handoffRoot) { const root = resolve(handoffRoot); const match = /^clean-([a-f0-9]{12})$/.exec(basename(root)); if (!match) fail('E2E_MANIFEST_ARGUMENT_INVALID', 'EXACT_QUARANTINE_SIDECAR_GUARD', 'handoff-root must be clean-<source12>.'); for (const path of [resolve(dirname(root), 'quarantine', `clean-${match[1]}.json`), resolve(dirname(root), 'quarantine', `.clean-${match[1]}.json.tmp`)]) { try { await lstat(path); fail('E2E_MANIFEST_INPUT_QUARANTINED', 'EXACT_QUARANTINE_SIDECAR_GUARD', 'Version input is quarantined.'); } catch (error) { if (error?.code !== 'ENOENT' && error?.code) throw error; } } }
-async function directory(path, stage) { try { const info = await lstat(path); if (info.isSymbolicLink() || !info.isDirectory()) throw new Error(); } catch { fail('E2E_MANIFEST_ARGUMENT_INVALID', stage, 'Expected a non-symlink directory.'); } }
-async function regular(path, stage) { try { const info = await lstat(path); if (info.isSymbolicLink() || !info.isFile() || info.nlink !== 1) throw new Error(); } catch { fail('E2E_MANIFEST_SOURCE_BUILD_INVALID', stage, 'Expected a single-link regular file.'); } }
-async function digest(root) { return sha256(Buffer.from(JSON.stringify(await listTree(root)), 'utf8')); }
+async function verifyCases(root, manifest) {
+  assertCaseDriverClosure(manifest.cases);
+  const drivers = new Set(manifest.driver_catalog.map(item => item.driver_id));
+  for (const item of manifest.cases) {
+    if (!drivers.has(item.driver_id)) fail('E2E_MANIFEST_DRIVER_INVALID', 'CASE_DRIVER', 'Case references a missing driver.');
+    for (const ref of [item.fixture_ref, item.input_ref]) await verifyFileRef({ root, reference: ref, code: 'E2E_MANIFEST_JOIN_MISMATCH' });
+  }
+  const common = manifest.cases.filter(item => !item.capability_id);
+  if (common.length !== 16 || common.filter(item => item.expectation === 'PASS').length !== 7 || common.filter(item => item.expectation === 'BLOCKED').length !== 9) fail('E2E_MANIFEST_JOIN_MISMATCH', 'EXPECTATION', 'Common expectation matrix must be 7/9.');
+}
 
-if (import.meta.url === new URL(process.argv[1], 'file:').href) main().then(result => process.stdout.write(`${result.path}\t${result.sha256}\n`)).catch(error => { process.stderr.write(`${error.code ?? 'E2E_MANIFEST_IO_FAILED'}\t${error.stage ?? 'INTERNAL'}\n`); process.exitCode = error.exitCode ?? 4; });
+async function verifyExactTree(root, manifest, manifestName) {
+  const expected = new Set([manifestName, 'inputs/build/package-lock.json', 'inputs/upstream/family/profile.json']);
+  for (const ref of [manifest.intake_report_ref, manifest.handoff_ref, manifest.input_materialization.bundle_ref, manifest.source_build.local_runtime_jar, manifest.common_fixture_catalog_ref, manifest.common_setup_plan_ref, ...manifest.profile_asset_refs, ...manifest.fixture_refs, ...manifest.driver_catalog.map(item => item.source_ref)]) expected.add(ref.path);
+  for (const item of manifest.upstream_input_refs) expected.add(item.ref.path);
+  for (const item of await listTree(resolveInside(root, 'inputs/build/web-dist', 'E2E_MANIFEST_TRANSACTION_INVALID'), 'E2E_MANIFEST_TRANSACTION_INVALID')) expected.add(`inputs/build/web-dist/${item.path}`);
+  for (const item of await listTree(resolveInside(root, 'inputs/common', 'E2E_MANIFEST_TRANSACTION_INVALID'), 'E2E_MANIFEST_TRANSACTION_INVALID')) expected.add(`inputs/common/${item.path}`);
+  const actual = await listTree(root, 'E2E_MANIFEST_TRANSACTION_INVALID');
+  if (actual.length !== expected.size || actual.some(item => !expected.has(item.path))) fail('E2E_MANIFEST_TRANSACTION_INVALID', 'EXACT_TREE', 'Manifest root contains missing or extra files.');
+}
+
+async function rawRef(root, path, kind) { const target = resolveInside(root, path, 'E2E_MANIFEST_SCHEMA_INVALID'); return fileRef(target, root, kind, 'E2E_MANIFEST_SCHEMA_INVALID'); }
+async function sameExternal(root, localRef, externalRoot, externalRef, code) { const local = await verifyFileRef({ root, reference: localRef, code }); const external = await verifyFileRef({ root: externalRoot, reference: externalRef, code }); if (!local.bytes.equals(external.bytes)) fail(code, 'EXTERNAL_TRUST', 'Staged trust input differs from external raw bytes.'); }
+async function digest(root) { return sha256(Buffer.from(jcs(await listTree(root, 'E2E_MANIFEST_TRANSACTION_INVALID')), 'utf8')); }
+function exactArtifact(handoff, kind) { const values = handoff.build_artifacts?.filter(item => item.kind === kind) ?? []; if (values.length !== 1) fail('E2E_MANIFEST_INTAKE_INVALID', 'EXTERNAL_TRUST', `Handoff must contain one ${kind} artifact.`); return values[0]; }
+function parse(bytes) { try { return JSON.parse(bytes.toString('utf8')); } catch { fail('E2E_MANIFEST_SCHEMA_INVALID', 'MANIFEST_RAW', 'Manifest must be JSON.'); } }
+function normalize(error) { return error instanceof E2eManifestV02Error ? error : new E2eManifestV02Error('E2E_MANIFEST_IO_FAILED', 'INTERNAL', error.message); }
+
+if (import.meta.url === new URL(process.argv[1], 'file:').href) {
+  main().then(result => process.stdout.write(`${result.path}\t${result.sha256}\n`)).catch(error => { const value = normalize(error); process.stderr.write(`${value.code}\t${value.stage}\n${value.message}\n`); process.exitCode = value.exitCode; });
+}

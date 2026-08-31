@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:opm:contract:dev-canvas-06-controlled-input-bundle:0.2",
+  "title": "OPM DEV-CANVAS-06 Fault Launcher Controlled Input Bundle",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "bundle_class", "bundle_id", "bundle_identity_sha256", "handoff_ref", "intake_report_ref", "evidence_bundle_ref", "approved_version_ref", "preflight_descriptor_ref"],
+  "properties": {
+    "schema_id": {"const": "OPM-DEV-CANVAS-06-CONTROLLED-INPUT-BUNDLE-001"},
+    "schema_version": {"const": "0.2"},
+    "bundle_class": {"const": "CONTROLLED_TEST"},
+    "bundle_id": {"pattern": "^canvas06-controlled-[a-f0-9]{64}$"},
+    "bundle_identity_sha256": {"$ref": "#/$defs/digest"},
+    "handoff_ref": {"$ref": "#/$defs/fileRef"},
+    "intake_report_ref": {"$ref": "#/$defs/fileRef"},
+    "evidence_bundle_ref": {"$ref": "#/$defs/fileRef"},
+    "approved_version_ref": {"type": "null"},
+    "preflight_descriptor_ref": {"allOf": [{"$ref": "#/$defs/fileRef"}, {"properties": {"kind": {"const": "FAULT_LAUNCHER_PREFLIGHT_DESCRIPTOR"}, "path": {"const": "fault-launcher/preflight-descriptor.json"}}}]}
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "safeRelativePath": {"type": "string", "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))[A-Za-z0-9][A-Za-z0-9._-]*(?:/[A-Za-z0-9][A-Za-z0-9._-]*)*$"},
+    "fileRef": {"type": "object", "additionalProperties": false, "required": ["kind", "path", "byte_length", "sha256"], "properties": {"kind": {"type": "string", "minLength": 1}, "path": {"$ref": "#/$defs/safeRelativePath"}, "byte_length": {"type": "integer", "minimum": 1}, "sha256": {"$ref": "#/$defs/digest"}}}
+  }
+}

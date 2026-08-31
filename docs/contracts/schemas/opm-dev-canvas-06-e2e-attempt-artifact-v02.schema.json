@@ -248,8 +248,18 @@
       ],
       "properties": {
         "assertion_id": {
-          "type": "string",
-          "minLength": 1
+          "enum": [
+            "REVISION_COMMITTED",
+            "TRANSACTION_MATCHED",
+            "PROJECTION_MATCHED",
+            "TEXT_TRACE_MATCHED",
+            "ERROR_CODE_MATCHED",
+            "TRANSACTION_ZERO",
+            "HEAD_UNCHANGED",
+            "PROJECTION_UNCHANGED",
+            "REVISION_OR_BLOCKED_MATCHED",
+            "REOPEN_MATCHED"
+          ]
         },
         "status": {
           "enum": [
@@ -304,7 +314,11 @@
       "additionalProperties": false,
       "required": [
         "storage_root",
+        "materialized_base_root",
         "project_db_ref",
+        "working_project_db_path",
+        "working_clone_byte_length",
+        "working_clone_sha256",
         "storage_schema_version",
         "sqlite_quick_check",
         "foreign_key_check_count",
@@ -314,8 +328,37 @@
         "storage_root": {
           "const": "storage"
         },
+        "materialized_base_root": {
+          "const": "storage/materialized-base"
+        },
         "project_db_ref": {
-          "$ref": "#/$defs/fileRef"
+          "allOf": [
+            {
+              "$ref": "#/$defs/fileRef"
+            },
+            {
+              "properties": {
+                "kind": {
+                  "const": "PROJECT_DB"
+                },
+                "path": {
+                  "type": "string",
+                  "pattern": "^storage/materialized-base/projects/[A-Za-z][A-Za-z0-9._:-]{2,127}/project\\.db$"
+                }
+              }
+            }
+          ]
+        },
+        "working_project_db_path": {
+          "type": "string",
+          "pattern": "^storage/projects/[A-Za-z][A-Za-z0-9._:-]{2,127}/project\\.db$"
+        },
+        "working_clone_byte_length": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "working_clone_sha256": {
+          "$ref": "#/$defs/digest"
         },
         "storage_schema_version": {
           "const": "1.0"
@@ -705,6 +748,9 @@
         "status",
         "top_error_code",
         "detail_error_code",
+        "revision_document_before_sha256",
+        "revision_document_after_sha256",
+        "revision_document_reopen_sha256",
         "projection_before_sha256",
         "projection_after_sha256",
         "projection_reopen_sha256",
@@ -825,7 +871,16 @@
           "$ref": "#/$defs/nullableString"
         },
         "detail_error_code": {
-          "$ref": "#/$defs/nullableString"
+          "type": "null"
+        },
+        "revision_document_before_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "revision_document_after_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "revision_document_reopen_sha256": {
+          "$ref": "#/$defs/digest"
         },
         "projection_before_sha256": {
           "$ref": "#/$defs/digest"
@@ -869,6 +924,7 @@
         "assertion_results": {
           "type": "array",
           "minItems": 1,
+          "uniqueItems": true,
           "items": {
             "$ref": "#/$defs/assertionResult"
           }
@@ -1814,6 +1870,7 @@
         "normalized_url",
         "request_ref",
         "response_ref",
+        "exchange_ref",
         "status",
         "revision"
       ],
@@ -1846,6 +1903,9 @@
         },
         "response_ref": {
           "$ref": "#/$defs/nullableFileRef"
+        },
+        "exchange_ref": {
+          "$ref": "#/$defs/fileRef"
         },
         "status": {
           "type": "integer",
@@ -1925,6 +1985,7 @@
             "TRANSACTION_OBSERVATION",
             "REOPEN_OBSERVATION",
             "API_EXCHANGE_INDEX",
+            "API_EXCHANGE",
             "API_REQUEST_BODY",
             "API_RESPONSE_BODY",
             "STDOUT_LOG",
@@ -2008,6 +2069,35 @@
           "if": {
             "properties": {
               "kind": {
+                "enum": [
+                  "API_EXCHANGE",
+                  "API_REQUEST_BODY",
+                  "API_RESPONSE_BODY"
+                ]
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "media_type": {
+                "const": "application/json"
+              },
+              "capture_phase": {
+                "const": "ACTION"
+              },
+              "required": {
+                "const": true
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
                 "const": "PROFILE_ASSET"
               }
             },
@@ -2060,7 +2150,7 @@
         },
         "refs": {
           "type": "array",
-          "minItems": 16,
+          "minItems": 20,
           "uniqueItems": true,
           "items": {
             "$ref": "#/$defs/artifactEntry"
@@ -2089,6 +2179,42 @@
               },
               "minContains": 1,
               "maxContains": 1
+            }
+          }
+        },
+        {
+          "properties": {
+            "refs": {
+              "contains": {
+                "properties": {
+                  "kind": {
+                    "const": "STDOUT_LOG"
+                  }
+                },
+                "required": [
+                  "kind"
+                ]
+              },
+              "minContains": 2,
+              "maxContains": 2
+            }
+          }
+        },
+        {
+          "properties": {
+            "refs": {
+              "contains": {
+                "properties": {
+                  "kind": {
+                    "const": "STDERR_LOG"
+                  }
+                },
+                "required": [
+                  "kind"
+                ]
+              },
+              "minContains": 2,
+              "maxContains": 2
             }
           }
         },

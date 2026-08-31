@@ -1,0 +1,212 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:opm:contract:dev-canvas-06-e2e-common-setup-plan:0.1",
+  "title": "OPM DEV-CANVAS-06 E2E Common Setup Plan 0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_id", "schema_version", "plan_id", "plan_version", "generated_at",
+    "generator_ref", "source_binding", "common_fixture_catalog_ref", "common_driver_ref",
+    "cases", "summary", "plan_payload_sha256"
+  ],
+  "properties": {
+    "schema_id": {"const": "OPM-DEV-CANVAS-06-E2E-COMMON-SETUP-PLAN-001"},
+    "schema_version": {"const": "0.1"},
+    "plan_id": {"pattern": "^dev-canvas-06\\.common-setup\\.[a-f0-9]{12}$"},
+    "plan_version": {"const": "0.1.0"},
+    "generated_at": {"type": "string", "format": "date-time"},
+    "generator_ref": {"allOf": [{"$ref": "#/$defs/fileRef"}, {"properties": {"kind": {"const": "GENERATOR_SOURCE"}, "path": {"const": "sources/scripts/build-canvas06-common-visual-fixtures.mjs"}}}]},
+    "source_binding": {"$ref": "#/$defs/binding"},
+    "common_fixture_catalog_ref": {"allOf": [{"$ref": "#/$defs/fileRef"}, {"properties": {"kind": {"const": "COMMON_FIXTURE_CATALOG"}}}]},
+    "common_driver_ref": {"allOf": [{"$ref": "#/$defs/fileRef"}, {"properties": {"kind": {"const": "E2E_DRIVER_SOURCE"}, "path": {"const": "tests/e2e/release/dev-canvas-06/drivers/common-driver.mjs"}}}]},
+    "cases": {
+      "type": "array",
+      "minItems": 16,
+      "maxItems": 16,
+      "prefixItems": [
+        {"$ref": "#/$defs/caseState"},
+        {"$ref": "#/$defs/caseSuppressed"},
+        {"$ref": "#/$defs/caseMobile"},
+        {"$ref": "#/$defs/caseStateFact"},
+        {"$ref": "#/$defs/caseObjectProcess"},
+        {"$ref": "#/$defs/caseAmbiguous"},
+        {"$ref": "#/$defs/caseStaleOption"},
+        {"$ref": "#/$defs/caseDeletableState"},
+        {"$ref": "#/$defs/caseFact"},
+        {"$ref": "#/$defs/caseStaleToken"},
+        {"$ref": "#/$defs/caseMismatchedToken"},
+        {"$ref": "#/$defs/caseAssetMissing"},
+        {"$ref": "#/$defs/caseTextBlocked"},
+        {"$ref": "#/$defs/caseRevisionConflict"},
+        {"$ref": "#/$defs/casePersistenceFailed"},
+        {"$ref": "#/$defs/caseReadonly"}
+      ],
+      "items": false
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["case_count", "initial_state_count"],
+      "properties": {"case_count": {"const": 16}, "initial_state_count": {"const": 8}}
+    },
+    "plan_payload_sha256": {"$ref": "#/$defs/digest"}
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "path": {"type": "string", "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$"},
+    "stableId": {"type": "string", "minLength": 1, "maxLength": 256},
+    "fileRef": {
+      "type": "object", "additionalProperties": false,
+      "required": ["kind", "path", "byte_length", "sha256"],
+      "properties": {
+        "kind": {"type": "string", "minLength": 1}, "path": {"$ref": "#/$defs/path"},
+        "byte_length": {"type": "integer", "minimum": 0}, "sha256": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "asset": {
+      "type": "object", "additionalProperties": false, "required": ["id", "version", "sha256"],
+      "properties": {"id": {"$ref": "#/$defs/stableId"}, "version": {"type": "string", "minLength": 1}, "sha256": {"$ref": "#/$defs/digest"}}
+    },
+    "binding": {
+      "type": "object", "additionalProperties": false,
+      "required": ["profile", "rule_set", "text_grammar", "symbol_catalog", "normalization_adapter", "binding_digest"],
+      "properties": {
+        "profile": {"$ref": "#/$defs/asset"}, "rule_set": {"$ref": "#/$defs/asset"},
+        "text_grammar": {"$ref": "#/$defs/asset"}, "symbol_catalog": {"$ref": "#/$defs/asset"},
+        "normalization_adapter": {"$ref": "#/$defs/asset"}, "binding_digest": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "layout": {
+      "type": "object", "additionalProperties": false, "required": ["x", "y"],
+      "properties": {"x": {"type": "number"}, "y": {"type": "number"}}
+    },
+    "elementPayload": {
+      "type": "object", "additionalProperties": false, "required": ["kind", "element_id", "name", "layout"],
+      "properties": {
+        "kind": {"enum": ["OBJECT", "PROCESS"]}, "element_id": {"$ref": "#/$defs/stableId"},
+        "name": {"type": "string", "minLength": 1}, "layout": {"$ref": "#/$defs/layout"}
+      }
+    },
+    "presentationPayload": {
+      "type": "object", "additionalProperties": false, "required": ["context_id", "state_id"],
+      "properties": {"context_id": {"const": "$CONTEXT_ID"}, "state_id": {"$ref": "#/$defs/stableId"}}
+    },
+    "targetRef": {
+      "type": "object", "additionalProperties": false, "required": ["target_kind", "target_id"],
+      "properties": {"target_kind": {"enum": ["ELEMENT", "STATE"]}, "target_id": {"$ref": "#/$defs/stableId"}}
+    },
+    "stateTemplate": {
+      "type": "object", "additionalProperties": false,
+      "required": ["context_id", "state_id", "owner_ref", "capability_ref", "name_or_value", "state_roles", "occurrence", "layout"],
+      "properties": {
+        "context_id": {"const": "$CONTEXT_ID"}, "state_id": {"$ref": "#/$defs/stableId"},
+        "owner_ref": {"$ref": "#/$defs/targetRef"},
+        "capability_ref": {"type": "object", "additionalProperties": false, "required": ["capability_id"], "properties": {"capability_id": {"const": "CAP-STATE-001"}}},
+        "name_or_value": {"type": "string", "minLength": 1},
+        "state_roles": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"enum": ["INITIAL", "DEFAULT", "FINAL"]}},
+        "occurrence": {"type": "object", "additionalProperties": false, "required": ["ownership", "construct_role"], "properties": {"ownership": {"const": "OWNED"}, "construct_role": {"const": "STATE_NODE"}}},
+        "layout": {"$ref": "#/$defs/layout"}
+      }
+    },
+    "endpoint": {
+      "type": "object", "additionalProperties": false, "required": ["role", "target_ref", "ordinal"],
+      "properties": {"role": {"type": "string", "minLength": 1}, "target_ref": {"$ref": "#/$defs/targetRef"}, "ordinal": {"type": "integer", "minimum": 0}}
+    },
+    "factTemplate": {
+      "type": "object", "additionalProperties": false,
+      "required": ["context_id", "fact_id", "capability_ref", "fact_family", "normalized_endpoints", "direction", "labels", "modifiers", "logical_groups", "occurrence", "layout"],
+      "properties": {
+        "context_id": {"const": "$CONTEXT_ID"}, "fact_id": {"$ref": "#/$defs/stableId"},
+        "capability_ref": {"type": "object", "additionalProperties": false, "required": ["capability_id"], "properties": {"capability_id": {"const": "CAP-ISO-PROC-001"}}},
+        "fact_family": {"const": "TRANSFORMATION"},
+        "normalized_endpoints": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"$ref": "#/$defs/endpoint"}},
+        "direction": {"const": "DIRECTED"}, "labels": {"const": []}, "modifiers": {"const": []}, "logical_groups": {"const": []},
+        "occurrence": {"type": "object", "additionalProperties": false, "required": ["ownership", "construct_role"], "properties": {"ownership": {"const": "OWNED"}, "construct_role": {"const": "PROCEDURAL_LINK"}}},
+        "layout": {"$ref": "#/$defs/layout"}
+      }
+    },
+    "candidateRequest": {
+      "type": "object", "additionalProperties": false, "required": ["intent", "selection_id", "endpoints"],
+      "properties": {
+        "intent": {"enum": ["CREATE_STATE", "CREATE_FACT", "DELETE_CONSTRUCT"]},
+        "selection_id": {"type": ["string", "null"]},
+        "endpoints": {"type": "array", "items": {"$ref": "#/$defs/stableId"}}
+      }
+    },
+    "optionSelector": {
+      "type": "object", "additionalProperties": false,
+      "required": ["command_type", "capability_id", "target_ids", "enabled"],
+      "properties": {
+        "command_type": {"enum": ["CREATE_STATE", "CREATE_FACT", "DELETE_CONSTRUCT"]},
+        "capability_id": {"$ref": "#/$defs/stableId"}, "target_ids": {"type": "array", "items": {"$ref": "#/$defs/stableId"}},
+        "enabled": {"const": true}, "owner_target_kind": {"const": "ELEMENT"},
+        "fact_family": {"const": "TRANSFORMATION"}, "requires_impact_token": {"type": "boolean"}
+      }
+    },
+    "staticStep": {
+      "type": "object", "additionalProperties": false,
+      "required": ["step_id", "step_kind", "command_type", "payload_template", "payload_sha256"],
+      "properties": {
+        "step_id": {"$ref": "#/$defs/stableId"}, "step_kind": {"const": "STATIC_COMMAND"},
+        "command_type": {"enum": ["CREATE_ELEMENT", "STATE_SUPPRESS"]},
+        "payload_template": {"oneOf": [{"$ref": "#/$defs/elementPayload"}, {"$ref": "#/$defs/presentationPayload"}]},
+        "payload_sha256": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "candidateStep": {
+      "type": "object", "additionalProperties": false,
+      "required": ["step_id", "step_kind", "candidate_request", "option_selector", "command_type", "payload_template", "payload_sha256"],
+      "properties": {
+        "step_id": {"$ref": "#/$defs/stableId"}, "step_kind": {"const": "CANDIDATE_COMMAND"},
+        "candidate_request": {"$ref": "#/$defs/candidateRequest"}, "option_selector": {"$ref": "#/$defs/optionSelector"},
+        "command_type": {"enum": ["CREATE_STATE", "CREATE_FACT"]},
+        "payload_template": {"oneOf": [{"$ref": "#/$defs/stateTemplate"}, {"$ref": "#/$defs/factTemplate"}]},
+        "payload_sha256": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "assertionStep": {
+      "type": "object", "additionalProperties": false,
+      "required": ["step_id", "step_kind", "candidate_request", "option_selector", "assertion"],
+      "properties": {
+        "step_id": {"$ref": "#/$defs/stableId"}, "step_kind": {"const": "CAPABILITY_ASSERTION"},
+        "candidate_request": {"$ref": "#/$defs/candidateRequest"}, "option_selector": {"$ref": "#/$defs/optionSelector"},
+        "assertion": {"type": "object", "additionalProperties": false, "required": ["impact_token_min_length"], "properties": {"impact_token_min_length": {"const": 16}}}
+      }
+    },
+    "planCase": {
+      "type": "object", "additionalProperties": false,
+      "required": ["case_id", "initial_state", "setup_steps", "expected_baseline"],
+      "properties": {
+        "case_id": {"$ref": "#/$defs/stableId"},
+        "initial_state": {"enum": ["M_OBJECT", "M_STATE", "M_STATE_SUPPRESSED", "M_OBJECT_PROCESS", "M_STATE_OBJECT_PROCESS", "M_FACT", "M_DELETABLE_STATE", "M_READONLY_TARGET"]},
+        "setup_steps": {"type": "array", "minItems": 1, "items": {"oneOf": [{"$ref": "#/$defs/staticStep"}, {"$ref": "#/$defs/candidateStep"}, {"$ref": "#/$defs/assertionStep"}]}},
+        "expected_baseline": {
+          "type": "object", "additionalProperties": false,
+          "required": ["construct_ids", "fact_ids", "minimum_api_exchange_count", "subject_baseline_source"],
+          "properties": {
+            "construct_ids": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/stableId"}},
+            "fact_ids": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/stableId"}},
+            "minimum_api_exchange_count": {"type": "integer", "minimum": 1},
+            "subject_baseline_source": {"enum": ["LAST_COMMITTED_REVISION", "MATERIALIZED_BASE_REVISION"]}
+          }
+        }
+      }
+    },
+    "caseState": {"allOf": [{"$ref": "#/$defs/planCase"}, {"properties": {"case_id": {"const": "E2E-CANVAS-001.STATE_CREATE_RENAME_ROLES"}, "initial_state": {"const": "M_STATE"}}}]},
+    "caseSuppressed": {"allOf": [{"$ref": "#/$defs/planCase"}, {"properties": {"case_id": {"const": "E2E-CANVAS-001.STATE_EXPLICITNESS_EXPANSION"}, "initial_state": {"const": "M_STATE_SUPPRESSED"}}}]},
+    "caseMobile": {"allOf": [{"$ref": "#/$defs/planCase"}, {"properties": {"case_id": {"const": "E2E-CANVAS-001.STATE_MOBILE_CREATE_REOPEN"}, "initial_state": {"const": "M_OBJECT"}}}]},
+    "caseStateFact": {"allOf": [{"$ref": "#/$defs/planCase"}, {"properties": {"case_id": {"const": "E2E-CANVAS-001.STATE_TEXT_TRACE_ROUNDTRIP"}, "initial_state": {"const": "M_STATE_OBJECT_PROCESS"}}}]},
+    "caseObjectProcess": {"allOf": [{"$ref": "#/$defs/planCase"}, {"properties": {"case_id": {"const": "E2E-CANVAS-005.REVERSE_DRAG_NORMALIZED"}, "initial_state": {"const": "M_OBJECT_PROCESS"}}}]},
+    "caseAmbiguous": {"allOf": [{"$ref": "#/$defs/planCase"}, {"properties": {"case_id": {"const": "E2E-CANVAS-005.AMBIGUOUS_OPTIONS_NOT_AUTOCOMMITTED"}, "initial_state": {"const": "M_OBJECT_PROCESS"}}}]},
+    "caseStaleOption": {"allOf": [{"$ref": "#/$defs/planCase"}, {"properties": {"case_id": {"const": "E2E-CANVAS-005.STALE_OPTION_BLOCKED"}, "initial_state": {"const": "M_OBJECT_PROCESS"}}}]},
+    "caseDeletableState": {"allOf": [{"$ref": "#/$defs/planCase"}, {"properties": {"case_id": {"const": "E2E-CANVAS-006.STATE_IMPACT_CONFIRMED"}, "initial_state": {"const": "M_DELETABLE_STATE"}}}]},
+    "caseFact": {"allOf": [{"$ref": "#/$defs/planCase"}, {"properties": {"case_id": {"const": "E2E-CANVAS-006.FACT_IMPACT_CONFIRMED"}, "initial_state": {"const": "M_FACT"}}}]},
+    "caseStaleToken": {"allOf": [{"$ref": "#/$defs/planCase"}, {"properties": {"case_id": {"const": "E2E-CANVAS-006.STALE_TOKEN_BLOCKED"}, "initial_state": {"const": "M_DELETABLE_STATE"}}}]},
+    "caseMismatchedToken": {"allOf": [{"$ref": "#/$defs/planCase"}, {"properties": {"case_id": {"const": "E2E-CANVAS-006.MISMATCHED_TOKEN_BLOCKED"}, "initial_state": {"const": "M_DELETABLE_STATE"}}}]},
+    "caseAssetMissing": {"allOf": [{"$ref": "#/$defs/planCase"}, {"properties": {"case_id": {"const": "E2E-CANVAS-007.ASSET_MISSING"}, "initial_state": {"const": "M_OBJECT_PROCESS"}}}]},
+    "caseTextBlocked": {"allOf": [{"$ref": "#/$defs/planCase"}, {"properties": {"case_id": {"const": "E2E-CANVAS-007.TEXT_BLOCKED"}, "initial_state": {"const": "M_OBJECT_PROCESS"}}}]},
+    "caseRevisionConflict": {"allOf": [{"$ref": "#/$defs/planCase"}, {"properties": {"case_id": {"const": "E2E-CANVAS-007.REVISION_CONFLICT"}, "initial_state": {"const": "M_OBJECT_PROCESS"}}}]},
+    "casePersistenceFailed": {"allOf": [{"$ref": "#/$defs/planCase"}, {"properties": {"case_id": {"const": "E2E-CANVAS-007.PERSISTENCE_FAILED"}, "initial_state": {"const": "M_OBJECT_PROCESS"}}}]},
+    "caseReadonly": {"allOf": [{"$ref": "#/$defs/planCase"}, {"properties": {"case_id": {"const": "E2E-CANVAS-007.READONLY"}, "initial_state": {"const": "M_READONLY_TARGET"}}}]}
+  }
+}

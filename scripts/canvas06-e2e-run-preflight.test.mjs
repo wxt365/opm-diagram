@@ -7,7 +7,7 @@ import { resolve } from 'node:path';
 import test from 'node:test';
 
 import { E2eRunInputError } from './canvas06-e2e-run-input.mjs';
-import { assertCapabilityClosure, inspectRuntime, inspectSource, verifyManifestCommonFixtureInput } from './canvas06-e2e-run-preflight.mjs';
+import { assertCapabilityClosure, inspectRuntime, inspectSource, manifestVerifierArgs, verifyManifestCommonFixtureInput } from './canvas06-e2e-run-preflight.mjs';
 
 const repositoryRoot = resolve(import.meta.dirname, '..');
 const commonFixtureBuilder = resolve(repositoryRoot, 'scripts/build-canvas06-common-visual-fixtures.mjs');
@@ -22,6 +22,23 @@ test('derives the ordered 34-capability closure and rejects duplicates', () => {
   assert.deepEqual(closure[0].covered_coverage_keys, ['coverage-PROC-1']);
   assert.equal(Object.hasOwn(closure[0], 'coverage_keys'), false);
   expectError(() => assertCapabilityClosure([...capabilities().slice(0, 33), capabilities()[0]]), 'E2E_RUN_CAPABILITY_CLOSURE_INVALID');
+});
+
+test('preflight only constructs the active Manifest v02 verifier command', () => {
+  const args = manifestVerifierArgs({
+    'input-mode': 'PRODUCTION_HANDOFF',
+    'handoff-root': '/handoff',
+    'intake-report': 'reports/intake.json',
+    'source-root': '/source',
+    'manifest-root': '/manifest',
+    manifest: 'dev-canvas-06-e2e-manifest.json',
+    'profile-asset-root': '/manifest/inputs/upstream/profile-assets'
+  });
+  assert.deepEqual(args, [
+    '--input-mode', 'PRODUCTION_HANDOFF', '--handoff-root', '/handoff', '--intake-report', 'reports/intake.json',
+    '--source-root', '/source', '--manifest-root', '/manifest', '--manifest', 'dev-canvas-06-e2e-manifest.json',
+    '--profile-asset-root', '/manifest/inputs/upstream/profile-assets', '--require-production'
+  ]);
 });
 
 test('requires clean exact source commit and frozen Java/Chromium versions', async () => {

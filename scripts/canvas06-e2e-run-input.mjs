@@ -13,10 +13,12 @@ addFormats(activeManifestAjv);
 const validateActiveManifest = activeManifestAjv.compile(ACTIVE_MANIFEST_SCHEMA);
 
 const RUN_VALUE_OPTIONS = [
-  'input-mode', 'manifest-root', 'manifest', 'source-root', 'java-home', 'browser-executable',
-  'runtime-port', 'web-port', 'output-root', 'out'
+  'input-mode', 'manifest-root', 'manifest', 'profile-asset-root', 'source-root', 'java-home', 'browser-executable',
+  'runtime-port', 'web-port', 'process-control-parent', 'output-root', 'out'
 ];
-const VERIFY_VALUE_OPTIONS = ['scope', 'input-mode', 'evidence-root', 'report'];
+const VERIFY_VALUE_OPTIONS = [
+  'scope', 'input-mode', 'evidence-root', 'manifest-root', 'manifest', 'profile-asset-root', 'report'
+];
 const ATTEMPT_VERIFY_VALUE_OPTIONS = ['scope', 'manifest-root', 'manifest', 'profile-asset-root', 'attempt-root', 'report-root'];
 const PRODUCTION_VALUE_OPTIONS = ['handoff-root', 'intake-report'];
 const CONTROLLED_VALUE_OPTIONS = ['controlled-bundle-root'];
@@ -34,6 +36,7 @@ export function parseRunOptions(argv) {
   const options = parseOptions({ argv, valueOptions: RUN_VALUE_OPTIONS, allowReady: false });
   validateMode(options, { requireProduction: true, allowReady: false });
   assertPortPair(options);
+  if (!isAbsolute(options['process-control-parent'])) fail('E2E_RUN_ARGUMENT_INVALID', '--process-control-parent must be absolute.');
   return Object.freeze(options);
 }
 
@@ -89,6 +92,69 @@ export async function loadActiveAttemptManifest({ manifestRoot, manifest, profil
     sourceDateEpoch,
     ...profileAssets
   });
+}
+
+/**
+ * 从已验证的活动 Manifest 选择一个 Common attempt 的唯一输入集合。
+ * 此处不读取 checkout，也不为缺失项推断默认路径。
+ */
+export function selectAttemptInputs({ manifestInput, caseEntry }) {
+  if (!manifestInput?.manifest || !manifestInput.manifestRoot || !manifestInput.profileRoot || !caseEntry?.case_id) {
+    fail('E2E_ORCHESTRATION_INPUT_INVALID', 'Controlled attempt requires a verified Manifest input and case entry.');
+  }
+  const manifest = manifestInput.manifest;
+  const manifestCase = manifest.cases?.filter(entry => entry?.case_id === caseEntry.case_id) ?? [];
+  if (manifestCase.length !== 1 || canonicalizeJcs(caseEntry) !== canonicalizeJcs(manifestCase[0])) {
+    fail('E2E_ORCHESTRATION_INPUT_INVALID', 'Controlled attempt case must be exactly one Manifest entry.');
+  }
+  const fixtureKind = manifestCase[0].driver_id === 'DRIVER-COMMON' ? 'COMMON' : 'FAMILY';
+  const familyCatalogs = manifest.fixture_refs?.filter(reference => reference?.kind === 'FAMILY_FIXTURE_IDENTITY_CATALOG') ?? [];
+  if (!validCaseRef(manifestCase[0].fixture_ref) || !validCaseRef(manifestCase[0].input_ref)
+      || fixtureKind === 'FAMILY' && familyCatalogs.length !== 1
+      || fixtureKind === 'COMMON' && (manifestCase[0].fixture_ref.kind !== 'FIXTURE' || manifestCase[0].input_ref.kind !== 'INPUT')) {
+    fail('E2E_ORCHESTRATION_REF_MISMATCH', 'Manifest case materializer references are not closed.', 3);
+  }
+  const sourceBuild = manifest.source_build;
+  if (sourceBuild?.local_runtime_jar?.kind !== 'LOCAL_RUNTIME_JAR'
+      || sourceBuild.local_runtime_jar.path !== 'inputs/build/local-runtime.jar'
+      || sourceBuild?.web_dist?.kind !== 'WEB_DIST_TREE'
+      || sourceBuild.web_dist.path !== 'inputs/build/web-dist') {
+    fail('E2E_ORCHESTRATION_REF_MISMATCH', 'Manifest build references do not match the frozen attempt layout.', 3);
+  }
+  const expectedDrivers = [
+    ['DRIVER-PROCEDURAL', 'inputs/drivers/procedural-driver.mjs'],
+    ['DRIVER-CONTROL', 'inputs/drivers/control-driver.mjs'],
+    ['DRIVER-STRUCTURAL', 'inputs/drivers/structural-driver.mjs'],
+    ['DRIVER-COMMON', 'inputs/drivers/common-driver.mjs']
+  ];
+  const drivers = manifest.driver_catalog;
+  if (!Array.isArray(drivers) || drivers.length !== expectedDrivers.length || drivers.some((driver, index) => {
+    const [driverId, path] = expectedDrivers[index];
+    return driver?.driver_id !== driverId || driver.source_ref?.kind !== 'E2E_DRIVER_SOURCE' || driver.source_ref?.path !== path;
+  })) {
+    fail('E2E_ORCHESTRATION_REF_MISMATCH', 'Manifest four-driver closure is invalid.', 3);
+  }
+  return deepFreeze({
+    fixtureKind,
+    caseEntry: structuredClone(manifestCase[0]),
+    fixtureRef: structuredClone(manifestCase[0].fixture_ref),
+    inputRef: structuredClone(manifestCase[0].input_ref),
+    familyIdentityCatalogRef: fixtureKind === 'FAMILY' ? structuredClone(familyCatalogs[0]) : null,
+    manifestRef: structuredClone(manifestInput.manifestRef),
+    activeBinding: structuredClone(manifestInput.activeBinding),
+    runtimeJarRef: structuredClone(sourceBuild.local_runtime_jar),
+    webDistRef: structuredClone(sourceBuild.web_dist),
+    profileAssetRefs: structuredClone(manifestInput.profileAssetRefs),
+    drivers: drivers.map(driver => ({ driver_id: driver.driver_id, source_ref: structuredClone(driver.source_ref) }))
+  });
+}
+
+export function selectCommonAttemptInputs({ manifestInput, caseEntry }) {
+  const selected = selectAttemptInputs({ manifestInput, caseEntry });
+  if (selected.fixtureKind !== 'COMMON') {
+    fail('E2E_ORCHESTRATION_INPUT_INVALID', 'Controlled Common attempt requires one Common Manifest entry.');
+  }
+  return selected;
 }
 
 export function parseUtcWholeSecond(value) {
@@ -274,6 +340,19 @@ function parseJson(bytes, code, exitCode) {
 
 function sameRawRef(left, right) {
   return left?.kind === right?.kind && left?.path === right?.path && left?.byte_length === right?.byte_length && left?.sha256 === right?.sha256;
+}
+
+function validCaseRef(value) {
+  return value && safeRelativePath(value.path) && Number.isSafeInteger(value.byte_length) && value.byte_length >= 0
+    && typeof value.sha256 === 'string' && /^[a-f0-9]{64}$/u.test(value.sha256);
+}
+
+function deepFreeze(value) {
+  if (value && typeof value === 'object' && !Object.isFrozen(value)) {
+    for (const child of Object.values(value)) deepFreeze(child);
+    Object.freeze(value);
+  }
+  return value;
 }
 
 function sameAssetReference(value, expected) {

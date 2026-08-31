@@ -106,6 +106,9 @@
             <div class="form-readonly"><span>名称</span><strong>{{ store.selectedNode.label }}</strong></div>
             <div class="form-readonly"><span>稳定标识</span><code>{{ store.selectedNode.id }}</code></div>
             <div class="form-readonly"><span>Occurrence</span><code>{{ store.selectedNode.occurrenceId }}</code></div>
+            <section v-if="store.selectedObjectSuppressedStates.length" class="state-presentation-actions" data-testid="p03-suppressed-states">
+              <button v-for="state in store.selectedObjectSuppressedStates" :key="state.state_id" class="button button--secondary" type="button" :data-testid="`p03-suppressed-state-${state.state_id}`" @click="store.makeSuppressedStateExplicit(state.state_id)">显式 {{ state.name_or_value }}</button>
+            </section>
             <p class="disabled-reason">属性更新命令不在 P0 范围。</p>
           </template>
           <template v-else-if="store.selectedRelation">

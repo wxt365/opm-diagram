@@ -4,6 +4,8 @@ import { execFileSync } from 'node:child_process';
 import { dirname, relative, resolve } from 'node:path';
 import Ajv2020 from 'ajv/dist/2020.js';
 
+import { assertTreeRef, sourceEpoch } from './canvas06-unified-production-input.mjs';
+
 const root = resolve('.');
 const options = parseOptions(process.argv.slice(2));
 const handoffRoot = resolveRequired(options, 'handoff-root');
@@ -14,19 +16,20 @@ const handoffBytes = await readFile(handoffPath);
 const handoffDigest = sha(handoffBytes);
 const handoffRef = await ref(handoffPath, handoffRoot, 'HANDOFF');
 const handoff = JSON.parse(handoffBytes.toString('utf8'));
-const handoffSchema = await json(resolve('docs/contracts/schemas/opm-dev-canvas-05-handoff.schema.json'));
+const production = options.get('require-production') === true;
+const handoffSchema = await json(resolve('docs/contracts/schemas', handoff.schema_version === '0.2' ? 'opm-dev-canvas-05-handoff-v02.schema.json' : 'opm-dev-canvas-05-handoff.schema.json'));
 const reportSchema = await json(resolve('docs/contracts/schemas/opm-dev-canvas-06-intake-report.schema.json'));
 const ajv = new Ajv2020({ allErrors: true, strict: false, formats: { 'date-time': true } });
 const validateHandoff = ajv.compile(handoffSchema);
 const checks = [];
 const blockers = [];
 
-const handoffSchemaMatched = validateHandoff(handoff) && handoff.handoff_status === 'READY_FOR_DEV_CANVAS_06' && handoff.blockers.length === 0;
+const handoffSchemaMatched = validateHandoff(handoff) && handoff.handoff_status === 'READY_FOR_DEV_CANVAS_06' && handoff.blockers.length === 0 && (!production || handoff.schema_version === '0.2');
 addCheck('INTAKE-06-001.HANDOFF_BYTES', suppliedDigest === handoffDigest, [handoffRef], 'CANVAS06_HANDOFF_DIGEST_MISMATCH', `sha256=${handoffDigest}`);
 addCheck('INTAKE-06-002.HANDOFF_SCHEMA_STATUS', handoffSchemaMatched, [handoffRef], 'CANVAS06_HANDOFF_NOT_READY', `schema=${validateHandoff.errors ? 'invalid' : 'valid'}, status=${handoff.handoff_status}`);
 
 const buildArtifactRefs = Array.isArray(handoff.build_artifacts) ? handoff.build_artifacts : [];
-const buildArtifactsMatched = handoff.source_build?.dirty_before_build === false && hasArtifactPair(buildArtifactRefs) && await refsMatch(buildArtifactRefs, handoffRoot);
+const buildArtifactsMatched = handoff.source_build?.dirty_before_build === false && (production ? hasArtifactTriplet(buildArtifactRefs, handoff.source_build?.source_commit?.slice(0, 12)) : hasArtifactPair(buildArtifactRefs)) && await refsMatch(buildArtifactRefs.filter(item => item.kind !== 'WEB_DIST_TREE'), handoffRoot) && await webArtifactMatches(buildArtifactRefs, handoffRoot, production);
 addCheck('INTAKE-06-003.SOURCE_BUILD_ARTIFACTS', buildArtifactsMatched, buildArtifactRefs.length ? buildArtifactRefs : [handoffRef], 'CANVAS06_BUILD_EVIDENCE_MISMATCH', `artifacts=${buildArtifactRefs.length}, dirty_before_build=${handoff.source_build?.dirty_before_build}`);
 
 const bindingRefs = [...(handoff.revision_contract?.schemas ?? [])];
@@ -55,7 +58,7 @@ const report = {
   schema_id: 'OPM-DEV-CANVAS-06-INTAKE-REPORT-001',
   schema_version: '0.1',
   report_id: `dev-canvas-06.intake.${handoff.handoff_id ?? 'invalid'}.${handoffDigest.slice(0, 12)}`,
-  generated_at: new Date().toISOString(),
+  generated_at: production ? sourceEpoch(command(['show', '-s', '--format=%ct', handoff.source_build.source_commit]).trim()) : new Date().toISOString(),
   runner_identity: {
     runner_version: '0.1.0',
     source_commit: command(['rev-parse', 'HEAD']).trim(),
@@ -164,6 +167,21 @@ function hasArtifactPair(items) {
   return items.length === 2 && new Set(items.map(item => item.kind)).size === 2
     && items.some(item => item.kind === 'LOCAL_RUNTIME_JAR') && items.some(item => item.kind === 'EVIDENCE_BUNDLE');
 }
+function hasArtifactTriplet(items, source12) {
+  return items.length === 3 && items[0]?.kind === 'LOCAL_RUNTIME_JAR'
+    && items[0].path === `releases/clean-${source12}/local-runtime-0.1.0-SNAPSHOT.jar`
+    && items[1]?.kind === 'EVIDENCE_BUNDLE'
+    && items[1].path === `releases/clean-${source12}/dev-canvas-05-evidence-bundle.jar`
+    && items[2]?.kind === 'WEB_DIST_TREE'
+    && items[2].path === `releases/clean-${source12}/web-dist`;
+}
+async function webArtifactMatches(items, rootPath, required) {
+  if (!required) return true;
+  try {
+    await assertTreeRef(rootPath, items[2], 'CANVAS06_UNIFIED_WEB_TREE_INVALID');
+    return true;
+  } catch { return false; }
+}
 function jcs(value) {
   if (value === null || typeof value === 'boolean' || typeof value === 'string') return JSON.stringify(value);
   if (typeof value === 'number') {
@@ -176,11 +194,18 @@ function jcs(value) {
 }
 function parseOptions(values) {
   const result = new Map();
-  for (let index = 0; index < values.length; index += 2) {
+  for (let index = 0; index < values.length;) {
     const flag = values[index];
+    if (flag === '--require-production') {
+      if (result.has('require-production')) throw new Error('Usage: release:canvas06:intake --handoff-root <root> --handoff <relative-path> --handoff-sha256 <sha256> --out <report-path> [--require-production]');
+      result.set('require-production', true);
+      index += 1;
+      continue;
+    }
     const value = values[index + 1];
-    if (!flag?.startsWith('--') || value === undefined || result.has(flag.slice(2))) throw new Error('Usage: release:canvas06:intake --handoff-root <root> --handoff <relative-path> --handoff-sha256 <sha256> --out <report-path>');
+    if (!flag?.startsWith('--') || !['--handoff-root', '--handoff', '--handoff-sha256', '--out'].includes(flag) || value === undefined || result.has(flag.slice(2))) throw new Error('Usage: release:canvas06:intake --handoff-root <root> --handoff <relative-path> --handoff-sha256 <sha256> --out <report-path> [--require-production]');
     result.set(flag.slice(2), value);
+    index += 2;
   }
   return result;
 }

@@ -53,7 +53,7 @@ test('executeCase 仅使用稳定定位器、观测sink和封闭precondition cli
     precondition_client: {
       execute: async value => {
         preconditions.push(value);
-        return { raw_request: { body: 'original' }, actual_request: { body: 'replacement' }, response: { status: 422 } };
+        return armedReceipt('REPLACE_IMPACT_TOKEN', '/payload/impact_token', 'impact.e2e.mismatched.token');
       }
     }
   });
@@ -67,6 +67,26 @@ test('executeCase 仅使用稳定定位器、观测sink和封闭precondition cli
     { operation_id: 'API-EDT-002', method: 'POST', ordinal: 1, expected_http_status: 422, expected_error_code: 'DOMAIN_REJECTED' }, 'projection'
   ]);
   assert.equal(evidence.length, 1);
+});
+
+test('executeCase 接纳DIRECT完整receipt且拒绝ARMED占位HTTP字段', async () => {
+  const evidence = [];
+  await executeCase({
+    page: fakePage(),
+    case_entry: entry('E2E-CANVAS-007.TEXT_BLOCKED'),
+    attempt_identity: { case_id: 'E2E-CANVAS-007.TEXT_BLOCKED', attempt_ordinal: 1 },
+    observation_sink: { waitForApi: async () => {}, waitForProjectionRefresh: async () => {}, recordPrecondition: async value => { evidence.push(value); } },
+    precondition_client: { execute: async () => directReceipt('SUBMIT_TEXT_BLOCKED_COMMAND') }
+  });
+  assert.equal(evidence[0].mode, 'DIRECT_COMMAND');
+
+  await assert.rejects(() => executeCase({
+    page: fakePage(),
+    case_entry: entry('E2E-CANVAS-005.STALE_OPTION_BLOCKED'),
+    attempt_identity: { case_id: 'E2E-CANVAS-005.STALE_OPTION_BLOCKED', attempt_ordinal: 1 },
+    observation_sink: { waitForApi: async () => {}, waitForProjectionRefresh: async () => {}, recordPrecondition: async () => {} },
+    precondition_client: { execute: async () => Object.freeze({ ...armedReceipt('REPLACE_OPTION_ID', '/payload/selected_option_id', 'option.e2e.invalid.stale'), response: {} }) }
+  }), error => error.code === 'E2E_DRIVER_MAPPING_INVALID');
 });
 
 test('executeCase 使用State inspector和candidate的精确角色定位', async () => {
@@ -106,6 +126,37 @@ function entry(caseId) {
 
 function sink() { return { waitForApi: async () => {}, waitForProjectionRefresh: async () => {} }; }
 function client() { return { execute: async () => ({ raw_request: {}, actual_request: {}, response: {} }) }; }
+
+function armedReceipt(kind, jsonPointer, replacement) {
+  return deepFreeze({
+    mode: 'REQUEST_MUTATION', kind, source_locator: 'setup-baseline-api',
+    source_exchange_ref: ref('API_EXCHANGE', 'api-exchanges/source.json'),
+    match: { operation_id: 'API-EDT-002', method: 'POST', normalized_url: '/api/v1/projects/project/models/model/contexts/context/commands', command_type: kind === 'REPLACE_OPTION_ID' ? 'CREATE_FACT' : 'DELETE_CONSTRUCT', base_revision: 'revision.base' },
+    json_pointer: jsonPointer, replacement, state: 'ARMED'
+  });
+}
+
+function directReceipt(kind) {
+  return deepFreeze({
+    mode: 'DIRECT_COMMAND', kind, source_locator: 'setup-baseline-api',
+    resolved_source_refs: {
+      setup_projection_exchange_ref: ref('API_EXCHANGE', 'api-exchanges/setup.json'),
+      setup_projection_response_ref: ref('API_RESPONSE_BODY', 'api-exchanges/setup.response.json')
+    },
+    raw_request: { body: {} }, actual_request: { body: {} }, response: { status: 422 },
+    exchange_ref: ref('API_EXCHANGE', 'api-exchanges/direct.json'), baseline_rebind: null
+  });
+}
+
+function ref(kind, path) { return Object.freeze({ kind, path, byte_length: 2, sha256: 'a'.repeat(64) }); }
+
+function deepFreeze(value) {
+  if (value && typeof value === 'object' && !Object.isFrozen(value)) {
+    for (const child of Object.values(value)) deepFreeze(child);
+    Object.freeze(value);
+  }
+  return value;
+}
 
 function fakePage() {
   const events = [];

@@ -5,9 +5,11 @@ import { basename, resolve } from 'node:path';
 import Ajv2020 from 'ajv/dist/2020.js';
 import { sha256Jcs } from './canvas06-rfc8785.mjs';
 import { e2eCases, e2eFixture, visualSubjects } from '../tests/e2e/release/dev-canvas-06/fixtures/factories/common-fixture-factory.mjs';
+import { COMMON_DRIVER_SOURCE_PATH, COMMON_SETUP_PLAN_PATH, verifyCommonSetupPlan } from './canvas06-e2e-common-setup-plan.mjs';
 
 const root = resolve('.');
 const factoryPath = fileURLToPath(new URL('../tests/e2e/release/dev-canvas-06/fixtures/factories/common-fixture-factory.mjs', import.meta.url));
+const commonDriverPath = fileURLToPath(new URL('../tests/e2e/release/dev-canvas-06/drivers/common-driver.mjs', import.meta.url));
 
 try {
   const options = parseOptions(process.argv.slice(2));
@@ -28,7 +30,7 @@ try {
 async function verify(fixtureRoot, binding) {
   const inventory = await files(fixtureRoot);
   const expected = expectedPaths();
-  if (inventory.length !== 43 || JSON.stringify(inventory.map(item => item.path)) !== JSON.stringify(expected)) fail('GOLDEN_COMMON_FIXTURE_REF_MISMATCH', 2, 'Fixture root inventory is not the frozen 43-file layout.');
+  if (inventory.length !== 44 || JSON.stringify(inventory.map(item => item.path)) !== JSON.stringify(expected)) fail('GOLDEN_COMMON_FIXTURE_REF_MISMATCH', 2, 'Fixture root inventory is not the frozen 44-file layout.');
   const catalog = await json(resolveInside(fixtureRoot, 'dev-canvas-06-common-fixture-catalog.json'));
   const catalogSchema = await json(resolve(root, 'docs/contracts/schemas/opm-dev-canvas-06-common-fixture-catalog.schema.json'));
   const revisionSchema = await json(resolve(root, 'docs/contracts/schemas/opm-revision-v0.2.schema.json'));
@@ -66,6 +68,20 @@ async function verify(fixtureRoot, binding) {
     await verifyExpectedBytes(fixtureRoot, item.base_fixture_ref.path, { ...fixture, fixture_kind: 'BASE' });
     await verifyExpectedBytes(fixtureRoot, item.input_ref.path, { ...fixture, fixture_kind: 'INPUT' });
     if (!same(item.actions, [fixture.action])) fail('GOLDEN_COMMON_FIXTURE_REF_MISMATCH', 2, `Catalog action differs: ${caseId}`);
+  }
+  await assertSourceOwner(commonDriverPath, COMMON_DRIVER_SOURCE_PATH);
+  const plan = await json(resolveInside(fixtureRoot, COMMON_SETUP_PLAN_PATH));
+  try {
+    verifyCommonSetupPlan({
+      plan,
+      sourceBinding: binding,
+      generatorRef: catalog.generator_ref,
+      commonFixtureCatalogRef: await fileRef(fixtureRoot, 'dev-canvas-06-common-fixture-catalog.json', 'COMMON_FIXTURE_CATALOG'),
+      commonDriverRef: await externalFileRef(commonDriverPath, COMMON_DRIVER_SOURCE_PATH, 'E2E_DRIVER_SOURCE'),
+      catalogCases: catalog.e2e_cases
+    });
+  } catch (error) {
+    fail(error.code === 'E2E_COMMON_SETUP_PLAN_REF_MISMATCH' ? 'GOLDEN_COMMON_FIXTURE_REF_MISMATCH' : 'GOLDEN_COMMON_FIXTURE_SCHEMA_INVALID', error.exitCode ?? 2, error.message);
   }
 }
 
@@ -107,12 +123,13 @@ async function verifyRef(base, ref, kind, path) {
 function cacheE2eFixtures() { if (e2eCases.length !== 16 || new Set(e2eCases).size !== 16) fail('GOLDEN_COMMON_INPUT_INVALID', 2, 'Factory case set is invalid.'); const cache = new Map(); for (const caseId of e2eCases) cache.set(caseId, e2eFixture(caseId)); return cache; }
 async function verifyExpectedBytes(base, path, expected) { const target = resolveInside(base, path); const actual = await readFile(target); const encoded = Buffer.from(`${JSON.stringify(expected, null, 2)}\n`, 'utf8'); if (!actual.equals(encoded)) fail('GOLDEN_COMMON_FIXTURE_REF_MISMATCH', 2, `E2E fixture bytes differ: ${path}`); }
 async function fileRef(base, path, kind) { const target = resolveInside(base, path); const info = await regularFile(target); return { kind, path, byte_length: info.size, sha256: sha(await readFile(target)) }; }
+async function externalFileRef(target, path, kind) { const info = await regularFile(target); return { kind, path, byte_length: info.size, sha256: sha(await readFile(target)) }; }
 async function assertSourceOwner(path, logical) { const first = await lstat(path); if (!first.isFile() || first.isSymbolicLink() || first.nlink !== 1 || basename(path) !== basename(logical)) fail('GOLDEN_COMMON_INPUT_INVALID', 2, `Invalid source owner: ${logical}`); const actual = await realpath(path); const second = await lstat(actual); if (actual !== path || !second.isFile() || second.isSymbolicLink() || second.nlink !== 1) fail('GOLDEN_COMMON_INPUT_INVALID', 2, `Invalid source owner: ${logical}`); }
 
 async function files(base) { const result = []; async function walk(path) { for (const entry of await readdir(path, { withFileTypes: true })) { const child = resolve(path, entry.name); if (entry.isDirectory()) await walk(child); else { const info = await regularFile(child); result.push({ path: child.slice(`${resolve(base)}/`.length), byte_length: info.size, sha256: sha(await readFile(child)) }); } } } await walk(base); return result.sort((left, right) => left.path.localeCompare(right.path)); }
 async function regularFile(path) { const first = await lstat(path); if (!first.isFile() || first.isSymbolicLink() || first.nlink !== 1) fail('GOLDEN_COMMON_FIXTURE_REF_MISMATCH', 2, `Non-regular file: ${path}`); const second = await lstat(await realpath(path)); if (!second.isFile() || second.isSymbolicLink() || second.nlink !== 1) fail('GOLDEN_COMMON_FIXTURE_REF_MISMATCH', 2, `Non-regular file: ${path}`); return stat(path); }
 async function treeDigest(base) { return sha256Jcs(await files(base)); }
-function expectedPaths() { return ['dev-canvas-06-common-fixture-catalog.json', ...visualSubjects.map(id => `visual/${id}.json`), ...e2eCases.flatMap(id => [`e2e/${id}.base.json`, `e2e/${id}.input.json`]), 'sources/scripts/build-canvas06-common-visual-fixtures.mjs', 'sources/tests/e2e/release/dev-canvas-06/fixtures/factories/common-fixture-factory.mjs'].sort((left, right) => left.localeCompare(right)); }
+function expectedPaths() { return ['dev-canvas-06-common-fixture-catalog.json', COMMON_SETUP_PLAN_PATH, ...visualSubjects.map(id => `visual/${id}.json`), ...e2eCases.flatMap(id => [`e2e/${id}.base.json`, `e2e/${id}.input.json`]), 'sources/scripts/build-canvas06-common-visual-fixtures.mjs', 'sources/tests/e2e/release/dev-canvas-06/fixtures/factories/common-fixture-factory.mjs'].sort((left, right) => left.localeCompare(right)); }
 async function json(path) { return JSON.parse(await readFile(path, 'utf8')); }
 function parseOptions(values) { const allowed = new Set(['handoff', 'fixture-root', 'catalog']); const result = new Map(); for (let index = 0; index < values.length; index += 2) { const flag = values[index]; const value = values[index + 1]; if (!flag?.startsWith('--') || !allowed.has(flag.slice(2)) || value === undefined || result.has(flag.slice(2))) fail('GOLDEN_COMMON_INPUT_INVALID', 2, 'Invalid verifier options.'); result.set(flag.slice(2), value); } return result; }
 function required(values, key) { const value = values.get(key); if (!value) fail('GOLDEN_COMMON_INPUT_INVALID', 2, `Missing --${key}.`); return value; }

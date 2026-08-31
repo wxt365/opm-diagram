@@ -3,12 +3,16 @@ import { copyFile, mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { dirname, relative, resolve } from 'node:path';
 
+import { assertArtifactOrder, sourceEpoch } from './canvas06-unified-production-input.mjs';
+
 const root = resolve('.');
 const profileRoot = resolve('packages/profiles/profile.iso19450.2024.draft/0.2.0');
 const handoffRoot = resolve(profileRoot, 'handoff');
-const reportRoot = resolve(handoffRoot, 'reports');
-const output = resolve(process.argv[2] ?? `${profileRoot}/handoff/dev-canvas-05-handoff.json`);
-const releaseBuildPath = resolve(handoffRoot, 'release/dev-canvas-05-release-build.json');
+const arguments_ = parseArguments(process.argv.slice(2));
+const output = resolve(arguments_.output ?? `${profileRoot}/handoff/dev-canvas-05-handoff.json`);
+const releaseBuildPath = resolve(arguments_.releaseBuild ?? `${handoffRoot}/release/dev-canvas-05-release-build.json`);
+const reportRoot = arguments_.reportRoot ? resolve(arguments_.reportRoot) : resolve(handoffRoot, 'reports');
+const logicalRoot = arguments_.logicalRoot;
 const profile = await json(resolve(profileRoot, 'profile.json'));
 const coverage = await json(resolve('services/local-runtime/target/golden-coverage/opm-opl-golden-coverage-report.json'));
 const replay = await json(resolve('services/local-runtime/target/golden-replay/opm-opl-golden-replay-report.json'));
@@ -36,6 +40,7 @@ const refs = Object.fromEntries(await Promise.all(sources.map(async ([name, , ki
 
 const commit = command(['rev-parse', 'HEAD']).trim();
 const releaseBuild = await optionalJson(releaseBuildPath);
+const isV02 = releaseBuild?.schema_version === '0.2';
 const dirty = releaseBuild ? sourceTreeDirtyOutsideHandoff() : command(['status', '--porcelain']).trim().length > 0;
 const active = binding(profile);
 const java = javaVersion(process.env.JAVA_HOME);
@@ -67,10 +72,10 @@ const gateEvidence = [
 ];
 const allGatesMatched = gateEvidence.every(item => item.status === 'MATCHED');
 const releaseBuildMatched = releaseBuild?.schema_id === 'OPM-DEV-CANVAS-05-RELEASE-BUILD-001'
-  && releaseBuild?.schema_version === '0.1'
+  && ['0.1', '0.2'].includes(releaseBuild?.schema_version)
   && releaseBuild?.source_build?.source_commit === commit
   && releaseBuild?.source_build?.dirty_before_build === false
-  && hasReleaseArtifacts(buildArtifacts);
+  && (isV02 ? hasV02ReleaseArtifacts(buildArtifacts, commit.slice(0, 12)) : hasReleaseArtifacts(buildArtifacts));
 const ready = !dirty && java.available && releaseBuildMatched && allGatesMatched && replayMatched && coverageMatched && compatibilityMatched && atomicMatched && concreteTemplatesMatched;
 const catalog = profile.capability_catalog.filter(item => /^CAP-ISO-(PROC|CTRL|STRUCT)-\d{3}$/.test(item.capability_id));
 const coverageKeys = new Map();
@@ -81,9 +86,9 @@ for (const requirement of (await json(resolve(profileRoot, 'golden/opm-opl-cover
 }
 const disabledReason = ready ? 'DEV_CANVAS_06_VALIDATION_REQUIRED' : 'DEV_CANVAS_05_HANDOFF_BLOCKED';
 const handoff = {
-  schema_id: 'OPM-DEV-CANVAS-05-HANDOFF-001', schema_version: '0.1',
+  schema_id: 'OPM-DEV-CANVAS-05-HANDOFF-001', schema_version: isV02 ? '0.2' : '0.1',
   handoff_id: `dev-canvas-05.profile.iso19450.2024.draft.0.2.0.${commit.slice(0, 12)}`,
-  handoff_status: ready ? 'READY_FOR_DEV_CANVAS_06' : 'BLOCKED', generated_at: new Date().toISOString(),
+  handoff_status: ready ? 'READY_FOR_DEV_CANVAS_06' : 'BLOCKED', generated_at: isV02 ? sourceEpoch(command(['show', '-s', '--format=%ct', commit]).trim()) : new Date().toISOString(),
   source_build: releaseBuild?.source_build ?? { source_commit: commit, dirty_before_build: dirty, evidence_output_root: 'reports', java_version: java.value, node_version: process.version, os: `${process.platform}-${process.arch}`, build_command: 'npm run golden:coverage && npm run golden:replay && npm run compatibility:replay', lockfile_sha256: await shaFile(resolve('package-lock.json')), pom_sha256: await shaFile(resolve('services/local-runtime/pom.xml')) },
   build_artifacts: buildArtifacts,
   revision_contract: { reader_versions: ['0.1', '0.2'], active_writer_version: '0.2', schemas: [refs['revision-v01.schema.json'], refs['revision-v02.schema.json']] },
@@ -113,7 +118,11 @@ function binding(value) {
   const asset = value => ({ id: value.id, version: value.version, sha256: value.digest.digest });
   return { profile: { id: value.identity.profile_id, version: value.identity.package_version, sha256: value.manifest.package_digest.digest }, rule_set: asset(dependency('RULE_SET')), text_grammar: asset(value.text_grammar_ref), symbol_catalog: asset(value.symbol_catalog_ref), normalization_adapter: asset(value.normalization_adapter_ref), binding_digest: '93805d6e2fdb3ea73c4ddfc0a995d662fbf13dee2d8a6f24fc20c79ecff65d1d' };
 }
-async function ref(path, kind) { const info = await stat(path); return { kind, path: relative(handoffRoot, path), byte_length: info.size, sha256: await shaFile(path) }; }
+async function ref(path, kind) {
+  const info = await stat(path);
+  const logicalPath = logicalRoot && path.startsWith(`${reportRoot}/`) ? `${logicalRoot}/handoff/reports/${relative(reportRoot, path)}` : relative(handoffRoot, path);
+  return { kind, path: logicalPath, byte_length: info.size, sha256: await shaFile(path) };
+}
 async function json(path) { return JSON.parse(await readFile(path, 'utf8')); }
 async function optionalJson(path) {
   try { return await json(path); } catch (error) {
@@ -126,6 +135,26 @@ function hasReleaseArtifacts(artifacts) {
   return artifacts.length === 2 && new Set(artifacts.map(item => item.kind)).size === 2
     && artifacts.some(item => item.kind === 'LOCAL_RUNTIME_JAR')
     && artifacts.some(item => item.kind === 'EVIDENCE_BUNDLE');
+}
+function hasV02ReleaseArtifacts(artifacts, source12) {
+  try {
+    assertArtifactOrder({ build_artifacts: artifacts }, source12);
+    return true;
+  } catch { return false; }
+}
+function parseArguments(values) {
+  if (values.length === 0) return {};
+  if (values.length === 1 && !values[0].startsWith('--')) return { output: values[0] };
+  const output = {};
+  for (let index = 0; index < values.length; index += 2) {
+    const flag = values[index];
+    const value = values[index + 1];
+    const key = { '--output': 'output', '--release-build': 'releaseBuild', '--report-root': 'reportRoot', '--logical-root': 'logicalRoot' }[flag];
+    if (!key || !value || output[key]) throw new Error('Usage: generate-dev-canvas-05-handoff [--output <path> --release-build <path> --report-root <path> --logical-root releases/clean-<source12>]');
+    output[key] = value;
+  }
+  if (output.logicalRoot && !/^releases\/clean-[a-f0-9]{12}$/.test(output.logicalRoot)) throw new Error('Logical release root must be releases/clean-<source12>.');
+  return output;
 }
 function command(args) { return execFileSync('git', args, { cwd: root, encoding: 'utf8' }); }
 function sourceTreeDirtyOutsideHandoff() {

@@ -1,6 +1,6 @@
 # DEV-CANVAS-06 E2E Profile Asset 与摘要闭包设计
 
-文档版本：`v1.6`
+文档版本：`v1.5`
 
 文档状态：`FROZEN_INCLUDED`
 
@@ -36,82 +36,13 @@ profile_asset_refs = [
 
 `profile_package_digest` 不是 `profile.json` raw SHA。前者按现有 Profile package owner 对四项 dependency 的 `logical_path/byte_length/sha256` 行编码重算，并同时等于 `profile.json.manifest.package_digest.digest` 与 `active_binding.profile.sha256`；后者只写在 `PROFILE_PACKAGE.sha256` 并等于 `profile.json` raw bytes。两者不得互换。
 
-### 2.2 Source Set、Staging Root 与 CLI 绑定
+### 2.2 CLI 绑定
 
-Profile Asset Source Set 固定为 clean `--source-root` 中以下五个普通单链接文件；物理路径不能配置、扫描、按 basename 推断或从 Profile ID/binding 回退：
+Manifest `0.2` builder 是生产者，只新增 `--profile-asset-root` 并继续以 `--out`写新 Manifest；不得接受既有 Manifest 后重写。Manifest verifier、E2E Runner、Java Materializer 和 Attempt Artifact verifier 是消费者，都必须显式接收 `--manifest-root`、`--manifest` 和 `--profile-asset-root`。`--manifest` 只允许读取指定 raw bytes，不能由目录扫描选择；`--profile-asset-root` 只允许读取指定目录，不能从 Profile ID、binding 或 basename 反推。
 
-| kind | clean source 固定相对路径 | Staging/Manifest 固定相对路径 |
-| --- | --- | --- |
-| `PROFILE_PACKAGE` | `packages/profiles/profile.iso19450.2024.draft/0.2.0/profile.json` | `profile.json` |
-| `RULE_SET` | `packages/profiles/profile.iso19450.2024.draft/0.2.0/rules/representative-rule-set.json` | `rules/representative-rule-set.json` |
-| `GRAMMAR_ASSET` | `packages/profiles/profile.iso19450.2024.draft/0.2.0/grammar/representative-opl-grammar.json` | `grammar/representative-opl-grammar.json` |
-| `SYMBOL_ASSET` | `packages/profiles/profile.iso19450.2024.draft/0.2.0/symbols/representative-symbol-catalog.json` | `symbols/representative-symbol-catalog.json` |
-| `NORMALIZATION_DATA` | `packages/profiles/profile.iso19450.2024.draft/0.2.0/normalization/representative-normalization.json` | `normalization/representative-normalization.json` |
+Attempt Artifact verifier 不新增 Source Set 外的 Node 文件；它由既有 `scripts/verify-canvas06-e2e-report.mjs --scope ATTEMPT` 承接，完整 Report 使用同一文件的显式 `--scope REPORT`。Node Token writer 固定归入既有 `scripts/canvas06-e2e-attempt-artifacts.mjs`，两者均已在Runner Source Set `0.1`的23项allowlist中；Java Token writer由exact Runtime JAR ref承接。
 
-Profile Asset Staging Root 是 Manifest `0.2` Producer 在 final Manifest staging 创建前，从上述 Source Set 逐字节物化的 fresh、隔离、逻辑只读目录。它恰含五个 Staging 固定相对路径，不要求也不允许物理位于 `--source-root` 内；还不得等于或位于versioned Handoff root、Common root、`--output-root`、Manifest final/staging root内。Producer启动时该路径必须不存在，禁止复用历史root、覆盖已有目录或把source package父目录直接当作Staging Root。
-
-fresh target创建前的路径守卫不能调用不存在目标的`realpath(target)`。唯一算法为：先把CLI值解析为absolute normalized lexical path并要求其nearest existing parent为普通非链接目录；对该parent取real path，再把尚不存在的相对子路径逐segment追加，使用“相等或separator边界内子路径”同时完成lexical/parent-real containment比较。创建目录后立即取得target real path并对全部受控root再做一次相同边界比较；任一父目录link、`..`、创建前后解析漂移或root重叠均拒绝。禁止字符串prefix、basename、目标不存在即跳过real-path检查或创建后不复核。
-
-Producer的`--profile-asset-root`只表示该fresh Staging target，由Producer创建后消费；Verifier的`--profile-asset-root`只表示`<manifest-root>/inputs/upstream/profile-assets`既有只读final root。两者角色不可互换。Producer与Verifier均显式接收`--source-root`；Verifier必须从clean source五固定路径和final root独立复算，不接受Producer内存结论或已缓存raw ref。Manifest verifier、E2E Runner、Java Materializer和Attempt Artifact verifier仍必须显式接收`--manifest-root`、`--manifest`和各自attempt/final内的`--profile-asset-root`。`--manifest`只允许读取指定raw bytes，不能由目录扫描选择；任何入口都不能从Profile ID、binding或basename反推root。
-
-“只读”是行为与验证契约，不是identity字段：Producer完成五文件物化、fsync和首次复算后必须关闭全部写句柄，不得再写、chmod后改bytes、替换或补文件；后续阶段只以只读句柄打开，并在final rename前复算Staging tree。POSIX mode、owner、mtime、ctime和目录inode不进入raw ref或tree digest，也不能单独证明只读。
-
-### 2.2.1 Source raw-ref 与 tree digest
-
-Producer和Verifier对Source Set逐项构造受控映射记录：
-
-```text
-{kind, source_path, logical_path, byte_length, sha256}
-```
-
-`source_path`必须逐字符等于上表clean source固定路径；`logical_path`必须逐字符等于对应Staging固定路径。该映射是执行期验证记录，不新增Manifest Schema字段。`byte_length/sha256`只能从同一只读文件句柄的0..EOF raw bytes计算；观测前后file key/size/mtime漂移、link、`nlink!=1`、特殊文件或source-root在校验前后变dirty均拒绝。
-
-Source、Staging和final的tree identity都使用第2.1节既有公式，并把逻辑`root_path`固定为`inputs/upstream/profile-assets`；entries使用Manifest五类kind和最终逻辑path，按UTF-8 path升序。物理source路径、Staging绝对路径、权限位和时间戳不进入preimage。因此三处物理root不同，但在五项raw bytes完全相等时tree `byte_length/sha256`必须相等；禁止另建ZIP、目录metadata、locale sort或“source父目录tree”摘要。
-
-唯一闭包为：
-
-```text
-clean source raw ref
-  -> source_path/logical_path固定映射
-  -> Profile Asset Staging raw ref/tree
-  -> Manifest final raw ref/tree
-  -> profile.json dependencies/package_digest
-  -> Handoff active_binding
-```
-
-五项中的任一`kind/logical_path/byte_length/sha256`必须在Source、Staging、final三方逐字段相等；`profile_package_digest`按第2.1节独立复算，不得用tree SHA或`profile.json` raw SHA替代。
-
-### 2.2.2 唯一生成与校验时序
-
-```text
-SOURCE_CLEAN_HEAD
--> SOURCE_PROFILE_5_LSTAT
--> SOURCE_PROFILE_5_RAW_REFS
--> SOURCE_PROFILE_PACKAGE_AND_BINDING_VERIFY
--> OUTPUT_ROOT_ABSENT
--> PROFILE_STAGING_ROOT_ABSENT_AND_ISOLATED
--> CREATE_PROFILE_STAGING_DIRECTORIES
--> COPY_5_TO_FIXED_RELATIVE_PATHS
--> FSYNC_PROFILE_STAGING_FILES_AND_DIRECTORIES
--> REVERIFY_SOURCE_STAGING_RAW_REFS
--> PROFILE_STAGING_TREE_DIGEST
--> PROFILE_PACKAGE_DIGEST
--> ACTIVE_BINDING_JOIN
--> SEAL_PROFILE_STAGING_READ_ONLY
--> CREATE_MANIFEST_FINAL_STAGING
--> COPY_PROFILE_STAGING_TO_FINAL
--> REVERIFY_SOURCE_STAGING_FINAL_THREE_WAY_JOIN
--> REMOVE_PROFILE_STAGING_ROOT
--> COMPOSE_AND_VERIFY_MANIFEST
-```
-
-Source raw/ref/package/binding、output fresh、Staging fresh/isolation和五文件复核全部成功前不得创建Manifest final staging。复制到final后必须重新从三处raw bytes复算，不能沿用copy前缓存。Profile Staging是本次调用拥有的临时root：三方join成功后、Manifest final rename前必须删除并fsync其既有父目录；Producer成功返回时该路径必须不存在。删除失败按I/O失败处理并保持final零输出，不得保留Staging后仍声明成功。Profile Staging创建前失败为零Staging、零Manifest output；创建后、final rename前失败只能删除本次调用创建的Staging和Manifest staging，不能删除source、Common、Handoff或既有root。final rename后沿用Manifest事务的保留/quarantine边界，不得覆盖或原地修补。
-
-身份、路径、文件集合、raw/tree/package/binding drift固定为`E2E_MANIFEST_PROFILE_ASSET_INVALID/3`；Staging已存在或与受控root重叠为`E2E_MANIFEST_TRANSACTION_INVALID/3`；mkdir/copy/fsync/read I/O失败为`E2E_MANIFEST_IO_FAILED/4`。首错必须服从上述时序，不能并发竞态决定。
-
-Attempt Artifact verifier 不新增 Source Set 外的 Node 文件；它由既有 `scripts/verify-canvas06-e2e-report.mjs --scope ATTEMPT` 承接，完整 Report 使用同一文件的显式 `--scope REPORT`。Node Token writer 固定归入既有 `scripts/canvas06-e2e-attempt-artifacts.mjs`，两者均在活动Runner Source Set `0.2/24` allowlist中；Java Token writer由exact Runtime JAR ref承接。
-
-Manifest `0.2` raw/Profile校验的共享纯函数owner固定为24项Source Set内的 `scripts/canvas06-e2e-run-input.mjs`。Runner直接调用该owner，不执行上游Manifest verifier CLI；Manifest v02 builder/verifier调用同一owner并由各自generator identity记录入口源码，避免新增未被任一source identity承接的helper。
+Manifest `0.2` raw/Profile校验的共享纯函数owner固定为23项Source Set内的 `scripts/canvas06-e2e-run-input.mjs`。Runner直接调用该owner，不执行上游Manifest verifier CLI；Manifest v02 builder/verifier调用同一owner并由各自generator identity记录入口源码，避免新增未被任一source identity承接的helper。
 
 校验顺序固定为：
 
@@ -205,6 +136,12 @@ manifest.generated_at == Instant.ofEpochSecond(source_date_epoch).toString()
 `parseUtcWholeSecond`必须同时满足：字段是JSON string；`Instant.parse`成功；`instant.getNano()==0`；按epoch second重建的`Instant.toString()`与原始字符串逐code point相等。合法形状因此唯一为大写`Z`结尾、无小数部分的UTC整秒。`.000Z`、非零小数、`+00:00`、其他offset、空白、大小写变化或任何解析后被归一化的表示均拒绝。历史Manifest`0.1`的`.000Z` bytes保持只读；活动`0.2` builder必须输出canonical整秒形式。
 
 `source_date_epoch`只作为Materializer内存中的Family/Common seed时间，统一驱动SQLite `created_at/updated_at`等确定性字段，写入文本固定为`Instant.ofEpochSecond(source_date_epoch).toString()`；它不新增到Manifest、Attempt Artifact或`fixture-materialization.json` Schema。Runner只能逐byte传递Manifest原始文件，不新增`--source-date-epoch`、环境变量或系统属性，不得解析、规范化或重写时间。Manifest semantic verifier可以提前执行同一检查，但Materializer和Artifact verifier仍必须从同一Manifest raw bytes各自独立派生；失败固定为`E2E_INPUT_INVALID/2`，且零SQLite、零`fixture-materialization.json`。
+
+### 2.9 SQLite base/working 分离
+
+Materializer确定性seed的原始SQLite证据固定写入`storage/materialized-base/projects/<project_id>/project.db`，`fixture-materialization.storage.project_db_ref`只引用该不可变base。Runtime使用的数据库固定为同一attempt内`storage/projects/<project_id>/project.db`，由Materializer在base关闭、完整性验证和sidecar清零后原子逐byte克隆。`working_clone_byte_length/working_clone_sha256`必须分别等于base ref的length/SHA；详细路径、原子顺序、Snapshot读取和Report验证边界以Common Driver受控编排设计`v1.9`第2.8节为唯一后继口径。
+
+该分离不新增时间、CLI或公共Schema版本；它关闭了Materialization raw identity与Runtime正常提交必然修改同一路径的冲突。任何consumer都不得用base SHA验证运行后的working bytes，也不得通过重写Materialization artifact追随working变化。
 
 ## 3. 三类摘要 Owner
 
