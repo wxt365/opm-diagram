@@ -44,6 +44,7 @@ import {
   selectSubjectReceipt,
   expectedSubjectForCase,
   buildAttemptIndexEntries,
+  assertProcessControlParent,
   runCli
 } from './release-canvas06-e2e-run.mjs';
 
@@ -53,6 +54,14 @@ test('CLI 在参数拒绝时不创建输出或导入副作用', async () => {
   const root = await mkdtemp(resolve(tmpdir(), 'canvas06-e2e-cli-'));
   await assert.rejects(() => runCli([], {}), error => error.code === 'E2E_RUN_ARGUMENT_INVALID' && error.exitCode === 2);
   assert.deepEqual(await readdir(root), []);
+});
+
+test('process-control parent 必须为空且与 Runner 输入输出隔离', async () => {
+  const root = await mkdtemp(resolve(tmpdir(), 'canvas06-process-control-'));
+  const isolated = [resolve(root, '..', 'source'), resolve(root, '..', 'manifest'), resolve(root, '..', 'profile'), resolve(root, '..', 'output')];
+  assert.equal(await assertProcessControlParent({ parent: root, isolatedFrom: isolated }), root);
+  await writeFile(resolve(root, 'residual'), 'x');
+  await assert.rejects(() => assertProcessControlParent({ parent: root, isolatedFrom: isolated }), error => error.code === 'E2E_RUN_ARGUMENT_INVALID');
 });
 
 test('writes and reads back both frozen attempt Fault Plans before a later producer can run', async () => {

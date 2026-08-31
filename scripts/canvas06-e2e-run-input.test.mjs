@@ -24,6 +24,7 @@ const controlledRun = [
   '--input-mode', 'CONTROLLED_TEST', '--controlled-bundle-root', '/bundle', '--manifest-root', '/manifest',
   '--manifest', 'dev-canvas-06-e2e-manifest.json', '--profile-asset-root', '/profile-assets', '--source-root', '/source', '--java-home', '/java',
   '--browser-executable', '/chromium', '--runtime-port', '17850', '--web-port', '5176',
+  '--process-control-parent', '/process-control',
   '--output-root', '/output', '--out', 'dev-canvas-06/e2e/reports/dev-canvas-06.e2e-report.aaaaaaaaaaaa.bbbbbbbbbbbb/dev-canvas-06-e2e-report.json'
 ];
 
@@ -31,6 +32,7 @@ const productionRun = [
   '--input-mode', 'PRODUCTION_HANDOFF', '--handoff-root', '/handoff', '--intake-report', 'reports/intake.json',
   '--manifest-root', '/manifest', '--manifest', 'dev-canvas-06-e2e-manifest.json', '--profile-asset-root', '/profile-assets', '--source-root', '/source',
   '--java-home', '/java', '--browser-executable', '/chromium', '--runtime-port', '17850', '--web-port', '5176',
+  '--process-control-parent', '/process-control',
   '--output-root', '/output', '--out', 'dev-canvas-06/e2e/reports/dev-canvas-06.e2e-report.aaaaaaaaaaaa.bbbbbbbbbbbb/dev-canvas-06-e2e-report.json',
   '--require-production'
 ];
@@ -47,6 +49,7 @@ test('rejects mixed modes, skipped guard flags, equal ports and unsafe report pa
   expectInputError(() => parseRunOptions(controlledRun.concat('--require-production')), 'E2E_RUN_INPUT_CLASS_INVALID');
   expectInputError(() => parseRunOptions(controlledRun.map(value => value === 'CONTROLLED_TEST' ? 'PRODUCTION_HANDOFF' : value)), 'E2E_RUN_ARGUMENT_INVALID');
   expectInputError(() => parseRunOptions(controlledRun.map(value => value === '5176' ? '17850' : value)), 'E2E_RUN_ARGUMENT_INVALID');
+  expectInputError(() => parseRunOptions(controlledRun.map(value => value === '/process-control' ? 'process-control' : value)), 'E2E_RUN_ARGUMENT_INVALID');
   expectInputError(() => parseRunOptions(controlledRun.filter(value => value !== '--profile-asset-root' && value !== '/profile-assets')), 'E2E_RUN_ARGUMENT_INVALID');
   expectInputError(() => resolveReportRoot({ outputRoot: '/output', out: '../report.json', reportId: 'dev-canvas-06.e2e-report.aaaaaaaaaaaa.bbbbbbbbbbbb' }), 'E2E_RUN_ARGUMENT_INVALID');
   expectInputError(() => resolveVerifierReport({ evidenceRoot: '/evidence', report: '../report.json' }), 'E2E_RUN_ARGUMENT_INVALID');

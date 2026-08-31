@@ -75,6 +75,10 @@ const verifiedExecutionToolchains = new WeakMap();
 /** 活动 Runner 的唯一命令行入口；完整 194/388 调度由受控 Playwright bridge 执行。 */
 export async function runCli(argv = process.argv.slice(2), dependencies = {}) {
   const options = parseRunOptions(argv);
+  const processControlParent = await assertProcessControlParent({
+    parent: options['process-control-parent'],
+    isolatedFrom: [options['source-root'], options['manifest-root'], options['profile-asset-root'], options['output-root']]
+  });
   const paths = resolveReportRoot({
     outputRoot: options['output-root'],
     out: options.out,
@@ -84,14 +88,14 @@ export async function runCli(argv = process.argv.slice(2), dependencies = {}) {
   const finalRoot = await (dependencies.commitReportRoot ?? commitReportRoot)({
     outputRoot: paths.outputRoot,
     reportRoot: paths.reportRoot,
-    write: stagingRoot => executeCliRun({ options, preflight, stagingRoot, dependencies })
+    write: stagingRoot => executeCliRun({ options, preflight, processControlParent, stagingRoot, dependencies })
   });
   const reportPath = resolve(finalRoot, 'dev-canvas-06-e2e-report.json');
   const bytes = await readFile(reportPath);
   return Object.freeze({ reportPath, sha256: sha256(bytes) });
 }
 
-async function executeCliRun({ options, preflight, stagingRoot, dependencies }) {
+async function executeCliRun({ options, preflight, processControlParent, stagingRoot, dependencies }) {
   const stagedManifest = await stageManifestInputs({
     manifestRoot: options['manifest-root'], stagingRoot, manifestName: options.manifest
   });
@@ -108,7 +112,7 @@ async function executeCliRun({ options, preflight, stagingRoot, dependencies }) 
   if (!sameRef(manifestInput.manifestRef, stagedManifest.manifestRef)) {
     throw new E2eRunInputError('E2E_RUN_MANIFEST_INVALID', 'Staged Manifest raw reference drifted.', 3);
   }
-  const controlParent = await mkdtemp(resolve(pathsParent(stagingRoot), '.canvas06-e2e-control-'));
+  const controlParent = await mkdtemp(resolve(processControlParent, '.canvas06-e2e-control-'));
   try {
     const contextResult = await writeFamilyControlledInvocationContext({
       input_mode: options['input-mode'],
@@ -140,7 +144,31 @@ async function executeCliRun({ options, preflight, stagingRoot, dependencies }) 
     await verifyE2eReportRoot({ reportRoot: stagingRoot, reportPath: resolve(stagingRoot, 'dev-canvas-06-e2e-report.json') });
   } finally {
     await rm(controlParent, { recursive: true, force: true });
+    await assertProcessControlParent({ parent: processControlParent, isolatedFrom: [options['source-root'], options['manifest-root'], options['profile-asset-root'], options['output-root']] });
   }
+}
+
+export async function assertProcessControlParent({ parent, isolatedFrom }) {
+  const root = resolve(parent);
+  const details = await lstat(root).catch(() => null);
+  if (!isAbsolute(parent) || !details || !details.isDirectory() || details.isSymbolicLink()) {
+    throw new E2eRunInputError('E2E_RUN_ARGUMENT_INVALID', 'process-control-parent must be an existing non-symlink directory.', 2);
+  }
+  if (!Array.isArray(isolatedFrom) || isolatedFrom.some(candidate => rootsOverlap(root, resolve(candidate)))) {
+    throw new E2eRunInputError('E2E_RUN_ARGUMENT_INVALID', 'process-control-parent must be isolated from Runner inputs and output.', 2);
+  }
+  if ((await readdir(root)).length !== 0) {
+    throw new E2eRunInputError('E2E_RUN_ARGUMENT_INVALID', 'process-control-parent must be empty.', 2);
+  }
+  return root;
+}
+
+function rootsOverlap(left, right) {
+  const leftToRight = relative(left, right);
+  const rightToLeft = relative(right, left);
+  return leftToRight === '' || rightToLeft === ''
+    || !leftToRight.startsWith(`..${sep}`) && leftToRight !== '..'
+    || !rightToLeft.startsWith(`..${sep}`) && rightToLeft !== '..';
 }
 
 async function cliInputTrust({ options, preflight }) {

@@ -14,7 +14,7 @@ const validateActiveManifest = activeManifestAjv.compile(ACTIVE_MANIFEST_SCHEMA)
 
 const RUN_VALUE_OPTIONS = [
   'input-mode', 'manifest-root', 'manifest', 'profile-asset-root', 'source-root', 'java-home', 'browser-executable',
-  'runtime-port', 'web-port', 'output-root', 'out'
+  'runtime-port', 'web-port', 'process-control-parent', 'output-root', 'out'
 ];
 const VERIFY_VALUE_OPTIONS = [
   'scope', 'input-mode', 'evidence-root', 'manifest-root', 'manifest', 'profile-asset-root', 'report'
@@ -36,6 +36,7 @@ export function parseRunOptions(argv) {
   const options = parseOptions({ argv, valueOptions: RUN_VALUE_OPTIONS, allowReady: false });
   validateMode(options, { requireProduction: true, allowReady: false });
   assertPortPair(options);
+  if (!isAbsolute(options['process-control-parent'])) fail('E2E_RUN_ARGUMENT_INVALID', '--process-control-parent must be absolute.');
   return Object.freeze(options);
 }
 
