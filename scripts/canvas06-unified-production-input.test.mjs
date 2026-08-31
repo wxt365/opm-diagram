@@ -9,11 +9,11 @@ import { FAULT_2A_CUMULATIVE_DELTA, FAULT_2A_DELTA, FAULT_CONTRACT_DELTA, FINAL_
 const commit = 'a'.repeat(40);
 const argv = ['--input-mode', 'EXTERNAL_RELEASE_STORE', '--source-root', '/source', '--release-store-root', '/release-store', '--source-chain-target', 'FINAL_RUNNER', '--origin-source-commit', ORIGIN_SOURCE_COMMIT, '--fault-contract-source-commit', 'b'.repeat(40), '--schema-conformance-source-commit', 'c'.repeat(40), '--fault-2a-source-commit', 'd'.repeat(40), '--runner-source-commit', commit, '--source-commit', commit, '--require-production'];
 
-test('source chain 精确锁定 C=20、A=7、R0=63、R=2、R2=9、Fault累计25与最终累计83个路径', () => {
+test('source chain 精确锁定 C=20、A=7、R0=63、R=2、R2=9、Fault累计25与最终累计85个路径', () => {
   assert.equal(FAULT_CONTRACT_DELTA.length, 20);
   assert.equal(FAULT_2A_DELTA.length, 7);
   assert.equal(FAULT_2A_CUMULATIVE_DELTA.length, 25);
-  assert.equal(FINAL_RUNNER_CUMULATIVE_DELTA.length, 83);
+  assert.equal(FINAL_RUNNER_CUMULATIVE_DELTA.length, 85);
   assert.equal(RUNNER_DELTA.length, 63);
   assert.equal(RUNNER_CLI_DELTA.length, 9);
   assert.deepEqual(RUNNER_DELTA_OWNER_CLOSURE, [['M', 'scripts/canvas06-unified-production-input.mjs'], ['M', 'scripts/canvas06-unified-production-input.test.mjs']]);
@@ -28,6 +28,8 @@ test('source chain 精确锁定 C=20、A=7、R0=63、R=2、R2=9、Fault累计25�
     ['M', 'scripts/release-canvas06-e2e-run.mjs'],
     ['M', 'scripts/release-canvas06-e2e-run.test.mjs']
   ]);
+  assert.equal(FINAL_RUNNER_CUMULATIVE_DELTA.some(([, path]) => path === 'scripts/canvas06-e2e-run-preflight.mjs'), true);
+  assert.equal(FINAL_RUNNER_CUMULATIVE_DELTA.some(([, path]) => path === 'scripts/canvas06-e2e-run-preflight.test.mjs'), true);
   assert.equal(RUNNER_DELTA.some(([, path]) => path === 'docs/contracts/schemas/opm-dev-canvas-06-e2e-attempt-artifact-v02.schema.json'), true);
   assert.equal(RUNNER_DELTA.some(([, path]) => path === 'scripts/canvas06-e2e-attempt-artifacts.mjs'), true);
   assert.equal(RUNNER_DELTA.some(([, path]) => path === 'scripts/canvas06-e2e-attempt-artifacts.test.mjs'), true);
