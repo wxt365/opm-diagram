@@ -69,3 +69,29 @@ Schema、builder、verifier、全部正反/故障/性能测试通过，Manifest 
 ## 11. 事实与假设
 
 事实：当前 `0.1` 缺 authoring provenance；`0.2` Schema 和定向 contract test 已完成，builder/verifier、受控 bundle descriptor 和生产 Manifest 尚未完成。旧 Visual/E2E 合并 builder 规格已是历史版本。假设：无。
+
+## 12. 可执行 CLI 与组装口径
+
+本节冻结本包唯一 CLI，避免由实现根据目录、环境变量或历史 E2E 参数推断输入。
+
+Producer 只接受以下公共参数，且每个参数恰好一次：
+
+```text
+--input-mode <CONTROLLED_TEST|PRODUCTION_HANDOFF>
+--source-root <absolute-clean-git-root>
+--runtime-jar <absolute-regular-file>
+--web-dist <absolute-regular-directory>
+--approved-version-root <absolute-approved/versions/<semver>>
+--output-root <absolute-fresh-parent>
+--out visual-manifest.json
+```
+
+Verifier 只接受相同的 `--input-mode`、`--source-root`、`--runtime-jar`、`--web-dist`、`--approved-version-root`、`--output-root`、`--out`，以及只读 `--require-production`。Producer 的 `--output-root` 必须不存在；`--out` 固定为其直接子项 `visual-manifest.json`。Verifier 的 `--output-root` 必须是已提交 Producer 根，不能接受其父目录、任意 JSON 文件或符号链接。
+
+`PRODUCTION_HANDOFF` 额外且只允许 `--handoff-root <absolute-readonly-root>`、`--intake-report <relative-path>`；`CONTROLLED_TEST` 额外且只允许 `--controlled-bundle-root <absolute-controlled-bundle-root>`。两种模式均禁止环境变量、当前工作目录、`latest`、目录扫描、默认 Handoff 和 checkout fallback。受控 descriptor 的 `approved_version_ref` 必须为对象，其 `path` 解析后必须等于 `--approved-version-root`，`golden_set_version` 必须等于 approved root basename，`authoring_report_ref` 必须与 approved root 的 `authoring-report.json` 原始 ref 完全一致。
+
+这里的两个 raw ref 分属不同 owner root：descriptor 路径相对 controlled bundle root，Manifest 路径相对 approved-version root。因此唯一比较方式是两者解析为同一绝对 regular file，且 `byte_length/sha256` 相等；`path` 仅在各自 owner root 内比较，禁止跨 root 误作字符串相等或重写为另一个 root 的路径。
+
+Manifest 的组装来源唯一如下：Capture Plan 的 `captures[]` 按首次出现的 `case_id` 分组，形成 `378=306 CAPABILITY+72 COMMON` 个 case；每个 `variant_captures[]` 保持 Plan 原顺序。每个 capture 的 `golden_ref` 必须由同序 `Authoring Report.approved_assets.png_refs[]` 中同 `logical_id=capture_id` 的原始 ref 映射为 `kind=GOLDEN_PNG`；每个 blank baseline 必须由同序 `approved_assets.blank_baseline_refs[]` 中同 `logical_id=baseline_id` 的原始 ref 映射为 `kind=BLANK_PNG`。Plan 的 `critical_regions[].region_id` 映射为 Manifest 的同序字符串数组，禁止丢弃、排序或补充。
+
+三项 policy 不再允许实现自选，固定为：`pixel_policy={policy_id=VISUAL_PIXEL_DIFF,policy_version=0.1}`、`geometry_policy={policy_id=VISUAL_GEOMETRY,policy_version=0.1}`、`golden_policy={policy_id=APPROVED_GOLDEN_ONLY,policy_version=0.1}`。viewport、zoom、Common subject 顺序严格采用 Visual Manifest Schema 的 prefix/enum 顺序。

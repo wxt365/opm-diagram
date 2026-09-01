@@ -19,6 +19,7 @@
 ## Build
 
 - [x] Visual Manifest `0.2` Schema/contract test 完成，`0.1` 未改；`0.2` 只增加八个冻结 provenance 字段并使用 `generator_identity.runner_version=0.2.0`。
+- [x] 规格第 12 节已冻结 Producer/Verifier 唯一 CLI、模式参数、输出布局、case 组装和三项 policy 常量。
 - [ ] builder 严格消费显式 approved version 和八字段。
 - [ ] semantic verifier、fresh atomic writer 和零输出失败边界完成。
 - [ ] builder/verifier 对 approved root 永久只读。
