@@ -54,7 +54,7 @@ Production重建准入：`READY_FOR_CLEAN_R_EXTERNAL_STORE_REBUILD`
 4. Family Fixture Identity Catalog `0.1/0.1.0`与活动Common Catalog `0.2.0`；
 5. 由统一Source生产输入重建规格形成的Handoff `0.2`、exact READY Intake、Runtime JAR和Web dist tree；
 6. 活动Report Schema `opm-dev-canvas-06-e2e-report-v02.schema.json/0.2`。
-7. 已通过独立Common E2E输入重建Verifier的活动`0.2.0` 43文件root；其factory source必须与第四`DRIVER-COMMON`所属clean source commit中的factory raw bytes相等；
+7. 已通过独立Common E2E输入重建Verifier的活动`0.2.0` 44文件root（含Common Setup Plan）；其factory source必须与第四`DRIVER-COMMON`所属clean source commit中的factory raw bytes相等；
 8. `specs/opm-dev-canvas-06-unified-source-production-input-rebuild-bugfix-task-spec.md`冻结的source-root固定路径、Handoff/Web tree和exact join；
 9. `specs/opm-dev-canvas-06-common-orchestration-integrated-source-closure-bugfix-task-spec.md`形成的`e598... -> 9048bb3...`与`17=14 M+3 A`只作为origin来源；最终production source、六方join和重建顺序唯一按Final Production Source Chain的`9048bb3... -> C -> S -> A -> R0 -> R`执行。
 
@@ -164,7 +164,7 @@ npm run release:canvas06:e2e:manifest:v02 -- \
   --intake-report <root内READY intake相对路径> \
   --source-root <clean target source> \
   --source-date-epoch <非负十进制UTC整秒> \
-  --common-fixture-root <已验证活动0.2.0的43文件root> \
+  --common-fixture-root <已验证活动0.2.0的44文件root> \
   --profile-asset-root <fresh且不存在的Profile Asset Staging Root绝对路径> \
   --output-root <release root> \
   --out dev-canvas-06/e2e/manifests/<manifest-id>/dev-canvas-06-e2e-manifest.json \
@@ -175,7 +175,7 @@ npm run release:canvas06:e2e:manifest:v02 -- \
   --controlled-bundle-root <只读controlled root> \
   --source-root <clean target source> \
   --source-date-epoch <非负十进制UTC整秒> \
-  --common-fixture-root <已验证活动0.2.0的43文件root> \
+  --common-fixture-root <已验证活动0.2.0的44文件root> \
   --profile-asset-root <fresh且不存在的Profile Asset Staging Root绝对路径> \
   --output-root <fresh controlled output> \
   --out dev-canvas-06/e2e/manifests/<manifest-id>/dev-canvas-06-e2e-manifest.json
@@ -261,7 +261,7 @@ Producer把五个source path按Profile/Digest设计`v1.5`固定映射到`--profi
 
 Handoff Web ref路径固定为`releases/clean-<source12>/web-dist`，Manifest final ref路径固定为`inputs/build/web-dist`；两者路径不同，但inventory、总`byte_length`和`sha256`必须相等。tree摘要复用统一重建规格第6.3节公式：普通单链接文件inventory按UTF-8 path排序，`sha256=SHA-256(UTF8(JCS(inventory)))`。禁止使用目录mtime、ZIP SHA、locale排序或只比较文件数。
 
-production校验顺序固定为：exact quarantine sidecar guard -> READY Intake raw ref -> Handoff `0.2` Schema/READY -> unified source commit -> Handoff Runtime/Web refs -> source-root Runtime/Web -> 四driver -> Common 43/factory/binding -> final copy。任一前项失败时不得创建staging。
+production校验顺序固定为：exact quarantine sidecar guard -> READY Intake raw ref -> Handoff `0.2` Schema/READY -> unified source commit -> Handoff Runtime/Web refs -> source-root Runtime/Web -> 四driver -> Common 44/setup plan/factory/binding -> final copy。任一前项失败时不得创建staging。
 
 ### 7.3 Unified Source Quarantine Sidecar Guard
 

@@ -32,7 +32,7 @@
 
 现有仓库只有以下局部输入能力：
 
-- `build-canvas06-common-visual-fixtures.mjs`能原子生成`43=1 Catalog+8 Visual+32 E2E+2 source mirror`；
+- `build-canvas06-common-visual-fixtures.mjs`能原子生成`44=1 Catalog+8 Visual+32 E2E+2 source mirror+1 Common Setup Plan`；
 - `canvas06-e2e-manifest-v02-profile.mjs`能验证一个已经存在的五文件direct root；
 - `release-canvas06-golden-plan.mjs`能生成`1242=1170 Family+72 Common`的Plan，但Common Catalog只能从`source-root`定位；
 - `canvas06-common-visual-materialization.test.mjs`只有缺callback、历史Request和Java raw-ref漂移等BLOCKED用例。
@@ -110,7 +110,7 @@ node scripts/verify-canvas06-common-visual-adapter-test-input.mjs \
     rules/representative-rule-set.json
     symbols/representative-symbol-catalog.json
   inputs/common/
-    <完整43文件root>
+    <完整44文件root>
   callback-results/
     000/attempt-1/observed-result.json
     000/attempt-1/capture.png
@@ -121,7 +121,7 @@ node scripts/verify-canvas06-common-visual-adapter-test-input.mjs \
     071/attempt-2/capture.png
 ```
 
-除上述`2+1+1+5+43+288=340`个普通单链接文件和必要目录外不得有额外文件、link、hardlink、socket/device/FIFO、临时文件或Git metadata。`adapter_work_root=<output-root>.adapter-work`，不在final root内，Builder和Verifier成功返回时必须不存在；预存在即在任何staging写入前拒绝。
+除上述`2+1+1+5+44+288=341`个普通单链接文件和必要目录外不得有额外文件、link、hardlink、socket/device/FIFO、临时文件或Git metadata。`adapter_work_root=<output-root>.adapter-work`，不在final root内，Builder和Verifier成功返回时必须不存在；预存在即在任何staging写入前拒绝。
 
 ## 7. 受控输入与生成顺序
 
@@ -139,7 +139,7 @@ Profile Source Set只接受clean source中既有Profile/Digest closure冻结的�
 
 Request中的`profile_asset_root=<output-root>/inputs/profile/assets`；五项`profile_asset_refs[].path`固定以`profile/assets/`开头，tree preimage固定`root_path='profile/assets'`。物理Bundle路径的`inputs/`前缀不进入Request tree identity。禁止把Profile package父目录直接当direct root。
 
-### 7.3 Fresh Common 43文件root
+### 7.3 Fresh Common 44文件root
 
 Builder必须调用现有`buildCommonVisualFixtures({handoffPath,target:<staging>/inputs/common,epoch})`，不得复制历史root或重写fixture。随后必须以现有只读Verifier闭合：
 
@@ -152,7 +152,7 @@ source mirrors=2
 source_binding==Handoff.active_binding
 ```
 
-`common_fixture_tree_ref.sha256=sha256(JCS(43项{path,byte_length,sha256}按UTF-8 path升序))`，`byte_length`为43项之和，tree path固定`inputs/common`。
+`common_fixture_tree_ref.sha256=sha256(JCS(44项{path,byte_length,sha256}按UTF-8 path升序))`，`byte_length`为44项之和，tree path固定`inputs/common`；第44项固定为`dev-canvas-06-common-setup-plan.json`，不得排除。
 
 ### 7.4 新Capture Plan与外置Common root
 
@@ -253,7 +253,7 @@ CLI/schema/source/Handoff/Java/Runtime preflight
 -> create staging
 -> derive/verify JDK root and jar; construct controlled Planner env
 -> Profile 5
--> Common 43
+-> Common 44
 -> Plan 1242/72
 -> Runtime staged copy
 -> Request 0.2
@@ -300,7 +300,7 @@ A scripts/build-canvas06-common-visual-adapter-test-input.test.mjs
 
 1. Bundle Schema Draft 2020-12 strict编译，1个完整正例；
 2. Profile缺/多/乱序/link/hardlink、raw/tree/package/binding漂移；
-3. Common非43文件、Catalog非`0.2.0`、source mirror/binding/ref漂移；
+3. Common非44文件、缺失或篡改Common Setup Plan、Catalog非`0.2.0`、source mirror/binding/ref漂移；
 4. Plan非1242/72、Common顺序/fixture/Catalog/Projection/focus/cell漂移，历史Plan拒绝；
 5. Request Java/JAR/Profile/Plan/Common/epoch/final path/work root单变量漂移；旧`RUNTIME_JAR` Request kind拒绝，Handoff/Plan/Request `LOCAL_RUNTIME_JAR`四字段闭合；
 6. callback少于/多于144、重复key、顺序、Observed缺/多字段、identity/Projection/focus/cell/fault/geometry/PNG漂移；

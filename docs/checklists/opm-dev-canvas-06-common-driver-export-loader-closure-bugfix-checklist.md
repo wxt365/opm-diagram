@@ -1,6 +1,6 @@
 # Checklist: DEV-CANVAS-06 Common Driver Export 与 Loader Closure Bugfix
 
-状态：`DESIGN_FROZEN / READY_FOR_BUILD`
+状态：`IMPLEMENTED / CONTROLLED_REGRESSION_PASS`
 
 ## Task Type
 
@@ -48,8 +48,17 @@
 
 ## Implementation
 
-- [ ] I01 先补旧四模块三导出要求会拒绝Common的失败测试。
-- [ ] I02 实现两类封闭export verifier。
-- [ ] I03 实现四Driver exact loader与session SHA cache。
-- [ ] I04 验证Family 178与Common 16原序集合。
-- [ ] I05 重跑Stage R/Source Set计数与Common回归。
+- [x] I01 先补旧四模块三导出要求会拒绝Common的失败测试。
+- [x] I02 实现两类封闭export verifier。
+- [x] I03 实现四Driver exact loader与session SHA cache。
+- [x] I04 验证Family 178与Common 16原序集合。
+- [x] I05 重跑Stage R/Source Set计数与Common回归。
+
+## 验证记录
+
+- `node --test tests/e2e/release/dev-canvas-06/drivers/common-driver.test.mjs`：通过。
+- `node --test scripts/release-canvas06-e2e-run.test.mjs`：`69/69`通过，包含四Driver导出、raw-byte join和SHA cache回归。
+- `node --test scripts/canvas06-e2e-run-stage.test.mjs scripts/validate-canvas06-visual-e2e-schemas.test.mjs`：`28/28`通过，复核24项Source Set与`194/388/178/16`机器契约。
+- `git diff --check`：通过。
+
+本清单的完成状态只证明受控模块加载与回归测试闭合；不构成真实`194/388`、E2E Report、GATE、Candidate、Activation、Capability、production或ISO符合性证据。

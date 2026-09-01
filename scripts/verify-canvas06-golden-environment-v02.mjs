@@ -30,7 +30,7 @@ export function verifyGoldenEnvironmentV02(environment, { sourceDateEpoch } = {}
   verifyLaunchArgs(environment.launch_args);
   verifyPngRefs(environment.png_refs);
   verifyBlanks(environment.blank_baseline_refs);
-  const expectedFingerprint = sha(jcs(fingerprintInput(environment)));
+  const expectedFingerprint = sha(jcs(goldenEnvironmentFingerprintInput(environment)));
   if (environment.environment_fingerprint !== expectedFingerprint) fail('GOLDEN_ENVIRONMENT_FINGERPRINT_MISMATCH', 3);
   const expectedId = `dev-canvas-06.golden-environment.${expectedFingerprint.slice(0, 12)}`;
   if (environment.environment_id !== expectedId) fail('GOLDEN_ENVIRONMENT_IDENTITY_MISMATCH', 3);
@@ -64,7 +64,7 @@ function verifyBlanks(refs) {
   if (JSON.stringify(refs.map(value => value.baseline_id)) !== JSON.stringify(blankIds) || new Set(refs.map(value => value.ref.path)).size !== refs.length) fail('GOLDEN_ENVIRONMENT_BLANK_SET_INVALID', 3);
 }
 
-function fingerprintInput(value) {
+export function goldenEnvironmentFingerprintInput(value) {
   return {
     os_name: value.os_name,
     os_build: value.os_build,

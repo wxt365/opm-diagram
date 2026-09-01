@@ -1,6 +1,6 @@
 # Checklist: GOLDEN-AUTHORING-03B Candidate Author 实现
 
-> 状态：`BLOCKED_BY_DEPENDENCY`。等待 02B/03C implementation checklist 完成；本 checklist 不构成 candidate、approval、release 或 ISO 证据。
+> 状态：`READY_FOR_CONTROLLED_IMPLEMENTATION`。02B已通过受控测试，03C已达到 Adapter Readiness；真实 UI/fault/capture 仍由本包实现并回填03C integration evidence。详见 `specs/opm-dev-canvas-06-common-visual-adapter-readiness-dependency-cycle-closure-bugfix-task-spec.md`。本 checklist 不构成 candidate、approval、release 或 ISO 证据。
 
 ## Spec Mapping
 
@@ -12,23 +12,26 @@
 ## Input Gate
 
 - [x] Golden Authoring `v1.4`、Visual Common Materialization `v1.5`、Materializer `v1.5` 和 Verifier Catalog `v1.1` 均为 `FROZEN`。
-- [ ] 02B Common Visual Fixture Contract/Planner checklist 全部通过，新 Plan拒绝历史占位Projection。
-- [ ] 03C Common Visual Materializer checklist全部通过，四份adapter机器契约、唯一ESM/144次callback、8 base/144 clone/独立fault hook受控集成可用。
-- [ ] Plan READY，130 项 materialization 通过 `--require-materialized`。
+- [x] 02B Common Visual Fixture Contract/Planner已达到受控测试通过，新 Plan拒绝历史占位Projection。
+- [x] 03C已达到 Adapter Readiness：四份adapter机器契约、唯一ESM/144次callback、8 base/144 clone和独立fault hook受控基线可用；真实 UI/fault/capture 由本包实现后回填。
+- [x] 03B只读消费接口先执行 `--require-materialized` verifier，再由Plan的130个fixture key固定读取Report/SQLite，逐项复算raw ref；物理Materialization root路径仅按bytes闭合，候选报告统一使用未来发布布局`materialization/**`。
+- [ ] Plan READY，130 项 materialization 通过 `--require-materialized` 的真实release执行证据可用。
 - [ ] clean source 与 exact Node/npm/Java/Playwright/Chromium/JAR/font 输入可用；Golden Environment `0.2` Schema/离线 verifier 已可用。
+- [x] 03B physical input closure已冻结：Adapter Request、Browser executable和三字体只接受显式raw-ref输入，不允许source/environment/PATH fallback。
 - [ ] 受控 test 输入与真实 release 输入已分开。
 
 ## Build
 
 - [x] Authoring Report `0.2` Schema 和正反 contract test 完成：三种状态、130/130 materialization、2484/18 attempt、Candidate/Approved/Blocked 引用边界、report ID 和额外字段反例均由定向 AJV test 覆盖。
-- [ ] CLI、clean build、environment/font verifier 和单 lane author 完成。
-- [ ] Family clone/Common 03C adapter、Schema-valid normalized result、稳定等待和双 attempt 完成。
-- [ ] candidate Golden Environment `0.2` writer、refs/fingerprint verifier 完成。
-- [ ] READY/BLOCKED Report atomic writer、payload SHA 和 candidate 只读边界完成。
+- [ ] CLI主链、clean build和单lane真实author完成；十参数preflight、clean source/JAR/Adapter/Browser/Font/Lineage闭合已实现。
+- [ ] Family clone/Runtime/Web capture adapter（见 `opm-dev-canvas-06-golden-authoring-family-capture-adapter-implementation-checklist.md`）、Common 03C adapter、Schema-valid normalized result、稳定等待和双attempt完成。
+- [x] candidate Golden Environment `0.2` writer、future layout refs/fingerprint离线 verifier 完成；真实浏览器PNG仍待主链。
+- [x] READY Report atomic writer、payload SHA和success-only candidate transaction已实现；BLOCKED诊断Report与candidate只读消费状态仍待主链。
 - [ ] runner 对 Approval/approved/Manifest 保持零写入。
 
 ## Verify
 
+- [x] Family `130/130` Materialization Report/SQLite引用、固定排序、raw SHA及semantic state输入闭合由定向测试覆盖。
 - [ ] `1242/2484/9/18`、逐 attempt result、顺序、refs、三个集合 SHA 和 payload 全闭合。
 - [ ] dirty/build/JAR/binding/environment/font/materialization 反例稳定阻断。
 - [ ] 缺失/额外/重复/超时/非确定性 capture 反例稳定阻断。

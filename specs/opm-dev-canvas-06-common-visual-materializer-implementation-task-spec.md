@@ -24,7 +24,7 @@
 
 唯一设计事实源为：
 
-- `docs/design/opm-dev-canvas-06-visual-common-materialization-design.md` `v1.9`；
+- `docs/design/opm-dev-canvas-06-visual-common-materialization-design.md` `v1.10`；
 - `specs/opm-dev-canvas-06-common-visual-adapter-and-one-shot-fault-contract-closure-bugfix-task-spec.md`；
 - `specs/opm-dev-canvas-06-common-visual-clone-and-web-runtime-protocol-closure-bugfix-task-spec.md`；
 - `specs/opm-dev-canvas-06-common-visual-adapter-controlled-java-profile-input-closure-bugfix-task-spec.md`；
@@ -136,7 +136,7 @@ materializer_identity,source_date_epoch
 --opm.release.visual-common.fault-max-invocations=1
 ```
 
-三项必须与闭包规格第6.2节完整command-line guard同时出现并 byte-for-byte 相等，只允许目标 subject/command。hook唯一调用顺序为`validation/text -> receipt/head recheck -> existing E2E hook -> Visual Common hook -> revision INSERT`；首个exact context原子触发一次 `PERSISTENCE_FAILED` 后永久禁用，第二次相同 command 走正常路径。其他 subject、Family、default/production Runtime、Visual validation runner 和 HTTP 请求不得装配或切换 hook。禁止通配符、环境变量覆盖、运行时 setter、公开 API、共享静态计数、复用`E2EFaultPort/RecoverySqliteFaultPort`和跨进程复用。
+三项必须与闭包规格第6.2节的完整Web command-line guard同时出现并 byte-for-byte 相等；Fault Configuration 接受七个固定Web identity/path key的存在和唯一来源，而Runtime Ready Writer唯一校验其具体值，只允许目标 subject/command。hook唯一调用顺序为`validation/text -> receipt/head recheck -> existing E2E hook -> Visual Common hook -> revision INSERT`；首个exact context原子触发一次 `PERSISTENCE_FAILED` 后永久禁用，第二次相同 command 走正常路径。其他 subject、Family、default/production Runtime、Visual validation runner 和 HTTP 请求不得装配或切换 hook。禁止通配符、环境变量覆盖、运行时 setter、公开 API、共享静态计数、复用`E2EFaultPort/RecoverySqliteFaultPort`和跨进程复用。
 
 ## 8. 03B 调用适配
 
@@ -157,7 +157,7 @@ request必须通过Visual Common`v1.9`活动Adapter Request `0.2/0.2.0`；其`ru
 7. capture 后关闭 Runtime，校验 clone 结果和 base digest，再返回Schema-valid、三项JCS摘要闭合的 normalized result；
 8. 不写 Environment、Authoring Report、candidate PNG、Approval、approved root 或 Manifest。
 
-第4、7项不得自行选择端口或解析stdout：application/management固定loopback动态端口，Node按Runtime Ready发现端口；callback后固定SIGTERM/10秒，必要时SIGKILL并使attempt失败，随后复核端口、SQLite sidecar、attempt tree和base digest。完整状态机只由Clone/Web闭包规格第6至9节承接。
+第4、7项不得自行选择端口或解析stdout：application/management固定loopback动态端口，Node按Runtime Ready发现端口；callback后固定SIGTERM/10秒，必要时SIGKILL并使attempt失败。关闭只接受`0/null`、`null/SIGTERM`，或唯一SIGTERM已成功发送且未SIGKILL时的JVM `143/null`等价观测，随后复核端口、SQLite sidecar、attempt tree和base digest。完整状态机只由Clone/Web闭包规格第6至9节承接。
 
 调用顺序固定为：
 
@@ -211,7 +211,7 @@ adapter新增并透传：`GOLDEN_COMMON_ADAPTER_INPUT_INVALID/2`、`GOLDEN_COMMO
 - exact `BLOCKED_FEEDBACK` command 只失败一次，第二次正常；错误 subject/command/次数/默认模式全部拒绝或使用 no-op；
 - 真实 UI setup/Projection 由后续 03B E2E 覆盖，本包验证 adapter 参数、Runtime状态和 normalized callback contract。
 - 活动Request `0.2`及其余三份Schema正反例、Java/Profile单变量漂移与零输出、CLI四模式、静态导出、144次串行顺序、callback throw/reject/extra/missing/wrong identity和三项result摘要全部覆盖；
-- Adapter Test Input Bundle Builder/Verifier必须生成fresh Profile 5、Common 43、Plan 1242/72、Request `0.2`及144份完整Observed/PNG，并覆盖`LOCAL_RUNTIME_JAR` source exact join、staged raw join、derived JDK/Planner五键env、原子安装、installed reverify和零fallback负例；
+- Adapter Test Input Bundle Builder/Verifier必须生成fresh Profile 5、Common 44（含Common Setup Plan）、Plan 1242/72、Request `0.2`及144份完整Observed/PNG，并覆盖`LOCAL_RUNTIME_JAR` source exact join、staged raw join、derived JDK/Planner五键env、原子安装、installed reverify和零fallback负例；
 - `GOLDEN_COMMON_UI_SETUP_FAILED`经runner、Spring cause chain和packaged JAR三条路径均返回exit `3`。
 
 ### 10.4 JAR 与性能
@@ -230,11 +230,12 @@ npm run release:canvas06:common-visual:test
 npm run release:canvas06:common-visual:materialize:test
 ./mvnw -pl services/local-runtime test
 ./mvnw -pl services/local-runtime package
-npm run release:canvas06:common-visual:materialize -- <受控 Plan/Catalog/JAR/root/epoch>
 npm run contract:validate
 npm run backend:verify
 git diff --check
 ```
+
+`runCommonVisualMaterialization(request, captureCallback)` 是唯一真实物化入口，只能由03B静态ESM import调用；它没有也不得新增生产物化CLI。`materialize:test`仅组合Adapter Test Input与Adapter定向测试，四种现有CLI仅可执行单文件机器契约验证。
 
 ## 12. 完成定义
 

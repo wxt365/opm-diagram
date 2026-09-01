@@ -2,7 +2,7 @@
 
 文档状态：`FROZEN_FOR_IMPLEMENTATION`
 
-实现状态：`BLOCKED_BY_DEPENDENCY`
+实现状态：`READY_FOR_CONTROLLED_IMPLEMENTATION`
 
 ## Task Type
 
@@ -28,19 +28,20 @@
 - `specs/opm-dev-canvas-06-common-visual-materializer-implementation-task-spec.md`；
 - Capture Plan `0.1`、Materialization Report `0.1` 和未来 Authoring Report `0.2` Schema；
 - DEV-CANVAS-06 READY Intake/Handoff、Common Fixture Catalog 和固定工具链版本。
+- `opm-dev-canvas-06-golden-candidate-author-input-closure-bugfix-task-spec.md`。
 
 实现不得重新决定 capture ID/顺序、attempt 数量、环境指纹、等待条件、ref/SHA 算法、报告字段、失败码或性能阈值。
 
 ## 3. 前置条件
 
 1. Capture Planner、Materialization Report semantic verifier 和 Golden Environment `0.2` Schema/semantic verifier 已完成；
-2. 02B checklist全部通过，新Common fixture/Catalog/Plan的semantic join通过；
-3. 03C checklist全部通过，四份adapter机器契约、唯一ESM函数/144次callback、8个Common base、attestation、fresh clone和独立one-shot fault hook受控集成通过；
+2. 02B 已达到 `IMPLEMENTED/CONTROLLED_TEST_PASS`，新Common fixture/Catalog/Plan的semantic join通过；
+3. 03C 已达到 `ADAPTER_READY_FOR_03B_CONTROLLED_INTEGRATION`，四份adapter机器契约、唯一ESM函数/144次callback、8个Common base、attestation、fresh clone和独立one-shot fault hook受控基线可用；真实 UI/fault/capture integration 由本03B完成后回填03C，禁止循环等待。唯一解释见 `opm-dev-canvas-06-common-visual-adapter-readiness-dependency-cycle-closure-bugfix-task-spec.md`；
 4. 输入 Plan 为新 change ID 的 `READY_FOR_AUTHORING`，130 项 Family root 在 `--require-materialized` 下通过，旧 `GOLDEN-CANVAS06-20260803-001` 被 semantic preflight拒绝；
 5. source checkout clean，Node 22/npm 10.9.4/Java 21/Playwright 1.57.0/Chromium 143.0.7499.4 可用；
 6. 真实 release 执行必须使用新 clean Handoff/Bundle/Plan；受控 test Plan 只能证明实现。
 
-当前第2、3项尚未完成，因此本包状态为`BLOCKED_BY_DEPENDENCY`。依赖完成后可继续实现，但第6项仍阻断真实 candidate、审批和 GATE-06-03 状态提升。
+当前仅在缺少上述 Adapter Readiness 时保持 `BLOCKED_BY_DEPENDENCY`。Adapter Readiness 成立后可进入受控实现，但第6项仍阻断真实 candidate、审批和 GATE-06-03 状态提升。
 
 ## 4. 修改边界
 
@@ -61,7 +62,7 @@
 
 ## 5. 实现责任
 
-1. CLI 严格实现主设计第 7 章参数，拒绝所有禁止参数和非空 candidate root；
+1. CLI 严格实现主设计第 7 章及输入闭包修正规格的十个参数，拒绝所有禁止参数和非空 candidate root；
 2. 复核 Plan/Handoff/Intake、130 项 materialization、active binding、clean build、Runtime JAR、Web dist 和 source epoch；
 3. 生成并校验完整 environment fingerprint 和实际 font refs，禁止隐式系统字体替代；
 4. Family capture 每 attempt 从 130 个 immutable SQLite base 创建独立 clone；Common capture 只能静态ESM调用03C的`runCommonVisualMaterialization(request,captureCallback)`，从8个immutable base创建144个fresh clone并消费Schema-valid normalized result，禁止03B自行seed、选择API/SQLite路径、动态加载callback或重定义callback/result字段；
@@ -118,4 +119,4 @@ Schema、runner、verifier、Common Factory、全量正反测试和性能证据�
 
 ## 12. 事实与假设
 
-事实：当前 `03B` runner 与真实 candidate 尚未完成；Authoring Report 和 Golden Environment `0.2` Schema/离线 verifier 已完成，但 runtime browser/font/Plan 闭包尚未实现。Common Runtime Materialization、Color Profile、Node adapter四份机器契约及one-shot fault实现边界已由Visual Common`v1.5`冻结，不再是设计待定项；03C仍处于实现/验收未完成状态，是当前明确依赖。假设：无；真实环境 SHA、PNG 和性能必须执行生成。
+事实：当前 `03B` runner 与真实 candidate 尚未完成；Authoring Report 和 Golden Environment `0.2` Schema/离线 verifier 已完成，但 runtime browser/font/Plan 闭包尚未实现。Common Runtime Materialization、Color Profile、Node adapter四份机器契约及one-shot fault实现边界已由Visual Common`v1.5`冻结，不再是设计待定项；03C 已达到 `ADAPTER_READY_FOR_03B_CONTROLLED_INTEGRATION`，其真实 UI/fault/capture integration evidence 仍由03B完成后回填，详见依赖环闭包修正规格。假设：无；真实环境 SHA、PNG 和性能必须执行生成。

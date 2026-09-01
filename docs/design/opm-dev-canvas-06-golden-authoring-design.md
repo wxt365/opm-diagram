@@ -20,7 +20,7 @@
 4. Visual Manifest/Report、`GATE-06-03`、Candidate 或 Activation 已 READY；
 5. 任一 Capability 已启用或 ISO 19450:2024 符合性已证明。
 
-当前已实现范围包括三类 `0.1` Schema、正反 contract test、`GOLDEN-AUTHORING-02` Capture Planner、`GOLDEN-AUTHORING-03A` Materializer `v1.5` 与 Verifier Catalog `v1.1` 63/63闭环，以及 Authoring Report、Approval Record、Golden Environment、Visual Manifest `0.2` Schema 的定向 contract test和只读 Environment verifier。03A的pending预验证、唯一四阶段quarantine、受控130项串行/并发4和完整contract/backend重验已通过；production 130项Materialization尚未执行。Visual Common Materialization `v1.5` 已冻结8 subject、唯一空Text Artifact、SQLite V1 `1/1/0`计数、五类index、8类UI step、43文件root、四份adapter/callback/result Schema、静态ESM/144次callback、独立one-shot fault port、normalized Projection、Color映射和JCS parity；当前只有局部未接纳的03C Java materializer字节，Node adapter、fault hook、8 base/144 clone及03C checklist未完成。Family Identity Catalog适配、版本化Handoff及fixed postverify均已闭合；03B仍等待03C。历史旧Bundle与Plan保持不可变且不得供新03B消费。production 130项、Common 8 base/144 clone及下游authoring均未执行。
+当前已实现范围包括三类 `0.1` Schema、正反 contract test、`GOLDEN-AUTHORING-02` Capture Planner、`GOLDEN-AUTHORING-03A` Materializer `v1.5` 与 Verifier Catalog `v1.1` 63/63闭环，以及 Authoring Report、Approval Record、Golden Environment、Visual Manifest `0.2` Schema 的定向 contract test和只读 Environment verifier。03A的pending预验证、唯一四阶段quarantine、受控130项串行/并发4和完整contract/backend重验已通过；production 130项Materialization尚未执行。Visual Common Materialization `v1.10` 已冻结8 subject、唯一空Text Artifact、SQLite V1 `1/1/0`计数、五类index、8类UI step、44文件root、四份adapter/callback/result Schema、静态ESM/144次callback、独立one-shot fault port、normalized Projection、Color映射和JCS parity；Adapter Test Input 的341文件Bundle及Node adapter真实8 base/144 clone固定callback受控调度已通过，03C处于`ADAPTER_READY_FOR_03B_CONTROLLED_INTEGRATION`。真实 UI setup、一次性fault、第二次正常提交、PNG与双attempt仍只可由03B回填，不得将固定callback升格为candidate或production证据。Family Identity Catalog适配、版本化Handoff及fixed postverify均已闭合；03B的Family clone/Web capture adapter仍需独立机器契约，不能由03C Common协议替代。历史旧Bundle与Plan保持不可变且不得供新03B消费。production 130项、Common 8 base/144 clone及下游authoring均未执行。
 
 ## 2. 目标与边界
 
@@ -96,7 +96,7 @@ Capture Plan、Approval Record、Authoring Report、Golden Environment `0.1` 和
 
 `0.2` 只允许按本文封闭字段扩展，禁止实现时新增未评审 optional escape hatch。所有 raw file ref 均为 `{kind,path,byte_length,sha256}`；集合 SHA 均为对应固定顺序数组的 RFC 8785 JCS SHA-256；payload SHA 均排除自身字段后计算。
 
-`0.2` 的 `generator_identity.runner_version` 固定为 `0.2.0`。Plan/Environment/Authoring Report 的 `generated_at` 固定为 `source_date_epoch` 对应 UTC；Approval 的 `requested_at/approved_at` 是显式审批事件时间，适用第 7、8 章约束。
+`0.2` 的 `generator_identity.runner_version` 固定为 `0.2.0`。Plan/Environment/Authoring Report 的 `generated_at` 固定为 `source_date_epoch` 对应 UTC；Approval 的 `requested_at/approved_at` 是显式审批事件时间，适用第 7、8 章约束。03B 仅依赖03C的 `ADAPTER_READY_FOR_03B_CONTROLLED_INTEGRATION`，而不等待03C最终 integration evidence；03B负责真实 Common UI/fault/capture并回填为03C最终 integration evidence。该受控实现资格不构成 candidate、Approval、Visual Manifest、Gate 或生产证据。
 
 所有对象必须 `additionalProperties=false`；时间为 UTC RFC 3339；digest 为小写 SHA-256；路径必须是对应 root 内无绝对路径、无 `..`、无 symlink 的相对路径。
 
@@ -314,7 +314,11 @@ npm run release:canvas06:golden:author -- \
   --runtime-jar <exact-intake-jar> \
   --materialization-root <verified-materialization-root> \
   --candidate-root <new-empty-path> \
-  --source-date-epoch <same-integer>
+  --source-date-epoch <same-integer> \
+  --common-adapter-request <exact-request-json> \
+  --browser-executable <exact-chromium-executable> \
+  --font-manifest <exact-three-font-manifest-json> \
+  --authoring-lineage <exact-lineage-json>
 
 npm run release:canvas06:golden:approve -- \
   --candidate-root <只读candidate-path> \
@@ -344,6 +348,8 @@ npm run release:canvas06:golden:verify -- \
 退出码统一为：`0=成功`、`2=输入/Schema/ref 无效`、`3=可归类的 join/environment/capture/approval/SHA 阻断`、`4=未分类 I/O 或内部错误`。
 
 禁止参数：`--force`、`--overwrite`、`--update-snapshots`、`--accept-new-golden`、`--skip-missing`、`--ignore-environment`、`--self-approve`、`--latest`。
+
+`--common-adapter-request`、`--browser-executable`、`--font-manifest` 和 `--authoring-lineage` 的唯一输入形状、Plan/JAR/epoch join、字体复制、版本 lineage 及零输出拒绝语义由 `opm-dev-canvas-06-golden-candidate-author-input-closure-bugfix-task-spec.md` 承接。Author 不得从 checkout、PATH、环境变量、浏览器默认配置、系统字体目录、approved root或版本目录推导它们。
 
 Author 对每个 capture 和 blank baseline 各执行两次全新 browser context。两次 PNG raw SHA、尺寸、cell geometry hash 和 Projection digest 必须完全相等；approved version 只保存 attempt 1 的 canonical PNG，attempt 2 仅留在 candidate 证据中。`1242*2=2484` 个 capture attempt 和 `9*2=18` 个 blank attempt 任一缺失或不一致，candidate 不得进入审批。
 
@@ -649,11 +655,12 @@ PLAN_READY
 3. `GOLDEN-AUTHORING-02B`：Common Visual Fixture Schema、8 fixture、新 Catalog、只读 verifier、Planner Common semantic join和Color Profile pure function；
 4. `GOLDEN-AUTHORING-03A`：Family Fixture Materialization/Quarantine Marker Schema、release-only Runtime Materializer、semantic verifier、130 个隔离 SQLite 与验证；
 5. `GOLDEN-AUTHORING-03C`：Common release-only Runtime Materializer、8 个 immutable base、attestation、144 个 fresh clone、一次性 fault hook 和 03B adapter；
-6. `GOLDEN-AUTHORING-03B`：clean build/environment verifier、真实 Common UI setup/capture和candidate author，生成 Authoring Report 0.2；
-7. `GOLDEN-AUTHORING-04`：Approval Record `0.2`、Approval verifier、immutable Publisher、并发/恢复测试；
-8. `GOLDEN-AUTHORING-05`：Visual Manifest `0.2` builder/verifier 绑定与正反测试；
-9. `GOLDEN-AUTHORING-06`：真实 INITIAL authoring、人工审批和 approved evidence；
-10. 返回 `GATE-06-03` 执行真实 Visual/E2E closure。
+6. `GOLDEN-AUTHORING-03B-FAMILY`：Family Clone/Web capture adapter，独立冻结 identity、机器 artifact、关闭和浏览器调度；不得复用03C Common协议；
+7. `GOLDEN-AUTHORING-03B`：clean build/environment verifier、真实 Common/Family UI setup/capture和candidate author，生成 Authoring Report 0.2；
+8. `GOLDEN-AUTHORING-04`：Approval Record `0.2`、Approval verifier、immutable Publisher、并发/恢复测试；
+9. `GOLDEN-AUTHORING-05`：Visual Manifest `0.2` builder/verifier 绑定与正反测试；
+10. `GOLDEN-AUTHORING-06`：真实 INITIAL authoring、人工审批和 approved evidence；
+11. 返回 `GATE-06-03` 执行真实 Visual/E2E closure。
 
 Golden Authoring 设计完成的定义是本文所有字段、算法、命令、状态和失败边界已冻结；Golden Authoring 工具实现完成必须由 02B/03A/03C/03B/04/05 各自 checklist 证明。真实 authoring 完成还必须由 06 生成新 production Plan、130 项 Family materialization、8 个 Common base/144 clone、candidate、人工审批和 approved evidence。三者不得合并表述。
 
@@ -668,7 +675,8 @@ Golden Authoring 设计完成的定义是本文所有字段、算法、命令、
 5. 当前 Golden Environment `0.1` Schema 与生产 `0.2` Schema/离线 verifier 已实现；真实实体、browser/font 运行时验证和 PNG 不存在；
 6. 当前 Authoring Report/Approval Record/Golden Environment/Visual Manifest `0.2` Schema 已有定向 contract test；candidate author、approval/publisher、Visual builder、生产 Golden Verifier 和 approved evidence 未实现；
 7. 当前 Visual Manifest `0.1` Schema 没有 `golden_authoring_report_ref`，不能作为生产 Visual Gate Manifest；
-8. 历史production Plan 的 Common digest仍是`HISTORICAL_PLACEHOLDER`且禁止新03B消费；03C已有局部未接纳Java materializer与fault hook字节，Node adapter未实现，fault hook未完成冻结范围和集成验收，8个base、144个clone、03B candidate和真实新production Plan均未完成；
+8. 历史production Plan 的 Common digest仍是`HISTORICAL_PLACEHOLDER`且禁止新03B消费；03C的341文件Adapter Test Input与8个base、144个clone固定callback受控调度已通过，但真实UI/fault/capture integration、03B candidate和真实新production Plan均未完成；
+9. Family Materialization消费闭环已经实现，但 Family Clone/Web/browser adapter 尚未实现；其唯一冻结边界见 `opm-dev-canvas-06-golden-authoring-family-capture-adapter-design.md`，不得以03C Common Adapter替代。
 9. 当前 validation runner 的冻结边界是 golden 只读。
 
 ### 16.2 假设

@@ -15,7 +15,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ReleaseGoldenAuthoringLaunchModeTest {
 
     @Test
-    void acceptsTheThreeFiniteModesAndKeepsCommonWebRunning() {
+    void acceptsFiniteModesAndKeepsWebModesRunning() {
         assertTrue(ReleaseGoldenAuthoringLaunchMode.isFiniteReleaseInvocation(environment(
                 "RELEASE_GOLDEN_FIXTURE_MATERIALIZE", "none", Map.of(
                         "opm.release-authoring.materializer.enabled", "true",
@@ -26,6 +26,10 @@ class ReleaseGoldenAuthoringLaunchModeTest {
                 "RELEASE_GOLDEN_COMMON_CLONE", "none", Map.of("opm.release.visual-common.clone", "true"))));
         assertFalse(ReleaseGoldenAuthoringLaunchMode.isFiniteReleaseInvocation(environment(
                 "RELEASE_GOLDEN_COMMON_WEB", "servlet", Map.of("opm.release.visual-common.web-runtime", "true"))));
+        assertTrue(ReleaseGoldenAuthoringLaunchMode.isFiniteReleaseInvocation(environment(
+                "RELEASE_GOLDEN_FAMILY_CLONE", "none", Map.of("opm.release.golden-family.clone", "true"))));
+        assertFalse(ReleaseGoldenAuthoringLaunchMode.isFiniteReleaseInvocation(environment(
+                "RELEASE_GOLDEN_FAMILY_WEB", "servlet", Map.of("opm.release.golden-family.web-runtime", "true"))));
     }
 
     @Test
@@ -41,6 +45,13 @@ class ReleaseGoldenAuthoringLaunchModeTest {
                                 "opm.release.visual-common-materializer", "true",
                                 "opm.release.visual-common.clone", "true"))));
         assertEquals("GOLDEN_COMMON_MODE_REJECTED", multipleModes.code());
+
+        GoldenFixtureMaterializationException mixedFamilies = assertThrows(GoldenFixtureMaterializationException.class,
+                () -> ReleaseGoldenAuthoringLaunchMode.require(environment(
+                        "RELEASE_GOLDEN_FAMILY_CLONE", "none", Map.of(
+                                "opm.release.golden-family.clone", "true",
+                                "opm.release.visual-common.clone", "true"))));
+        assertEquals("GOLDEN_FAMILY_MODE_REJECTED", mixedFamilies.code());
     }
 
     private StandardEnvironment environment(String mode, String webApplicationType, Map<String, String> additions) {

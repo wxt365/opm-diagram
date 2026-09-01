@@ -10,26 +10,28 @@ public enum ReleaseGoldenAuthoringLaunchMode {
     RELEASE_GOLDEN_FIXTURE_MATERIALIZE("none", true, null),
     RELEASE_GOLDEN_COMMON_BASE("none", true, "opm.release.visual-common-materializer"),
     RELEASE_GOLDEN_COMMON_CLONE("none", true, "opm.release.visual-common.clone"),
-    RELEASE_GOLDEN_COMMON_WEB("servlet", false, "opm.release.visual-common.web-runtime");
+    RELEASE_GOLDEN_COMMON_WEB("servlet", false, "opm.release.visual-common.web-runtime"),
+    RELEASE_GOLDEN_FAMILY_CLONE("none", true, "opm.release.golden-family.clone"),
+    RELEASE_GOLDEN_FAMILY_WEB("servlet", false, "opm.release.golden-family.web-runtime");
 
     private static final String RELEASE_PROFILE = "release-golden-authoring";
 
     private final String webApplicationType;
     private final boolean finite;
-    private final String commonSwitch;
+    private final String releaseSwitch;
 
-    ReleaseGoldenAuthoringLaunchMode(String webApplicationType, boolean finite, String commonSwitch) {
+    ReleaseGoldenAuthoringLaunchMode(String webApplicationType, boolean finite, String releaseSwitch) {
         this.webApplicationType = webApplicationType;
         this.finite = finite;
-        this.commonSwitch = commonSwitch;
+        this.releaseSwitch = releaseSwitch;
     }
 
     public boolean finite() {
         return finite;
     }
 
-    public boolean common() {
-        return commonSwitch != null;
+    public boolean guarded() {
+        return releaseSwitch != null;
     }
 
     public static ReleaseGoldenAuthoringLaunchMode require(ConfigurableEnvironment environment) {
@@ -43,7 +45,7 @@ public enum ReleaseGoldenAuthoringLaunchMode {
         try {
             mode = ReleaseGoldenAuthoringLaunchMode.valueOf(rawMode);
         } catch (Exception exception) {
-            throw rejected("Release launch mode is missing or unsupported.");
+            throw new GoldenFixtureMaterializationException("GOLDEN_COMMON_MODE_REJECTED", "Release launch mode is missing or unsupported.");
         }
         if (mode == RELEASE_GOLDEN_FIXTURE_MATERIALIZE) {
             if (!"none".equals(value(source, "spring.main.web-application-type"))) {
@@ -59,17 +61,17 @@ public enum ReleaseGoldenAuthoringLaunchMode {
         }
         if (!"true".equals(value(source, "opm.release.golden-authoring"))
                 || !mode.webApplicationType.equals(value(source, "spring.main.web-application-type"))) {
-            throw rejected("Release launch mode and web application type do not match.");
+            throw rejected(mode, "Release launch mode and web application type do not match.");
         }
         for (ReleaseGoldenAuthoringLaunchMode candidate : values()) {
-            if (!candidate.common()) continue;
-            boolean present = value(source, candidate.commonSwitch) != null;
+            if (!candidate.guarded()) continue;
+            boolean present = value(source, candidate.releaseSwitch) != null;
             if (candidate == mode) {
-                if (!"true".equals(value(source, candidate.commonSwitch))) {
-                    throw rejected("Required Common Visual launch switch is missing.");
+                if (!"true".equals(value(source, candidate.releaseSwitch))) {
+                    throw rejected(mode, "Required release launch switch is missing.");
                 }
             } else if (present) {
-                throw rejected("More than one Common Visual launch switch is present.");
+                throw rejected(mode, "More than one release launch switch is present.");
             }
         }
         return mode;
@@ -84,7 +86,9 @@ public enum ReleaseGoldenAuthoringLaunchMode {
         return value == null ? null : value.toString();
     }
 
-    private static GoldenFixtureMaterializationException rejected(String message) {
-        return new GoldenFixtureMaterializationException("GOLDEN_COMMON_MODE_REJECTED", message);
+    private static GoldenFixtureMaterializationException rejected(ReleaseGoldenAuthoringLaunchMode mode, String message) {
+        String code = mode == RELEASE_GOLDEN_FAMILY_CLONE || mode == RELEASE_GOLDEN_FAMILY_WEB
+                ? "GOLDEN_FAMILY_MODE_REJECTED" : "GOLDEN_COMMON_MODE_REJECTED";
+        return new GoldenFixtureMaterializationException(code, message);
     }
 }

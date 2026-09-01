@@ -2,7 +2,7 @@
 
 文档状态：`HISTORICAL_IMPLEMENTED_INPUT`
 
-实现状态：`IMPLEMENTED_RELEASE_INPUT_REBUILD_REQUIRED`（活动Common 43文件root与Family Identity Catalog适配已完成定向`23/23`；production正例等待独立最小重建规格执行）
+实现状态：`IMPLEMENTED_RELEASE_INPUT_REBUILD_REQUIRED`（历史Common 43文件root与Family Identity Catalog适配已完成定向`23/23`；活动44文件root需按inventory闭包重新验收；production正例等待独立最小重建规格执行）
 
 ## Task Type
 
@@ -15,7 +15,7 @@
 
 ## 1. 目标
 
-实现历史 E2E Manifest `0.1` builder/verifier：从 `CONTROLLED_TEST` 或 `PRODUCTION_HANDOFF` 的 exact Intake/Handoff/Evidence Bundle、Family Fixture Identity Catalog `0.1/0.1.0`、clean target build和已通过02B verifier的活动Common Fixture Catalog `0.2.0` 43文件根确定性生成 `194=178+16` 个case的Manifest，并以单一目录级原子提交保证任一失败零输出。该 `0.1` 输入保持只读，不得承接新的 Profile asset/digest 字段。
+实现历史 E2E Manifest `0.1` builder/verifier：从 `CONTROLLED_TEST` 或 `PRODUCTION_HANDOFF` 的 exact Intake/Handoff/Evidence Bundle、Family Fixture Identity Catalog `0.1/0.1.0`、clean target build和已通过02B verifier的活动Common Fixture Catalog `0.2.0` 44文件根确定性生成 `194=178+16` 个case的Manifest，并以单一目录级原子提交保证任一失败零输出。该 `0.1` 输入保持只读，不得承接新的 Profile asset/digest 字段。
 
 唯一输出身份固定为：
 
@@ -52,7 +52,7 @@ generator_identity.runner_version=0.1.0
 - `specs/opm-dev-canvas-06-family-fixture-identity-source-closure-bugfix-task-spec.md`；
 - `docs/checklists/opm-dev-canvas-06-toolchain-release-checklist.md` 的 `GATE-06-03`。
 
-发生冲突时，本规格只细化 E2E `0.1` builder；Visual `0.2`、bundle identity和既有Schema仍以上述上游文档为准。Common输入布局和信任边界唯一采用Visual Common `v1.4`的活动43文件root，不得回退到checkout历史fixture目录。
+发生冲突时，本规格只细化 E2E `0.1` builder；Visual `0.2`、bundle identity和既有Schema仍以上述上游文档为准。Common输入布局和信任边界唯一采用Visual Common `v1.10`的活动44文件root，不得回退到checkout历史fixture目录。
 
 ## 3. 唯一 owner 与模块边界
 
@@ -77,7 +77,7 @@ npm run release:canvas06:e2e:manifest -- \
   --source-date-epoch <非负十进制秒> \
   --web-dist <source-root内相对production dist path> \
   --runtime-jar <source-root内相对exact LOCAL_RUNTIME_JAR path> \
-  --common-fixture-root <只读02B活动43文件root> \
+  --common-fixture-root <只读02B活动44文件root> \
   --common-fixture-catalog <common-fixture-root内相对catalog path> \
   --driver-root <source-root内相对tests/e2e/release/dev-canvas-06/drivers> \
   --output-root <evidence_output_root> \
@@ -94,7 +94,7 @@ npm run release:canvas06:e2e:manifest -- \
   --source-date-epoch <非负十进制秒> \
   --web-dist <source-root内相对production dist path> \
   --runtime-jar <source-root内相对exact LOCAL_RUNTIME_JAR path> \
-  --common-fixture-root <只读02B活动43文件root> \
+  --common-fixture-root <只读02B活动44文件root> \
   --common-fixture-catalog <common-fixture-root内相对catalog path> \
   --driver-root <source-root内相对tests/e2e/release/dev-canvas-06/drivers> \
   --output-root <fresh controlled_output_root> \
@@ -173,7 +173,7 @@ packages/profiles/<profile-id>/<profile-version>/
 
 ### 5.3 Common fixture 与 driver 输入
 
-Common 输入不放入 Evidence Bundle，也不从clean target checkout读取。唯一输入是02B成功发布并通过Visual Common `v1.4` semantic verifier的活动43文件root：
+Common 输入不放入 Evidence Bundle，也不从clean target checkout读取。唯一输入是02B成功发布并通过Visual Common `v1.10` semantic verifier的活动44文件root：
 
 ```text
 <common-fixture-root>/
@@ -185,7 +185,7 @@ Common 输入不放入 Evidence Bundle，也不从clean target checkout读取。
   sources/tests/e2e/release/dev-canvas-06/fixtures/factories/common-fixture-factory.mjs
 ```
 
-Catalog必须满足`schema_id=OPM-DEV-CANVAS-06-COMMON-FIXTURE-CATALOG-001/schema_version=0.1/catalog_version=0.2.0`、`summary=8/16`，source binding与exact Intake active binding相等，并由02B verifier闭合exact 43文件inventory、8个Visual、32个E2E、两份source mirror、24项factory ref和全部raw ref。Builder在写staging前验证源root前后tree digest不变，再把完整43文件树逐byte复制到final `inputs/common/`；不得只挑Catalog/E2E文件。历史`0.1.0`、旧Catalog/factory/32 E2E source布局、缺8个Visual或两份source mirror的root统一返回`E2E_MANIFEST_COMMON_FIXTURE_INVALID/2`。
+Catalog必须满足`schema_id=OPM-DEV-CANVAS-06-COMMON-FIXTURE-CATALOG-001/schema_version=0.1/catalog_version=0.2.0`、`summary=8/16`，source binding与exact Intake active binding相等，并由02B verifier闭合exact 44文件inventory、8个Visual、32个E2E、两份source mirror、Common Setup Plan、24项factory ref和全部raw ref。Builder在写staging前验证源root前后tree digest不变，再把完整44文件树逐byte复制到final `inputs/common/`；不得只挑Catalog/E2E文件。历史`0.1.0`、旧Catalog/factory/32 E2E source布局、缺8个Visual、两份source mirror或Common Setup Plan的root统一返回`E2E_MANIFEST_COMMON_FIXTURE_INVALID/2`。
 
 三个driver仍从clean target checkout的`--driver-root`读取，分别映射`DRIVER-PROCEDURAL/CONTROL/STRUCTURAL`；公共case使用Catalog的factory，不新增`driver_catalog`第四项。
 
@@ -259,7 +259,7 @@ family fixture materialized basename 不是原 basename。其相对路径固定�
 | `input_materialization.materialized_count` | allowlist 长度，不含 raw archive/Common/driver |
 | `input_materialization.aggregate_sha256` | `sha256(JCS([{archive_entry_path,path,byte_length,sha256}] 按 archive_entry_path 排序))` |
 | `input_materialization.temporary_directory_cleaned` | 固定`true`；仅在所有archive工作temp已删除且staging内只剩final allowlist materialization后才能构造Manifest；final transaction staging自身不属于该字段所称archive temp |
-| `common_fixture_catalog_ref` | final root内`inputs/common/dev-canvas-06-common-fixture-catalog.json` raw fileRef；其活动43文件root已经逐byte复制并通过同一02B semantic verifier |
+| `common_fixture_catalog_ref` | final root内`inputs/common/dev-canvas-06-common-fixture-catalog.json` raw fileRef；其活动44文件root已经逐byte复制并通过同一02B semantic verifier |
 | `environment_policy` | 固定`locale=zh-CN/timezone=Asia/Shanghai/color_scheme=light/reduced_motion=reduce/device_scale_factor=1` |
 | `fixture_refs[]` | 所有 `cases[].fixture_ref/input_ref` 的深度去重并加唯一Catalog普通fileRef后，按`path + NUL + sha256` UTF-8字典序排序；Catalog ref固定`kind=FAMILY_FIXTURE_IDENTITY_CATALOG/path=inputs/upstream/catalogs/family-fixture-identity-catalog.json` |
 | `driver_catalog[]` | 三个 final root driver source fileRef，顺序固定 Procedural、Control、Structural |
@@ -292,11 +292,11 @@ builder 固定执行：
 ```text
 参数/模式
   -> 输入 root 与 exact raw ref
-  -> source build/活动Common 43文件root/driver preflight
+  -> source build/活动Common 44文件root/driver preflight
   -> archive central-directory safety + allowlist/Catalog/fixture join
   -> 计算 manifest_id/final root 并确认 fresh
   -> 在 final root 同父目录排他创建 .<manifest-id>.tmp-<随机128位>
-  -> 全部 build/raw copy/materialization/Common 43文件tree/driver copy 写入 staging
+  -> 全部 build/raw copy/materialization/Common 44文件tree/driver copy 写入 staging
   -> 构造 Manifest
   -> Schema + semantic verifier 对 staging 完整只读验证
   -> 每个文件 fsync、从叶到根 fsync 目录
@@ -347,7 +347,7 @@ E2E_MANIFEST_INTERNAL_ERROR
 1. 两类模式各有完整正例，相同受控 bytes 与 epoch 两次 clean 构建的 final tree digest 相同；
 2. 参数重复/未知/模式互用/Golden 参数/路径逃逸/symlink/hardlink/非 fresh 输出均在提交前阻断；
 3. controlled descriptor 缺 `approved_version_ref`、非 `null`、identity/raw ref 不闭合均退出 `2`；
-4. archive duplicate/path traversal/symlink/size limit、Catalog/Replay/Symbol/fixture ref tamper 和 ordinary/archive ref 混用均阻断；Family Identity Catalog缺失、Schema/payload/Golden Manifest SHA错误、entry缺失/额外/重复、Project命名空间或fixture deep join错误均零final输出；活动Common正例必须证明`43=1+8+32+2`、source/target tree digest相等、16 case顺序和24项factory ref闭合；历史`0.1.0`、旧source布局、缺项/额外项/E2E tamper均在final root写入前阻断；
+4. archive duplicate/path traversal/symlink/size limit、Catalog/Replay/Symbol/fixture ref tamper 和 ordinary/archive ref 混用均阻断；Family Identity Catalog缺失、Schema/payload/Golden Manifest SHA错误、entry缺失/额外/重复、Project命名空间或fixture deep join错误均零final输出；活动Common正例必须证明`44=1+8+32+2+1 Common Setup Plan`、source/target tree digest相等、16 case顺序和24项factory ref闭合；历史`0.1.0`、旧source布局、缺项/额外项/E2E/setup plan tamper均在final root写入前阻断；
 5. 178 family +16 common、130 PASS +48 BLOCKED、194 case、388 attempt summary、五类 upstream ref、case fixture union加唯一Identity Catalog raw ref和三个 driver 顺序可复算；
 6. staging 每一阶段注入失败都满足 final root零输出；rename 成功后 verifier只读通过且前后 tree digest相等；
 7. controlled verifier必须消费exact descriptor root且不能接受`--require-production`；production verifier必须消费exact READY Handoff/Intake并强制`--require-production`，跨模式root/参数全部拒绝；

@@ -1,6 +1,6 @@
 # Checklist: OPM Bootstrap Build Closure
 
-状态：`FROZEN/NOT_STARTED`
+状态：`IMPLEMENTED / CONTROLLED_VERIFY_PASS / CLEAN_ROOT_BUILD_PENDING`
 
 ## Task Type
 
@@ -56,11 +56,11 @@
 - [x] C30 首错顺序固定且verifier只读。
 - [x] C31 Node 22根build、Runtime bytes和browser order正例已定义。
 - [x] C32 Node/config/HTML/dist/wire/order/source drift单变量反例已定义。
-- [ ] C33 后继实现的verifier unit test通过。
-- [ ] C34 后继clean Node 22 build、Java定向测试和Playwright顺序测试通过。
+- [x] C33 后继实现的verifier unit test通过。
+- [-] C34 Java定向测试和Playwright顺序测试通过；独立clean Node 22 root build仍等待统一Source生产输入重建。
 - [x] C35 完成状态必须同时具备五个实现/验证标志。
 - [x] C36 回滚不涉及数据库或用户数据，但恢复旧配置后必须重新BLOCKED。
-- [x] C37 当前只冻结设计，不声明实现、build或Runtime测试已通过。
+- [x] C37 当前只冻结设计时的历史结论已被本轮实现与受控验证取代；未声明clean root build、Handoff或生产证据已通过。
 - [x] C38 不提升Handoff、Manifest、Gate、Candidate、Activation、Capability、production或ISO状态。
 
 ## Verify
@@ -69,11 +69,14 @@
 - [x] 当前source HTML、dist HTML、Runtime Controller和MVC测试已逐项核对。
 - [x] 当前五个Bootstrap fixture值与完整响应`227 bytes/c74cff...`已复算。
 - [x] 当前`vite.config.js`为tracked文件，`vite.config.d.ts`不受ignore规则覆盖。
-- [x] 本轮只执行文档一致性验证，不运行并宣称修正后的clean build。
+- [x] `npm run bootstrap:build:closure:test`：`4/4`通过。
+- [x] `JAVA_HOME=/Users/xiaotaowang/Library/Java/JavaVirtualMachines/graalvm-jdk-21.0.7/Contents/Home ./mvnw -pl services/local-runtime -Dtest=LocalRuntimeBootstrapControllerTest test`：`1/1`通过。
+- [x] `npm run bootstrap:order:test`：`1/1`通过。
+- [x] 当前主目录SOURCE verifier按预期拒绝`BOOTSTRAP_BUILD_SOURCE_DIRTY/2`，未将现有未提交工作区伪装为clean root。
 
 ## 当前状态
 
 - 设计：`FROZEN_FOR_IMPLEMENTATION`。
-- 实现：`NOT_STARTED`。
-- 统一Source build：`BLOCKED_BY_BOOTSTRAP_BUILD_CLOSURE_IMPLEMENTATION`。
+- 实现：`IMPLEMENTED/CONTROLLED_VERIFY_PASS`。
+- 统一Source build：`BLOCKED_BY_UNIFIED_SOURCE_PRODUCTION_INPUT_REBUILD`。
 - Production/ISO evidence：`NOT_GENERATED/EVIDENCE_MISSING`。

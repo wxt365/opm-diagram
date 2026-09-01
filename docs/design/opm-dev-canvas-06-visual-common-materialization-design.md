@@ -1,6 +1,6 @@
 # DEV-CANVAS-06 Visual Common Fixture Materialization 与 Color Profile 设计
 
-文档版本：`1.9`
+文档版本：`1.10`
 
 设计状态：`FROZEN`
 
@@ -12,7 +12,7 @@
 
 本文是 8 个 Visual Common subject 从 fixture bytes 到 Runtime 可捕获状态的唯一设计口径，同时冻结 Capture Plan `srgb` 与 Golden Environment `sRGB IEC61966-2.1` 的唯一映射。Golden Authoring 主设计继续承接审批、发布和 approved evidence；本文只承接 Common materialization、UI setup、Projection join 和 color profile semantic join。
 
-本文冻结设计并发布Common Visual Fixture、活动Adapter Request `0.2`、其余Adapter/Callback/Result、Adapter Test Input Bundle `0.1`、Clone Result及Runtime Ready机器Schema。活动Common 43文件root的实现状态由02B/Common E2E checklist承接；Adapter测试Builder/Verifier已有未接纳实现，但仍需修正Runtime source kind和Planner受控JDK环境。Java Base/Clone/Web局部实现和单个STATE_ROLES受控验证不表示03C Node adapter、8 base/144 clone或关闭矩阵已经验收，也不表示工作树中的局部one-shot fault字节已通过验收，且不表示03B author、新production Plan、PNG、candidate或approved evidence已经生成。
+本文冻结设计并发布Common Visual Fixture、活动Adapter Request `0.2`、其余Adapter/Callback/Result、Adapter Test Input Bundle `0.1`、Clone Result及Runtime Ready机器Schema。活动Common root固定为`44=1 Catalog+8 Visual+32 E2E+2 source mirror+1 Common Setup Plan`；其实现状态由02B/Common E2E checklist承接。Adapter测试Builder/Verifier已有未接纳实现，但仍需修正Runtime source kind和Planner受控JDK环境。Java Base/Clone/Web局部实现和单个STATE_ROLES受控验证不表示03C Node adapter、8 base/144 clone或关闭矩阵已经验收，也不表示工作树中的局部one-shot fault字节已通过验收，且不表示03B author、新production Plan、PNG、candidate或approved evidence已经生成。
 
 ## 2. 冻结决策
 
@@ -24,18 +24,19 @@
 6. transient candidate/catalog/finding/feedback 通过正常 production Web 和真实 UI/API 路径建立；只有 `BLOCKED_FEEDBACK` 允许 exact Runtime JAR 的一次性、进程内、release-only SQLite fault hook；
 7. Plan raw 值固定为 `srgb`，Environment canonical 值固定为 `sRGB IEC61966-2.1`，只接受这一对显式映射；
 8. 旧 8 个元数据 fixture 和 `GOLDEN-CANVAS06-20260803-001` 保持不可变，可作为历史 Schema 资产，但不得进入新的 03B authoring。
+9. `visual_subjects[].critical_regions` 是活动 Common Visual 的唯一结构化 UI 区域 owner；Fixture `capture_setup` 不含该字段。`scripts/canvas06-common-critical-regions.mjs` 的 `projectCatalogCriticalRegions()` 是唯一 Catalog UI 区域到 Capture Plan 区域的转换 owner：`CANVAS -> FOCUS_BBOX`、普通 `LABEL -> LABEL_SLOT`、`LABEL/COMPLETENESS -> COMPLETENESS`、`JUNCTION -> JUNCTION_MARKER`、`TOOLBAR -> CANVAS`，其他 Catalog kind 均以 `GOLDEN_COMMON_CRITICAL_REGION_INVALID/2` 拒绝。Planner 以投影写入 Common capture；Adapter 与 Bundle verifier 只比较该投影，不得与不含字段的 Fixture `capture_setup`比较。Fixture 仍逐字段闭合 revision、focus、anchor、cell 与 Projection，禁止以字符串区域名、新增 Fixture 字段或复制映射分支替代 Catalog join。
 
 ## 3. 机器契约与 Owner
 
 | 契约 | 版本 | Owner | 当前状态 |
 | --- | --- | --- | --- |
-| Common Fixture Catalog | Schema `0.1`；历史`0.1.0`/活动`0.2.0` | QA | 活动43文件root已self-verified，production统一输入待重建 |
+| Common Fixture Catalog | Schema `0.1`；历史`0.1.0`/活动`0.2.0` | QA | 活动44文件root已self-verified，production统一输入待重建 |
 | Common Visual Fixture | `0.1/0.1.0` | QA + Runtime | 机器Schema与活动fixture producer/verifier已形成，production消费待后继链 |
 | Common Visual Materializer/Fault Hook | `0.1.0` | Runtime | 局部Java与fault hook字节存在，未通过03C checklist |
 | Common Visual Adapter Request | 历史`0.1/0.1.0`；活动`0.2/0.2.0` | QA + Release | 活动Schema补齐Java/Profile受控输入，consumer未实现 |
 | Common Visual Capture Invocation/Observed Result | `0.1/0.1.0` | QA + Release | 两份机器Schema与callback契约已冻结，未实现 |
 | Common Visual Adapter Normalized Result | `0.1/0.1.0` | QA + Release | 机器Schema、顺序和摘要已冻结，未实现 |
-| Common Visual Adapter Test Input Bundle | `0.1/0.1.0` | QA + Release | Schema、原子Builder/Verifier、fresh 5/43/1242/72/144 exact join已冻结；实现存在但未符合Runtime/JDK修正，尚未接纳 |
+| Common Visual Adapter Test Input Bundle | `0.1/0.1.0` | QA + Release | Schema、原子Builder/Verifier、fresh 5/44/1242/72/144 exact join已冻结；实现存在但未符合Runtime/JDK修正，尚未接纳 |
 | Common Visual Clone Result | `0.1/0.1.0` | Runtime | 机器Schema、CLI和原子写入协议已冻结；Java局部实现有单例验证，完整03C未验收 |
 | Common Visual Runtime Ready | `0.1/0.1.0` | Runtime + Release | 机器Schema、动态端口、READY和关闭协议已冻结；Java局部实现有单例验证，Node消费与关闭矩阵未验收 |
 | Common Projection Normalizer | `0.1.0` | Frontend + QA | 设计冻结，未实现 |
@@ -506,7 +507,7 @@ error_code="PERSISTENCE_FAILED"
 max_invocations=1
 ```
 
-hook 只能由 03C 通过进程内受控启动参数绑定 exact command id；没有 HTTP/环境通配符/运行时切换入口，触发一次后自动禁用。其他 subject、Family、production 默认启动和 Visual validation runner 禁止装配该 hook。
+hook只能由03C完整Web Runtime command-line绑定 exact command id；Fault Configuration固定校验profile/golden/web mode、三项fault值及七项动态Web identity/path key的存在与唯一来源，Runtime Ready Writer唯一复核动态值、端口、storage、Profile与Clone。任何额外`opm.release.visual-common.*`键、HTTP/环境通配符或运行时切换入口均拒绝，触发一次后自动禁用。其他 subject、Family、production 默认启动和 Visual validation runner 禁止装配该 hook。
 
 该hook的唯一Java机器边界由[`03C Node Adapter与一次性Fault Hook契约闭包规格`](../../specs/opm-dev-canvas-06-common-visual-adapter-and-one-shot-fault-contract-closure-bugfix-task-spec.md)第6节承接：独立`VisualCommonCommitFaultPort`默认NOOP，active实现为每进程一个`OneShotVisualCommonCommitFaultPort`；调用点固定在Candidate validation/Text generation及repository receipt/head recheck成功之后、`revision_document INSERT`之前。它与`E2EFaultPort`、`RecoverySqliteFaultPort`互斥且不共享接口、状态或计数。exact首次调用先原子转为`TRIGGERED`再抛`PERSISTENCE_FAILED`，事务delta为0；第二次相同command正常提交。任何partial guard不得静默降级为NOOP。
 
@@ -698,7 +699,7 @@ Builder与Verifier均禁止`--source-root`、source path override或环境变量
 计数公式固定为：
 
 ```text
-43 = 1 Catalog + 8 Visual + 32 E2E + 2 source mirror
+44 = 1 Catalog + 8 Visual + 32 E2E + 2 source mirror + 1 Common Setup Plan
 ```
 
 32个E2E资产是Catalog `e2e_cases[16]`的活动raw ref目标，不是外部只读依赖。Builder必须从静态import的同一factory读取固定`e2eCases[16]`顺序，并对每个`case_id`调用`e2eFixture(caseId)`；base唯一写为`{...e2eFixture(caseId),fixture_kind:"BASE"}`，input唯一写为`{...e2eFixture(caseId),fixture_kind:"INPUT"}`。禁止复制`tests/e2e/**/fixtures/e2e`历史bytes、目录扫描、外部E2E root或source override。JSON编码与Visual fixture相同，固定UTF-8、LF、2空格和末尾单LF。
@@ -710,8 +711,8 @@ Builder与Verifier均禁止`--source-root`、source path override或环境变量
 3. 两个实际source都必须通过`lstat -> realpath -> lstat`，是普通非symlink单链接文件，且logical basename/path与allowlist相等；
 4. Builder在同一fresh staging内生成8个Visual fixture、32个E2E asset并逐byte复制两份source到上述mirror path；file fsync后回读，要求`source bytes == mirror bytes`，再从staging内实际bytes计算Catalog fileRef；
 5. 活动Catalog固定`catalog_version="0.2.0"`；`generator_ref={kind:"GENERATOR_SOURCE",path:"sources/scripts/build-canvas06-common-visual-fixtures.mjs",byte_length,sha256}`；8项Visual与16项E2E共24项`factory_source_ref`必须逐字段相同并固定指向第二个mirror，`kind="FACTORY_SOURCE"`；16项`base_fixture_ref/input_ref`分别固定指向`e2e/<case-id>.base.json`和`e2e/<case-id>.input.json`；
-6. Verifier只信readonly output root内Catalog、8个Visual、32个E2E和两份mirror，验证安全相对路径、root containment、普通非链接单链接文件、raw length/SHA、两项source allowlist、16个case顺序、32个factory重算结果、24项factory ref相等、exact 43文件inventory和root前后tree digest；不读取外部checkout、Git或历史E2E目录；
-7. root中缺任一E2E/source、存在额外文件或Git metadata、absolute/`..`/symlink/hardlink、source checkout path、source/mirror bytes不等、factory输出漂移或Catalog ref不闭合均拒绝。执行source owner/path/type、case集合或factory输出不合法映射`GOLDEN_COMMON_INPUT_INVALID/2`；copy/mirror/Catalog raw ref、E2E内容或43文件inventory不闭合映射`GOLDEN_COMMON_FIXTURE_REF_MISMATCH/2`。
+6. Verifier只信readonly output root内Catalog、8个Visual、32个E2E、两份mirror和`dev-canvas-06-common-setup-plan.json`，验证安全相对路径、root containment、普通非链接单链接文件、raw length/SHA、两项source allowlist、16个case顺序、32个factory重算结果、24项factory ref相等、setup plan exact join、exact 44文件inventory和root前后tree digest；不读取外部checkout、Git或历史E2E目录；
+7. root中缺任一E2E/source/setup plan、存在额外文件或Git metadata、absolute/`..`/symlink/hardlink、source checkout path、source/mirror bytes不等、factory输出漂移或Catalog/setup plan ref不闭合均拒绝。执行source owner/path/type、case集合或factory输出不合法映射`GOLDEN_COMMON_INPUT_INVALID/2`；copy/mirror/Catalog/setup plan raw ref、E2E内容或44文件inventory不闭合映射`GOLDEN_COMMON_FIXTURE_REF_MISMATCH/2`。
 
 Builder唯一调用顺序固定为：
 
@@ -722,7 +723,7 @@ CLI/source owner
 -> 镜像2份source
 -> 生成Catalog 0.2.0
 -> Schema与全量semantic verify
--> 复算43文件tree digest
+-> 复算44文件tree digest
 -> fsync
 -> atomic rename
 ```
@@ -768,7 +769,7 @@ adapter按Plan Common capture原序及attempt`1,2`串行调用恰`144`次；call
 
 #### 11.2.1 受控测试输入Bundle
 
-03C实现测试不得分别手写Request、Profile、Plan或callback结果。唯一入口是`OPM-DEV-CANVAS-06-COMMON-VISUAL-ADAPTER-TEST-INPUT-BUNDLE-001/0.1/0.1.0`：同一原子root必须由clean source和exact Handoff生成fresh Profile 5、Common 43、完整Plan 1242/72、Request `0.2`以及144份完整Observed Result/测试PNG。固定callback只按`common_capture_ordinal/capture_id/subject_id/attempt_ordinal`在Bundle descriptor中exact lookup，禁止目录扫描、路径反推、动态补字段或observed反填。Builder/Verifier CLI、340文件布局、Profile/Common tree、Planner外置Common root、受控JDK env、Runtime source/staged ref、staging/final路径映射、fsync/rename/installed reverify和`19=8 M+11 A`后继allowlist由Builder闭包及Runtime/JDK修正规格共同承接。
+03C实现测试不得分别手写Request、Profile、Plan或callback结果。唯一入口是`OPM-DEV-CANVAS-06-COMMON-VISUAL-ADAPTER-TEST-INPUT-BUNDLE-001/0.1/0.1.0`：同一原子root必须由clean source和exact Handoff生成fresh Profile 5、Common 44（含Common Setup Plan）、完整Plan 1242/72、Request `0.2`以及144份完整Observed Result/测试PNG。固定callback只按`common_capture_ordinal/capture_id/subject_id/attempt_ordinal`在Bundle descriptor中exact lookup，禁止目录扫描、路径反推、动态补字段或observed反填。Builder/Verifier CLI、341文件布局、Profile/Common tree、Planner外置Common root、受控JDK env、Runtime source/staged ref、staging/final路径映射、fsync/rename/installed reverify和`19=8 M+11 A`后继allowlist由Builder闭包及Runtime/JDK修正规格共同承接。
 
 Bundle状态`READY_FOR_ADAPTER_TEST`只恢复受控03C测试资格。测试PNG与production candidate root物理隔离，不得进入Authoring Report、approved version、Visual Manifest或Gate；Bundle未实现并通过installed verifier前，Node adapter保持`BLOCKED_BY_ADAPTER_TEST_INPUT_BUILDER_IMPLEMENTATION`。
 
@@ -822,7 +823,7 @@ RELEASE_GOLDEN_COMMON_WEB         -> servlet/长驻服务
 
 Java在`ApplicationReadyEvent`、application/management两个WebServer均完成初始化，以及JAR/Profile/Clone/storage/fault全部复核后，原子写`OPM-DEV-CANVAS-06-COMMON-VISUAL-RUNTIME-READY-001/0.1/0.1.0`。Node以30秒monotonic deadline、100ms固定poll等待，并同时验证child PID、Ready artifact、management `/actuator/health/readiness`为`UP`及application `/opm-bootstrap.js`既有wire；四项未全部通过不得调用capture callback。
 
-callback完成或失败后固定发送一次SIGTERM并等待10秒；仍未退出时发送SIGKILL且当前attempt失败。退出后必须确认两个端口不可连接、SQLite无WAL/SHM、attempt tree可复算且base digest不变，才能写`runtime_shutdown_status=CLOSED`。完整Web命令、nonce、Ready字段、原子写入、错误边界和关闭矩阵唯一由上述闭包规格第6至7节承接。
+callback完成或失败后固定发送一次SIGTERM并等待10秒；仍未退出时发送SIGKILL且当前attempt失败。正常关闭只接受`0/null`、`null/SIGTERM`，或该唯一SIGTERM已成功发送且未SIGKILL时JVM报告的`143/null`；不得把任意143视为成功。退出后必须确认两个端口不可连接、SQLite无WAL/SHM、attempt tree可复算且base digest不变，才能写`runtime_shutdown_status=CLOSED`。完整Web命令、nonce、Ready字段、原子写入、错误边界和关闭矩阵唯一由上述闭包规格第6至7节承接。
 
 ## 12. 失败优先级与退出码
 
@@ -869,7 +870,7 @@ callback完成或失败后固定发送一次SIGTERM并等待10秒；仍未退出
 
 ### 14.1 `GOLDEN-AUTHORING-02B`
 
-实现 Common Visual Fixture Schema consumer/contract test、8个完整Visual fixture、由同一factory确定性生成的32个E2E asset、两份source mirror、新Catalog、43文件只读verifier、Planner Common semantic join、color canonicalization纯函数和旧输入反例。完成后只证明新Plan与E2E Manifest的Common输入可生成，不产生SQLite、Manifest、Report或PNG。
+实现 Common Visual Fixture Schema consumer/contract test、8个完整Visual fixture、由同一factory确定性生成的32个E2E asset、两份source mirror、Common Setup Plan、新Catalog、44文件只读verifier、Planner Common semantic join、color canonicalization纯函数和旧输入反例。完成后只证明新Plan与E2E Manifest的Common输入可生成，不产生SQLite、Manifest、Report或PNG。
 
 ### 14.2 `GOLDEN-AUTHORING-03C`
 
@@ -886,7 +887,7 @@ callback完成或失败后固定发送一次SIGTERM并等待10秒；仍未退出
 | 验收面 | 正例 | 必须拒绝 |
 | --- | --- | --- |
 | Fixture | 8个Schema-valid完整fixture，binding/payload/ref闭合 | 旧元数据fixture、缺Revision/UI setup/Projection、额外字段 |
-| Source与E2E asset | generator/factory实际source逐byte镜像，32个E2E asset由同一factory生成，Catalog全部ref只指self-contained 43文件root | `--source-root`、外部E2E root、历史bytes复制、cwd/env/dynamic source、缺失/额外/链接/mirror漂移 |
+| Source与E2E asset | generator/factory实际source逐byte镜像，32个E2E asset由同一factory生成，Common Setup Plan与Catalog全部ref只指self-contained 44文件root | `--source-root`、外部E2E root、历史bytes复制、cwd/env/dynamic source、缺失/额外/链接/mirror/setup plan漂移 |
 | SQLite | 8个fresh base按V1原子写入并重开 | 公共API seed、共享写库、非空目标、DDL变化、索引漂移 |
 | Isolation | 72 capture x 2 fresh clone，base digest不变 | 共享Runtime/clone、跨attempt状态、写base |
 | UI setup | 真实Web/UI/API达到8个封闭终态 | DOM/Pinia/X6写注入、network mock、sleep替代状态 |

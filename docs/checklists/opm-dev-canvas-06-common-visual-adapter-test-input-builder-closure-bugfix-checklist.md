@@ -49,7 +49,7 @@
 - [x] C14 Builder CLI八项输入已冻结。
 - [x] C15 Verifier installed/staging两模式已冻结。
 - [x] C16 env/stdin/URL/glob/scan/latest/fallback全部禁止；Planner仅接收由exact Java推导的固定五键子进程env。
-- [x] C17 final布局固定340个普通单链接文件。
+- [x] C17 的历史340文件口径已由44-file inventory闭包取代；活动final布局固定341个普通单链接文件。
 - [x] C18 Profile、Common、Plan、Request、callback固定路径已冻结。
 - [x] C19 work root固定为final sibling且成功时不存在。
 - [x] C20 final/work/staging必须fresh且物理隔离。
@@ -61,8 +61,8 @@
 - [x] C26 Profile tree固定使用`root_path=profile/assets`。
 - [x] C27 Profile inventory/raw/tree/package/binding全部复算。
 - [x] C28 Common必须调用现有02B Builder并再次只读验证。
-- [x] C29 Common root固定43项及Catalog`0.2.0`。
-- [x] C30 Common tree digest复用43项JCS公式。
+- [x] C29 的历史43项口径已由44-file inventory闭包取代；活动Common root固定44项及Catalog`0.2.0`，包括Common Setup Plan。
+- [x] C30 Common tree digest复用44项JCS公式，包含Common Setup Plan。
 - [x] C31 Planner外置Common root参数和成对约束已冻结。
 - [x] C32 legacy Planner只要求除自引用source SHA外语义一致。
 - [x] C33 Plan固定1242/1170/72和Common exact join。

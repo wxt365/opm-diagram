@@ -1,6 +1,6 @@
 # Checklist: GOLDEN-AUTHORING-02B Common Visual Fixture Contract/Planner 实现
 
-状态：`IN_PROGRESS`
+状态：`IMPLEMENTED / CONTROLLED_TEST_PASS / NOT_RELEASE_VALIDATED`
 
 ## Spec Mapping
 
@@ -28,8 +28,8 @@
 - [x] 同一静态factory按固定16 case顺序确定性生成32个E2E base/input，禁止复制历史E2E bytes。
 - [x] 实际generator/factory source逐byte镜像到固定`sources/**`，Catalog source refs只指mirror。
 - [x] 活动Catalog固定`catalog_version=0.2.0`；历史`0.1.0`保持不可变且被新semantic preflight拒绝。
-- [x] 新 Catalog builder 的`43=1+8+32+2` fresh staging/atomic rename/零输出事务完成。
-- [x] 只读 semantic verifier、exact 43文件inventory和tree digest守卫完成。
+- [x] 新 Catalog builder 的`44=1+8+32+2+1 Common Setup Plan` fresh staging/atomic rename/零输出事务完成。
+- [x] 只读 semantic verifier、exact 44文件inventory、Common Setup Plan和tree digest守卫完成。
 - [x] Planner Common Projection semantic join 和旧占位 digest 拒绝完成。
 - [x] `srgb -> sRGB IEC61966-2.1` 唯一 pure function 与 Planner 复用入口完成。
 - [x] 10项exact Node/Java共用parity vector完成，Node逐项canonical/SHA、safe integer边界、UTF-16 key排序和非法值反例通过；Java 03C parity仍未实现。
@@ -49,10 +49,19 @@
 - [ ] wall time `<=5 s`、peak RSS `<=256 MiB`。
 - [x] `common-visual:test`、独立build/verify、Planner回归、Golden Authoring Schema、`contract:validate`和`git diff --check`通过；JDK 21由受控本机路径提供。
 
+## 本轮验证
+
+- `npm run release:canvas06:common-visual:test`：`14/14`通过，覆盖44文件构建/只读验证、单字节篡改、source mirror、额外文件或链接、staging故障、确定性与factory矩阵。
+- `JAVA_HOME=/Users/xiaotaowang/Library/Java/JavaVirtualMachines/graalvm-jdk-21.0.7/Contents/Home npm run release:canvas06:golden:plan:test`：`3/3`通过，覆盖`1242/9`确定性Plan、历史/dirty/golden-like零输出拒绝与非Java 21拒绝。
+- `npm run release:canvas06:common-visual:jcs:test`：`2/2`通过。
+- `npm run release:canvas06:common-visual:color-profile:test`：`2/2`通过。
+
+以上验证使用受控临时根或测试输入。READY Handoff、fresh release root、性能阈值与后续Plan/SQLite/PNG/authoring证据仍未执行。
+
 ## Risks And Residuals
 
 - [ ] 02B 完成也不表示 03C/03B 已实现或新 production Plan 已生成。
-- [x] E2E Manifest builder已完成活动43文件root适配与`22/22`重验；后续Family Identity Catalog适配由独立契约Gate跟踪，不回退本项。
+- [x] E2E Manifest builder的历史43文件root适配与`22/22`重验已记录；活动输入由44-file inventory闭包重新验收，后续Family Identity Catalog适配由独立契约Gate跟踪，不回退本项。
 - [ ] 8 个 SQLite base、144 个 clone、1242 PNG、candidate 和 approved version 仍不存在。
 - [ ] GATE-06-03、Candidate、Activation、Capability 和 ISO 状态不得提升。
 - [x] Common Driver改变factory语义后的32个E2E/Catalog raw ref重建由独立Common E2E输入重建规格承接，现有02B局部结果不得作为活动clean root。

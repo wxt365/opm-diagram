@@ -15,7 +15,7 @@
 
 ## 1. 目标
 
-实现 `GOLDEN-AUTHORING-02B`：发布 Common Visual Fixture `0.1/0.1.0` Schema，按冻结的 8 个 subject 构造完整Visual fixture，并由同一静态factory确定性生成16组32个E2E asset和新 Common Fixture Catalog，以只读 semantic verifier 复算43文件树、Schema、raw ref、payload、binding、Revision/index/setup/Projection闭包，并修正 Capture Planner 的 Common Projection 与 Color Profile semantic join。
+实现 `GOLDEN-AUTHORING-02B`：发布 Common Visual Fixture `0.1/0.1.0` Schema，按冻结的 8 个 subject 构造完整Visual fixture，并由同一静态factory确定性生成16组32个E2E asset、Common Setup Plan和新 Common Fixture Catalog，以只读 semantic verifier 复算44文件树、Schema、raw ref、payload、binding、Revision/index/setup/Projection闭包，并修正 Capture Planner 的 Common Projection 与 Color Profile semantic join。
 
 本包完成后只表示新 Common fixture/Catalog/Plan 输入可被确定性构造和验证；Common Driver后续改变E2E factory语义时，活动Catalog/32个BASE/INPUT/raw ref必须由独立Common E2E输入重建规格重新闭合，不能沿用本包旧执行结果。不创建 SQLite、Runtime、PNG、candidate、approved version 或 release Report。
 
@@ -30,7 +30,7 @@
 - `MS-REV-001/0.2` Revision Schema、SQLite V1 contract 和 active binding；
 - DEV-CANVAS-06 READY Intake/Handoff 及 exact Runtime JAR identity。
 
-实现不得重新决定 fixture 字段、8 个 subject 的语义/布局/index/setup/Projection、16个E2E case、base/input生成算法、ID、排序、JCS/SHA、颜色别名、Plan 版本、43文件输出布局、错误码或回滚边界。
+实现不得重新决定 fixture 字段、8 个 subject 的语义/布局/index/setup/Projection、16个E2E case、base/input生成算法、ID、排序、JCS/SHA、颜色别名、Plan 版本、44文件输出布局、错误码或回滚边界。
 
 ## 3. 前置条件
 
@@ -92,7 +92,7 @@ npm run release:canvas06:common-visual:build -- \
   sources/tests/e2e/release/dev-canvas-06/fixtures/factories/common-fixture-factory.mjs
 ```
 
-成功root必须恰有`43=1 Catalog+8 Visual+32 E2E+2 source mirror`个普通非链接文件；不允许外部E2E root、历史fixture目录副本或其他文件。
+成功root必须恰有`44=1 Catalog+8 Visual+32 E2E+2 source mirror+1 Common Setup Plan`个普通非链接文件；不允许外部E2E root、历史fixture目录副本或其他文件。
 
 Verifier CLI 固定为：
 
@@ -122,7 +122,7 @@ Builder和Verifier均禁止`--source-root`、`--e2e-root`及任何source path/en
 2. generator必须用`import.meta.url`绑定实际执行的`build-canvas06-common-visual-fixtures.mjs`，factory必须绑定其静态import实际模块；两者按主设计第11.1节逐byte镜像到固定`sources/**`路径；
 3. factory导出的`e2eCases[16]`必须逐项等于Catalog Schema的16个`prefixItems.case_id`；每个case调用`e2eFixture(caseId)`恰一次，base写为`{...fixture,fixture_kind:"BASE"}`，input写为`{...fixture,fixture_kind:"INPUT"}`，JSON固定UTF-8/LF/2空格/末尾单LF；禁止读取或复制历史`fixtures/e2e/**`；
 4. Catalog `generator_ref`只指generator mirror；8项Visual和16项E2E共24项`factory_source_ref`逐字段相同且只指factory mirror；16项`base_fixture_ref/input_ref`固定指向活动root内32个E2E文件；禁止指外部checkout、历史author、cwd/env或动态import来源；
-5. verifier固定按CLI/path/source owner -> Schema/source mirror/raw ref -> 43文件inventory -> E2E case/factory输出 -> payload SHA -> Handoff/binding -> subject identity -> Revision/index -> setup -> Projection的顺序返回首错；
+5. verifier固定按CLI/path/source owner -> Schema/source mirror/raw ref -> 44文件inventory/Common Setup Plan -> E2E case/factory输出 -> payload SHA -> Handoff/binding -> subject identity -> Revision/index -> setup -> Projection的顺序返回首错；
 6. 验证8项Visual的唯一性、顺序、闭包字段、固定ID/名称/布局、五类index逐字段/排序/计数/时间/null、空Text Artifact preimage/digest、显式空Trace、8类step shape与各subject exact steps、focus、rendered cell数和subject差量；同时重算16组E2E base/input、32条raw ref和24项factory ref相等性；
 7. verifier只读且不读取外部checkout；root必须恰为43个普通非链接单链接文件，验证前后fixture root tree digest必须相等。
 
@@ -157,7 +157,7 @@ canonicalize("srgb", [exact launch args containing one --force-color-profile=srg
 | --- | --- | --- |
 | `GOLDEN_COMMON_INPUT_INVALID` | `2` | CLI、路径、实际source owner/type、E2E case集合/factory输出、Schema engine输入或禁止参数 |
 | `GOLDEN_COMMON_FIXTURE_SCHEMA_INVALID` | `2` | fixture 结构/版本/封闭字段无效 |
-| `GOLDEN_COMMON_FIXTURE_REF_MISMATCH` | `2` | source mirror/raw ref、E2E内容、43文件inventory、payload SHA、Catalog/subject/Projection join不闭合 |
+| `GOLDEN_COMMON_FIXTURE_REF_MISMATCH` | `2` | source mirror/raw ref、E2E内容、Common Setup Plan、44文件inventory、payload SHA、Catalog/subject/Projection join不闭合 |
 | `GOLDEN_COMMON_BINDING_MISMATCH` | `3` | fixture/Catalog/Handoff active binding 不同 |
 | `GOLDEN_COLOR_PROFILE_MISMATCH` | `3` | raw alias、launch arg 或 canonical mapping 不精确 |
 | `GOLDEN_COMMON_INTERNAL_ERROR` | `4` | 未分类 I/O、serializer、digest 或 atomic writer 失败 |
@@ -171,14 +171,14 @@ canonicalize("srgb", [exact launch args containing one --force-color-profile=srg
 1. Schema正例8项及缺字段、额外字段、版本、SHA、null/空形状反例；
 2. 8个subject的元素/State/Fact、layout、五类index entry逐字段/顺序/固定ID时间状态、8类step shape/exact对象、focus、cell数和Projection golden；
 3. binding、source mirror/raw ref、payload SHA、Catalog顺序/重复/缺失/额外、Revision/index/setup/Projection单变量篡改；
-4. 16个E2E case顺序、32个base/input固定路径和factory重算结果、24项factory ref相等、exact 43文件inventory全部闭合；缺失/额外/E2E tamper和历史bytes复制拒绝；
+4. 16个E2E case顺序、32个base/input固定路径和factory重算结果、24项factory ref相等、Common Setup Plan和exact 44文件inventory全部闭合；缺失/额外/E2E/setup plan tamper和历史bytes复制拒绝；
 5. generator/factory实际source到mirror逐byte相等，Catalog path/kind/length/SHA闭合；source override、E2E root override、历史author、动态import、缺失/额外source、symlink/hardlink/escape/Git metadata全部拒绝；
 6. 两次build byte-identical，失败/root已存在/rename fault最终零输出；
 7. planner `72=8*3*3`、每subject 9项、projection digest深度复算、旧占位digest拒绝和新change ID；
 8. Color Profile唯一正例及trim/case/alias/缺失/重复/冲突launch arg反例；
 9. verifier前后tree digest不变；
 10. 共享Node模块被Builder/Verifier/Planner共同导入，Planner无局部`jcs()`；10项parity vector的canonical JSON text/SHA全部匹配，safe integer、UTF-16 key排序、lone surrogate及其他Node非法值反例全部拒绝；
-11. 固定参考环境中43文件build加完整verify wall time`<=5 s`、peak RSS`<=256 MiB`。该阈值是release tooling约束，不是ISO要求。
+11. 固定参考环境中44文件build加完整verify wall time`<=5 s`、peak RSS`<=256 MiB`。该阈值是release tooling约束，不是ISO要求。
 
 ## 9. 验证命令
 
@@ -196,7 +196,7 @@ git diff --check
 
 ## 10. 完成定义
 
-冻结Schema的validator/contract test、Factory、8个Visual fixture、32个E2E asset、两份source mirror、43文件Catalog builder、只读verifier、共享Node JCS/parity vector、Planner semantic join、Color Profile pure function、正反例、确定性和性能全部通过，implementation checklist记录exact命令与计数。完成后状态仅可提升为`IMPLEMENTED/NOT_RELEASE_VALIDATED`；E2E Manifest新消费契约、03C、03B、真实新Plan、SQLite/PNG/candidate/approved evidence、Gate、Capability与ISO状态不得联动提升。
+冻结Schema的validator/contract test、Factory、8个Visual fixture、32个E2E asset、两份source mirror、Common Setup Plan、44文件Catalog builder、只读verifier、共享Node JCS/parity vector、Planner semantic join、Color Profile pure function、正反例、确定性和性能全部通过，implementation checklist记录exact命令与计数。完成后状态仅可提升为`IMPLEMENTED/NOT_RELEASE_VALIDATED`；E2E Manifest新消费契约、03C、03B、真实新Plan、SQLite/PNG/candidate/approved evidence、Gate、Capability与ISO状态不得联动提升。
 
 ## 11. 回滚
 

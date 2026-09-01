@@ -147,8 +147,8 @@
       "properties": {
         "kind": {"const": "COMMON_FIXTURE_TREE"},
         "path": {"const": "inputs/common"},
-        "file_count": {"const": 43},
-        "byte_length": {"type": "integer", "minimum": 43, "maximum": 9007199254740991},
+        "file_count": {"const": 44},
+        "byte_length": {"type": "integer", "minimum": 44, "maximum": 9007199254740991},
         "sha256": {"$ref": "#/$defs/digest"}
       }
     },

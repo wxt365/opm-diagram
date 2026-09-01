@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:opm:contract:dev-canvas-06-golden-authoring-font-input:0.1",
+  "title": "OPM DEV-CANVAS-06 Golden Authoring Font Input 0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "manifest_version", "font_input_id", "fonts"],
+  "properties": {
+    "schema_id": {"const": "OPM-DEV-CANVAS-06-GOLDEN-AUTHORING-FONT-INPUT-001"},
+    "schema_version": {"const": "0.1"},
+    "manifest_version": {"const": "0.1.0"},
+    "font_input_id": {"pattern": "^dev-canvas-06\\.golden-authoring-font-input\\.[A-Za-z0-9._-]+$"},
+    "fonts": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "prefixItems": [
+        {"$ref": "#/$defs/uiSans"},
+        {"$ref": "#/$defs/cjkFallback"},
+        {"$ref": "#/$defs/monospace"}
+      ],
+      "items": false
+    }
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "absolutePath": {"type": "string", "pattern": "^/(?!\\.\\.(?:/|$))(?!.*?/\\.\\.(?:/|$))(?!.*//).+$"},
+    "rawRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "path", "byte_length", "sha256"],
+      "properties": {
+        "kind": {"const": "FONT_FILE"},
+        "path": {"$ref": "#/$defs/absolutePath"},
+        "byte_length": {"type": "integer", "minimum": 1},
+        "sha256": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "font": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["logical_role", "postscript_name", "font_version", "source_path", "source_ref"],
+      "properties": {
+        "logical_role": {"enum": ["UI_SANS", "CJK_FALLBACK", "MONOSPACE"]},
+        "postscript_name": {"type": "string", "minLength": 1, "pattern": "^[A-Za-z0-9._-]+$"},
+        "font_version": {"type": "string", "minLength": 1},
+        "source_path": {"$ref": "#/$defs/absolutePath"},
+        "source_ref": {"$ref": "#/$defs/rawRef"}
+      }
+    },
+    "uiSans": {
+      "allOf": [
+        {"$ref": "#/$defs/font"},
+        {"properties": {"logical_role": {"const": "UI_SANS"}}}
+      ]
+    },
+    "cjkFallback": {
+      "allOf": [
+        {"$ref": "#/$defs/font"},
+        {"properties": {"logical_role": {"const": "CJK_FALLBACK"}}}
+      ]
+    },
+    "monospace": {
+      "allOf": [
+        {"$ref": "#/$defs/font"},
+        {"properties": {"logical_role": {"const": "MONOSPACE"}}}
+      ]
+    }
+  }
+}

@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import Ajv2020 from 'ajv/dist/2020.js';
 import { loadProfileAssetClosure } from './canvas06-e2e-manifest-v02-profile.mjs';
 import { sha256Jcs } from './canvas06-rfc8785.mjs';
+import { projectCatalogCriticalRegions } from './canvas06-common-critical-regions.mjs';
 
 const ROOT = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const SUBJECTS = Object.freeze(['STATE_ROLES', 'LONG_LABELS', 'FUNDAMENTAL_FAN', 'CANDIDATE_LAYER', 'INSPECTOR', 'TOOLCHAIN_CATALOG', 'FINDING_FOCUS', 'BLOCKED_FEEDBACK']);
@@ -73,7 +74,7 @@ async function loadCommonCaptures(request, plan, catalog, catalogRef, validators
     await exactRawFile(path, subject.fixture_ref, `Fixture ${subject.subject_id}`);
     const fixture = await readJson(path, `Fixture ${subject.subject_id}`, 'GOLDEN_COMMON_ADAPTER_INPUT_INVALID', 2);
     requireSchema(validators.fixture, fixture, `Fixture ${subject.subject_id} is invalid.`, 'GOLDEN_COMMON_ADAPTER_INPUT_INVALID', 2);
-    if (fixture.subject_id !== subject.subject_id || fixture.revision_document.revision_id !== subject.expected_revision || fixture.capture_setup.expected_focus_target_id !== subject.focus_target_id || fixture.capture_setup.expected_focus_anchor !== subject.focus_anchor || expectedCellCount(fixture.expected_projection) !== subject.expected_cells || !sameJcs(fixture.capture_setup.critical_regions, subject.critical_regions)) adapterInput(`Fixture ${subject.subject_id} does not close Catalog.`);
+    if (fixture.subject_id !== subject.subject_id || fixture.revision_document.revision_id !== subject.expected_revision || fixture.capture_setup.expected_focus_target_id !== subject.focus_target_id || fixture.capture_setup.expected_focus_anchor !== subject.focus_anchor || expectedCellCount(fixture.expected_projection) !== subject.expected_cells) adapterInput(`Fixture ${subject.subject_id} does not close Catalog.`);
     fixtureBySubject.set(subject.subject_id, fixture);
   }
   const common = plan.captures.filter(item => item.capture_kind === 'COMMON');
@@ -81,7 +82,10 @@ async function loadCommonCaptures(request, plan, catalog, catalogRef, validators
   for (const capture of common) {
     const fixture = fixtureBySubject.get(capture.subject_id);
     const subject = catalog.visual_subjects.find(item => item.subject_id === capture.subject_id);
-    if (!fixture || !subject || !sameJcs(capture.fixture_ref, subject.fixture_ref) || !sameJcs(capture.common_fixture_catalog_ref, catalogRef) || capture.expected_revision !== fixture.revision_document.revision_id || capture.expected_projection_sha256 !== sha256Jcs(fixture.expected_projection) || capture.focus_target_id !== fixture.capture_setup.expected_focus_target_id || capture.focus_anchor !== fixture.capture_setup.expected_focus_anchor || capture.expected_cells !== expectedCellCount(fixture.expected_projection) || !sameJcs(capture.critical_regions, fixture.capture_setup.critical_regions)) adapterInput(`Common capture ${capture.capture_id} does not close Plan, Catalog, and fixture.`);
+    let projectedRegions;
+    try { projectedRegions = projectCatalogCriticalRegions(subject?.critical_regions); }
+    catch (error) { adapterInput(error.message); }
+    if (!fixture || !subject || !sameJcs(capture.fixture_ref, subject.fixture_ref) || !sameJcs(capture.common_fixture_catalog_ref, catalogRef) || capture.expected_revision !== fixture.revision_document.revision_id || capture.expected_projection_sha256 !== sha256Jcs(fixture.expected_projection) || capture.focus_target_id !== fixture.capture_setup.expected_focus_target_id || capture.focus_anchor !== fixture.capture_setup.expected_focus_anchor || capture.expected_cells !== expectedCellCount(fixture.expected_projection) || !sameJcs(capture.critical_regions, projectedRegions)) adapterInput(`Common capture ${capture.capture_id} does not close Plan, Catalog, and fixture.`);
   }
   return common.map((capture, commonCaptureOrdinal) => ({ capture, commonCaptureOrdinal, fixture: fixtureBySubject.get(capture.subject_id) }));
 }
@@ -172,12 +176,12 @@ async function verifyCloneResult(request, capture, ordinal, base, storageRoot, c
 async function startWebRuntime(request, capture, ordinal, storageRoot, cloneResultPath, attemptRoot) {
   const { spawn } = await import('node:child_process');
   const readyPath = resolve(attemptRoot, 'runtime-ready.json'); const nonce = randomBytes(32).toString('hex');
-  const args = ['-jar', request.runtime_jar_path, '--spring.profiles.active=release-golden-authoring', '--spring.main.web-application-type=servlet', '--opm.runtime.mode=RELEASE_GOLDEN_COMMON_WEB', '--opm.release.golden-authoring=true', '--opm.release.visual-common.web-runtime=true', `--opm.release.visual-common.request-id=${request.request_id}`, `--opm.release.visual-common.capture-id=${capture.capture_id}`, `--opm.release.visual-common.subject-id=${capture.subject_id}`, `--opm.release.visual-common.attempt-ordinal=${ordinal}`, `--opm.release.visual-common.launch-nonce=${nonce}`, `--opm.release.visual-common.attempt-storage-root=${storageRoot}`, `--opm.release.visual-common.clone-result=${cloneResultPath}`, `--opm.release.visual-common.runtime-ready-out=${readyPath}`, `--opm.storage.root=${storageRoot}`, `--opm.assets.root=${request.profile_asset_root}`, '--server.address=127.0.0.1', '--server.port=0', '--management.server.address=127.0.0.1', '--management.server.port=0', '--management.endpoints.web.exposure.include=health', '--management.endpoint.health.probes.enabled=true', `--opm.release.source-date-epoch=${request.source_date_epoch}`];
+  const args = ['-jar', request.runtime_jar_path, '--spring.profiles.active=release-golden-authoring', '--spring.main.web-application-type=servlet', '--opm.runtime.mode=RELEASE_GOLDEN_COMMON_WEB', '--opm.release.golden-authoring=true', '--opm.release.visual-common.web-runtime=true', `--opm.release.visual-common.request-id=${request.request_id}`, `--opm.release.visual-common.capture-id=${capture.capture_id}`, `--opm.release.visual-common.subject-id=${capture.subject_id}`, `--opm.release.visual-common.attempt-ordinal=${ordinal}`, `--opm.release.visual-common.launch-nonce=${nonce}`, `--opm.release.visual-common.clone-result=${cloneResultPath}`, `--opm.release.visual-common.runtime-ready-out=${readyPath}`, `--opm.storage.root=${storageRoot}`, `--opm.assets.root=${request.profile_asset_root}`, '--server.address=127.0.0.1', '--server.port=0', '--management.server.address=127.0.0.1', '--management.server.port=0', '--management.endpoints.web.exposure.include=health', '--management.endpoint.health.probes.enabled=true', `--opm.release.source-date-epoch=${request.source_date_epoch}`];
   if (capture.subject_id === 'BLOCKED_FEEDBACK') args.push('--opm.release.visual-common.fault-hook=sqlite.revision-commit.before-insert', '--opm.release.visual-common.fault-command-id=command.visual.blocked-feedback.persistence-failed', '--opm.release.visual-common.fault-max-invocations=1');
   const child = spawn(request.java_executable_ref.path, args, { stdio: ['ignore', 'ignore', 'pipe'], env: controlledJavaEnv(request.java_executable_ref.path) });
   let stderr = ''; child.stderr.on('data', chunk => { stderr += chunk; });
   const ready = await waitForReady(readyPath, child, nonce, capture, ordinal, () => stderr);
-  return { child, ready, nonce };
+  return { child, ready, nonce, stderr: () => stderr };
 }
 
 async function waitForReady(path, child, nonce, capture, ordinal, stderr) {
@@ -223,16 +227,23 @@ function verifyObservedResult(observed, invocation, validator) {
 }
 
 async function closeWebRuntime(runtime, storageRoot, base) {
-  if (!runtime.child.kill('SIGTERM')) uiFailure('Cannot signal Web Runtime.');
+  const sigtermSent = runtime.child.kill('SIGTERM');
+  if (!sigtermSent) uiFailure('Cannot signal Web Runtime.');
   const exit = await waitForChildClose(runtime.child, 10000);
   if (!exit) { runtime.child.kill('SIGKILL'); uiFailure('Web Runtime required SIGKILL.'); }
-  if (!((exit.code === 0 && exit.signal === null) || (exit.code === null && exit.signal === 'SIGTERM'))) uiFailure('Web Runtime exited unexpectedly.');
+  if (!expectedWebRuntimeExit(exit, sigtermSent)) uiFailure(`Web Runtime exited unexpectedly: code=${exit.code}; signal=${exit.signal}; stderr=${runtime.stderr()}`);
   if (!(await portClosed(runtime.ready.server_port)) || !(await portClosed(runtime.ready.management_server_port))) uiFailure('Web Runtime port remains reachable after shutdown.');
   await assertNoSqliteSidecars(resolveInside(storageRoot, runtime.ready.attempt_database_ref.path, 'GOLDEN_COMMON_UI_SETUP_FAILED', 3), 'GOLDEN_COMMON_UI_SETUP_FAILED', 3);
   const attemptTreeSha256 = await storageTreeDigest(storageRoot, 'GOLDEN_COMMON_UI_SETUP_FAILED', 3);
   const baseTreeSha256After = await storageTreeDigest(base.storageRoot, 'GOLDEN_COMMON_UI_SETUP_FAILED', 3);
   if (baseTreeSha256After !== base.baseTreeSha256) uiFailure('Immutable base changed during an attempt.');
   return { attemptTreeSha256, baseTreeSha256After };
+}
+
+function expectedWebRuntimeExit(exit, sigtermSent) {
+  return (exit.code === 0 && exit.signal === null)
+    || (exit.code === null && exit.signal === 'SIGTERM')
+    || (sigtermSent && exit.code === 143 && exit.signal === null);
 }
 
 function buildNormalizedResult(request, inputs, bases, attemptResults) {

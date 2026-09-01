@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:opm:contract:dev-canvas-06-golden-family-capture-identity:0.1",
+  "title": "OPM DEV-CANVAS-06 Golden Family Capture Identity",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "identity_version", "capture_id", "attempt_ordinal", "source_date_epoch", "fixture_ref", "materialization_report_ref", "materialized_identity", "model_id", "revision_id", "revision_sequence", "context_id", "capability_id", "viewport_id", "zoom_id", "expected_projection_sha256", "focus_target_id", "focus_anchor", "expected_cells", "critical_regions", "identity_payload_sha256"],
+  "properties": {
+    "schema_id": {"const": "OPM-DEV-CANVAS-06-GOLDEN-FAMILY-CAPTURE-IDENTITY-001"},
+    "schema_version": {"const": "0.1"},
+    "identity_version": {"const": "0.1.0"},
+    "capture_id": {"type": "string", "minLength": 1},
+    "attempt_ordinal": {"enum": [1, 2]},
+    "source_date_epoch": {"type": "integer", "minimum": 0},
+    "fixture_ref": {"$ref": "#/$defs/archiveEntryRef"},
+    "materialization_report_ref": {"allOf": [{"$ref": "#/$defs/fileRef"}, {"type": "object", "properties": {"kind": {"const": "MATERIALIZATION_REPORT"}}}]},
+    "materialized_identity": {"$ref": "#/$defs/materializedIdentity"},
+    "model_id": {"type": "string", "minLength": 1},
+    "revision_id": {"type": "string", "minLength": 1},
+    "revision_sequence": {"type": "integer", "minimum": 1},
+    "context_id": {"type": "string", "minLength": 1},
+    "capability_id": {"pattern": "^CAP-ISO-(PROC|CTRL|STRUCT)-[0-9]{3}$"},
+    "viewport_id": {"enum": ["VP-1440X900", "VP-1280X800", "VP-390X844"]},
+    "zoom_id": {"enum": ["Z-025", "Z-100", "Z-400"]},
+    "expected_projection_sha256": {"$ref": "#/$defs/digest"},
+    "focus_target_id": {"type": "string", "minLength": 1},
+    "focus_anchor": {"enum": ["CENTER", "SOURCE", "TARGET", "LABEL", "JUNCTION"]},
+    "expected_cells": {"type": "integer", "minimum": 1},
+    "critical_regions": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/criticalRegion"}},
+    "identity_payload_sha256": {"$ref": "#/$defs/digest"}
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "path": {"type": "string", "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*//).+$"},
+    "fileRef": {"type": "object", "additionalProperties": false, "required": ["kind", "path", "byte_length", "sha256"], "properties": {"kind": {"type": "string", "minLength": 1}, "path": {"$ref": "#/$defs/path"}, "byte_length": {"type": "integer", "minimum": 0}, "sha256": {"$ref": "#/$defs/digest"}}},
+    "archiveEntryRef": {"type": "object", "additionalProperties": false, "required": ["path", "byte_length", "sha256", "bundle_sha256", "archive_entry_path"], "properties": {"path": {"$ref": "#/$defs/path"}, "byte_length": {"type": "integer", "minimum": 0}, "sha256": {"$ref": "#/$defs/digest"}, "bundle_sha256": {"$ref": "#/$defs/digest"}, "archive_entry_path": {"$ref": "#/$defs/path"}}},
+    "materializedIdentity": {"type": "object", "additionalProperties": false, "required": ["project_id", "model_id", "revision_id", "revision_sequence", "draft_head_revision_id", "head_sequence", "history_mode"], "properties": {"project_id": {"pattern": "^project\\.golden\\.fixture\\.[a-f0-9]{64}$"}, "model_id": {"type": "string", "minLength": 1}, "revision_id": {"type": "string", "minLength": 1}, "revision_sequence": {"type": "integer", "minimum": 1}, "draft_head_revision_id": {"type": "string", "minLength": 1}, "head_sequence": {"type": "integer", "minimum": 1}, "history_mode": {"const": "SINGLE_REVISION_SNAPSHOT"}}},
+    "criticalRegion": {"type": "object", "additionalProperties": false, "required": ["region_id", "kind"], "properties": {"region_id": {"type": "string", "minLength": 1}, "kind": {"enum": ["FOCUS_BBOX", "SOURCE_MARKER", "TARGET_MARKER", "JUNCTION_MARKER", "ANNOTATION", "COMPLETENESS", "LABEL_SLOT"]}}}
+  }
+}

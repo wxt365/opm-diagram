@@ -26,7 +26,7 @@ class VisualCommonCommitFaultConfigurationTest {
 
     @Test
     void acceptsOnlyTheCompleteExactCommandLineConfiguration() {
-        String[] source = requiredArguments();
+        String[] source = fullWebRuntimeFaultArguments();
         assertInstanceOf(OneShotVisualCommonCommitFaultPort.class,
                 configuration.visualCommonCommitFaultPort(environment(source), arguments(source), E2EFaultPort.NOOP));
     }
@@ -62,10 +62,25 @@ class VisualCommonCommitFaultConfigurationTest {
                 "--spring.profiles.active=release-golden-authoring",
                 "--opm.release.golden-authoring=true",
                 "--spring.main.web-application-type=servlet",
+                "--opm.runtime.mode=RELEASE_GOLDEN_COMMON_WEB",
+                "--opm.release.visual-common.web-runtime=true",
                 "--opm.release.visual-common.fault-hook=sqlite.revision-commit.before-insert",
                 "--opm.release.visual-common.fault-command-id=command.visual.blocked-feedback.persistence-failed",
                 "--opm.release.visual-common.fault-max-invocations=1"
         };
+    }
+
+    private String[] fullWebRuntimeFaultArguments() {
+        String[] required = requiredArguments();
+        String[] source = java.util.Arrays.copyOf(required, required.length + 7);
+        source[required.length] = "--opm.release.visual-common.request-id=dev-canvas-06.common-visual-adapter.test";
+        source[required.length + 1] = "--opm.release.visual-common.capture-id=capture.blocked-feedback";
+        source[required.length + 2] = "--opm.release.visual-common.subject-id=BLOCKED_FEEDBACK";
+        source[required.length + 3] = "--opm.release.visual-common.attempt-ordinal=1";
+        source[required.length + 4] = "--opm.release.visual-common.launch-nonce=" + "a".repeat(64);
+        source[required.length + 5] = "--opm.release.visual-common.clone-result=/tmp/clone-result.json";
+        source[required.length + 6] = "--opm.release.visual-common.runtime-ready-out=/tmp/runtime-ready.json";
+        return source;
     }
 
     private void assertRejected(org.junit.jupiter.api.function.Executable executable) {

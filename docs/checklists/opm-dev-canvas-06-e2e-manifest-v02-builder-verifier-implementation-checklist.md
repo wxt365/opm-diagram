@@ -33,7 +33,7 @@ Production准入：`READY_FOR_CLEAN_R_EXTERNAL_STORE_REBUILD`。`9048bb3...`既�
 - [x] C01 只实现Manifest `0.2/0.2.0` producer/verifier，不执行194/388。
 - [x] C02 OpenAPI、SQLite、Vue、Java、v01和既有release root保持只读。
 - [x] C03 失败测试先复现第四driver与146/48两个冲突。
-- [ ] C04 Profile、Common Driver、Family Catalog、Common `0.2.0` 43文件root、Handoff `0.2`、READY Intake、Runtime和Web统一production输入逐项相等。
+- [ ] C04 Profile、Common Driver、Family Catalog、Common `0.2.0` 44文件root（含Common Setup Plan）、Handoff `0.2`、READY Intake、Runtime和Web统一production输入逐项相等。
 - [ ] C05 source delta恰好属于17路径allowlist。
 - [ ] C06 v01只读复用仅限五个helper，未导入v01 composer/release/verifier。
 - [x] C07 Manifest `driver_catalog`为四项固定顺序。
@@ -44,7 +44,7 @@ Production准入：`READY_FOR_CLEAN_R_EXTERNAL_STORE_REBUILD`。`9048bb3...`既�
 - [ ] C12 final root包含trust/family/profile/common/build/four drivers。
 - [ ] C13 Profile source/staging/final五资产raw refs与tree三方相等，package/binding join通过。
 - [ ] C14 Runtime JAR和Web dist来自统一source commit固定路径，并与Handoff和final copy三方exact join。
-- [ ] C15 Common 43文件、四driver固定source路径和final raw/tree ref复核通过。
+- [ ] C15 Common 44文件（含Common Setup Plan）、四driver固定source路径和final raw/tree ref复核通过。
 - [ ] C16 producer按冻结first-failure顺序执行，Profile source验证和Staging seal先于Manifest final staging。
 - [ ] C17 `178 Family + 16 Common`同序派生。
 - [ ] C18 Common expectation恰好`7 PASS + 9 BLOCKED`。

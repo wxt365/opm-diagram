@@ -4,7 +4,7 @@
 
 实现状态：`IMPLEMENTED/REBUILD_COMPLETE`
 
-生产重建状态：`IMPLEMENTED/COMMON_ROOT_SELF_VERIFIED`
+生产重建状态：`HISTORICAL_43_ROOT_SELF_VERIFIED / ACTIVE_44_ROOT_REBUILD_REQUIRED`
 
 统一生产链状态：`BLOCKED_BY_UNIFIED_SOURCE_PRODUCTION_INPUT_REBUILD`
 
@@ -21,7 +21,7 @@
 
 实现并执行一个独立的 Common E2E 输入重建事务：只读消费 Common Driver 包形成的 exact clean `common-fixture-factory.mjs`，生成活动 Common Fixture Catalog `0.2.0`、16 个 case 对应的 32 个 `BASE/INPUT` 文件，并按新生成的原始 bytes 重新计算 Catalog 内全部 raw ref。
 
-本包关闭“factory 已按 `7 PASS + 9 BLOCKED` 新语义更新，但活动 Catalog/BASE/INPUT 仍引用旧 bytes”的发布输入缺口。完成后只形成 E2E Manifest v02 可消费的已验证 Common 43 文件输入根，不生成 Manifest、Attempt、Report、Gate、Candidate、Activation、Capability 或 ISO 证据。
+本包关闭“factory 已按 `7 PASS + 9 BLOCKED` 新语义更新，但活动 Catalog/BASE/INPUT 仍引用旧 bytes”的发布输入缺口。活动 root 固定为可由 E2E Manifest v02 消费的 44 文件输入根，包含 Common Setup Plan；本包不生成 Manifest、Attempt、Report、Gate、Candidate、Activation、Capability 或 ISO 证据。
 
 ## 2. 问题与唯一修正
 
@@ -43,7 +43,7 @@ Builder 和 Verifier 必须静态绑定同一逻辑 factory owner，分别按固
 1. `docs/design/opm-dev-canvas-06-visual-common-materialization-design.md` `v1.4`；
 2. `docs/design/opm-dev-canvas-06-e2e-common-driver-controlled-orchestration-design.md` `v1.2`；
 3. `OPM-DEV-CANVAS-06-COMMON-FIXTURE-CATALOG-001/0.1` Schema，活动 `catalog_version=0.2.0`；
-4. `GOLDEN-AUTHORING-02B` Builder/Verifier 与 43 文件布局；
+4. `GOLDEN-AUTHORING-02B` Builder/Verifier 与 44 文件布局；
 5. READY Handoff 的 exact `active_binding`；
 6. Common Driver checklist 已确认的 16 case、`7 PASS + 9 BLOCKED`、八个 exact HTTP 错误码及 Ambiguous 无错误码口径。
 
@@ -65,7 +65,7 @@ Builder 和 Verifier 必须静态绑定同一逻辑 factory owner，分别按固
 2. `scripts/verify-canvas06-common-visual-fixtures.mjs`
 3. `scripts/common-visual-fixtures.test.mjs`
 
-允许同步本规格、对应 checklist、README、冻结基线、测试策略、开发执行包、02B/Manifest v02/Toolchain 状态入口。生成的 43 文件 fresh root 是受控输出，不计入 source delta。
+允许同步本规格、对应 checklist、README、冻结基线、测试策略、开发执行包、02B/Manifest v02/Toolchain 状态入口。生成的 44 文件 fresh root 是受控输出，不计入 source delta。
 
 ### 4.2 明确禁止
 
@@ -96,7 +96,7 @@ npm run release:canvas06:common-visual:verify -- \
   --catalog dev-canvas-06-common-fixture-catalog.json
 ```
 
-成功 root 恰为 43 个普通、非链接、单链接文件：
+成功 root 恰为 44 个普通、非链接、单链接文件：
 
 ```text
 1  dev-canvas-06-common-fixture-catalog.json
@@ -104,6 +104,7 @@ npm run release:canvas06:common-visual:verify -- \
 32 e2e/<case-id>.base.json | <case-id>.input.json
 1  sources/scripts/build-canvas06-common-visual-fixtures.mjs
 1  sources/tests/e2e/release/dev-canvas-06/fixtures/factories/common-fixture-factory.mjs
+1  dev-canvas-06-common-setup-plan.json
 ```
 
 Catalog 固定 `schema_version=0.1`、`catalog_version=0.2.0`、8 个 Visual、16 个 E2E 和 `summary=8/16`。Schema 不升级，不增加字段。
@@ -189,7 +190,7 @@ Verifier 必须只读，验证前后 tree digest 相同，并按以下顺序返�
 ```text
 CLI/path
 -> READY Handoff/binding shape
--> exact 43-file type/link/inventory
+-> exact 44-file type/link/inventory
 -> Catalog Schema/version/order/count
 -> generator/factory mirror raw refs
 -> actual factory owner/mirror/24 refs三方join
@@ -216,12 +217,12 @@ Verifier 不得使用 case 名称正则、硬编码 error map、历史 fixture �
 
 ### 9.1 正例
 
-1. exact clean factory 生成 `43=1+8+32+2`；
+1. exact clean factory 生成 `44=1+8+32+2+1 Common Setup Plan`；
 2. 16 case 固定同序，32 路径唯一，JSON bytes 满足唯一编码；
 3. 7 PASS/9 BLOCKED、八个 exact 错误码、Ambiguous 无错误码、事务与 REOPEN 全部等于 factory；
 4. 24 个 factory ref 相等，全部 generator/Visual/E2E ref 的 path/length/SHA 从实际 staging bytes 复算；
 5. 两次 fresh build byte-identical；只读 verifier 前后 tree digest 相同；
-6. 完整 43 文件 root 可作为 Manifest v02 `--common-fixture-root` 输入，但不在本包生成 Manifest。
+6. 完整 44 文件 root 可作为 Manifest v02 `--common-fixture-root` 输入，但不在本包生成 Manifest。
 
 ### 9.2 反例
 
@@ -240,7 +241,7 @@ npm run contract:validate
 git diff --check
 ```
 
-生产重建还要记录 exact 命令、Node 版本、source commit、factory/Handoff SHA、binding digest、epoch、final tree digest、Catalog SHA、43 文件计数和 verifier exit。单元/临时目录正例不能替代该记录。
+生产重建还要记录 exact 命令、Node 版本、source commit、factory/Handoff SHA、binding digest、epoch、final tree digest、Catalog SHA、44 文件计数和 verifier exit。单元/临时目录正例不能替代该记录。
 
 ## 10. 完成与状态边界
 
@@ -252,7 +253,7 @@ git diff --check
 
 exact clean factory 输入门通过，fresh root 原子生成，正反例和完整 verifier 通过，执行 checklist 记录全部身份与摘要后，才可标记 `IMPLEMENTED/COMMON_ROOT_SELF_VERIFIED`。
 
-该状态只证明当前43文件Common root自身闭合。由于其构建时消费的Handoff/Intake与后继统一source生产链尚未重建，它不能单独解除Manifest v02 production输入门；必须由`opm-dev-canvas-06-unified-source-production-input-rebuild-bugfix-task-spec.md`从新的`unified_source_commit`重新生成并闭合。该状态不等于Manifest v02 producer/verifier完成，不等于`194/388`、`137/57` Report、GATE-06-03、Candidate、Activation、Capability、production release或ISO符合性。
+活动44文件状态只证明当前Common root自身闭合。由于其构建时消费的Handoff/Intake与后继统一source生产链尚未重建，它不能单独解除Manifest v02 production输入门；必须由`opm-dev-canvas-06-unified-source-production-input-rebuild-bugfix-task-spec.md`从新的`unified_source_commit`重新生成并闭合。该状态不等于Manifest v02 producer/verifier完成，不等于`194/388`、`137/57` Report、GATE-06-03、Candidate、Activation、Capability、production release或ISO符合性。
 
 ## 11. 回滚
 
@@ -263,11 +264,11 @@ exact clean factory 输入门通过，fresh root 原子生成，正反例和完�
 ### 12.1 事实
 
 1. Catalog Schema `0.1`已允许活动 `catalog_version=0.2.0`；
-2. 活动成功布局已冻结为43文件；
+2. 活动成功布局已冻结为44文件，包含Common Setup Plan；
 3. Common Driver factory当前语义为7 PASS/9 BLOCKED；
 4. 当前 Builder对每个case调用factory不止一次，当前 Verifier维护了独立硬编码E2E期望；
 5. Common Driver规格明确把32个资产和Catalog ref重建交给后继任务。
 
 ### 12.2 假设/待执行输入
 
-clean factory source已在`daf383df6d7faad866b84fceac0a2c9111a8c926`记录；factory raw SHA为`4cabb5b86932f338f9bf546be7fd7ec226743b5796f1d1d712036ca532cebd82`。完整执行身份、fresh root和独立Verifier结果以本规格checklist的2026-08-25执行记录为准；这些事实不替代后继统一source commit上的再次重建。
+clean factory source已在`daf383df6d7faad866b84fceac0a2c9111a8c926`记录；factory raw SHA为`4cabb5b86932f338f9bf546be7fd7ec226743b5796f1d1d712036ca532cebd82`。checklist 的2026-08-25 `43` 文件记录是本修正前的历史执行事实，不得伪造成活动44文件根；完整活动44文件执行身份、fresh root和独立Verifier结果必须在后继统一source commit上重新产生。

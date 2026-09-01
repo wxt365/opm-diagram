@@ -199,7 +199,7 @@ callback返回或失败后，Node必须：
 5. 确认SQLite无WAL/SHM、attempt tree可复算、base before/after digest相等；
 6. 仅在上述条件通过时写既有`runtime_shutdown_status=CLOSED`。
 
-正常关闭接受Node观测到`exitCode=0`，或`exitCode=null && signal=SIGTERM`；其他exit/signal、端口残留、sidecar或base漂移均为`GOLDEN_COMMON_UI_SETUP_FAILED/3`。fault port关闭验证失败保持同一错误码并按首错保留。
+正常关闭接受Node观测到`exitCode=0`、`exitCode=null && signal=SIGTERM`，或在Node已成功发送本次唯一SIGTERM且未发送SIGKILL时观测到的`exitCode=143 && signal=null`。最后一种是JVM将已接收SIGTERM转换为进程状态码的受控等价观测，不得用于child自行退出、SIGKILL、重复信号或未发送SIGTERM的路径。其他exit/signal、端口残留、sidecar或base漂移均为`GOLDEN_COMMON_UI_SETUP_FAILED/3`。fault port关闭验证失败保持同一错误码并按首错保留。
 
 ## 8. 退出码唯一Owner
 

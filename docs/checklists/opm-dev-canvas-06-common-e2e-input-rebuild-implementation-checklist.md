@@ -37,9 +37,9 @@
 - [x] C10 非文档source delta只允许3个路径。
 - [x] C11 factory及factory测试不在本包allowlist。
 - [x] C12 historical author、Runner/测试、Schema、API、SQLite、Java、Vue和生产配置禁止修改。
-- [x] C13 生成43文件root不计入source delta且不得写入历史路径。
+- [x] C13 的历史43文件root不计入source delta且不得写入历史路径；活动44文件root须重新生成。
 - [x] C14 Builder/Verifier CLI不增加参数。
-- [x] C15 临时fresh root恰为43个普通非链接单链接文件。
+- [x] C15 历史临时fresh root恰为43个普通非链接单链接文件；活动44文件root须重新验收。
 - [x] C16 Catalog固定`0.1/0.2.0`、8 Visual、16 E2E和summary 8/16。
 - [x] C17 16 case顺序与Schema prefixItems逐项相等。
 - [x] C18 32个BASE/INPUT由同一轮缓存结果写出并满足唯一JSON编码。
@@ -55,7 +55,7 @@
 - [x] C28 Catalog action/transaction/reopen与同一factory result深度相等。
 - [x] C29 稳定错误码/exit/首错顺序通过。
 - [x] C30 parent fsync失败不声明成功，residual进入隔离记录。
-- [x] C31 临时43文件、16 case、32路径、24 ref正例通过。
+- [x] C31 历史临时43文件、16 case、32路径、24 ref正例通过；活动44-file inventory闭包另行验收。
 - [x] C32 两次临时fresh build byte-identical。
 - [x] C33 活动错误码、Ambiguous伪造错误码和raw byte漂移反例通过。
 - [x] C34 raw byte、编码、ref、inventory、link、source drift和原子failure反例通过。
@@ -72,7 +72,7 @@
 
 - 设计：`FROZEN_FOR_IMPLEMENTATION`。
 - 工具Build：`IMPLEMENTED/REBUILD_COMPLETE`。
-- 生产重建：`IMPLEMENTED/COMMON_ROOT_SELF_VERIFIED`。
+- 生产重建：`HISTORICAL_43_ROOT_SELF_VERIFIED / ACTIVE_44_ROOT_REBUILD_REQUIRED`。
 - Manifest v02 Common子输入自身：`READY`。
 - Manifest v02统一production输入：`BLOCKED_BY_UNIFIED_SOURCE_PRODUCTION_INPUT_REBUILD`。
 - `GATE-06-03`：`NOT_RUN`。
@@ -96,4 +96,4 @@
 - `npm run contract:validate`：通过。
 - `git diff --check`：通过。
 
-以上结果不包含工具修复、fresh 43文件生产重建、Manifest生成或release evidence。
+以上结果不包含活动44文件生产重建、Manifest生成或release evidence。

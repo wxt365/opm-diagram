@@ -84,7 +84,7 @@ common_capture_ordinal=71, attempt=1
 common_capture_ordinal=71, attempt=2
 ```
 
-`captureCallback(invocation)` 每次恰调用一次，且任意时刻最多一个 callback 在执行。Invocation 中 capture/fixture/setup/Projection/focus/cell/critical region 必须分别与 Plan、Catalog 和 fixture 深度相等；attempt/storage/base attestation/tree/runtime URL 由 adapter 生成。`BLOCKED_FEEDBACK` 的 `fault_mode` 必须为 `BLOCKED_FEEDBACK_ONE_SHOT`，其余 63 个 Common capture均为 `NONE`。
+`captureCallback(invocation)` 每次恰调用一次，且任意时刻最多一个 callback 在执行。Invocation 中 capture/fixture/setup/Projection/focus/cell 必须分别与 Plan、Catalog 和 fixture 深度相等；`critical_regions` 的唯一结构化 UI owner 是 Catalog，Adapter 只验证 `Plan.capture.critical_regions == projectCatalogCriticalRegions(Catalog.visual_subject.critical_regions)`，其中共享 mapper 固定将`CANVAS/LABEL/COMPLETENESS/JUNCTION/TOOLBAR`转换为`FOCUS_BBOX/LABEL_SLOT/COMPLETENESS/JUNCTION_MARKER/CANVAS`并拒绝其他 kind。不得与不含该字段的Fixture `capture_setup`比较，也不得复制 mapper 分支。attempt/storage/base attestation/tree/runtime URL 由 adapter 生成。`BLOCKED_FEEDBACK` 的 `fault_mode` 必须为 `BLOCKED_FEEDBACK_ONE_SHOT`，其余 63 个 Common capture均为 `NONE`。
 
 ### 4.3 Callback 返回
 
@@ -169,18 +169,20 @@ public interface VisualCommonCommitFaultPort {
 
 ### 6.2 装配守卫
 
-三项 fault 参数全部缺失时只装配 `NOOP`。任一出现时，以下参数必须全部来自 Spring `commandLineArgs` 且逐 byte 相等：
+三项 fault 参数全部缺失时只装配 `NOOP`。任一出现时，Fault Configuration 必须要求完整的Web Runtime command-line 组合；固定值必须逐 byte 相等，动态identity/path字段必须各出现一次、非空且其`commandLineArgs`值与原始参数逐字一致。固定值为：
 
 ```text
 spring.profiles.active=release-golden-authoring
 opm.release.golden-authoring=true
 spring.main.web-application-type=servlet
+opm.runtime.mode=RELEASE_GOLDEN_COMMON_WEB
+opm.release.visual-common.web-runtime=true
 opm.release.visual-common.fault-hook=sqlite.revision-commit.before-insert
 opm.release.visual-common.fault-command-id=command.visual.blocked-feedback.persistence-failed
 opm.release.visual-common.fault-max-invocations=1
 ```
 
-同时必须满足 `opm.release.visual-common-materializer` 缺失、`E2EFaultPort==NOOP`。缺项、重复、非 command-line 覆盖、non-web、E2E active或参数漂移必须在接受请求前以`GOLDEN_COMMON_MODE_REJECTED/2`失败，禁止退回NOOP继续运行。普通/default/production、03A、Family、Visual validation和其他subject启动不得携带三项fault参数。
+动态字段固定为`opm.release.visual-common.request-id/capture-id/subject-id/attempt-ordinal/launch-nonce/clone-result/runtime-ready-out`。Fault Configuration 只校验它们的存在、唯一command-line来源及完整键集合；`VisualCommonRuntimeReadyWriter`继续是这些字段、端口、storage、Profile、Clone和Ready raw identity的唯一值校验owner。任何额外`opm.release.visual-common.*`键均拒绝。与此同时必须满足 `opm.release.visual-common-materializer` 缺失、`E2EFaultPort==NOOP`。缺项、重复、非 command-line 覆盖、non-web、E2E active、额外Common key或参数漂移必须在接受请求前以`GOLDEN_COMMON_MODE_REJECTED/2`失败，禁止退回NOOP继续运行。普通/default/production、03A、Family、Visual validation和其他subject启动不得携带三项fault参数。
 
 ### 6.3 唯一调用点与状态机
 

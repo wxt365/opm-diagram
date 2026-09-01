@@ -1,10 +1,25 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { mkdtemp, mkdir, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 import { runCommonVisualMaterialization } from './canvas06-common-visual-materialization.mjs';
+
+test('03C Web Runtime命令只使用Web协议允许的attempt storage参数', async () => {
+  const source = await readFile(new URL('./canvas06-common-visual-materialization.mjs', import.meta.url), 'utf8');
+  const start = source.indexOf('async function startWebRuntime');
+  const end = source.indexOf('async function waitForReady');
+  const command = source.slice(start, end);
+  assert.match(command, /`--opm\.storage\.root=\$\{storageRoot\}`/);
+  assert.doesNotMatch(command, /`--opm\.release\.visual-common\.attempt-storage-root=\$\{storageRoot\}`/);
+});
+
+test('03C关闭只将已发送SIGTERM后的JVM 143视为受控等价退出', async () => {
+  const source = await readFile(new URL('./canvas06-common-visual-materialization.mjs', import.meta.url), 'utf8');
+  assert.match(source, /sigtermSent && exit\.code === 143 && exit\.signal === null/);
+  assert.match(source, /const sigtermSent = runtime\.child\.kill\('SIGTERM'\)/);
+});
 
 test('03C adapter在callback缺失时不读取或创建受控输入', async () => {
   await assert.rejects(() => runCommonVisualMaterialization({}, undefined), error => {

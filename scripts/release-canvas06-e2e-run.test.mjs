@@ -1731,28 +1731,102 @@ test('production Family sink将异步raw capture首错稳定升级为EVIDENCE_TR
   }
 });
 
-test('Driver loader复核actual、Manifest、source owner与Report mirror四方bytes', async () => {
+test('旧三导出假设拒绝Common，活动验证器按四类Driver的冻结导出与原序case集合闭合', async () => {
+  const modules = await Promise.all([
+    import(resolve('tests/e2e/release/dev-canvas-06/drivers/procedural-driver.mjs')),
+    import(resolve('tests/e2e/release/dev-canvas-06/drivers/control-driver.mjs')),
+    import(resolve('tests/e2e/release/dev-canvas-06/drivers/structural-driver.mjs')),
+    import(resolve('tests/e2e/release/dev-canvas-06/drivers/common-driver.mjs'))
+  ]);
+  const definitions = [
+    ['DRIVER-PROCEDURAL', modules[0], 33],
+    ['DRIVER-CONTROL', modules[1], 35],
+    ['DRIVER-STRUCTURAL', modules[2], 110],
+    ['DRIVER-COMMON', modules[3], 16]
+  ];
+  const manifest = {
+    cases: definitions.flatMap(([driverId, module]) => {
+      const caseIds = driverId === 'DRIVER-COMMON' ? Object.keys(module.COMMON_CASES) : module.case_ids;
+      return caseIds.map(case_id => ({ driver_id: driverId, case_id }));
+    })
+  };
+
+  assert.equal(Object.keys(modules[3]).length, 4);
+  assert.equal(['case_ids', 'driver', 'executeCase'].every(key => key in modules[3]), false);
+  for (const [driverId, module, expectedCaseCount] of definitions) {
+    const verified = verifyControlledDriverModuleExports({ module, driver_id: driverId, manifest });
+    assert.equal(verified.driver_id, driverId);
+    assert.equal(verified.case_ids.length, expectedCaseCount);
+    assert.deepEqual(verified.case_ids, manifest.cases.filter(item => item.driver_id === driverId).map(item => item.case_id));
+    assert.equal(Object.isFrozen(verified), true);
+  }
+
+  assert.throws(
+    () => verifyControlledDriverModuleExports({
+      module: { ...modules[3], driver: Object.freeze({}), case_ids: Object.freeze([]) },
+      driver_id: 'DRIVER-COMMON', manifest
+    }),
+    error => error.code === 'E2E_DRIVER_CONTRACT_INVALID'
+  );
+  assert.throws(
+    () => verifyControlledDriverModuleExports({
+      module: { ...modules[3], COMMON_CASES: undefined },
+      driver_id: 'DRIVER-COMMON', manifest
+    }),
+    error => error.code === 'E2E_DRIVER_CONTRACT_INVALID'
+  );
+  assert.throws(
+    () => verifyControlledDriverModuleExports({
+      module: { ...modules[0], default: modules[0].executeCase },
+      driver_id: 'DRIVER-PROCEDURAL', manifest
+    }),
+    error => error.code === 'E2E_DRIVER_CONTRACT_INVALID'
+  );
+  assert.throws(
+    () => verifyControlledDriverModuleExports({
+      module: { ...modules[1], case_ids: Object.freeze([...modules[1].case_ids].reverse()) },
+      driver_id: 'DRIVER-CONTROL', manifest
+    }),
+    error => error.code === 'E2E_DRIVER_CONTRACT_INVALID'
+  );
+});
+
+test('Driver loader复核四类actual、Manifest、source owner与Report mirror bytes，并按SHA缓存', async () => {
   const root = await mkdtemp(resolve(tmpdir(), 'canvas06-driver-loader-'));
   const manifestRoot = resolve(root, 'manifest');
   const reportRoot = resolve(root, 'report');
   const driverRoot = resolve(root, 'attempt/inputs/drivers');
-  const sourcePath = 'tests/e2e/release/dev-canvas-06/drivers/procedural-driver.mjs';
-  const manifestPath = 'inputs/drivers/procedural-driver.mjs';
-  const bytes = await readFile(sourcePath);
-  for (const path of [resolve(manifestRoot, manifestPath), resolve(reportRoot, 'inputs/runner', sourcePath), resolve(driverRoot, 'procedural-driver.mjs')]) {
-    await mkdir(dirname(path), { recursive: true });
-    await writeFile(path, bytes);
-  }
   const original = JSON.parse(await readFile(resolve('packages/profiles/profile.iso19450.2024.draft/0.2.0/handoff/releases/clean-37c5412a9c12/dev-canvas-06/e2e/manifests/dev-canvas-06.e2e.37c5412a9c12.6f601a3f8e2d/dev-canvas-06-e2e-manifest.json'), 'utf8'));
-  const reference = { kind: 'E2E_DRIVER_SOURCE', path: manifestPath, byte_length: bytes.length, sha256: digest(bytes) };
-  const activeManifest = { ...original, driver_catalog: [{ driver_id: 'DRIVER-PROCEDURAL', source_ref: reference }] };
   const context = { source_root_realpath: resolve('.'), manifest_root_realpath: manifestRoot, report_staging_root_realpath: reportRoot };
-  const sourceSet = { entries: [{ path: sourcePath, byte_length: bytes.length, sha256: digest(bytes) }] };
   const cache = new Map();
-  const loaded = await loadControlledDriverModule({ invocation_context: context, manifest: activeManifest, runner_source_set: sourceSet, driver_id: 'DRIVER-PROCEDURAL', driver_root: driverRoot, session_cache: cache });
-  assert.equal(loaded.case_ids.length, 33);
-  assert.strictEqual(await loadControlledDriverModule({ invocation_context: context, manifest: activeManifest, runner_source_set: sourceSet, driver_id: 'DRIVER-PROCEDURAL', driver_root: driverRoot, session_cache: cache }), loaded);
-  await writeFile(resolve(manifestRoot, manifestPath), 'drift');
+  const definitions = [
+    ['DRIVER-PROCEDURAL', 'procedural-driver.mjs', 33],
+    ['DRIVER-CONTROL', 'control-driver.mjs', 35],
+    ['DRIVER-STRUCTURAL', 'structural-driver.mjs', 110],
+    ['DRIVER-COMMON', 'common-driver.mjs', 16]
+  ];
+  const catalog = [];
+  const sourceEntries = [];
+  for (const [driverId, filename] of definitions) {
+    const sourcePath = `tests/e2e/release/dev-canvas-06/drivers/${filename}`;
+    const manifestPath = `inputs/drivers/${filename}`;
+    const bytes = await readFile(sourcePath);
+    for (const path of [resolve(manifestRoot, manifestPath), resolve(reportRoot, 'inputs/runner', sourcePath), resolve(driverRoot, filename)]) {
+      await mkdir(dirname(path), { recursive: true });
+      await writeFile(path, bytes);
+    }
+    catalog.push({ driver_id: driverId, source_ref: { kind: 'E2E_DRIVER_SOURCE', path: manifestPath, byte_length: bytes.length, sha256: digest(bytes) } });
+    sourceEntries.push({ path: sourcePath, byte_length: bytes.length, sha256: digest(bytes) });
+  }
+  const activeManifest = { ...original, driver_catalog: catalog };
+  const sourceSet = { entries: sourceEntries };
+  for (const [driverId, , expectedCaseCount] of definitions) {
+    const loaded = await loadControlledDriverModule({ invocation_context: context, manifest: activeManifest, runner_source_set: sourceSet, driver_id: driverId, driver_root: driverRoot, session_cache: cache });
+    assert.equal(loaded.case_ids.length, expectedCaseCount);
+    assert.strictEqual(await loadControlledDriverModule({ invocation_context: context, manifest: activeManifest, runner_source_set: sourceSet, driver_id: driverId, driver_root: driverRoot, session_cache: cache }), loaded);
+  }
+  const procedural = catalog[0];
+  await writeFile(resolve(manifestRoot, procedural.source_ref.path), 'drift');
   await assert.rejects(
     () => loadControlledDriverModule({ invocation_context: context, manifest: activeManifest, runner_source_set: sourceSet, driver_id: 'DRIVER-PROCEDURAL', driver_root: driverRoot, session_cache: cache }),
     error => error.code === 'E2E_DRIVER_CONTRACT_INVALID'

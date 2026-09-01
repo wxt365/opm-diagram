@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:opm:contract:dev-canvas-06-golden-family-runtime-ready:0.1",
+  "title": "OPM DEV-CANVAS-06 Golden Family Runtime Ready",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "ready_version", "status", "capture_id", "attempt_ordinal", "source_date_epoch", "launch_nonce", "process_id", "runtime_jar_ref", "profile_asset_refs", "profile_asset_tree_sha256", "family_capture_identity_ref", "clone_result_ref", "attempt_database_ref", "attempt_tree_sha256_before", "server_port", "management_server_port", "runtime_base_url", "management_base_url", "readiness_path", "bootstrap_path", "ready_payload_sha256"],
+  "properties": {
+    "schema_id": {"const": "OPM-DEV-CANVAS-06-GOLDEN-FAMILY-RUNTIME-READY-001"},
+    "schema_version": {"const": "0.1"},
+    "ready_version": {"const": "0.1.0"},
+    "status": {"const": "READY_FOR_BROWSER"},
+    "capture_id": {"type": "string", "minLength": 1},
+    "attempt_ordinal": {"enum": [1, 2]},
+    "source_date_epoch": {"type": "integer", "minimum": 0},
+    "launch_nonce": {"pattern": "^[a-f0-9]{64}$"},
+    "process_id": {"type": "integer", "minimum": 1},
+    "runtime_jar_ref": {"allOf": [{"$ref": "#/$defs/fileRef"}, {"type": "object", "properties": {"kind": {"const": "RUNTIME_JAR"}}}]},
+    "profile_asset_refs": {"type": "array", "minItems": 5, "maxItems": 5, "items": {"$ref": "#/$defs/fileRef"}},
+    "profile_asset_tree_sha256": {"$ref": "#/$defs/digest"},
+    "family_capture_identity_ref": {"allOf": [{"$ref": "#/$defs/fileRef"}, {"type": "object", "properties": {"kind": {"const": "FAMILY_CAPTURE_IDENTITY"}}}]},
+    "clone_result_ref": {"allOf": [{"$ref": "#/$defs/fileRef"}, {"type": "object", "properties": {"kind": {"const": "FAMILY_CLONE_RESULT"}}}]},
+    "attempt_database_ref": {"allOf": [{"$ref": "#/$defs/fileRef"}, {"type": "object", "properties": {"kind": {"const": "PROJECT_DB"}}}]},
+    "attempt_tree_sha256_before": {"$ref": "#/$defs/digest"},
+    "server_port": {"type": "integer", "minimum": 1024, "maximum": 65535},
+    "management_server_port": {"type": "integer", "minimum": 1024, "maximum": 65535},
+    "runtime_base_url": {"pattern": "^http://127\\.0\\.0\\.1:[0-9]{4,5}$"},
+    "management_base_url": {"pattern": "^http://127\\.0\\.0\\.1:[0-9]{4,5}$"},
+    "readiness_path": {"const": "/actuator/health/readiness"},
+    "bootstrap_path": {"const": "/opm-bootstrap.js"},
+    "ready_payload_sha256": {"$ref": "#/$defs/digest"}
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "path": {"type": "string", "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*//).+$"},
+    "fileRef": {"type": "object", "additionalProperties": false, "required": ["kind", "path", "byte_length", "sha256"], "properties": {"kind": {"type": "string", "minLength": 1}, "path": {"$ref": "#/$defs/path"}, "byte_length": {"type": "integer", "minimum": 0}, "sha256": {"$ref": "#/$defs/digest"}}}
+  }
+}

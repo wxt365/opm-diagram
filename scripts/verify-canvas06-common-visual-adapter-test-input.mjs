@@ -7,6 +7,7 @@ import Ajv2020 from 'ajv/dist/2020.js';
 
 import { loadProfileAssetClosure } from './canvas06-e2e-manifest-v02-profile.mjs';
 import { sha256Jcs } from './canvas06-rfc8785.mjs';
+import { projectCatalogCriticalRegions } from './canvas06-common-critical-regions.mjs';
 
 const ROOT = resolve('.');
 const PROFILE_FILES = Object.freeze([
@@ -17,7 +18,7 @@ const PROFILE_FILES = Object.freeze([
   'symbols/representative-symbol-catalog.json'
 ]);
 const COMMON_CATALOG = 'dev-canvas-06-common-fixture-catalog.json';
-const EXPECTED_FILE_COUNT = 340;
+const EXPECTED_FILE_COUNT = 341;
 
 if (resolve(process.argv[1] ?? '') === new URL(import.meta.url).pathname) {
   verifyAdapterTestInputBundle(parseOptions(process.argv.slice(2))).then(() => process.stdout.write('COMMON_VISUAL_ADAPTER_TEST_INPUT_VALID\n')).catch(error => {
@@ -87,7 +88,7 @@ async function verifyProfile(root, binding) {
 async function verifyCommon(root, handoffPath, binding) {
   const commonRoot = resolve(root, 'inputs/common');
   const treeRef = await treeRefFor(root, 'inputs/common', 'COMMON_FIXTURE_TREE');
-  if (treeRef.file_count !== 43) fail('GOLDEN_COMMON_ADAPTER_TEST_JOIN_MISMATCH', 3, 'Common root does not contain 43 files.');
+  if (treeRef.file_count !== 44) fail('GOLDEN_COMMON_ADAPTER_TEST_JOIN_MISMATCH', 3, 'Common root does not contain 44 files.');
   const catalogRef = await refFor(root, `inputs/common/${COMMON_CATALOG}`, 'COMMON_FIXTURE_CATALOG');
   const catalog = await json(resolve(commonRoot, COMMON_CATALOG), 'Common Catalog');
   if (catalog.catalog_version !== '0.2.0' || !same(catalog.source_binding, binding)) fail('GOLDEN_COMMON_ADAPTER_TEST_JOIN_MISMATCH', 3, 'Common Catalog binding differs.');
@@ -118,7 +119,10 @@ async function verifyCommonCapture(capture, expected, commonRoot, catalogRef) {
   const fixture = await json(inside(commonRoot, capture.fixture_ref.path), 'Common fixture');
   const projection = fixture.expected_projection; const expectedCells = projection.committed_cells.length + projection.transient_cells.length;
   const captureId = `VIS-CANVAS.COMMON.${capture.subject_id}.${capture.viewport_id}.${capture.zoom_id}.${sha(Buffer.from(capture.subject_id, 'utf8')).slice(0, 12)}`;
-  if (capture.capture_id !== captureId || capture.expected_revision !== fixture.revision_document.revision_id || capture.expected_projection_sha256 !== sha256Jcs(projection) || capture.focus_target_id !== fixture.capture_setup.expected_focus_target_id || capture.focus_anchor !== fixture.capture_setup.expected_focus_anchor || capture.expected_cells !== expectedCells) fail('GOLDEN_COMMON_ADAPTER_TEST_JOIN_MISMATCH', 3, 'Common capture semantic join differs.');
+  let projectedRegions;
+  try { projectedRegions = projectCatalogCriticalRegions(expected.subject.critical_regions); }
+  catch (error) { fail(error.code ?? 'GOLDEN_COMMON_ADAPTER_TEST_JOIN_MISMATCH', error.exitCode ?? 3, error.message); }
+  if (capture.capture_id !== captureId || capture.expected_revision !== fixture.revision_document.revision_id || capture.expected_projection_sha256 !== sha256Jcs(projection) || capture.focus_target_id !== fixture.capture_setup.expected_focus_target_id || capture.focus_anchor !== fixture.capture_setup.expected_focus_anchor || capture.expected_cells !== expectedCells || !same(capture.critical_regions, projectedRegions)) fail('GOLDEN_COMMON_ADAPTER_TEST_JOIN_MISMATCH', 3, 'Common capture semantic join differs.');
 }
 
 async function verifyRequest({ root, finalRoot, bundle, plan, profile, upstream, validators }) {

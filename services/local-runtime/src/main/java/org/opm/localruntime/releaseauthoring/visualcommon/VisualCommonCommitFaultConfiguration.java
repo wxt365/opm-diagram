@@ -19,6 +19,8 @@ public class VisualCommonCommitFaultConfiguration {
             new Option("spring.profiles.active", "release-golden-authoring"),
             new Option("opm.release.golden-authoring", "true"),
             new Option("spring.main.web-application-type", "servlet"),
+            new Option("opm.runtime.mode", "RELEASE_GOLDEN_COMMON_WEB"),
+            new Option("opm.release.visual-common.web-runtime", "true"),
             new Option("opm.release.visual-common.fault-hook", "sqlite.revision-commit.before-insert"),
             new Option("opm.release.visual-common.fault-command-id", "command.visual.blocked-feedback.persistence-failed"),
             new Option("opm.release.visual-common.fault-max-invocations", "1"));
@@ -27,6 +29,14 @@ public class VisualCommonCommitFaultConfiguration {
             .map(Option::key)
             .filter(key -> key.startsWith("opm.release.visual-common.fault-"))
             .toList();
+    private static final List<String> WEB_IDENTITY_KEYS = List.of(
+            "opm.release.visual-common.request-id", "opm.release.visual-common.capture-id",
+            "opm.release.visual-common.subject-id", "opm.release.visual-common.attempt-ordinal",
+            "opm.release.visual-common.launch-nonce", "opm.release.visual-common.clone-result",
+            "opm.release.visual-common.runtime-ready-out");
+    private static final List<String> ALLOWED_VISUAL_COMMON_KEYS = java.util.stream.Stream.concat(
+            java.util.stream.Stream.of("opm.release.visual-common.web-runtime"),
+            java.util.stream.Stream.concat(FAULT_KEYS.stream(), WEB_IDENTITY_KEYS.stream())).toList();
 
     @Bean
     @ConditionalOnMissingBean(VisualCommonCommitFaultPort.class)
@@ -44,8 +54,9 @@ public class VisualCommonCommitFaultConfiguration {
             throw rejected();
         }
         for (Option option : REQUIRED) requireExact(commandLine, arguments.getSourceArgs(), option);
+        for (String key : WEB_IDENTITY_KEYS) requirePresentExactly(commandLine, arguments.getSourceArgs(), key);
         for (String argument : arguments.getSourceArgs()) {
-            if (argument.startsWith("--opm.release.visual-common.") && !FAULT_KEYS.stream().anyMatch(key -> argument.startsWith("--" + key + "="))) {
+            if (argument.startsWith("--opm.release.visual-common.") && !ALLOWED_VISUAL_COMMON_KEYS.contains(optionKey(argument))) {
                 throw rejected();
             }
         }
@@ -61,6 +72,21 @@ public class VisualCommonCommitFaultConfiguration {
                 || !java.util.Arrays.asList(sourceArgs).contains("--" + option.key() + "=" + option.value())) {
             throw rejected();
         }
+    }
+
+    private void requirePresentExactly(PropertySource<?> commandLine, String[] sourceArgs, String key) {
+        Object value = commandLine.getProperty(key);
+        long count = java.util.Arrays.stream(sourceArgs).filter(argument -> argument.startsWith("--" + key + "=")).count();
+        if (count != 1 || value == null || value.toString().isBlank()
+                || !java.util.Arrays.asList(sourceArgs).contains("--" + key + "=" + value)) {
+            throw rejected();
+        }
+    }
+
+    private String optionKey(String argument) {
+        int separator = argument.indexOf('=');
+        if (separator <= 2) throw rejected();
+        return argument.substring(2, separator);
     }
 
     private boolean containsVisualCommonFaultArgument(String[] sourceArgs) {
