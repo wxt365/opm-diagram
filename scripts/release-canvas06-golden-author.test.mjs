@@ -7,14 +7,29 @@ import { join, resolve } from 'node:path';
 import test from 'node:test';
 import Ajv2020 from 'ajv/dist/2020.js';
 
-import { GoldenAuthorError, assertCleanSource, collectVerifiedFamilyMaterialization, loadAuthoringLineage, loadFontManifest, parseAuthorOptions, runCandidateTransaction, validateAdapterRequestJoin, writeCandidateAuthoringReport, writeCandidateGoldenEnvironment } from './release-canvas06-golden-author.mjs';
+import { GoldenAuthorError, assertCleanSource, collectVerifiedFamilyMaterialization, commonAdapterInvocation, loadAuthoringLineage, loadFontManifest, parseAuthorOptions, runCandidateTransaction, validateAdapterRequestJoin, writeCandidateAuthoringReport, writeCandidateFromAdapterResults, writeCandidateGoldenEnvironment } from './release-canvas06-golden-author.mjs';
 import { collectFamilyFixtures } from './release-canvas06-golden-materialize.mjs';
 
-test('03B CLI只接受十个显式参数', () => {
+test('03B CLI只接受十一个显式参数', () => {
   const options = authorOptions();
   assert.equal(options.sourceDateEpoch, 1782864000);
   assert.throws(() => parseAuthorOptions(['--plan', '/plan']), error => sameInput(error));
   assert.throws(() => parseAuthorOptions([...authorArgs(), '--force', 'true']), error => sameInput(error));
+});
+
+test('03B Author 在 Family 后以同一预检环境构造 Common callback', () => {
+  const request = { request_id: 'request.common.1' };
+  const invocation = commonAdapterInvocation({
+    request,
+    browser: { realpath: '/controlled/chromium' },
+    familyInputs: { web_dist: '/controlled/web-dist' },
+    plan: { environment_policy: {
+      launch_args: [], locale: 'zh-CN', timezone: 'Asia/Shanghai', color_scheme: 'light', reduced_motion: 'reduce', device_scale_factor: 1,
+      screenshot_options: { animations: 'disabled', caret: 'hide', scale: 'css' },
+    } },
+  });
+  assert.equal(invocation.request, request);
+  assert.equal(typeof invocation.capture_callback, 'function');
 });
 
 test('03B Adapter Request在Plan/JAR/epoch或work root越界时零候选输出拒绝', async () => {
@@ -131,7 +146,7 @@ test('03B候选Environment只接受1242+9 canonical attempt-1 PNG并原子写入
   candidate = await realpath(candidate);
   const plan = candidatePlan();
   const captures = await createPngAssets(candidate, plan.captures, 'capture_id');
-  const blanks = await createPngAssets(candidate, plan.blank_baselines, 'baseline_id');
+  const blanks = await createPngAssets(candidate, plan.blank_baselines, 'baseline_id', 'blank/attempt-1');
   const fonts = await createFonts(root);
   const environment = await writeCandidateGoldenEnvironment({ candidateTemporaryRoot: candidate, plan, browser: { realpath: '/controlled/chromium', byte_length: 1, sha256: 'a'.repeat(64) }, fonts, captureAssets: captures, blankAssets: blanks, runtime: { os_name: 'darwin', os_build: 'macOS-26.0', arch: 'arm64', playwright_version: '1.57.0', chromium_version: '143.0.7499.4' } });
   assert.equal(environment.value.png_refs.length, 1242);
@@ -166,16 +181,128 @@ test('03B candidate transaction只在成功时原子切换最终根', async () =
   assert.equal((await lstat(join(candidate, 'ready.txt'))).isFile(), true);
 });
 
+test('03B主链只消费Family/Common Adapter输出并原子发布1242/2484/9/18 Candidate', async () => {
+  const root = await realpath(await mkdtemp(join(tmpdir(), 'canvas06-author-main-')));
+  const candidate = join(root, 'candidate');
+  const familyWorkRoot = join(root, 'family-work');
+  const commonWorkRoot = join(root, 'common-work');
+  const plan = fullCandidatePlan();
+  const [familyResult, commonResult] = await createAdapterResults({ familyWorkRoot, commonWorkRoot, plan });
+  const fonts = await createFonts(root);
+  const preflight = {
+    plan,
+    planRef: ref('CAPTURE_PLAN', 'capture-plan.json', 'plan'),
+    familyWorkRoot,
+    request: { work_root: commonWorkRoot },
+    browser: { realpath: '/controlled/chromium', byte_length: 1, sha256: 'a'.repeat(64) },
+    fonts,
+    lineage: initialLineage(),
+    materialization: materializationEvidence()
+  };
+  const result = await writeCandidateFromAdapterResults({
+    candidateRoot: candidate,
+    preflight,
+    familyResult,
+    commonResult,
+    dependencies: { chromium: blankChromium(), playwrightVersion: '1.57.0', osName: 'darwin', osBuild: 'test-build', arch: 'arm64' }
+  });
+  assert.equal(result.candidate_root, candidate);
+  assert.equal((await lstat(join(candidate, 'candidate-authoring-report.json'))).isFile(), true);
+  assert.equal((await lstat(join(candidate, 'golden-environment.json'))).isFile(), true);
+  assert.equal((await lstat(join(candidate, 'captures', 'attempt-1', `${plan.captures[0].capture_id}.png`))).isFile(), true);
+  assert.equal((await lstat(join(candidate, 'blank', 'attempt-2', `${plan.blank_baselines[8].baseline_id}.png`))).isFile(), true);
+
+  const rejected = join(root, 'rejected');
+  commonResult.attempt_results[1].observed.png_sha256 = 'f'.repeat(64);
+  await assert.rejects(() => writeCandidateFromAdapterResults({
+    candidateRoot: rejected,
+    preflight,
+    familyResult,
+    commonResult,
+    dependencies: { chromium: blankChromium(), playwrightVersion: '1.57.0', osName: 'darwin', osBuild: 'test-build', arch: 'arm64' }
+  }), error => error instanceof GoldenAuthorError && error.code === 'GOLDEN_AUTHOR_ENVIRONMENT_MISMATCH');
+  await assert.rejects(() => lstat(rejected), { code: 'ENOENT' });
+});
+
 function authorOptions() { return parseAuthorOptions(authorArgs()); }
-function authorArgs() { return ['--plan', '/plan', '--source-root', '/source', '--runtime-jar', '/jar', '--materialization-root', '/materialization', '--candidate-root', '/candidate', '--source-date-epoch', '1782864000', '--common-adapter-request', '/request.json', '--browser-executable', '/browser', '--font-manifest', '/fonts.json', '--authoring-lineage', '/lineage.json']; }
+function authorArgs() { return ['--plan', '/plan', '--source-root', '/source', '--runtime-jar', '/jar', '--web-dist', '/web-dist', '--materialization-root', '/materialization', '--candidate-root', '/candidate', '--source-date-epoch', '1782864000', '--common-adapter-request', '/request.json', '--browser-executable', '/browser', '--font-manifest', '/fonts.json', '--authoring-lineage', '/lineage.json']; }
 function ref(kind, path, bytes) { return { kind, path, byte_length: Buffer.byteLength(bytes), sha256: createHash('sha256').update(bytes).digest('hex') }; }
 async function awaitJson(root, value) { const path = join(root, 'fonts.json'); await writeFile(path, JSON.stringify(value)); return path; }
 function sameInput(error) { return error instanceof GoldenAuthorError && error.code === 'GOLDEN_AUTHOR_INPUT_INVALID' && error.exitCode === 2; }
 
 function candidatePlan() {
   const captures = Array.from({ length: 1242 }, (_, index) => ({ capture_id: `CAPTURE-${index}` }));
-  const blank_baselines = ['VP-1440X900.Z-025', 'VP-1440X900.Z-100', 'VP-1440X900.Z-400', 'VP-1280X800.Z-025', 'VP-1280X800.Z-100', 'VP-1280X800.Z-400', 'VP-390X844.Z-025', 'VP-390X844.Z-100', 'VP-390X844.Z-400'].map(baseline_id => ({ baseline_id }));
-  return { source_date_epoch: 1785628800, captures, blank_baselines, environment_policy: { launch_args: ['--force-color-profile=srgb'], color_profile: 'srgb', locale: 'zh-CN', timezone: 'Asia/Shanghai', color_scheme: 'light', reduced_motion: 'reduce', device_scale_factor: 1, screenshot_options: { animations: 'disabled', caret: 'hide', scale: 'css' } } };
+  const blank_baselines = ['VP-1440X900.Z-025', 'VP-1440X900.Z-100', 'VP-1440X900.Z-400', 'VP-1280X800.Z-025', 'VP-1280X800.Z-100', 'VP-1280X800.Z-400', 'VP-390X844.Z-025', 'VP-390X844.Z-100', 'VP-390X844.Z-400'].map(baseline_id => {
+    const [viewport_id, zoom_id] = baseline_id.split('.');
+    return { baseline_id, viewport_id, zoom_id };
+  });
+  return { source_date_epoch: 1785628800, captures, blank_baselines, environment_policy: { playwright_version: '1.57.0', chromium_version: '143.0.7499.4', launch_args: ['--force-color-profile=srgb'], color_profile: 'srgb', locale: 'zh-CN', timezone: 'Asia/Shanghai', color_scheme: 'light', reduced_motion: 'reduce', device_scale_factor: 1, screenshot_options: { animations: 'disabled', caret: 'hide', scale: 'css' } } };
+}
+
+function fullCandidatePlan() {
+  const plan = candidatePlan();
+  plan.captures = [
+    ...Array.from({ length: 1170 }, (_, index) => ({ capture_id: `FAMILY-${String(index).padStart(4, '0')}`, capture_kind: 'FAMILY' })),
+    ...Array.from({ length: 72 }, (_, index) => ({ capture_id: `COMMON-${String(index).padStart(3, '0')}`, capture_kind: 'COMMON' }))
+  ];
+  enrichPlanForReport(plan);
+  return plan;
+}
+
+async function createAdapterResults({ familyWorkRoot, commonWorkRoot, plan }) {
+  const family = plan.captures.filter(value => value.capture_kind === 'FAMILY');
+  const common = plan.captures.filter(value => value.capture_kind === 'COMMON');
+  const familyAttempts = [];
+  for (const [ordinal, capture] of family.entries()) {
+    for (const attemptOrdinal of [1, 2]) {
+      const bytes = Buffer.from(`family:${capture.capture_id}`);
+      const path = join(familyWorkRoot, 'attempts', String(ordinal).padStart(4, '0'), `attempt-${attemptOrdinal}`, 'artifacts', 'capture.png');
+      await mkdir(resolve(path, '..'), { recursive: true }); await writeFile(path, bytes);
+      familyAttempts.push({ capture_ordinal: ordinal, capture_id: capture.capture_id, attempt_ordinal: attemptOrdinal, observed: observed(capture.capture_id, attemptOrdinal, bytes, 1440, 900) });
+    }
+  }
+  const commonAttempts = [];
+  for (const [ordinal, capture] of common.entries()) {
+    for (const attemptOrdinal of [1, 2]) {
+      const bytes = Buffer.from(`common:${capture.capture_id}`);
+      const path = join(commonWorkRoot, 'attempts', String(ordinal).padStart(3, '0'), `attempt-${attemptOrdinal}`, 'capture.png');
+      await mkdir(resolve(path, '..'), { recursive: true }); await writeFile(path, bytes);
+      commonAttempts.push({ common_capture_ordinal: ordinal, capture_id: capture.capture_id, attempt_ordinal: attemptOrdinal, observed: observed(capture.capture_id, attemptOrdinal, bytes, 1440, 900) });
+    }
+  }
+  return [
+    { status: 'READY_FOR_CANDIDATE_TRANSACTION', attempt_results: familyAttempts, summary: { family_capture_count: 1170, attempt_count: 2340, deterministic: true } },
+    { status: 'READY_FOR_CANDIDATE_TRANSACTION', attempt_results: commonAttempts, summary: { common_capture_count: 72, attempt_count: 144, deterministic: true } }
+  ];
+}
+
+function observed(captureId, attemptOrdinal, bytes, width, height) {
+  return { capture_id: captureId, attempt_ordinal: attemptOrdinal, png_byte_length: bytes.length, png_sha256: sha(bytes), width, height, cell_geometry_sha256: sha(`geometry:${captureId}`), projection_sha256: sha(`projection:${captureId}`) };
+}
+
+function blankChromium() {
+  return {
+    async launch() {
+      return {
+        async version() { return '143.0.7499.4'; },
+        async newContext({ viewport }) {
+          return {
+            async newPage() {
+              return {
+                async goto(url) { assert.equal(url, 'about:blank'); },
+                url() { return 'about:blank'; },
+                async evaluate() {},
+                async screenshot({ path }) { await writeFile(path, `blank:${viewport.width}x${viewport.height}`); },
+                async close() {}
+              };
+            },
+            async close() {}
+          };
+        },
+        async close() {}
+      };
+    }
+  };
 }
 
 function enrichPlanForReport(plan) {
@@ -217,13 +344,13 @@ function identity(command) { return { runner_version: '0.2.0', source_commit: 'd
 function key(index) { return index.toString(16).padStart(64, '0'); }
 function sha(value) { return createHash('sha256').update(value).digest('hex'); }
 
-async function createPngAssets(root, entries, idKey) {
+async function createPngAssets(root, entries, idKey, directory = 'captures/attempt-1') {
   const assets = [];
   for (const entry of entries) {
-    const path = join(root, 'captures', 'attempt-1', `${entry[idKey]}.png`);
+    const path = join(root, directory, `${entry[idKey]}.png`);
     await mkdir(resolve(path, '..'), { recursive: true });
     await writeFile(path, Buffer.from('png'));
-    assets.push({ [idKey]: entry[idKey], path: `captures/attempt-1/${entry[idKey]}.png` });
+    assets.push({ [idKey]: entry[idKey], path: `${directory}/${entry[idKey]}.png` });
   }
   return assets;
 }

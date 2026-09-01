@@ -1,10 +1,10 @@
 # OPM 单机建模工具全量设计冻结基线
 
-文档版本：`1.75`
+文档版本：`1.76`
 
 初始冻结日期：`2026-07-30`
 
-最近复核日期：`2026-08-30`
+最近复核日期：`2026-09-01`
 
 设计冻结状态：`FROZEN`
 
@@ -353,6 +353,8 @@ development_gate=READY_FOR_DEVELOPMENT
 
 当前允许按已冻结独立实现规格恢复Recovery `RECOVERY-IMPL-01`，并继续其他已解锁切片；03C Node adapter必须先使Adapter Test Input Builder/Verifier符合Runtime/JDK修正并通过完整验收，再执行8/144；每个切片仍须独立Build/Verify，不能引用全局设计准入冒充实现或release完成。
 
+2026-09-01 复核记录七十三：`DFR-017` 的物理格式虽已冻结，但仍缺 Manifest machine Schema、摘要预像、Decimal canonical JSON 与 ZIP 安全限额，不能安全实现。新增 EXCHANGE-01 机器契约、L3 实现规格和检查清单后，实现 `.opmp` ZIP Writer/Reader、JCS Manifest digest、Decimal entry canonicalizer、路径/重复/symlink/压缩限制、required extension/版本/依赖拒绝及 `MODEL_REVISION` 只读内存适配。定向 Java `7/7`、Schema `2/2`、全局 contract validate 与 diff check 均通过；`PROJECT_FULL`/`BASELINE_ASSET` 仍仅 inspection，SQLite 写入、导入提交、静态 golden 文件、生产发布和 ISO 证据均未实现或运行。设计责任仍为`32=22+10`，`blocked/unresolved/cross_document_conflict=0`。
+
 ## 9. 实现与证据状态
 
 设计状态与实现状态必须分栏。当前设计冻结结论不修改以下事实：
@@ -367,7 +369,7 @@ development_gate=READY_FOR_DEVELOPMENT
 | Golden Authoring Schema/runner/approved version | 三类`0.1` Schema、Capture Planner及Environment/Approval/Authoring/Visual Manifest `0.2` Schema已实现；Common Visual Fixture`0.1`、活动Adapter Request`0.2`、Adapter Test Input Bundle`0.1`、其余三份adapter`0.1`、Clone Result/Runtime Ready两份`0.1` Schema、launch/READY/关闭协议和共享JCS输入已冻结。Adapter测试Builder/Verifier实现已出现但Runtime kind与Planner JDK env未符合修正、尚未接纳；Java Base/Clone/Web已有局部实现和单例验证，Node adapter尚未消费完整Bundle/Request，8 base/144 clone为`NOT_RUN/NOT_ACCEPTED`，fault hook为`PARTIAL_NOT_ACCEPTED`；03B为`BLOCKED_BY_DEPENDENCY`，04/05及真实实体/approved version为`NOT_IMPLEMENTED/NOT_RUN` |
 | Golden Fixture Materializer | `IMPLEMENTED/NOT_RELEASE_VALIDATED`；`v1.5` pending预验证、唯一四阶段quarantine、Catalog `v1.1` 63/63、受控130项串行/并发4及contract/backend已闭环；真实production 130项与release evidence尚未生成 |
 | Recovery Execution | 历史五份`0.1` Schema、活动Manifest `0.2`、Reopen Catalog/API Request Artifact/Launch Request/Launch Proof `0.1` Schema已实现，Execution设计`v1.5`、Projection Digest `v1.0/0.1`、Catalog与两份`0.1.0` template输入已冻结；`RECOVERY-IMPL-01=DESIGN_READY/IMPLEMENTATION_NOT_STARTED`，完整factory、fault/reachpoint、launcher、artifact、真实28/56及READY Report为`NOT_IMPLEMENTED/NOT_RUN` |
-| `.opmp` 1.0 Schema/reader/writer/golden roundtrip | `NOT_IMPLEMENTED/NOT_RUN`；物理格式已冻结不等于实现完成 |
+| `.opmp` 1.0 Schema/reader/writer/Revision roundtrip | `IMPLEMENTED/UNIT_VERIFIED`：EXCHANGE-01 已实现容器、inspection 与 `MODEL_REVISION` 内存适配；`PROJECT_FULL`/`BASELINE_ASSET` 提交、静态 golden、生产和外部互操作仍为`NOT_IMPLEMENTED/NOT_RUN` |
 | production enablement | 默认 `DISABLED` |
 | ISO 19450:2024 conformance | `EVIDENCE_MISSING/无法判断` |
 
@@ -388,7 +390,7 @@ development_gate=READY_FOR_DEVELOPMENT
 2. Control/Structural concrete OPL、Token/Trace、golden、Golden Authoring `v1.4`、Visual Common Materialization `v1.10`、Common Visual Fixture、活动Adapter Request`0.2`、Adapter Test Input Bundle`0.1`与其余三份adapter`0.1`、Clone Result/Runtime Ready机器契约`0.1`、03C Adapter/Fault、Clone/Web Runtime、Adapter受控输入、测试Builder、Runtime-JDK及44-file inventory闭包、Golden Fixture Materializer `v1.5`、Verifier Catalog `v1.1`、历史E2E Manifest/Attempt Artifact `0.1`、活动Manifest/Attempt Artifact `0.2`与Profile/Digest closure、Manifest v02 producer/verifier及集成Source重建规格、Common Driver/controlled orchestration `v1.11`、Family Driver `v1.6`、Family Error Code Mapping及Controlled Invocation Closure、Stage A Lifecycle与Release Discovery/Source Guard、Runner Source Set `0.2/24`目标与Final Production Source Chain、Fault Launcher `v1.9`、活动Report `0.2`/Family Fixture Identity Catalog `0.1/0.1.0`、Recovery Execution `v1.5`与Launch Request/Proof `0.1`、Projection Digest `v1.0/0.1`均已冻结；
 3. 当前 OpenAPI 已出现 `base_fact_capability_ref`、`AllowedModifier` 和 State/Fact command union；Revision 0.1 Schema 已出现 Fact `modifiers[]`；
 4. 当前机器文件的存在不等于 generated client、handler、roundtrip、release 或 ISO 证据通过；
-5. `.opmp` 首发物理格式和版本已经冻结，机器 Schema、reader/writer、golden package 与 roundtrip 仍待实现；
+5. `.opmp` 首发物理格式和版本已经冻结；EXCHANGE-01 已提供 machine Schema、Reader/Writer 与 Revision 单元 roundtrip，Project/Baseline 持久化导入、静态 golden package、生产与外部互操作仍待实现；
 6. `.harness/repo-profile.md` 与当前应用仓库事实不一致，本任务按边界不修改 `.harness/**`。该治理偏差不改变产品设计语义，但后续 Harness 治理任务必须修正。
 
 ### 11.2 假设/解释

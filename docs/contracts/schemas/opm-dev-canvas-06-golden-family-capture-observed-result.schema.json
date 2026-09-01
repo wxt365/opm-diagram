@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:opm:contract:dev-canvas-06:golden-family-capture-observed-result:0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "result_version", "capture_id", "attempt_ordinal", "identity_payload_sha256", "ui_setup_status", "stability_status", "png_ref", "projection_ref", "geometry_ref", "png_byte_length", "png_sha256", "width", "height", "cell_geometry_sha256", "projection_sha256", "observed_cells", "focus_target_id", "focus_anchor", "result_payload_sha256"],
+  "properties": {
+    "schema_id": {"const": "OPM-DEV-CANVAS-06-GOLDEN-FAMILY-CAPTURE-OBSERVED-RESULT-001"},
+    "schema_version": {"const": "0.1"},
+    "result_version": {"const": "0.1.0"},
+    "capture_id": {"type": "string", "minLength": 1}, "attempt_ordinal": {"enum": [1, 2]},
+    "identity_payload_sha256": {"$ref": "#/$defs/digest"}, "ui_setup_status": {"const": "READY"}, "stability_status": {"const": "STABLE"},
+    "png_ref": {"$ref": "#/$defs/ref"}, "projection_ref": {"$ref": "#/$defs/ref"}, "geometry_ref": {"$ref": "#/$defs/ref"}, "png_byte_length": {"type": "integer", "minimum": 1}, "png_sha256": {"$ref": "#/$defs/digest"}, "width": {"type": "integer", "minimum": 1}, "height": {"type": "integer", "minimum": 1},
+    "cell_geometry_sha256": {"$ref": "#/$defs/digest"}, "projection_sha256": {"$ref": "#/$defs/digest"}, "observed_cells": {"type": "integer", "minimum": 1},
+    "focus_target_id": {"type": "string", "minLength": 1}, "focus_anchor": {"enum": ["CENTER", "SOURCE", "TARGET", "LABEL", "JUNCTION"]}, "result_payload_sha256": {"$ref": "#/$defs/digest"}
+  },
+  "$defs": {"digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"}, "path": {"type": "string", "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*//).+$"}, "ref": {"type": "object", "additionalProperties": false, "required": ["kind", "path", "byte_length", "sha256"], "properties": {"kind": {"type": "string", "minLength": 1}, "path": {"$ref": "#/$defs/path"}, "byte_length": {"type": "integer", "minimum": 1}, "sha256": {"$ref": "#/$defs/digest"}}}}
+}

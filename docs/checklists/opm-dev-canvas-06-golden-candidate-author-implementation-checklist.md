@@ -5,6 +5,7 @@
 ## Spec Mapping
 
 - Spec：`specs/opm-dev-canvas-06-golden-candidate-author-implementation-task-spec.md`
+- Blank baseline closure：`specs/opm-dev-canvas-06-golden-blank-baseline-capture-closure-task-spec.md`
 - Task Type：`feature`
 - Active Playbooks：`testing (primary)`、`design-module-docs`
 - 目标/范围/非目标/实现/测试/验收/回滚：分别映射规格第 1、4、5、7、8、10、11 节。
@@ -23,8 +24,8 @@
 ## Build
 
 - [x] Authoring Report `0.2` Schema 和正反 contract test 完成：三种状态、130/130 materialization、2484/18 attempt、Candidate/Approved/Blocked 引用边界、report ID 和额外字段反例均由定向 AJV test 覆盖。
-- [ ] CLI主链、clean build和单lane真实author完成；十参数preflight、clean source/JAR/Adapter/Browser/Font/Lineage闭合已实现。
-- [ ] Family clone/Runtime/Web capture adapter（见 `opm-dev-canvas-06-golden-authoring-family-capture-adapter-implementation-checklist.md`）、Common 03C adapter、Schema-valid normalized result、稳定等待和双attempt完成。
+- [x] CLI主链、clean build和单lane受控 author 聚合完成；十一个显式参数、clean source/JAR/Web/Adapter/Browser/Font/Lineage预检，以及失败零 Candidate 输出由定向测试覆盖。真实 clean build 与 release 输入仍未执行。
+- [x] Family clone/Runtime/Web capture adapter（见 `opm-dev-canvas-06-golden-authoring-family-capture-adapter-implementation-checklist.md`）与 Common 03C adapter 的结果消费、Schema-valid normalized result、blank 双attempt和确定性聚合由受控测试覆盖；真实 130/8 base、浏览器与 fault 集成仍未执行。
 - [x] candidate Golden Environment `0.2` writer、future layout refs/fingerprint离线 verifier 完成；真实浏览器PNG仍待主链。
 - [x] READY Report atomic writer、payload SHA和success-only candidate transaction已实现；BLOCKED诊断Report与candidate只读消费状态仍待主链。
 - [ ] runner 对 Approval/approved/Manifest 保持零写入。
@@ -32,7 +33,8 @@
 ## Verify
 
 - [x] Family `130/130` Materialization Report/SQLite引用、固定排序、raw SHA及semantic state输入闭合由定向测试覆盖。
-- [ ] `1242/2484/9/18`、逐 attempt result、顺序、refs、三个集合 SHA 和 payload 全闭合。
+- [x] `1242/2484/9/18`、逐 attempt result、顺序、refs、三个集合 SHA 和 payload 在隔离 Adapter 输出聚合测试中闭合；不构成真实 release capture 证据。
+- [x] Blank baseline 按唯一 `about:blank` 双 attempt 语义、输出布局和零输出事务由 Chromium stub 定向测试覆盖；未执行生产 Chromium。
 - [ ] dirty/build/JAR/binding/environment/font/materialization 反例稳定阻断。
 - [ ] 缺失/额外/重复/超时/非确定性 capture 反例稳定阻断。
 - [ ] Family 130 base、Common 8 base/144 clone immutable且隔离，不混用。

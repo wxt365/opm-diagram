@@ -57,6 +57,40 @@ describe("localRuntimeApi", () => {
 
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  it("关系目录查询携带显式 Context 和 revision", async () => {
+    const fetchMock = vi.fn(async () => response(200, { meta: {}, data: { items: [] } }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await localRuntimeApi.relationCatalog("project.test", "model.test", "context.root", "revision.1");
+
+    expect(fetchMock.mock.calls[0]?.[0]).toMatch(/contexts\/context\.root\/relation-catalog\?request_id=query\.relation-catalog\.[a-f0-9]+&revision=revision\.1$/);
+  });
+
+  it("release-only descriptor 查询绑定 Context 和 revision", async () => {
+    const fetchMock = vi.fn(async () => response(200, { meta: {}, data: releaseVisualCommonFaultCommand() }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await localRuntimeApi.releaseVisualCommonFaultCommand("project.test", "model.test", "context.root", "revision.1");
+
+    expect(fetchMock.mock.calls[0]?.[0]).toMatch(/contexts\/context\.root\/release-visual-common-fault-command\?request_id=query\.release-visual-common-fault-command\.[a-f0-9]+&revision=revision\.1$/);
+  });
+
+  it("release-only command 只透传 Runtime descriptor，不开放通用 command id 覆盖", async () => {
+    window.__OPM_LOCAL_SESSION__ = "session-from-bootstrap";
+    window.__OPM_ACTIVE_PROFILE_BINDING__ = binding();
+    const fetchMock = vi.fn(async () => response(200, { meta: { committed_revision: "revision.2" }, data: {} }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await localRuntimeApi.executeReleaseVisualCommonFaultCommand("project.test", "model.test", "context.root", "revision.1", releaseVisualCommonFaultCommand());
+
+    const [, request] = fetchMock.mock.calls[0] ?? [];
+    expect(JSON.parse((request as RequestInit).body as string)).toMatchObject({
+      command_id: "command.visual.blocked-feedback.persistence-failed",
+      command_type: "CREATE_FACT",
+      payload: releaseVisualCommonFaultCommand().payload,
+    });
+  });
 });
 
 function project() {
@@ -69,6 +103,20 @@ function model() {
 
 function binding() {
   return { profile_id: "profile.iso19450.2024.draft", profile_version: "0.2.0", rule_set_id: "rules.iso19450.2024.draft", rule_version: "0.1.0" };
+}
+
+function releaseVisualCommonFaultCommand() {
+  return {
+    command_id: "command.visual.blocked-feedback.persistence-failed" as const,
+    command_type: "CREATE_FACT" as const,
+    payload: {
+      kind: "CONSUMPTION" as const,
+      fact_id: "fact.visual.blocked-feedback.one-shot" as const,
+      object_id: "element.visual.blocked-feedback.input" as const,
+      process_id: "element.visual.blocked-feedback.process" as const,
+      layout: { x: 340 as const, y: 266 as const },
+    },
+  };
 }
 
 function response(status: number, body: unknown) {

@@ -18,6 +18,8 @@ const props = defineProps<{
   selectedId: string;
   zoom: number;
   statePlacementOwnerId?: string;
+  relationPreview?: { candidateId: string; sourceId: string; targetId: string };
+  highlightedFindingTargetId?: string;
 }>();
 
 const emit = defineEmits<{
@@ -47,6 +49,8 @@ function renderGraph() {
       label: node.label,
       attrs: {
         body: {
+          "data-opm-capture-cell-id": node.occurrenceId,
+          "data-testid": `p03-occurrence-${node.occurrenceId}`,
           fill: node.id === props.selectedId ? "#eaf3fc" : "#ffffff",
           stroke: "#20242a",
           strokeWidth: isInitial ? 4 : 2,
@@ -72,7 +76,7 @@ function renderGraph() {
     if (endpoints.length === 3 && relation.symbolRef.startsWith("symbol.link.effect")) {
       const [input, process, output] = endpoints;
       if (!input || !process || !output) return;
-      addRelationEdge(`${relation.id}.input`, input.targetId, process.targetId, relation, true, true);
+      addRelationEdge(`${relation.id}.input`, input.targetId, process.targetId, relation, true, true, relation.occurrenceId);
       addRelationEdge(`${relation.id}.output`, process.targetId, output.targetId, relation, true, false);
       return;
     }
@@ -80,9 +84,29 @@ function renderGraph() {
       addStructuralRelation(relation, endpoints);
       return;
     }
-    addRelationEdge(relation.id, relation.sourceId, relation.targetId, relation, false, true);
+    addRelationEdge(relation.id, relation.sourceId, relation.targetId, relation, false, true, relation.occurrenceId);
   });
+  if (props.relationPreview) addCandidatePreview(props.relationPreview);
   graph.zoomTo(props.zoom / 100);
+}
+
+function addCandidatePreview(preview: NonNullable<typeof props.relationPreview>) {
+  graph?.addEdge({
+    id: preview.candidateId,
+    source: preview.sourceId,
+    target: preview.targetId,
+    zIndex: 3,
+    attrs: {
+      line: {
+        "data-opm-candidate-cell-id": preview.candidateId,
+        "data-testid": `p03-candidate-${preview.candidateId}`,
+        stroke: "#2f7abf",
+        strokeDasharray: "6 4",
+        strokeWidth: 2,
+        targetMarker: { name: "classic", width: 10, height: 8, fill: "#ffffff", stroke: "#2f7abf" },
+      },
+    },
+  });
 }
 
 function addStructuralRelation(relation: ConsumptionRelation, endpoints: NonNullable<ConsumptionRelation["endpoints"]>) {
@@ -106,6 +130,9 @@ function addStructuralRelation(relation: ConsumptionRelation, endpoints: NonNull
     labels: structuralLabels(relation),
     attrs: {
       line: {
+        "data-opm-capture-cell-id": relation.occurrenceId,
+        "data-testid": `p03-occurrence-${relation.occurrenceId}`,
+        "data-opm-finding-highlight": findingHighlight(relation),
         stroke: "#20242a",
         strokeWidth: 2,
         sourceMarker: bidirectional ? marker : undefined,
@@ -141,7 +168,7 @@ function addStructuralFan(relation: ConsumptionRelation, endpoints: NonNullable<
       label: { text: "" },
     },
   });
-  graph?.addEdge({ id: `${relation.id}.root`, source: root.targetId, target: junctionId, zIndex: 1, data: relationData(relation), attrs: { line: { stroke: "#20242a", strokeWidth: 2 } } });
+  graph?.addEdge({ id: `${relation.id}.root`, source: root.targetId, target: junctionId, zIndex: 1, data: relationData(relation), attrs: { line: { "data-opm-capture-cell-id": relation.occurrenceId, "data-testid": `p03-occurrence-${relation.occurrenceId}`, "data-opm-finding-highlight": findingHighlight(relation), stroke: "#20242a", strokeWidth: 2 } } });
   members.forEach((member, index) => {
     graph?.addEdge({
       id: `${relation.id}.member.${index}`,
@@ -171,6 +198,10 @@ function relationData(relation: ConsumptionRelation) {
   return { relationId: relation.id, sourceOccurrenceId: relation.sourceOccurrenceId, targetOccurrenceId: relation.targetOccurrenceId, symbolRef: relation.symbolRef, layoutRef: relation.layoutRef };
 }
 
+function findingHighlight(relation: ConsumptionRelation) {
+  return relation.id === props.highlightedFindingTargetId ? "true" : "false";
+}
+
 function structuralLabels(relation: ConsumptionRelation) {
   return (relation.labels ?? []).map((label) => ({
     position: label.slotId === "forward_tag" ? 0.35 : label.slotId === "reverse_tag" ? 0.65 : 0.5,
@@ -178,7 +209,7 @@ function structuralLabels(relation: ConsumptionRelation) {
   }));
 }
 
-function addRelationEdge(id: string, source: string, target: string, relation: ConsumptionRelation, effectSegment: boolean, processInputSegment: boolean) {
+function addRelationEdge(id: string, source: string, target: string, relation: ConsumptionRelation, effectSegment: boolean, processInputSegment: boolean, captureCellId?: string) {
   const symbol = relation.symbolRef;
   const isAgent = symbol === "symbol.link.agent" || symbol === "symbol.link.agent.state";
   const isInstrument = symbol === "symbol.link.instrument" || symbol === "symbol.link.instrument.state";
@@ -205,6 +236,8 @@ function addRelationEdge(id: string, source: string, target: string, relation: C
     ],
     attrs: {
       line: {
+        ...(captureCellId ? { "data-opm-capture-cell-id": captureCellId, "data-testid": `p03-occurrence-${captureCellId}` } : {}),
+        "data-opm-finding-highlight": findingHighlight(relation),
         stroke: "#20242a",
         strokeWidth: 2,
         sourceMarker: effectSegment ? { name: "classic", width: 10, height: 8, fill: "#ffffff", stroke: "#20242a" } : undefined,

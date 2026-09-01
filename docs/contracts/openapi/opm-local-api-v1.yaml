@@ -19,6 +19,7 @@ tags:
   - name: Models
   - name: Contexts
   - name: Editing
+  - name: Catalog
   - name: Text
   - name: Validation
   - name: Versions
@@ -217,6 +218,48 @@ paths:
                 $ref: "#/components/schemas/CommandCapabilitiesResult"
         default:
           $ref: "#/components/responses/ErrorResponse"
+  /projects/{projectId}/models/{modelId}/contexts/{contextId}/relation-catalog:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+      - $ref: "#/components/parameters/ModelId"
+      - $ref: "#/components/parameters/ContextId"
+      - $ref: "#/components/parameters/Revision"
+    get:
+      tags: [Catalog]
+      operationId: API-CAT-001
+      summary: 读取活动 Profile 的全量关系工具目录
+      description: >-
+        目录只表示可见 capability，不是创建或更新 Fact 的授权。Control 条目只能通过既有 Procedural Fact 的 UPDATE_FACT 候选形成。
+      responses:
+        "200":
+          description: 与修订绑定的关系目录
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RelationCatalogResult"
+        default:
+          $ref: "#/components/responses/ErrorResponse"
+  /projects/{projectId}/models/{modelId}/contexts/{contextId}/release-visual-common-fault-command:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+      - $ref: "#/components/parameters/ModelId"
+      - $ref: "#/components/parameters/ContextId"
+      - $ref: "#/components/parameters/Revision"
+    get:
+      tags: [ReleaseAuthoring]
+      operationId: API-REL-003
+      summary: 发现受控 Visual Common 一次性故障命令
+      description: >-
+        仅在 release-only Runtime 已通过 one-shot fault launch guard 且请求 identity 完全匹配 BLOCKED_FEEDBACK fixture 时返回固定 descriptor；普通 Runtime 返回 NOT_FOUND。
+      responses:
+        "200":
+          description: 受控命令 descriptor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReleaseVisualCommonFaultCommandResult"
+        default:
+          $ref: "#/components/responses/ErrorResponse"
   /projects/{projectId}/models/{modelId}/contexts/{contextId}/commands:
     parameters:
       - $ref: "#/components/parameters/ProjectId"
@@ -272,6 +315,44 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/TextProjectionResult"
+        default:
+          $ref: "#/components/responses/ErrorResponse"
+  /projects/{projectId}/models/{modelId}/contexts/{contextId}/findings:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+      - $ref: "#/components/parameters/ModelId"
+      - $ref: "#/components/parameters/ContextId"
+      - $ref: "#/components/parameters/Revision"
+    get:
+      tags: [Validation]
+      operationId: API-VAL-003
+      summary: 读取 Context 内与修订绑定的 Finding 列表
+      responses:
+        "200":
+          description: Finding 列表
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FindingListResult"
+        default:
+          $ref: "#/components/responses/ErrorResponse"
+  /projects/{projectId}/models/{modelId}/contexts/{contextId}/operation-records:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+      - $ref: "#/components/parameters/ModelId"
+      - $ref: "#/components/parameters/ContextId"
+      - $ref: "#/components/parameters/Revision"
+    get:
+      tags: [Versions]
+      operationId: API-VER-006
+      summary: 读取与修订绑定的 Operation Record 历史
+      responses:
+        "200":
+          description: Operation Record 列表
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OperationRecordListResult"
         default:
           $ref: "#/components/responses/ErrorResponse"
   /projects/{projectId}/models/{modelId}/validation-tasks:
@@ -642,10 +723,11 @@ components:
               type: array
               items:
                 type: object
-                required: [occurrence_id, target_id, construct_role, layout]
+                required: [occurrence_id, target_id, target_kind, construct_role, capability_id, layout]
                 properties:
                   occurrence_id: {$ref: "#/components/schemas/StableId"}
                   target_id: {$ref: "#/components/schemas/StableId"}
+                  target_kind: {type: string, enum: [ELEMENT, FEATURE, STATE, FACT]}
                   construct_role: {type: string}
                   label: {type: string}
                   owner_id: {$ref: "#/components/schemas/StableId"}
@@ -695,6 +777,63 @@ components:
             options:
               type: array
               items: {$ref: "#/components/schemas/CommandCapabilityOption"}
+    RelationCatalogResult:
+      type: object
+      additionalProperties: false
+      required: [meta, data]
+      properties:
+        meta: {$ref: "#/components/schemas/QueryMeta"}
+        data:
+          type: object
+          additionalProperties: false
+          required: [items]
+          properties:
+            items:
+              type: array
+              minItems: 34
+              maxItems: 34
+              items:
+                type: object
+                additionalProperties: false
+                required: [family, capability_id, display_name, symbol_id, enabled, reason_codes]
+                properties:
+                  family: {type: string, enum: [PROCEDURAL, CONTROL, STRUCTURAL]}
+                  capability_id: {$ref: "#/components/schemas/StableId"}
+                  display_name: {type: string, minLength: 1, maxLength: 256}
+                  symbol_id: {$ref: "#/components/schemas/StableId"}
+                  enabled: {type: boolean}
+                  reason_codes:
+                    type: array
+                    items: {type: string, minLength: 1, maxLength: 128}
+    ReleaseVisualCommonFaultCommandResult:
+      type: object
+      additionalProperties: false
+      required: [meta, data]
+      properties:
+        meta: {$ref: "#/components/schemas/QueryMeta"}
+        data:
+          type: object
+          additionalProperties: false
+          required: [command_id, command_type, payload]
+          properties:
+            command_id: {const: command.visual.blocked-feedback.persistence-failed}
+            command_type: {const: CREATE_FACT}
+            payload:
+              type: object
+              additionalProperties: false
+              required: [kind, fact_id, object_id, process_id, layout]
+              properties:
+                kind: {const: CONSUMPTION}
+                fact_id: {const: fact.visual.blocked-feedback.one-shot}
+                object_id: {const: element.visual.blocked-feedback.input}
+                process_id: {const: element.visual.blocked-feedback.process}
+                layout:
+                  type: object
+                  additionalProperties: false
+                  required: [x, y]
+                  properties:
+                    x: {const: 340}
+                    y: {const: 266}
     ExecuteEditCommandRequest:
       type: object
       unevaluatedProperties: false
@@ -1176,6 +1315,49 @@ components:
                   sentence_id: {$ref: "#/components/schemas/StableId"}
                   fact_ids: {type: array, items: {$ref: "#/components/schemas/StableId"}}
                   occurrence_ids: {type: array, items: {$ref: "#/components/schemas/StableId"}}
+    FindingListResult:
+      type: object
+      additionalProperties: false
+      required: [meta, data]
+      properties:
+        meta: {$ref: "#/components/schemas/QueryMeta"}
+        data:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [finding_id, rule_id, severity, category, context_id, entity_id]
+            properties:
+              finding_id: {$ref: "#/components/schemas/StableId"}
+              rule_id: {$ref: "#/components/schemas/StableId"}
+              severity: {type: string, enum: [BLOCKING, WARNING, SUGGESTION]}
+              category: {type: string, minLength: 1}
+              context_id: {$ref: "#/components/schemas/StableId"}
+              entity_id: {$ref: "#/components/schemas/StableId"}
+    OperationRecordListResult:
+      type: object
+      additionalProperties: false
+      required: [meta, data]
+      properties:
+        meta: {$ref: "#/components/schemas/QueryMeta"}
+        data:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [operation_record_id, project_id, model_id, operation_id, aggregate_id, command_id, input_revision_id, result_revision_id, result_status, diagnostic_id, occurred_at]
+            properties:
+              operation_record_id: {$ref: "#/components/schemas/StableId"}
+              project_id: {$ref: "#/components/schemas/StableId"}
+              model_id: {$ref: "#/components/schemas/StableId"}
+              operation_id: {$ref: "#/components/schemas/StableId"}
+              aggregate_id: {$ref: "#/components/schemas/StableId"}
+              command_id: {$ref: "#/components/schemas/StableId"}
+              input_revision_id: {$ref: "#/components/schemas/StableId"}
+              result_revision_id: {anyOf: [{$ref: "#/components/schemas/StableId"}, {type: "null"}]}
+              result_status: {type: string, minLength: 1}
+              diagnostic_id: {anyOf: [{$ref: "#/components/schemas/StableId"}, {type: "null"}]}
+              occurred_at: {type: string, format: date-time}
     ValidateModelRequest:
       type: object
       unevaluatedProperties: false

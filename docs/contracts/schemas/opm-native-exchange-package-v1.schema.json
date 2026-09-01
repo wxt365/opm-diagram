@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://opm.local/contracts/opm-native-exchange-package-v1.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "package_id", "package_kind", "exchange_format_version", "minimum_reader_version", "created_at", "producer_application", "identity_namespace", "source", "entries", "extensions", "package_digest"],
+  "properties": {
+    "schema_id": {"const": "OPM-NATIVE-EXCHANGE-001"},
+    "schema_version": {"const": "1.0"},
+    "package_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "package_kind": {"enum": ["PROJECT_FULL", "MODEL_REVISION", "BASELINE_ASSET"]},
+    "exchange_format_version": {"const": "1.0"},
+    "minimum_reader_version": {"const": "1.0"},
+    "created_at": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"},
+    "producer_application": {"$ref": "#/$defs/producer"},
+    "identity_namespace": {"type": "string", "minLength": 1, "maxLength": 512},
+    "source": {"$ref": "#/$defs/source"},
+    "entries": {"type": "array", "minItems": 1, "maxItems": 64, "items": {"$ref": "#/$defs/entry"}},
+    "extensions": {"type": "array", "maxItems": 32, "items": {"$ref": "#/$defs/extension"}},
+    "package_digest": {"$ref": "#/$defs/digest"}
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "logicalPath": {"type": "string", "maxLength": 1024, "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*\\\\)(?!.*\\u0000)[A-Za-z0-9][A-Za-z0-9._-]*(?:/[A-Za-z0-9][A-Za-z0-9._-]*)*$"},
+    "producer": {"type": "object", "additionalProperties": false, "required": ["application_id", "version"], "properties": {"application_id": {"type": "string", "minLength": 1, "maxLength": 128}, "version": {"type": "string", "minLength": 1, "maxLength": 128}}},
+    "source": {"type": "object", "additionalProperties": false, "required": ["project_id", "model_id", "revision_id", "baseline_id"], "properties": {"project_id": {"type": ["string", "null"], "maxLength": 128}, "model_id": {"type": ["string", "null"], "maxLength": 128}, "revision_id": {"type": ["string", "null"], "maxLength": 128}, "baseline_id": {"type": ["string", "null"], "maxLength": 128}}},
+    "schemaRef": {"type": "object", "additionalProperties": false, "required": ["schema_id", "schema_version"], "properties": {"schema_id": {"type": "string", "minLength": 1, "maxLength": 256}, "schema_version": {"type": "string", "minLength": 1, "maxLength": 64}}},
+    "entry": {"type": "object", "additionalProperties": false, "required": ["entry_id", "entry_role", "logical_path", "media_type", "schema_ref", "required", "byte_length", "sha256", "depends_on"], "properties": {"entry_id": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]{2,63}$"}, "entry_role": {"enum": ["MODEL_CATALOG", "SEMANTIC_REVISION", "CAPABILITY_REPORT", "PROJECT_CATALOG", "BASELINE", "PROFILE", "RULE", "GRAMMAR", "TEXT", "TRACE", "VALIDATION", "ASSET", "EXTENSION"]}, "logical_path": {"$ref": "#/$defs/logicalPath"}, "media_type": {"type": "string", "minLength": 1, "maxLength": 128}, "schema_ref": {"$ref": "#/$defs/schemaRef"}, "required": {"type": "boolean"}, "byte_length": {"type": "integer", "minimum": 1, "maximum": 16777216}, "sha256": {"$ref": "#/$defs/digest"}, "depends_on": {"type": "array", "uniqueItems": true, "maxItems": 32, "items": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]{2,63}$"}}}},
+    "extension": {"type": "object", "additionalProperties": false, "required": ["extension_id", "version", "required"], "properties": {"extension_id": {"type": "string", "minLength": 1, "maxLength": 256}, "version": {"type": "string", "minLength": 1, "maxLength": 64}, "required": {"type": "boolean"}}}
+  },
+  "allOf": [
+    {"if": {"properties": {"package_kind": {"const": "MODEL_REVISION"}}}, "then": {"properties": {"source": {"properties": {"project_id": {"const": null}, "model_id": {"type": "string", "minLength": 1}, "revision_id": {"type": "string", "minLength": 1}, "baseline_id": {"const": null}}}}}},
+    {"if": {"properties": {"package_kind": {"const": "PROJECT_FULL"}}}, "then": {"properties": {"source": {"properties": {"project_id": {"type": "string", "minLength": 1}, "model_id": {"const": null}, "revision_id": {"const": null}, "baseline_id": {"const": null}}}}}},
+    {"if": {"properties": {"package_kind": {"const": "BASELINE_ASSET"}}}, "then": {"properties": {"source": {"properties": {"project_id": {"const": null}, "model_id": {"type": "string", "minLength": 1}, "revision_id": {"type": "string", "minLength": 1}, "baseline_id": {"type": "string", "minLength": 1}}}}}}
+  ]
+}

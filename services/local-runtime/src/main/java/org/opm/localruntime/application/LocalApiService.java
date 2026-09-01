@@ -21,6 +21,7 @@ import org.opm.localruntime.storage.ProjectDatabaseOpenResult;
 import org.opm.localruntime.storage.SqliteRevisionCommitRepository;
 import org.opm.localruntime.releaseevidence.fault.E2EFaultPort;
 import org.opm.localruntime.releaseauthoring.visualcommon.VisualCommonCommitFaultPort;
+import org.opm.localruntime.releaseauthoring.visualcommon.OneShotVisualCommonCommitFaultPort;
 import org.opm.localruntime.text.OplGenerationResult;
 import org.opm.localruntime.text.OplGrammar;
 import org.opm.localruntime.text.OplTextGenerationService;
@@ -49,6 +50,11 @@ import static org.opm.localruntime.application.RuntimeActiveBindingProvider.*;
 
 @Service
 public class LocalApiService {
+
+    private static final String VISUAL_COMMON_PROJECT_ID = "project.visual.blocked-feedback";
+    private static final String VISUAL_COMMON_MODEL_ID = "model.visual.blocked-feedback";
+    private static final String VISUAL_COMMON_CONTEXT_ID = "context.visual.blocked-feedback.sd";
+    private static final String VISUAL_COMMON_REVISION_ID = "revision.visual.blocked-feedback";
 
     private final ProjectDatabaseFactory databaseFactory;
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -274,6 +280,8 @@ public class LocalApiService {
             Map<String, Object> construct = new LinkedHashMap<>();
             construct.put("occurrence_id", occurrence.id());
             construct.put("target_id", occurrence.targetId());
+            construct.put("target_kind", occurrence.targetKind().name());
+            construct.put("capability_id", projectionCapability(revision, occurrence));
             construct.put("construct_role", occurrence.constructRole());
             construct.put("label", labels.getOrDefault(occurrence.targetId(), occurrence.targetId()));
             construct.put("layout", Map.of("x", layout.x(), "y", layout.y(), "width", layout.width(), "height", layout.height(), "z_order", layout.zOrder()));
@@ -341,6 +349,20 @@ public class LocalApiService {
         return queryResult(requestId, revisionId, revision.profileBinding().profile().version(), revision.profileBinding().ruleSet().version(), freshness(projectId, modelId, revisionId), Map.of("context_id", contextId, "constructs", constructs, "suppressed_states", suppressedStates), false);
     }
 
+    private String projectionCapability(SemanticRevision revision, SemanticRevision.Occurrence occurrence) {
+        return switch (occurrence.targetKind()) {
+            case ELEMENT -> revision.elements().stream().filter(element -> element.id().equals(occurrence.targetId())).findFirst()
+                    .orElseThrow(() -> domain("Context Element 不存在")).capability().capabilityId();
+            case FEATURE -> revision.features().stream().filter(feature -> feature.id().equals(occurrence.targetId())).findFirst()
+                    .orElseThrow(() -> domain("Context Feature 不存在")).capability().capabilityId();
+            case STATE -> revision.states().stream().filter(state -> state.id().equals(occurrence.targetId())).findFirst()
+                    .orElseThrow(() -> domain("Context State 不存在")).capability().capabilityId();
+            case FACT -> revision.facts().stream().filter(fact -> fact.id().equals(occurrence.targetId())).findFirst()
+                    .orElseThrow(() -> domain("Context Fact 不存在")).capability().capabilityId();
+            default -> throw domain("Context construct 类型不支持 Projection capability");
+        };
+    }
+
     public Map<String, Object> capabilities(String requestId, String projectId, String modelId, String revisionId) {
         return capabilities(requestId, projectId, modelId, revisionId, null, null, List.of());
     }
@@ -383,6 +405,55 @@ public class LocalApiService {
                 queryId,
                 options);
         return queryResult(requestId, revisionId, revision.profileBinding().profile().version(), revision.profileBinding().ruleSet().version(), freshness(projectId, modelId, revisionId), data.toWire(), false);
+    }
+
+    public Map<String, Object> relationCatalog(String requestId, String projectId, String modelId, String contextId, String revisionId) {
+        SemanticRevision revision = revision(projectId, modelId, revisionId);
+        context(revision, contextId);
+        List<Map<String, Object>> items = new ArrayList<>();
+        ProceduralLinkCatalog.all().forEach(descriptor -> items.add(relationCatalogItem("PROCEDURAL", descriptor.capabilityId(), descriptor.displayName(), descriptor.symbolId(), true, List.of())));
+        ControlLinkCatalog.all().forEach(descriptor -> items.add(relationCatalogItem("CONTROL", descriptor.capabilityId(), descriptor.displayName(), descriptor.symbolId(), false, List.of("CONTROL_REQUIRES_BASE_FACT"))));
+        StructuralLinkCatalog.all().forEach(descriptor -> items.add(relationCatalogItem("STRUCTURAL", descriptor.capabilityId(), descriptor.displayName(), descriptor.symbolId(), true, List.of())));
+        items.sort(Comparator.comparingInt(this::relationCatalogFamilyOrder).thenComparing(item -> (String) item.get("capability_id")));
+        return queryResult(requestId, revisionId, revision.profileBinding().profile().version(), revision.profileBinding().ruleSet().version(),
+                freshness(projectId, modelId, revisionId), Map.of("items", List.copyOf(items)), false);
+    }
+
+    public Map<String, Object> releaseVisualCommonFaultCommand(String requestId, String projectId, String modelId, String contextId, String revisionId) {
+        if (!(visualCommonCommitFaultPort instanceof OneShotVisualCommonCommitFaultPort)
+                || !VISUAL_COMMON_PROJECT_ID.equals(projectId) || !VISUAL_COMMON_MODEL_ID.equals(modelId)
+                || !VISUAL_COMMON_CONTEXT_ID.equals(contextId) || !VISUAL_COMMON_REVISION_ID.equals(revisionId)) {
+            throw notFound("受控 Visual Common 命令不存在");
+        }
+        SemanticRevision revision = revision(projectId, modelId, revisionId);
+        context(revision, contextId);
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("kind", "CONSUMPTION");
+        payload.put("fact_id", "fact.visual.blocked-feedback.one-shot");
+        payload.put("object_id", "element.visual.blocked-feedback.input");
+        payload.put("process_id", "element.visual.blocked-feedback.process");
+        payload.put("layout", Map.of("x", 340, "y", 266));
+        Map<String, Object> command = new LinkedHashMap<>();
+        command.put("command_id", "command.visual.blocked-feedback.persistence-failed");
+        command.put("command_type", "CREATE_FACT");
+        command.put("payload", payload);
+        return queryResult(requestId, revisionId, revision.profileBinding().profile().version(), revision.profileBinding().ruleSet().version(),
+                freshness(projectId, modelId, revisionId), command, false);
+    }
+
+    private Map<String, Object> relationCatalogItem(String family, String capabilityId, String displayName, String symbolId,
+                                                    boolean enabled, List<String> reasonCodes) {
+        return Map.of("family", family, "capability_id", capabilityId, "display_name", displayName, "symbol_id", symbolId,
+                "enabled", enabled, "reason_codes", reasonCodes);
+    }
+
+    private int relationCatalogFamilyOrder(Map<String, Object> item) {
+        return switch ((String) item.get("family")) {
+            case "PROCEDURAL" -> 0;
+            case "CONTROL" -> 1;
+            case "STRUCTURAL" -> 2;
+            default -> throw new IllegalStateException("未知关系目录分组");
+        };
     }
 
     private List<ApiEdtContract.CommandCapabilityOption> factOptions(String queryId, SemanticRevision revision, List<String> endpointIds) {
@@ -685,6 +756,73 @@ public class LocalApiService {
         List<Map<String, Object>> traces = generated.traces().stream().map(trace -> Map.<String, Object>of("sentence_id", trace.sentenceIds().getFirst(), "fact_ids", trace.factIds(), "occurrence_ids", trace.occurrenceIds())).toList();
         return queryResult(requestId, revisionId, revision.profileBinding().profile().version(), revision.profileBinding().ruleSet().version(), freshness(projectId, modelId, revisionId),
                 Map.of("artifact_id", generated.artifact().artifactId(), "modality", "OPL", "sentences", sentences, "traces", traces), false);
+    }
+
+    public Map<String, Object> findings(String requestId, String projectId, String modelId, String contextId, String revisionId) {
+        SemanticRevision revision = revision(projectId, modelId, revisionId);
+        context(revision, contextId);
+        List<Map<String, Object>> findings = new ArrayList<>();
+        try (Connection connection = projectConnection(projectId);
+             PreparedStatement statement = connection.prepareStatement("""
+                     SELECT finding_id, rule_id, severity, category, context_id, entity_id
+                     FROM finding_index
+                     WHERE source_revision_id = ? AND model_id = ? AND context_id = ?
+                     ORDER BY finding_id
+                     """)) {
+            statement.setString(1, revisionId);
+            statement.setString(2, modelId);
+            statement.setString(3, contextId);
+            try (ResultSet result = statement.executeQuery()) {
+                while (result.next()) {
+                    findings.add(Map.of("finding_id", result.getString("finding_id"), "rule_id", result.getString("rule_id"),
+                            "severity", result.getString("severity"), "category", result.getString("category"),
+                            "context_id", result.getString("context_id"), "entity_id", result.getString("entity_id")));
+                }
+            }
+        } catch (SQLException exception) {
+            throw persistence(exception);
+        }
+        return queryResult(requestId, revisionId, revision.profileBinding().profile().version(), revision.profileBinding().ruleSet().version(),
+                freshness(projectId, modelId, revisionId), findings, true);
+    }
+
+    public Map<String, Object> operationRecords(String requestId, String projectId, String modelId, String contextId, String revisionId) {
+        SemanticRevision revision = revision(projectId, modelId, revisionId);
+        context(revision, contextId);
+        List<Map<String, Object>> records = new ArrayList<>();
+        try (Connection connection = projectConnection(projectId);
+             PreparedStatement statement = connection.prepareStatement("""
+                     SELECT operation_record_id, project_id, model_id, operation_id, aggregate_id, command_id,
+                            input_revision_id, result_revision_id, result_status, diagnostic_id, occurred_at
+                     FROM operation_record
+                     WHERE project_id = ? AND model_id = ? AND input_revision_id = ?
+                     ORDER BY occurred_at, operation_record_id
+                     """)) {
+            statement.setString(1, projectId);
+            statement.setString(2, modelId);
+            statement.setString(3, revisionId);
+            try (ResultSet result = statement.executeQuery()) {
+                while (result.next()) {
+                    Map<String, Object> record = new LinkedHashMap<>();
+                    record.put("operation_record_id", result.getString("operation_record_id"));
+                    record.put("project_id", result.getString("project_id"));
+                    record.put("model_id", result.getString("model_id"));
+                    record.put("operation_id", result.getString("operation_id"));
+                    record.put("aggregate_id", result.getString("aggregate_id"));
+                    record.put("command_id", result.getString("command_id"));
+                    record.put("input_revision_id", result.getString("input_revision_id"));
+                    record.put("result_revision_id", result.getString("result_revision_id"));
+                    record.put("result_status", result.getString("result_status"));
+                    record.put("diagnostic_id", result.getString("diagnostic_id"));
+                    record.put("occurred_at", result.getString("occurred_at"));
+                    records.add(record);
+                }
+            }
+        } catch (SQLException exception) {
+            throw persistence(exception);
+        }
+        return queryResult(requestId, revisionId, revision.profileBinding().profile().version(), revision.profileBinding().ruleSet().version(),
+                freshness(projectId, modelId, revisionId), records, true);
     }
 
     public synchronized Map<String, Object> validate(String projectId, String modelId, Map<String, Object> request) {

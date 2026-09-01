@@ -6,6 +6,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.opm.localruntime.application.LocalApiService;
+import org.opm.localruntime.assets.FileProfilePackageLoader;
+import org.opm.localruntime.releaseauthoring.visualcommon.OneShotVisualCommonCommitFaultPort;
+import org.opm.localruntime.releaseauthoring.visualcommon.VisualCommonFixtureMaterializer;
+import org.opm.localruntime.releaseevidence.fault.E2EFaultPort;
 import org.opm.localruntime.storage.ProjectDatabaseFactory;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
@@ -75,6 +79,8 @@ class LocalApiControllerTest {
         revision = committed(response(perform(write(post("/api/v1/projects/{projectId}/models/{modelId}/contexts/{contextId}/commands", projectId, modelId, contextId), editRequest("request.fact.001", "command.fact.001", revision, "CREATE_FACT", map("kind", "CONSUMPTION", "object_id", "element.raw.material", "process_id", "element.processing")))).andExpect(status().isOk()).andReturn()));
 
         perform(get("/api/v1/projects/{projectId}/models/{modelId}/contexts/{contextId}/text-projection", projectId, modelId, contextId).param("request_id", "request.text.001").param("revision", revision)).andExpect(status().isOk());
+        perform(get("/api/v1/projects/{projectId}/models/{modelId}/contexts/{contextId}/findings", projectId, modelId, contextId).param("request_id", "request.findings.001").param("revision", revision)).andExpect(status().isOk());
+        perform(get("/api/v1/projects/{projectId}/models/{modelId}/contexts/{contextId}/operation-records", projectId, modelId, contextId).param("request_id", "request.operation-records.001").param("revision", revision)).andExpect(status().isOk());
         Map<String, Object> validation = response(perform(write(post("/api/v1/projects/{projectId}/models/{modelId}/validation-tasks", projectId, modelId), validationRequest("request.validation.001", "command.validation.001", revision))).andExpect(status().isAccepted()).andReturn());
         String taskId = string(data(validation).get("task_id"));
         perform(get("/api/v1/projects/{projectId}/models/{modelId}/revisions", projectId, modelId).param("request_id", "request.revisions.001")).andExpect(status().isOk());
@@ -144,6 +150,67 @@ class LocalApiControllerTest {
                 .andExpect(status().isUnprocessableEntity())
                 .andReturn();
         assertErrorEnvelope(structuralResult, "MODIFIER_COMBINATION_INVALID");
+    }
+
+    @Test
+    void returnsTheFrozenRuntimeRelationCatalogWithoutCommandAuthorization() throws Exception {
+        ModelFixture fixture = createModelFixture("relation-catalog");
+
+        Map<String, Object> response = response(perform(get("/api/v1/projects/{projectId}/models/{modelId}/contexts/{contextId}/relation-catalog",
+                fixture.projectId(), fixture.modelId(), fixture.contextId())
+                .param("request_id", "request.relation-catalog.001")
+                .param("revision", fixture.revision())).andExpect(status().isOk()).andReturn());
+        List<Map<String, Object>> items = ((List<?>) data(response).get("items")).stream().map(Map.class::cast)
+                .map(item -> (Map<String, Object>) item).toList();
+
+        assertEquals(34, items.size());
+        assertEquals("CAP-ISO-PROC-001", items.getFirst().get("capability_id"));
+        assertEquals("CAP-ISO-STRUCT-010", items.getLast().get("capability_id"));
+        assertEquals(16, items.stream().filter(item -> "PROCEDURAL".equals(item.get("family"))).count());
+        assertEquals(8, items.stream().filter(item -> "CONTROL".equals(item.get("family"))).count());
+        assertEquals(10, items.stream().filter(item -> "STRUCTURAL".equals(item.get("family"))).count());
+        items.stream().filter(item -> "CONTROL".equals(item.get("family"))).forEach(item -> {
+            assertEquals(false, item.get("enabled"));
+            assertEquals(List.of("CONTROL_REQUIRES_BASE_FACT"), item.get("reason_codes"));
+        });
+    }
+
+    @Test
+    void exposesTheReleaseVisualCommonFaultCommandOnlyForTheArmedExactFixture() throws Exception {
+        Path storage = temporaryDirectory.resolve("armed-visual-common");
+        new VisualCommonFixtureMaterializer().materialize(visualFixture(), storage,
+                temporaryDirectory.resolve("armed-visual-common-attestation.json"), 1782864000L);
+        LocalApiService armedService = new LocalApiService(new ProjectDatabaseFactory(storage),
+                new FileProfilePackageLoader(Path.of("..", "..", "packages", "profiles")), E2EFaultPort.NOOP,
+                new OneShotVisualCommonCommitFaultPort());
+        mvc = MockMvcBuilders.standaloneSetup(new LocalApiController(armedService))
+                .setControllerAdvice(new ApiExceptionHandler())
+                .addInterceptors(new LocalWriteRequestGuard(new LocalSessionToken(SESSION)))
+                .build();
+
+        Map<String, Object> exact = response(perform(get("/api/v1/projects/{projectId}/models/{modelId}/contexts/{contextId}/release-visual-common-fault-command",
+                "project.visual.blocked-feedback", "model.visual.blocked-feedback", "context.visual.blocked-feedback.sd")
+                .param("request_id", "request.release-visual-common.001")
+                .param("revision", "revision.visual.blocked-feedback")).andExpect(status().isOk()).andReturn());
+        assertEquals(map("command_id", "command.visual.blocked-feedback.persistence-failed", "command_type", "CREATE_FACT", "payload", map(
+                "kind", "CONSUMPTION", "fact_id", "fact.visual.blocked-feedback.one-shot",
+                "object_id", "element.visual.blocked-feedback.input", "process_id", "element.visual.blocked-feedback.process",
+                "layout", map("x", 340, "y", 266))), data(exact));
+
+        perform(get("/api/v1/projects/{projectId}/models/{modelId}/contexts/{contextId}/release-visual-common-fault-command",
+                "project.visual.blocked-feedback", "model.visual.blocked-feedback", "context.visual.blocked-feedback.sd")
+                .param("request_id", "request.release-visual-common.drift")
+                .param("revision", "revision.visual.blocked-feedback.drift")).andExpect(status().isNotFound());
+
+        LocalApiService noopService = new LocalApiService(new ProjectDatabaseFactory(storage));
+        mvc = MockMvcBuilders.standaloneSetup(new LocalApiController(noopService))
+                .setControllerAdvice(new ApiExceptionHandler())
+                .addInterceptors(new LocalWriteRequestGuard(new LocalSessionToken(SESSION)))
+                .build();
+        perform(get("/api/v1/projects/{projectId}/models/{modelId}/contexts/{contextId}/release-visual-common-fault-command",
+                "project.visual.blocked-feedback", "model.visual.blocked-feedback", "context.visual.blocked-feedback.sd")
+                .param("request_id", "request.release-visual-common.noop")
+                .param("revision", "revision.visual.blocked-feedback")).andExpect(status().isNotFound());
     }
 
     @Test
@@ -240,6 +307,11 @@ class LocalApiControllerTest {
                 "request." + elementId, "command." + elementId, revision, "CREATE_ELEMENT",
                 map("kind", kind, "element_id", elementId, "name", name, "layout", map("x", 80, "y", 80)))))
                 .andExpect(status().isOk()).andReturn()));
+    }
+
+    private Path visualFixture() {
+        return Path.of("..", "..", "packages", "profiles", "profile.iso19450.2024.draft", "0.2.0", "handoff", "releases",
+                "clean-37c5412a9c12", "dev-canvas-06", "common-fixtures", "0.2.0", "visual", "BLOCKED_FEEDBACK.json");
     }
 
     private Map<String, Object> capabilityOption(ModelFixture fixture, String selectionId, String intent,

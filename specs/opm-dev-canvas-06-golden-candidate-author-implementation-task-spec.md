@@ -29,6 +29,7 @@
 - Capture Plan `0.1`、Materialization Report `0.1` 和未来 Authoring Report `0.2` Schema；
 - DEV-CANVAS-06 READY Intake/Handoff、Common Fixture Catalog 和固定工具链版本。
 - `opm-dev-canvas-06-golden-candidate-author-input-closure-bugfix-task-spec.md`。
+- `opm-dev-canvas-06-golden-blank-baseline-capture-closure-task-spec.md`。
 
 实现不得重新决定 capture ID/顺序、attempt 数量、环境指纹、等待条件、ref/SHA 算法、报告字段、失败码或性能阈值。
 
@@ -66,7 +67,7 @@
 2. 复核 Plan/Handoff/Intake、130 项 materialization、active binding、clean build、Runtime JAR、Web dist 和 source epoch；
 3. 生成并校验完整 environment fingerprint 和实际 font refs，禁止隐式系统字体替代；
 4. Family capture 每 attempt 从 130 个 immutable SQLite base 创建独立 clone；Common capture 只能静态ESM调用03C的`runCommonVisualMaterialization(request,captureCallback)`，从8个immutable base创建144个fresh clone并消费Schema-valid normalized result，禁止03B自行seed、选择API/SQLite路径、动态加载callback或重定义callback/result字段；
-5. 固定单 browser lane，对 1242 capture 和 9 blank 各执行两次新 context，按 Plan 顺序稳定等待并生成 raw/geometry/projection 证据；
+5. 固定单 browser lane，对 1242 capture 和 9 blank 各执行两次新 context，按 Plan 顺序稳定等待并生成 raw/geometry/projection 证据；blank 的唯一 `about:blank` 生命周期、输出布局与结果映射由 Blank Baseline Capture Closure 规格承接；
 6. 只在两次 attempt 完全一致、计数闭合且无额外文件时保留 attempt 1 canonical refs；
 7. 先原子写并通过 semantic verifier 的 candidate Golden Environment `0.2`，其完整 fingerprint、1242 PNG、9 blank 和 font refs 与 candidate content 深度相等；
 8. 最后原子写 `READY_FOR_APPROVAL` Authoring Report `0.2`，包含 Environment exact ref、130/130 refs、2484/18 逐 attempt results、三个集合 SHA、verifier identity、完整资产 refs 和 payload SHA；

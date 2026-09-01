@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:opm:contract:dev-canvas-06:golden-family-capture-adapter-result:0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "result_version", "status", "plan_ref", "runtime_jar_ref", "source_date_epoch", "attempt_results", "attempt_set_sha256", "result_payload_sha256", "summary"],
+  "properties": {
+    "schema_id": {"const": "OPM-DEV-CANVAS-06-GOLDEN-FAMILY-CAPTURE-ADAPTER-RESULT-001"}, "schema_version": {"const": "0.1"}, "result_version": {"const": "0.1.0"}, "status": {"const": "READY_FOR_CANDIDATE_TRANSACTION"},
+    "plan_ref": {"$ref": "#/$defs/ref"}, "runtime_jar_ref": {"$ref": "#/$defs/ref"}, "source_date_epoch": {"type": "integer", "minimum": 0},
+    "attempt_results": {"type": "array", "minItems": 2340, "maxItems": 2340, "items": {"$ref": "#/$defs/attempt"}}, "attempt_set_sha256": {"$ref": "#/$defs/digest"}, "result_payload_sha256": {"$ref": "#/$defs/digest"},
+    "summary": {"type": "object", "additionalProperties": false, "required": ["family_capture_count", "attempt_count", "deterministic"], "properties": {"family_capture_count": {"const": 1170}, "attempt_count": {"const": 2340}, "deterministic": {"const": true}}}
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"}, "logicalPath": {"type": "string", "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*//).+$"},
+    "ref": {"type": "object", "additionalProperties": false, "required": ["kind", "path", "byte_length", "sha256"], "properties": {"kind": {"type": "string", "minLength": 1}, "path": {"$ref": "#/$defs/logicalPath"}, "byte_length": {"type": "integer", "minimum": 1}, "sha256": {"$ref": "#/$defs/digest"}}},
+    "observed": {"type": "object", "additionalProperties": false, "required": ["capture_id", "attempt_ordinal", "identity_payload_sha256", "png_byte_length", "png_sha256", "width", "height", "cell_geometry_sha256", "projection_sha256"], "properties": {"capture_id": {"type": "string", "minLength": 1}, "attempt_ordinal": {"enum": [1, 2]}, "identity_payload_sha256": {"$ref": "#/$defs/digest"}, "png_byte_length": {"type": "integer", "minimum": 1}, "png_sha256": {"$ref": "#/$defs/digest"}, "width": {"type": "integer", "minimum": 1}, "height": {"type": "integer", "minimum": 1}, "cell_geometry_sha256": {"$ref": "#/$defs/digest"}, "projection_sha256": {"$ref": "#/$defs/digest"}}},
+    "attempt": {"type": "object", "additionalProperties": false, "required": ["capture_ordinal", "capture_id", "attempt_ordinal", "family_capture_identity_ref", "clone_result_ref", "runtime_ready_ref", "observed", "attempt_tree_sha256", "base_tree_sha256_before", "base_tree_sha256_after", "runtime_shutdown_status"], "properties": {"capture_ordinal": {"type": "integer", "minimum": 0, "maximum": 1169}, "capture_id": {"type": "string", "minLength": 1}, "attempt_ordinal": {"enum": [1, 2]}, "family_capture_identity_ref": {"$ref": "#/$defs/ref"}, "clone_result_ref": {"$ref": "#/$defs/ref"}, "runtime_ready_ref": {"$ref": "#/$defs/ref"}, "observed": {"$ref": "#/$defs/observed"}, "attempt_tree_sha256": {"$ref": "#/$defs/digest"}, "base_tree_sha256_before": {"$ref": "#/$defs/digest"}, "base_tree_sha256_after": {"$ref": "#/$defs/digest"}, "runtime_shutdown_status": {"const": "CLOSED"}}}
+  }
+}

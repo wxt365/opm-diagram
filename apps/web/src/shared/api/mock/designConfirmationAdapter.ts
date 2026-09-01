@@ -55,8 +55,10 @@ export function createMockNode(
 }
 
 export function createMockConsumption(source: OpdNode, target: OpdNode, suffix = "") {
+  const id = `consumption-${source.id}-${target.id}${suffix}`;
   return {
-    id: `consumption-${source.id}-${target.id}${suffix}`,
+    id,
+    occurrenceId: `occ-${id}`,
     sourceId: source.id,
     targetId: target.id,
     sourceOccurrenceId: source.occurrenceId,

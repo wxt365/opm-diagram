@@ -78,6 +78,18 @@ class LocalApiController {
         return service.capabilities(requestId, projectId, modelId, revision, selectionId, intent, endpoints == null ? List.of() : endpoints);
     }
 
+    @GetMapping("/projects/{projectId}/models/{modelId}/contexts/{contextId}/relation-catalog")
+    Map<String, Object> relationCatalog(@PathVariable String projectId, @PathVariable String modelId, @PathVariable String contextId,
+                                        @RequestParam("request_id") String requestId, @RequestParam("revision") String revision) {
+        return service.relationCatalog(requestId, projectId, modelId, contextId, revision);
+    }
+
+    @GetMapping("/projects/{projectId}/models/{modelId}/contexts/{contextId}/release-visual-common-fault-command")
+    Map<String, Object> releaseVisualCommonFaultCommand(@PathVariable String projectId, @PathVariable String modelId, @PathVariable String contextId,
+                                                         @RequestParam("request_id") String requestId, @RequestParam("revision") String revision) {
+        return service.releaseVisualCommonFaultCommand(requestId, projectId, modelId, contextId, revision);
+    }
+
     @PostMapping("/projects/{projectId}/models/{modelId}/contexts/{contextId}/commands")
     Map<String, Object> edit(@PathVariable String projectId, @PathVariable String modelId, @PathVariable String contextId,
                              @RequestBody Map<String, Object> request) {
@@ -88,6 +100,18 @@ class LocalApiController {
     Map<String, Object> text(@PathVariable String projectId, @PathVariable String modelId, @PathVariable String contextId,
                              @RequestParam("request_id") String requestId, @RequestParam("revision") String revision) {
         return service.text(requestId, projectId, modelId, contextId, revision);
+    }
+
+    @GetMapping("/projects/{projectId}/models/{modelId}/contexts/{contextId}/findings")
+    Map<String, Object> findings(@PathVariable String projectId, @PathVariable String modelId, @PathVariable String contextId,
+                                 @RequestParam("request_id") String requestId, @RequestParam("revision") String revision) {
+        return service.findings(requestId, projectId, modelId, contextId, revision);
+    }
+
+    @GetMapping("/projects/{projectId}/models/{modelId}/contexts/{contextId}/operation-records")
+    Map<String, Object> operationRecords(@PathVariable String projectId, @PathVariable String modelId, @PathVariable String contextId,
+                                         @RequestParam("request_id") String requestId, @RequestParam("revision") String revision) {
+        return service.operationRecords(requestId, projectId, modelId, contextId, revision);
     }
 
     @PostMapping("/projects/{projectId}/models/{modelId}/validation-tasks")

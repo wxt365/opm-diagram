@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:opm:contract:dev-canvas-06-golden-publish-postverify-marker:0.1",
+  "title": "OPM DEV-CANVAS-06 Golden Publish Postverify Marker",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "status", "golden_set_version", "approved_output_path", "final_authoring_report_ref", "failure_code", "failure_stage", "marker_payload_sha256"],
+  "properties": {
+    "schema_id": {"const": "OPM-DEV-CANVAS-06-GOLDEN-PUBLISH-POSTVERIFY-MARKER-001"},
+    "schema_version": {"const": "0.1"},
+    "status": {"const": "POSTVERIFY_FAILED"},
+    "golden_set_version": {"pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"},
+    "approved_output_path": {"pattern": "^versions/(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"},
+    "final_authoring_report_ref": {"$ref": "#/$defs/fileRef"},
+    "failure_code": {"const": "GOLDEN_PUBLISH_POSTVERIFY_FAILED"},
+    "failure_stage": {"const": "FINAL_GOLDEN_VERIFIER"},
+    "marker_payload_sha256": {"$ref": "#/$defs/digest"}
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "path": {"type": "string", "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*//).+$"},
+    "fileRef": {"type": "object", "additionalProperties": false, "required": ["kind", "path", "byte_length", "sha256"], "properties": {"kind": {"const": "AUTHORING_REPORT"}, "path": {"$ref": "#/$defs/path"}, "byte_length": {"type": "integer", "minimum": 1}, "sha256": {"$ref": "#/$defs/digest"}}}
+  }
+}

@@ -30,10 +30,10 @@
 
 ## 5. Approve 实现
 
-1. 严格实现主设计第 7、8 章命令/字段，output 必须 fresh；
+1. 严格实现主设计第 7、8 章命令/字段，output 必须 fresh；candidate root 必须精确为 `<change-root>/candidate`，Plan 与 `--out=<change-root>/approval-record.json` 必须位于同一普通 change root；
 2. 先调用 Plan、Materialization、candidate report/content verifier，再验证人物非空且 ID 不同、reason/time/mode/version/predecessor；
-3. Approval exact 记录 candidate report raw/payload/attempt set SHA、authored Golden Environment ref、130 Report、130 database、1242 PNG、9 blank、全部 font refs 和集合 SHA；
-4. candidate content、golden set 和 approval payload 三类 digest 独立复算；
+3. Approval exact 记录 candidate report raw/payload/attempt set SHA、authored Golden Environment ref、130 Report、130 database、1242 PNG、9 blank、全部 font refs 和集合 SHA；font ref 路径遵循主设计 `environment/fonts/<font-relative-path>`，允许一个或多个普通相对段，禁止绝对路径、`.`、`..` 和空段；
+4. candidate content、golden set 和 approval payload 三类 digest 独立复算；`INITIAL` 禁止 predecessor 输入，`SUPERSEDE` 必须接收显式 predecessor Authoring Report，验证其 `APPROVED_PUBLISHED` 状态、版本和 old golden set SHA 后规范化为 `versions/<old-version>/authoring-report.json`；
 5. 在既有 change root 原子写 fresh `approval-record.json`；拒绝不生成 APPROVED 文件；已有文件不得覆盖。
 
 ## 6. Publisher 与 Golden Verifier
@@ -42,7 +42,7 @@
 2. INITIAL 只允许空 versions + `1.0.0`；SUPERSEDE 必须引用最高 SemVer predecessor，new version 更高且 new SHA 不同；
 3. approved root 单写者排他锁，同文件系统临时 sibling 写入，复制 Plan、candidate report、Approval、03B authored Environment、130 Report/SQLite、fonts、1242 PNG、9 blank；Publisher 禁止重算 Environment；
 4. Publisher 生成具有 `.approved.<golden-set-version>` 唯一 report ID 的 `APPROVED_PUBLISHED` Authoring Report `0.2`，再由 Golden Verifier 全量复核，最后 atomic rename；
-5. rename 后 verify 失败的 version 标记不可消费且禁止原地修复，只能新 SUPERSEDE；
+5. rename 后 verify 失败时，Publisher 在 approved root 的固定 `quarantine/<golden-set-version>.postverify-failed.json` 原子写 Schema-valid postverify marker；Golden Verifier 和下游消费者必须在读取 version 前精确检查该 marker 并拒绝消费，禁止原地修复，只能新 SUPERSEDE；
 6. Golden Verifier 永久只读，复核目录 allowlist、全部 Schema/raw/payload/set SHA、candidate/approval/final report/environment/predecessor exact join；
 7. 不创建 `latest`、symlink、mutable pointer，不覆盖/删除/重命名既有 version。
 

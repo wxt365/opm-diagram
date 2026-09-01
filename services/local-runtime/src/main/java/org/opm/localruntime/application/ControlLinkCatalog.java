@@ -17,6 +17,10 @@ final class ControlLinkCatalog {
     private ControlLinkCatalog() {
     }
 
+    static List<Descriptor> all() {
+        return List.copyOf(DESCRIPTORS.values());
+    }
+
     static Optional<Descriptor> find(String capabilityId) {
         return Optional.ofNullable(DESCRIPTORS.get(capabilityId));
     }

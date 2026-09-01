@@ -248,7 +248,7 @@ screenshot_options
 
 `font_refs` 必须覆盖浏览器实际解析并用于 UI sans、中文 fallback 和 monospace 的每个字体文件。不得只记录 CSS family 名；author 启动前和 capture 前均按 file SHA 复核。不同 OS/font bytes 产生不同 environment fingerprint，不能复用同一 approved version。
 
-`browser_executable_sha256` 必须来自启动前 realpath 的普通浏览器可执行文件 bytes；其 realpath/byte length 只作审计证据，不进入 fingerprint。`font_refs` 必须在 future approved 相对路径 `environment/fonts/<font-relative-path>` 记录 `logical_role/postscript_name/font_version/path/byte_length/sha256`；三个 logical role 固定为 `UI_SANS/CJK_FALLBACK/MONOSPACE`，各恰有一个。`screenshot_options` 固定为 `{animations:"disabled",caret:"hide",scale:"css",mask_count:0}`。
+`browser_executable_sha256` 必须来自启动前 realpath 的普通浏览器可执行文件 bytes；其 realpath/byte length 只作审计证据，不进入 fingerprint。`font_refs` 必须在 future approved 相对路径 `environment/fonts/<font-relative-path>` 记录 `logical_role/postscript_name/font_version/path/byte_length/sha256`；`<font-relative-path>` 是一个或多个非空普通路径段，不得含绝对路径、`.`、`..` 或空段，因此 `environment/fonts/UI_SANS/ControlledSans.font` 合法。三个 logical role 固定为 `UI_SANS/CJK_FALLBACK/MONOSPACE`，各恰有一个。`screenshot_options` 固定为 `{animations:"disabled",caret:"hide",scale:"css",mask_count:0}`。
 
 `environment_fingerprint=sha256(JCS(上述离散字段对象))`。其中 `font_refs` 按 `logical_role/postscript_name/path` 排序，`launch_args` 保留实际传参顺序；`environment_id=dev-canvas-06.golden-environment.<fingerprint 前12位>`。随机端口、PID、临时目录、实际开始/结束时间、browser realpath 不进入 fingerprint。
 
@@ -331,6 +331,7 @@ npm run release:canvas06:golden:approve -- \
   --requested-at <UTC-RFC3339> \
   --approved-at <UTC-RFC3339> \
   --external-refs <closed-json-file> \
+  --predecessor-authoring-report <SUPERSEDE-only-approved-authoring-report> \
   --out <existing-change-root>/approval-record.json
 
 npm run release:canvas06:golden:publish -- \
@@ -353,7 +354,11 @@ npm run release:canvas06:golden:verify -- \
 
 Author 对每个 capture 和 blank baseline 各执行两次全新 browser context。两次 PNG raw SHA、尺寸、cell geometry hash 和 Projection digest 必须完全相等；approved version 只保存 attempt 1 的 canonical PNG，attempt 2 仅留在 candidate 证据中。`1242*2=2484` 个 capture attempt 和 `9*2=18` 个 blank attempt 任一缺失或不一致，candidate 不得进入审批。
 
+Blank baseline 的唯一页面、浏览器生命周期、输出布局和结果映射由 `opm-dev-canvas-06-golden-blank-baseline-capture-closure-task-spec.md` 冻结；Author 不得把 Runtime、Web、fixture 或任意应用页面作为 blank 替代物。
+
 Candidate Author 必须最后原子写 `candidate/candidate-authoring-report.json`；写入后 candidate root 对 Approver/Publisher 只读。Approve 命令不得写 candidate root，只能从通过 Authoring Report `0.2` verifier 的 `READY_FOR_APPROVAL` report 及其 exact refs，在 change root 创建 fresh `approval-record.json`。`requested_at <= approved_at`，二者是审批事件时间，不参与 environment fingerprint；不接受系统登录用户、Git author 或环境变量作为隐式身份来源。
+
+Candidate root 必须精确为 `<change-root>/candidate`；Capture Plan 必须是同一 `<change-root>` 内的普通文件，Candidate Report 的 `capture_plan_ref.path` 固定相对该根。Approve 的 `--out` 必须精确为同一 `<change-root>/approval-record.json`。`INITIAL` 禁止传 `--predecessor-authoring-report`；`SUPERSEDE` 必须显式传入已发布 predecessor 的 `authoring-report.json`，Approve 读取其 raw bytes 并将 ref 规范化为 `versions/<old_golden_set_version>/authoring-report.json`，再校验其版本、golden set SHA 和 `APPROVED_PUBLISHED` 状态。不得由目录扫描、候选 lineage、外部引用或环境变量推断 predecessor。
 
 `--external-refs` 文件必须是一个封闭 JSON 数组，每项严格为 `{kind,reference}` 且两字段非空；数组顺序进入 approval payload，不允许从 Git remote、issue URL 或环境变量隐式补齐。
 
@@ -612,7 +617,7 @@ PLAN_READY
 1. Plan/materialize/author 失败：保留 work root 诊断或在确认后清理，不触碰 approved root；Materializer 只能清理本次从空目标创建的失败 storage；
 2. 审批拒绝：不创建 APPROVED 记录，不 publish；candidate 可作为非发布证据保留；
 3. publish rename 前失败：清理临时 sibling，approved version 零输出；
-4. publish 后 verify 失败：该 version 标记为不可消费，禁止原地修复；通过新的 SUPERSEDE change 发布修正版；
+4. publish 后 verify 失败：Publisher 必须在 `<approved-root>/quarantine/<golden-set-version>.postverify-failed.json` 原子写入 `OPM-DEV-CANVAS-06-GOLDEN-PUBLISH-POSTVERIFY-MARKER-001/0.1`。marker 固定记录 `status=POSTVERIFY_FAILED`、版本、`approved_output_path`、最终 `authoring-report.json` raw ref、`failure_code=GOLDEN_PUBLISH_POSTVERIFY_FAILED`、`failure_stage=FINAL_GOLDEN_VERIFIER` 和排除自身字段后的 JCS SHA-256。任何 Golden Verifier 或下游消费者先精确检查该 marker；存在即拒绝该 version。marker 不得覆盖，Publisher 不得删除/移动 quarantine 或原地修复 version；通过新的 SUPERSEDE change 发布修正版；
 5. release 回滚：Visual Manifest 可显式重新选择仍然完整的旧 approved version，但不得修改旧 version 或 mutable pointer；
 6. 任一已进入发布证据链的文件都不得因回滚删除。
 

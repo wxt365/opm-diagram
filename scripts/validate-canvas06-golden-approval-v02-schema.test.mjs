@@ -43,6 +43,10 @@ test('Approval Record 0.2 rejects non-approved output paths and unknown fields',
   const unknown = approval('INITIAL');
   unknown.self_approve = true;
   assert.equal(validate(unknown), false);
+
+  const unsafeFont = approval('INITIAL');
+  unsafeFont.font_refs[0].path = 'environment/fonts/UI_SANS/../controlled-sans.ttf';
+  assert.equal(validate(unsafeFont), false);
 });
 
 function approval(mode) {
@@ -57,7 +61,7 @@ function approval(mode) {
     candidate_authoring_report_ref: ref('AUTHORING_REPORT', 'candidate/candidate-authoring-report.json'), candidate_authoring_report_payload_sha256: digest(), candidate_attempt_set_sha256: digest(), authored_golden_environment_ref: ref('GOLDEN_ENVIRONMENT', 'golden-environment.json'),
     fixture_materialization_report_refs: Array.from({ length: 130 }, (_, index) => ({ fixture_ref_key: key(index), report_ref: ref('MATERIALIZATION_REPORT', `materialization/reports/${key(index)}.json`) })), fixture_materialization_set_sha256: digest(),
     fixture_database_refs: Array.from({ length: 130 }, (_, index) => ({ fixture_ref_key: key(index), database_ref: ref('DATABASE', `materialization/fixtures/${key(index)}/storage/projects/project-${index}/project.db`), semantic_state_sha256: digest() })), fixture_database_set_sha256: digest(),
-    png_refs: Array.from({ length: 1242 }, (_, index) => ({ capture_id: `capture-${index}`, path: `capture-${index}.png`, byte_length: 1, sha256: digest() })), blank_baseline_refs: baselines(), font_refs: [{ logical_role: 'UI_SANS', postscript_name: 'ControlledSans', font_version: '1.0', path: 'environment/fonts/controlled-sans.ttf', byte_length: 1, sha256: digest() }],
+    png_refs: Array.from({ length: 1242 }, (_, index) => ({ capture_id: `capture-${index}`, path: `capture-${index}.png`, byte_length: 1, sha256: digest() })), blank_baseline_refs: baselines(), font_refs: [{ logical_role: 'UI_SANS', postscript_name: 'ControlledSans', font_version: '1.0', path: 'environment/fonts/UI_SANS/controlled-sans.ttf', byte_length: 1, sha256: digest() }],
     candidate_content_sha256: digest(), old_golden_set_version: supersede ? '1.0.0' : null, old_golden_set_sha256: supersede ? digest() : null, predecessor_authoring_report_ref: supersede ? ref('AUTHORING_REPORT', 'versions/1.0.0/authoring-report.json') : null, new_golden_set_sha256: digest(), approved_output_path: `versions/${version}`, approval_status: 'APPROVED', approval_payload_sha256: digest()
   };
 }

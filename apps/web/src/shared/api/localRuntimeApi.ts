@@ -70,6 +70,7 @@ export interface NavigationNodeWire {
 export interface ProjectionConstructWire {
   occurrence_id: string;
   target_id: string;
+  target_kind: "ELEMENT" | "FEATURE" | "STATE" | "FACT";
   construct_role: string;
   label?: string;
   layout: { x: number; y: number; width: number; height: number; z_order: number };
@@ -83,7 +84,7 @@ export interface ProjectionConstructWire {
   state_roles?: Array<"INITIAL" | "DEFAULT" | "FINAL">;
   explicitness?: "EXPLICIT" | "SUPPRESSED";
   fold_state?: "UNFOLDED" | "FOLDED";
-  capability_id?: string;
+  capability_id: string;
   direction?: "DIRECTED" | "BIDIRECTIONAL" | "UNDIRECTED";
   endpoints?: Array<{ role: string; target_kind: "ELEMENT" | "STATE" | "FEATURE"; target_id: string; ordinal: number }>;
   modifiers?: Array<{ modifier_id: string; value: string }>;
@@ -111,6 +112,15 @@ export interface TextTraceWire {
   occurrence_ids: string[];
 }
 
+export interface RelationCatalogItemWire {
+  family: "PROCEDURAL" | "CONTROL" | "STRUCTURAL";
+  capability_id: string;
+  display_name: string;
+  symbol_id: string;
+  enabled: boolean;
+  reason_codes: string[];
+}
+
 export interface RevisionWire {
   revision_id: string;
   sequence: number;
@@ -118,6 +128,41 @@ export interface RevisionWire {
   created_at: string;
   immutable: boolean;
   blocking_count: number;
+}
+
+export interface FindingWire {
+  finding_id: string;
+  rule_id: string;
+  severity: "BLOCKING" | "WARNING" | "SUGGESTION";
+  category: string;
+  context_id: string;
+  entity_id: string;
+}
+
+export interface OperationRecordWire {
+  operation_record_id: string;
+  project_id: string;
+  model_id: string;
+  operation_id: string;
+  aggregate_id: string;
+  command_id: string;
+  input_revision_id: string;
+  result_revision_id: string | null;
+  result_status: string;
+  diagnostic_id: string | null;
+  occurred_at: string;
+}
+
+export interface ReleaseVisualCommonFaultCommandWire {
+  command_id: "command.visual.blocked-feedback.persistence-failed";
+  command_type: "CREATE_FACT";
+  payload: {
+    kind: "CONSUMPTION";
+    fact_id: "fact.visual.blocked-feedback.one-shot";
+    object_id: "element.visual.blocked-feedback.input";
+    process_id: "element.visual.blocked-feedback.process";
+    layout: { x: 340; y: 266 };
+  };
 }
 
 export interface ValidationTaskWire {
@@ -221,8 +266,24 @@ class LocalRuntimeApi {
     return this.request<QueryEnvelope<ApiEdtCommandCapabilitiesData>>(`/api/v1/projects/${encodeURIComponent(projectId)}/models/${encodeURIComponent(modelId)}/contexts/${encodeURIComponent(contextId)}/command-capabilities?${params}`);
   }
 
+  async relationCatalog(projectId: string, modelId: string, contextId: string, revision: string): Promise<QueryEnvelope<{ items: RelationCatalogItemWire[] }>> {
+    return this.queryContext(projectId, modelId, contextId, revision, "relation-catalog");
+  }
+
   async textProjection(projectId: string, modelId: string, contextId: string, revision: string): Promise<QueryEnvelope<{ artifact_id: string; modality: "OPL" | "OPT"; sentences: TextSentenceWire[]; traces: TextTraceWire[] }>> {
     return this.queryContext(projectId, modelId, contextId, revision, "text-projection");
+  }
+
+  async findings(projectId: string, modelId: string, contextId: string, revision: string): Promise<QueryEnvelope<FindingWire[]>> {
+    return this.queryContext(projectId, modelId, contextId, revision, "findings");
+  }
+
+  async operationRecords(projectId: string, modelId: string, contextId: string, revision: string): Promise<QueryEnvelope<OperationRecordWire[]>> {
+    return this.queryContext(projectId, modelId, contextId, revision, "operation-records");
+  }
+
+  async releaseVisualCommonFaultCommand(projectId: string, modelId: string, contextId: string, revision: string): Promise<QueryEnvelope<ReleaseVisualCommonFaultCommandWire>> {
+    return this.queryContext(projectId, modelId, contextId, revision, "release-visual-common-fault-command");
   }
 
   async revisions(projectId: string, modelId: string): Promise<RevisionWire[]> {
@@ -236,6 +297,17 @@ class LocalRuntimeApi {
       base_revision: baseRevision,
       binding: activeBinding(),
       command_type: command.commandType,
+      payload: command.payload,
+    });
+  }
+
+  async executeReleaseVisualCommonFaultCommand(projectId: string, modelId: string, contextId: string, baseRevision: string, command: ReleaseVisualCommonFaultCommandWire): Promise<CommandEnvelope<{ affected_ids: string[]; text_trace_ids: string[]; validation_summary: { blocking: number; warning: number; suggestion: number; coverage_state: string } }>> {
+    return this.write(`/api/v1/projects/${encodeURIComponent(projectId)}/models/${encodeURIComponent(modelId)}/contexts/${encodeURIComponent(contextId)}/commands`, {
+      request_id: requestId("request.release-visual-common-fault-command"),
+      command_id: command.command_id,
+      base_revision: baseRevision,
+      binding: activeBinding(),
+      command_type: command.command_type,
       payload: command.payload,
     });
   }

@@ -15,7 +15,7 @@ const SCHEMAS = Object.freeze({
   request: 'docs/contracts/schemas/opm-dev-canvas-06-common-visual-adapter-request-v02.schema.json',
   plan: 'docs/contracts/schemas/opm-dev-canvas-06-golden-capture-plan.schema.json',
   catalog: 'docs/contracts/schemas/opm-dev-canvas-06-common-fixture-catalog.schema.json',
-  invocation: 'docs/contracts/schemas/opm-dev-canvas-06-common-visual-capture-invocation.schema.json',
+  invocation: 'docs/contracts/schemas/opm-dev-canvas-06-common-visual-capture-invocation-v02.schema.json',
   observed: 'docs/contracts/schemas/opm-dev-canvas-06-common-visual-capture-observed-result.schema.json',
   clone: 'docs/contracts/schemas/opm-dev-canvas-06-common-visual-clone-result.schema.json',
   ready: 'docs/contracts/schemas/opm-dev-canvas-06-common-visual-runtime-ready.schema.json',
@@ -217,7 +217,7 @@ async function verifyRuntimeEndpoints(ready) {
 }
 
 function buildInvocation(request, capture, commonCaptureOrdinal, fixture, ordinal, storageRoot, attemptRoot, base, ready) {
-  return { schema_id: 'OPM-DEV-CANVAS-06-COMMON-VISUAL-CAPTURE-INVOCATION-001', schema_version: '0.1', invocation_version: '0.1.0', request_id: request.request_id, plan_ref: request.plan_ref, common_capture_ordinal: commonCaptureOrdinal, capture_id: capture.capture_id, subject_id: capture.subject_id, attempt_ordinal: ordinal, visual_variant_key: capture.visual_variant_key, viewport_id: capture.viewport_id, zoom_id: capture.zoom_id, fixture_ref: capture.fixture_ref, capture_setup: fixture.capture_setup, expected_projection: fixture.expected_projection, expected_projection_sha256: capture.expected_projection_sha256, expected_revision: capture.expected_revision, focus_target_id: capture.focus_target_id, focus_anchor: capture.focus_anchor, expected_cells: capture.expected_cells, critical_regions: capture.critical_regions, attempt_root: attemptRoot, storage_root: storageRoot, runtime_base_url: ready.runtime_base_url, base_attestation_ref: base.attestationRef, base_tree_sha256: base.baseTreeSha256, fault_mode: capture.subject_id === 'BLOCKED_FEEDBACK' ? 'BLOCKED_FEEDBACK_ONE_SHOT' : 'NONE' };
+  return { schema_id: 'OPM-DEV-CANVAS-06-COMMON-VISUAL-CAPTURE-INVOCATION-001', schema_version: '0.2', invocation_version: '0.2.0', request_id: request.request_id, plan_ref: request.plan_ref, common_capture_ordinal: commonCaptureOrdinal, capture_id: capture.capture_id, subject_id: capture.subject_id, attempt_ordinal: ordinal, visual_variant_key: capture.visual_variant_key, viewport_id: capture.viewport_id, zoom_id: capture.zoom_id, fixture_ref: capture.fixture_ref, project_id: fixture.project.project_id, model_id: fixture.model.model_id, context_id: fixture.revision_document.model_header.root_context_id, capture_setup: fixture.capture_setup, expected_projection: fixture.expected_projection, expected_projection_sha256: capture.expected_projection_sha256, expected_revision: capture.expected_revision, focus_target_id: capture.focus_target_id, focus_anchor: capture.focus_anchor, expected_cells: capture.expected_cells, critical_regions: capture.critical_regions, attempt_root: attemptRoot, storage_root: storageRoot, runtime_base_url: ready.runtime_base_url, base_attestation_ref: base.attestationRef, base_tree_sha256: base.baseTreeSha256, fault_mode: capture.subject_id === 'BLOCKED_FEEDBACK' ? 'BLOCKED_FEEDBACK_ONE_SHOT' : 'NONE' };
 }
 
 function verifyObservedResult(observed, invocation, validator) {

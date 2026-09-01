@@ -68,6 +68,7 @@ export interface ProceduralEndpoint {
 
 export interface ConsumptionRelation {
   id: string;
+  occurrenceId: string;
   sourceId: string;
   targetId: string;
   sourceOccurrenceId: string;

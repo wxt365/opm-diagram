@@ -16,9 +16,14 @@ vi.mock("@/shared/api/localRuntimeApi", async (importOriginal) => {
       navigation: vi.fn(),
       projection: vi.fn(),
       commandCapabilities: vi.fn(),
+      relationCatalog: vi.fn(),
       textProjection: vi.fn(),
+      findings: vi.fn(),
+      operationRecords: vi.fn(),
+      releaseVisualCommonFaultCommand: vi.fn(),
       revisions: vi.fn(),
       executeP0Command: vi.fn(),
+      executeReleaseVisualCommonFaultCommand: vi.fn(),
       validate: vi.fn(),
     },
   };
@@ -40,7 +45,11 @@ function configureApi() {
     { occurrence_id: "occ.fact.structural", target_id: "fact.structural", construct_role: "STRUCTURAL_LINK", layout: { x: 250, y: 272, width: 160, height: 2, z_order: 3 }, symbol_ref: "symbol.link.structural.tagged.state", layout_ref: "layout.fact.structural", capability_id: "CAP-ISO-STRUCT-010", direction: "DIRECTED", labels: [{ slot_id: "forward_tag", text: "owns" }], collection_completeness: "NOT_APPLICABLE", endpoints: [endpoint("STATE_TAGGED_SOURCE", "STATE", "state.material.ready", 0), endpoint("STATE_TAGGED_TARGET", "ELEMENT", "element.object.product", 1)] },
   ], suppressed_states: [] } });
   api.commandCapabilities.mockResolvedValue({ data: { allowed: ["CREATE_ELEMENT", "CREATE_FACT"], forbidden: [], capability_query_id: "query.1", options: [] } });
+  api.relationCatalog.mockResolvedValue({ data: { items: relationCatalog() } });
   api.textProjection.mockResolvedValue({ data: { sentences: [{ sentence_id: "sentence.1", text: "Transform consumes Material.", ordinal: 0 }], traces: [{ sentence_id: "sentence.1", fact_ids: ["fact.consumption"], occurrence_ids: ["occ.object", "occ.process"] }] } });
+  api.findings.mockResolvedValue({ data: [] });
+  api.operationRecords.mockResolvedValue({ data: [] });
+  api.releaseVisualCommonFaultCommand.mockRejectedValue(new LocalRuntimeApiError("NOT_FOUND", "受控命令不存在"));
   api.revisions.mockResolvedValue([{ revision_id: "revision.1", sequence: 1, kind: "DRAFT", created_at: "2026-07-28T00:00:00Z", immutable: true, blocking_count: 0 }]);
   api.executeP0Command.mockResolvedValue({ meta: { committed_revision: "revision.2", status: "COMMITTED", command_id: "command.1", autosave_state: "saved" }, data: { affected_ids: [], text_trace_ids: [], validation_summary: { blocking: 0, warning: 0, suggestion: 0, coverage_state: "INCOMPLETE" } } });
   api.validate.mockResolvedValue({ data: { task_id: "task.1", state: "COMPLETED", progress: 100 } });
@@ -66,6 +75,11 @@ async function mountWorkbench() {
   return { wrapper, router };
 }
 
+async function openRightPanel(wrapper: ReturnType<typeof mount>) {
+  await wrapper.get('[data-testid="p03-right-panel-open"]').trigger("click");
+  await flushPromises();
+}
+
 describe("WorkbenchView", () => {
   beforeEach(() => {
     setActivePinia(createPinia());
@@ -81,7 +95,84 @@ describe("WorkbenchView", () => {
     expect(router.currentRoute.value.query).toMatchObject({ revision: "revision.1", context: "context.root" });
 
     await wrapper.get('[data-testid="p03-opl-sentence"]').trigger("click");
+    await openRightPanel(wrapper);
     expect(wrapper.text()).toContain("fact.consumption");
+  });
+
+  it("关系目录只读取 Runtime 的 16/8/10 项，并显式标记 Control 不可独立创建", async () => {
+    const { wrapper } = await mountWorkbench();
+
+    await wrapper.get('[data-testid="p03-tool-relation-menu"]').trigger("click");
+    await flushPromises();
+    for (const family of ["PROCEDURAL", "CONTROL", "STRUCTURAL"]) {
+      await wrapper.get(`[data-testid="p03-relation-catalog-toggle-${family}"]`).trigger("click");
+    }
+
+    expect(api.relationCatalog).toHaveBeenCalledWith("project.1", "model.1", "context.root", "revision.1");
+    expect(wrapper.get('[data-testid="p03-relation-catalog-PROCEDURAL"]').text()).toContain("PROCEDURAL 16");
+    expect(wrapper.get('[data-testid="p03-relation-catalog-CONTROL"]').text()).toContain("CONTROL 8");
+    expect(wrapper.get('[data-testid="p03-relation-catalog-STRUCTURAL"]').text()).toContain("STRUCTURAL 10");
+    const control = wrapper.get('[data-testid="p03-relation-catalog-option-CAP-ISO-CTRL-001"]');
+    expect(control.attributes("disabled")).toBeDefined();
+    expect(control.text()).toContain("CONTROL_REQUIRES_BASE_FACT");
+    const state = wrapper.get('[data-testid="p03-capture-view-state"]');
+    expect(state.attributes("data-catalog-open")).toBe("true");
+    expect(state.attributes("data-catalog-procedural-count")).toBe("16");
+    expect(state.attributes("data-catalog-control-count")).toBe("8");
+    expect(state.attributes("data-catalog-structural-count")).toBe("10");
+  });
+
+  it("Capture view state 只通过显式 DOM 表达 inspector、Finding 高亮与 History", async () => {
+    api.findings.mockResolvedValueOnce({ data: [{
+      finding_id: "finding.1", rule_id: "RULE-1", severity: "WARNING", category: "MODEL_QUALITY", context_id: "context.root", entity_id: "fact.consumption",
+    }] });
+    api.operationRecords.mockResolvedValueOnce({ data: [
+      operationRecord("validation-blocked", "diagnostic.visual.validation-blocked.VALIDATION_BLOCKED"),
+      operationRecord("revision-conflict", "diagnostic.visual.revision-conflict.REVISION_CONFLICT"),
+      operationRecord("readonly", "diagnostic.visual.readonly.READONLY"),
+    ] });
+    const { wrapper } = await mountWorkbench();
+    const state = () => wrapper.get('[data-testid="p03-capture-view-state"]');
+
+    expect(state().attributes("data-right-open")).toBe("false");
+    await wrapper.get('[data-testid="p03-canvas-select-consumption"]').trigger("click");
+    await openRightPanel(wrapper);
+    expect(state().attributes("data-selection-kind")).toBe("relation");
+    expect(state().attributes("data-selection-target-id")).toBe("fact.consumption");
+    expect(state().attributes("data-right-open")).toBe("true");
+    expect(state().attributes("data-right-mode")).toBe("inspector-relation-fields");
+
+    await wrapper.get('[data-testid="p03-tab-findings"]').trigger("click");
+    await wrapper.get('[data-testid="p03-finding-finding.1"]').trigger("click");
+    await wrapper.get('[data-testid="p03-finding-locate"]').trigger("click");
+    await flushPromises();
+    expect(state().attributes("data-finding-selected-id")).toBe("finding.1");
+    expect(state().attributes("data-finding-highlighted-target-id")).toBe("fact.consumption");
+
+    await wrapper.get('[data-testid="p03-tab-history"]').trigger("click");
+    expect(state().findAll("[data-opm-history-code]").map((item) => item.attributes("data-opm-history-code"))).toEqual([
+      "VALIDATION_BLOCKED", "REVISION_CONFLICT", "READONLY",
+    ]);
+  });
+
+  it("普通 Runtime 不显示受控故障命令，armed descriptor 仅从 History 入口提交 exact command", async () => {
+    const normal = await mountWorkbench();
+    await normal.wrapper.get('[data-testid="p03-tab-history"]').trigger("click");
+    expect(normal.wrapper.find('[data-testid="p03-release-visual-common-fault-command"]').exists()).toBe(false);
+    normal.wrapper.unmount();
+
+    const command = releaseVisualCommonFaultCommand();
+    api.releaseVisualCommonFaultCommand.mockResolvedValueOnce({ data: command });
+    api.executeReleaseVisualCommonFaultCommand.mockRejectedValueOnce(new LocalRuntimeApiError("PERSISTENCE_FAILED", "受控持久化失败"));
+    const { wrapper } = await mountWorkbench();
+    await wrapper.get('[data-testid="p03-tab-history"]').trigger("click");
+    await wrapper.get('[data-testid="p03-release-visual-common-fault-command"]').trigger("click");
+    await flushPromises();
+
+    expect(api.executeReleaseVisualCommonFaultCommand).toHaveBeenCalledWith("project.1", "model.1", "context.root", "revision.1", command);
+    expect(wrapper.get('[data-testid="p03-command-feedback-code"]').text()).toBe("PERSISTENCE_FAILED");
+    expect(wrapper.get('[data-testid="p03-command-feedback"]').exists()).toBe(true);
+    expect(wrapper.get('[data-testid="p03-capture-view-state"]').attributes("data-feedback-current-code")).toBe("PERSISTENCE_FAILED");
   });
 
   it("Object 命令提交后使用 committed revision 重读投影", async () => {
@@ -142,6 +233,7 @@ describe("WorkbenchView", () => {
     api.commandCapabilities.mockResolvedValueOnce({ data: { allowed: ["DELETE_CONSTRUCT"], forbidden: [], capability_query_id: "query.delete.1", options: [{ capability_query_id: "query.delete.1", option_id: "option.delete.1", command_type: "DELETE_CONSTRUCT", capability_ref: { capability_id: "CAP-STATE-001" }, display_name: "删除 State", group_path: ["Object", "State"], normalized_endpoints: [], required_fields: [], allowed_modifiers: [], symbol_descriptor: { id: "symbol.state", version: "0.1.0", digest: "digest" }, template_family: { id: "grammar", version: "0.1.0", digest: "digest" }, rule_refs: [], enabled: true, reason_codes: [], expires_with_revision: "revision.1", impact_summary: { affected_construct_count: 2, affected_context_count: 1, affected_sentence_count: 0, affected_finding_count: 0 }, impact_token: "impact.runtime.token.001" }] } });
     await wrapper.get('[data-testid="p03-canvas-select-state"]').trigger("click");
     await flushPromises();
+    await openRightPanel(wrapper);
     expect(wrapper.get('[data-testid="p03-state-delete-impact"]').text()).toContain("构造 2");
     await wrapper.get('[data-testid="p03-state-delete-impact"] button').trigger("click");
     await flushPromises();
@@ -153,6 +245,7 @@ describe("WorkbenchView", () => {
 
     await wrapper.get('[data-testid="p03-canvas-select-state"]').trigger("click");
     await flushPromises();
+    await openRightPanel(wrapper);
 
     expect(wrapper.get('[data-testid="p03-state-inspector"]').exists()).toBe(true);
     expect(wrapper.get('[data-testid="p03-state-inspector-name"]').element.tagName).toBe("INPUT");
@@ -167,6 +260,7 @@ describe("WorkbenchView", () => {
 
     await wrapper.get('[data-testid="p03-canvas-select-object"]').trigger("click");
     await flushPromises();
+    await openRightPanel(wrapper);
     await wrapper.get('[data-testid="p03-suppressed-state-state.common.subject"]').trigger("click");
     await flushPromises();
 
@@ -182,6 +276,7 @@ describe("WorkbenchView", () => {
 
     await wrapper.get('[data-testid="p03-canvas-select-consumption"]').trigger("click");
     await flushPromises();
+    await openRightPanel(wrapper);
 
     expect(wrapper.get('[data-testid="p03-fact-delete-impact"]').text()).toContain("构造 1");
     await wrapper.get('[data-testid="p03-fact-delete-impact"] button').trigger("click");
@@ -195,6 +290,7 @@ describe("WorkbenchView", () => {
 
     await wrapper.get('[data-testid="p03-canvas-select-consumption"]').trigger("click");
     await flushPromises();
+    await openRightPanel(wrapper);
 
     expect(wrapper.get('[data-testid="p03-fact-delete-impact"] button').attributes("disabled")).toBeDefined();
     await wrapper.get('[data-testid="p03-fact-delete-impact"] button').trigger("click");
@@ -241,6 +337,31 @@ describe("WorkbenchView", () => {
         ],
       }),
     }));
+  });
+
+  it("候选 preview 将 endpoint 身份作为只读 capture view state 输出", async () => {
+    api.commandCapabilities.mockImplementation((...args: unknown[]) => {
+      const endpointIds = args[6] as string[] | undefined;
+      if (endpointIds?.length === 2) return Promise.resolve({ data: {
+        allowed: ["CREATE_FACT"], capability_query_id: "query.preview.1",
+        options: [relationOption("CAP-ISO-PROC-001", "Consumption", [endpoint("CONSUMED_OBJECT", "ELEMENT", "element.object", 0), endpoint("CONSUMING_PROCESS", "ELEMENT", "element.process", 1)])],
+      } });
+      return Promise.resolve({ data: { allowed: ["CREATE_ELEMENT", "CREATE_FACT"], forbidden: [], capability_query_id: "query.1", options: [] } });
+    });
+    const { wrapper } = await mountWorkbench();
+
+    await wrapper.get('[data-testid="p03-canvas-select-object"]').trigger("click");
+    await wrapper.get('[data-testid="p03-tool-procedural-relation"]').trigger("click");
+    await wrapper.get('[data-testid="p03-canvas-select-process"]').trigger("click");
+    await wrapper.get('[data-testid="p03-relation-resolve"]').trigger("click");
+    await flushPromises();
+    await wrapper.get('[data-testid="p03-relation-option-CAP-ISO-PROC-001"]').trigger("click");
+    await flushPromises();
+
+    const state = wrapper.get('[data-testid="p03-capture-view-state"]');
+    expect(state.attributes("data-relation-candidate-state")).toBe("preview");
+    expect(state.attributes("data-relation-candidate-source-target-id")).toBe("element.object");
+    expect(state.attributes("data-relation-candidate-target-target-id")).toBe("element.process");
   });
 
   it("Exception Link 未填写 duration 时不提交，填写后使用 Runtime option 提交", async () => {
@@ -326,6 +447,7 @@ describe("WorkbenchView", () => {
     const { wrapper } = await mountWorkbench();
 
     await wrapper.get('[data-testid="p03-canvas-select-consumption"]').trigger("click");
+    await openRightPanel(wrapper);
     await wrapper.get('[data-testid="p03-control-open"]').trigger("click");
     await flushPromises();
     await wrapper.get('[data-testid="p03-control-option-CAP-ISO-CTRL-001"]').trigger("click");
@@ -408,6 +530,7 @@ describe("WorkbenchView", () => {
     const { wrapper } = await mountWorkbench();
 
     await wrapper.get('[data-testid="p03-canvas-select-structural"]').trigger("click");
+    await openRightPanel(wrapper);
     await wrapper.get('[data-testid="p03-structural-update-open"]').trigger("click");
     await flushPromises();
     await wrapper.get('[data-testid="p03-structural-update-label-forward_tag"]').setValue("owns");
@@ -447,6 +570,36 @@ function endpoint(role: string, targetKind: "ELEMENT" | "STATE", targetId: strin
   return { role, target_ref: { target_kind: targetKind, target_id: targetId }, ordinal };
 }
 
+function releaseVisualCommonFaultCommand() {
+  return {
+    command_id: "command.visual.blocked-feedback.persistence-failed" as const,
+    command_type: "CREATE_FACT" as const,
+    payload: {
+      kind: "CONSUMPTION" as const,
+      fact_id: "fact.visual.blocked-feedback.one-shot" as const,
+      object_id: "element.visual.blocked-feedback.input" as const,
+      process_id: "element.visual.blocked-feedback.process" as const,
+      layout: { x: 340 as const, y: 266 as const },
+    },
+  };
+}
+
+function operationRecord(suffix: string, diagnosticId: string) {
+  return {
+    operation_record_id: `operation.${suffix}`,
+    project_id: "project.1",
+    model_id: "model.1",
+    operation_id: `operation.${suffix}`,
+    aggregate_id: "model.1",
+    command_id: `command.${suffix}`,
+    input_revision_id: "revision.1",
+    result_revision_id: null,
+    result_status: "BLOCKED",
+    diagnostic_id: diagnosticId,
+    occurred_at: "2026-07-28T00:00:00Z",
+  };
+}
+
 function relationOption(capabilityId: string, displayName: string, normalizedEndpoints: ReturnType<typeof endpoint>[], requiresDuration = false) {
   return {
     capability_query_id: "query.procedural.1",
@@ -465,4 +618,20 @@ function relationOption(capabilityId: string, displayName: string, normalizedEnd
     reason_codes: [],
     expires_with_revision: "revision.1",
   };
+}
+
+function relationCatalog() {
+  const item = (family: "PROCEDURAL" | "CONTROL" | "STRUCTURAL", index: number) => ({
+    family,
+    capability_id: `CAP-ISO-${family === "PROCEDURAL" ? "PROC" : family === "CONTROL" ? "CTRL" : "STRUCT"}-${String(index).padStart(3, "0")}`,
+    display_name: `${family} ${index}`,
+    symbol_id: `symbol.relation.${family.toLowerCase()}.${index}`,
+    enabled: family !== "CONTROL",
+    reason_codes: family === "CONTROL" ? ["CONTROL_REQUIRES_BASE_FACT"] : [],
+  });
+  return [
+    ...Array.from({ length: 16 }, (_, index) => item("PROCEDURAL", index + 1)),
+    ...Array.from({ length: 8 }, (_, index) => item("CONTROL", index + 1)),
+    ...Array.from({ length: 10 }, (_, index) => item("STRUCTURAL", index + 1)),
+  ];
 }

@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:opm:contract:dev-canvas-06:golden-family-capture-invocation:0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "invocation_version", "capture_ordinal", "capture_id", "attempt_ordinal", "family_capture_identity_ref", "fixture_ref", "clone_result_ref", "runtime_ready_ref", "project_id", "model_id", "revision_id", "context_id", "runtime_base_url", "web_base_url", "viewport_id", "zoom_id", "expected_projection_sha256", "focus_target_id", "focus_anchor", "expected_cells", "critical_regions", "attempt_artifact_root"],
+  "properties": {
+    "schema_id": {"const": "OPM-DEV-CANVAS-06-GOLDEN-FAMILY-CAPTURE-INVOCATION-001"},
+    "schema_version": {"const": "0.1"},
+    "invocation_version": {"const": "0.1.0"},
+    "capture_ordinal": {"type": "integer", "minimum": 0, "maximum": 1169},
+    "capture_id": {"type": "string", "minLength": 1},
+    "attempt_ordinal": {"enum": [1, 2]},
+    "family_capture_identity_ref": {"$ref": "#/$defs/ref"},
+    "fixture_ref": {"$ref": "#/$defs/ref"},
+    "clone_result_ref": {"$ref": "#/$defs/ref"},
+    "runtime_ready_ref": {"$ref": "#/$defs/ref"},
+    "project_id": {"type": "string", "minLength": 1}, "model_id": {"type": "string", "minLength": 1}, "revision_id": {"type": "string", "minLength": 1}, "context_id": {"type": "string", "minLength": 1},
+    "runtime_base_url": {"$ref": "#/$defs/origin"},
+    "web_base_url": {"$ref": "#/$defs/origin"},
+    "viewport_id": {"enum": ["VP-1440X900", "VP-1280X800", "VP-390X844"]},
+    "zoom_id": {"enum": ["Z-025", "Z-100", "Z-400"]},
+    "expected_projection_sha256": {"$ref": "#/$defs/digest"},
+    "focus_target_id": {"type": "string", "minLength": 1},
+    "focus_anchor": {"enum": ["CENTER", "SOURCE", "TARGET", "LABEL", "JUNCTION"]},
+    "expected_cells": {"type": "integer", "minimum": 1},
+    "critical_regions": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/criticalRegion"}},
+    "attempt_artifact_root": {"$ref": "#/$defs/absolutePath"}
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "logicalPath": {"type": "string", "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*//).+$"},
+    "absolutePath": {"type": "string", "pattern": "^/(?!.*(?:^|/)\\.\\.(?:/|$)).+$"},
+    "origin": {"type": "string", "pattern": "^http://127\\.0\\.0\\.1:[1-9][0-9]{0,4}$"},
+    "ref": {"type": "object", "additionalProperties": false, "required": ["kind", "path", "byte_length", "sha256"], "properties": {"kind": {"type": "string", "minLength": 1}, "path": {"$ref": "#/$defs/logicalPath"}, "byte_length": {"type": "integer", "minimum": 1}, "sha256": {"$ref": "#/$defs/digest"}}},
+    "criticalRegion": {"type": "object", "additionalProperties": false, "required": ["region_id", "kind"], "properties": {"region_id": {"type": "string", "minLength": 1}, "kind": {"enum": ["CANVAS", "INSPECTOR", "OPL", "FINDING", "FOCUS_BBOX", "SOURCE_MARKER", "TARGET_MARKER", "JUNCTION_MARKER", "ANNOTATION", "COMPLETENESS", "LABEL_SLOT"]}}}
+  }
+}

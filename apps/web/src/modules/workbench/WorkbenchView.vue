@@ -16,7 +16,7 @@
     <div class="workbench-main">
       <div class="workbench-notices">
         <p v-if="store.workbench.resourceState === 'loading'" class="command-feedback" role="status">正在读取 Local Runtime 工作台会话。</p>
-        <p v-if="store.workbench.resourceState === 'error' || store.workbench.commandFeedback" class="command-feedback" role="status">{{ store.workbench.commandFeedback }}</p>
+        <p v-if="store.workbench.resourceState === 'error' || store.workbench.commandFeedback" class="command-feedback" role="status" data-testid="p03-command-feedback">{{ store.workbench.commandFeedback }}<code v-if="store.workbench.feedbackCode" data-testid="p03-command-feedback-code">{{ store.workbench.feedbackCode }}</code></p>
         <div v-if="store.isReadonly" class="readonly-banner" data-testid="p03-readonly-banner">当前修订只读，语义写入已禁用。</div>
       </div>
 
@@ -43,9 +43,12 @@
               <button class="tool-button tool-button--icon" type="button" title="创建 Attribute" aria-label="创建 Attribute" :disabled="store.isReadonly || !store.selectedNode || (store.selectedNode.kind !== 'object' && store.selectedNode.kind !== 'process')" data-testid="p03-tool-attribute" @click="store.addFeature('ATTRIBUTE')"><ListTree :size="18" aria-hidden="true" /></button>
               <button class="tool-button tool-button--icon" type="button" title="创建 Operation" aria-label="创建 Operation" :disabled="store.isReadonly || !store.selectedNode || (store.selectedNode.kind !== 'object' && store.selectedNode.kind !== 'process')" data-testid="p03-tool-operation" @click="store.addFeature('OPERATION')"><Cog :size="18" aria-hidden="true" /></button>
               <button class="tool-button tool-button--icon" type="button" title="创建 Consumption" aria-label="创建 Consumption" :disabled="store.isReadonly" data-testid="p03-tool-consumption" @click="store.addConsumption"><Workflow :size="18" aria-hidden="true" /></button>
-              <button class="tool-button tool-button--icon" :class="{ 'is-active': store.relationCandidate.phase !== 'idle' }" type="button" title="创建过程关系" aria-label="创建过程关系" :disabled="store.isReadonly || !store.selectedNode" data-testid="p03-tool-procedural-relation" @click="store.armRelationCreation"><GitFork :size="18" aria-hidden="true" /></button>
-              <button class="tool-button tool-button--icon" :class="{ 'is-active': store.relationCandidate.phase !== 'idle' }" type="button" title="创建结构关系" aria-label="创建结构关系" :disabled="store.isReadonly || !store.selectedNode" data-testid="p03-tool-structural-relation" @click="store.armRelationCreation"><Network :size="18" aria-hidden="true" /></button>
+              <button class="tool-button tool-button--icon" :class="{ 'is-active': store.relationCandidate.phase !== 'idle' }" type="button" title="创建过程关系" aria-label="创建过程关系" :disabled="store.isReadonly" data-testid="p03-tool-procedural-relation" @click="store.armRelationCreation"><GitFork :size="18" aria-hidden="true" /></button>
+              <button class="tool-button tool-button--icon" :class="{ 'is-active': store.relationCandidate.phase !== 'idle' }" type="button" title="创建结构关系" aria-label="创建结构关系" :disabled="store.isReadonly" data-testid="p03-tool-structural-relation" @click="store.armRelationCreation"><Network :size="18" aria-hidden="true" /></button>
               <button class="tool-button tool-button--icon" :class="{ 'is-active': store.stateCandidate.phase === 'placing' }" type="button" title="创建 State" aria-label="创建 State" :disabled="store.isReadonly || !store.selectedNode || (store.selectedNode.kind !== 'object' && store.selectedNode.kind !== 'attribute' && store.selectedNode.kind !== 'operation') || !store.stateCreateOption?.enabled" data-testid="p03-tool-state" @click="store.armStateCreation"><CircleDotDashed :size="18" aria-hidden="true" /></button>
+            </div>
+            <div class="tool-group" aria-label="关系目录">
+              <button class="tool-button tool-button--icon" :class="{ 'is-active': store.relationCatalog.open }" type="button" title="关系目录" aria-label="关系目录" data-testid="p03-tool-relation-menu" @click="store.openRelationCatalog"><ListTree :size="18" aria-hidden="true" /></button>
             </div>
             <div class="tool-group tool-group--end" aria-label="视口控制">
               <button class="tool-button tool-button--icon" type="button" title="缩小视图" aria-label="缩小视图" data-testid="p03-zoom-out" @click="store.setViewportZoom(store.workbench.zoom - 10)"><ZoomOut :size="18" aria-hidden="true" /></button>
@@ -54,14 +57,28 @@
               <button class="tool-button tool-button--icon" type="button" title="适配画布" aria-label="适配画布" data-testid="p03-zoom-fit" @click="store.setViewportZoom(100)"><Maximize :size="18" aria-hidden="true" /></button>
             </div>
           </div>
+          <section v-if="store.relationCatalog.open" class="relation-candidate" data-testid="p03-relation-catalog-menu">
+            <div class="form-readonly"><span>Runtime 关系目录</span><button class="button button--secondary" type="button" data-testid="p03-relation-catalog-close" @click="store.closeRelationCatalog">关闭</button></div>
+            <label class="form-field"><span>搜索</span><input v-model="store.relationCatalog.search" data-testid="p03-relation-catalog-search" maxlength="256"></label>
+            <p v-if="store.relationCatalog.loading" class="disabled-reason">正在读取 Runtime 关系目录。</p>
+            <section v-for="family in store.relationCatalogFamilies" :key="family" class="relation-candidate" :data-testid="`p03-relation-catalog-${family}`">
+              <button class="button button--secondary" type="button" :data-testid="`p03-relation-catalog-toggle-${family}`" @click="store.toggleRelationCatalogFamily(family)">{{ family }} {{ store.relationCatalogItems(family).length }}</button>
+              <div v-if="store.isRelationCatalogExpanded(family)" class="relation-candidate__options">
+                <button v-for="item in store.relationCatalogItems(family)" :key="item.capability_id" class="relation-candidate__option" type="button" :disabled="!item.enabled" :data-testid="`p03-relation-catalog-option-${item.capability_id}`">
+                  <strong>{{ item.display_name }}</strong><span>{{ item.capability_id }}</span><span>{{ item.symbol_id }}</span><span v-if="item.reason_codes.length" class="disabled-reason">{{ item.reason_codes.join(", ") }}</span>
+                </button>
+              </div>
+            </section>
+          </section>
           <div class="canvas-frame">
-            <OpdCanvas :nodes="store.workbench.nodes" :relations="store.workbench.relations" :selected-id="store.workbench.selectedId" :zoom="store.workbench.zoom" :state-placement-owner-id="store.stateCandidate.phase === 'placing' ? store.stateCandidate.ownerId : undefined" @select="store.selectConstruct" @place-state="store.placeState" />
+            <OpdCanvas :nodes="store.workbench.nodes" :relations="store.workbench.relations" :selected-id="store.workbench.selectedId" :zoom="store.workbench.zoom" :state-placement-owner-id="store.stateCandidate.phase === 'placing' ? store.stateCandidate.ownerId : undefined" :relation-preview="relationPreview" :highlighted-finding-target-id="store.highlightedFindingTargetId || undefined" @select="store.selectConstruct" @place-state="store.placeState" />
             <div class="canvas-state">{{ store.workbench.lastAction }}</div>
           </div>
         </section>
 
-        <aside class="workbench-panel inspector-panel">
+        <aside class="workbench-panel inspector-panel" data-testid="p03-right-panel">
           <div class="panel-heading"><div><span>选择与属性</span><strong>{{ selectionKind }}</strong></div><span class="profile-tag">{{ store.workbench.revision }}</span></div>
+          <button v-if="!store.rightPanel.open && store.workbench.selectedId && store.relationCandidate.phase === 'idle' && store.stateCandidate.phase === 'idle'" class="button button--secondary" type="button" data-testid="p03-right-panel-open" @click="store.openRightPanel">打开属性</button>
           <section v-if="store.relationCandidate.phase === 'selecting-target'" class="relation-candidate" data-testid="p03-relation-target">
             <div class="form-readonly"><span>已选端点</span><code>{{ store.relationCandidate.endpointIds.join(' -> ') }}</code></div>
             <p class="disabled-reason">可继续在画布选择端点；Self-invocation 可重复选择同一 Process。</p>
@@ -87,13 +104,18 @@
             </form>
             <button class="button button--secondary" type="button" @click="store.cancelRelationCandidate">取消</button>
           </section>
+          <section v-else-if="store.relationCandidate.phase === 'previewing'" class="relation-candidate" data-testid="p03-relation-preview">
+            <div class="form-readonly"><span>候选</span><code data-testid="p03-relation-preview-id">{{ store.relationCandidate.candidateId }}</code></div>
+            <p class="disabled-reason">候选尚未写入修订或投影，确认后才创建关系。</p>
+            <div class="state-editor__actions"><button class="button button--secondary" type="button" data-testid="p03-relation-preview-cancel" @click="store.cancelRelationCandidate">取消</button><button class="button" type="button" data-testid="p03-relation-preview-confirm" @click="store.confirmRelationCandidate">确认创建</button></div>
+          </section>
           <form v-else-if="store.stateCandidate.phase === 'editing'" class="state-editor" data-testid="p03-state-candidate" @submit.prevent="store.submitStateCandidate">
             <div class="form-readonly"><span>Owner</span><code>{{ store.stateCandidate.ownerId }}</code></div>
             <label class="form-field"><span>State 名称</span><input v-model="store.stateCandidate.name" data-testid="p03-state-name" maxlength="256" autofocus></label>
             <fieldset class="state-role-group"><legend>角色</legend><label v-for="role in stateRoles" :key="role"><input v-model="store.stateCandidate.roles" type="checkbox" :value="role">{{ role }}</label></fieldset>
             <div class="state-editor__actions"><button class="button button--secondary" type="button" @click="store.cancelStateCandidate">取消</button><button class="button" type="submit" :disabled="store.workbench.commandState === 'submitting'">创建</button></div>
           </form>
-          <section v-else-if="store.selectedNode?.kind === 'state'" data-testid="p03-state-inspector">
+          <section v-else-if="store.rightPanel.open && store.selectedNode?.kind === 'state'" data-testid="p03-state-inspector">
             <div class="form-readonly"><span>State ID</span><code>{{ store.selectedNode.id }}</code></div>
             <div class="form-readonly"><span>Owner</span><code>{{ store.selectedNode.ownerId }}</code></div>
             <label class="form-field"><span>名称</span><input v-model="store.stateEditor.name" data-testid="p03-state-inspector-name" maxlength="256"></label>
@@ -102,7 +124,7 @@
             <div class="state-presentation-actions"><button class="button button--secondary" type="button" @click="store.changeStatePresentation(store.selectedNode.explicitness === 'SUPPRESSED' ? 'STATE_EXPLICIT' : 'STATE_SUPPRESS')">{{ store.selectedNode.explicitness === 'SUPPRESSED' ? '显式' : '抑制' }}</button><button class="button button--secondary" type="button" @click="store.changeStatePresentation(store.selectedNode.foldState === 'FOLDED' ? 'UNFOLD' : 'FOLD')">{{ store.selectedNode.foldState === 'FOLDED' ? '展开' : '折叠' }}</button></div>
             <div v-if="store.stateDeleteOption" class="impact-callout" data-testid="p03-state-delete-impact"><strong>删除影响</strong><span>构造 {{ store.stateDeleteOption.impact_summary?.affected_construct_count ?? 0 }} · Context {{ store.stateDeleteOption.impact_summary?.affected_context_count ?? 0 }} · 文本 {{ store.stateDeleteOption.impact_summary?.affected_sentence_count ?? 0 }}</span><button class="button button--danger" type="button" :disabled="!store.stateDeleteOption.enabled" @click="store.deleteSelectedState">{{ store.stateDeleteOption.enabled ? '删除 State' : 'State 被 Fact 引用，不能删除' }}</button></div>
           </section>
-          <template v-else-if="store.selectedNode">
+          <template v-else-if="store.rightPanel.open && store.selectedNode">
             <div class="form-readonly"><span>名称</span><strong>{{ store.selectedNode.label }}</strong></div>
             <div class="form-readonly"><span>稳定标识</span><code>{{ store.selectedNode.id }}</code></div>
             <div class="form-readonly"><span>Occurrence</span><code>{{ store.selectedNode.occurrenceId }}</code></div>
@@ -111,7 +133,7 @@
             </section>
             <p class="disabled-reason">属性更新命令不在 P0 范围。</p>
           </template>
-          <template v-else-if="store.selectedRelation">
+          <template v-else-if="store.rightPanel.open && store.selectedRelation">
             <div class="form-readonly"><span>关系</span><strong>{{ store.selectedRelation.capabilityId ?? 'Consumption' }}</strong></div>
             <div class="form-readonly"><span>稳定标识</span><code>{{ store.selectedRelation.id }}</code></div>
             <div v-for="endpoint in store.selectedRelation.endpoints ?? []" :key="`${endpoint.ordinal}-${endpoint.role}`" class="form-readonly"><span>{{ endpoint.role }}</span><code>{{ endpoint.targetId }}</code></div>
@@ -156,10 +178,44 @@
         <button v-for="line in store.textLines" :key="line.id" class="opl-line" type="button" data-testid="p03-opl-sentence" @click="store.locateText(line)">{{ line.text }}</button>
         <p v-if="!store.textLines.length" class="projection-message">当前 Context 尚无可生成 OPL 的 Procedural Fact。</p>
       </div>
-      <div v-else-if="store.workbench.bottomTab === 'findings'" class="bottom-content" data-testid="p03-findings-panel"><p class="projection-message">当前校验任务未返回 Finding 明细。</p></div>
-      <div v-else-if="store.workbench.bottomTab === 'history'" class="bottom-content" data-testid="p03-history-panel"><p v-for="revision in store.revisions" :key="revision.id">{{ revision.sequence }} · {{ revision.kind }} · {{ revision.id }}</p></div>
+      <div v-else-if="store.workbench.bottomTab === 'findings'" class="bottom-content" data-testid="p03-findings-panel">
+        <p v-if="!store.findings.length" class="projection-message">当前修订没有 Finding。</p>
+        <button v-for="finding in store.findings" :key="finding.finding_id" class="opl-line" type="button" :class="{ 'is-active': finding.finding_id === store.selectedFindingId }" :data-testid="`p03-finding-${finding.finding_id}`" @click="store.selectFinding(finding.finding_id)">{{ finding.severity }} · {{ finding.rule_id }}</button>
+        <button class="button button--secondary" type="button" :disabled="!store.selectedFindingId" data-testid="p03-finding-locate" @click="store.locateFinding">定位 Finding</button>
+      </div>
+      <div v-else-if="store.workbench.bottomTab === 'history'" class="bottom-content" data-testid="p03-history-panel">
+        <p v-if="!store.operationRecords.length" class="projection-message">当前修订没有 Operation Record。</p>
+        <p v-for="record in store.operationRecords" :key="record.operation_record_id" :data-testid="`p03-operation-${record.operation_record_id}`">{{ record.result_status }} · {{ record.diagnostic_id ?? record.operation_id }} · {{ record.command_id }}</p>
+        <button v-if="store.releaseVisualCommonFaultCommand" class="button button--secondary" type="button" data-testid="p03-release-visual-common-fault-command" @click="store.submitReleaseVisualCommonFaultCommand">提交受控故障命令</button>
+      </div>
       <div v-else class="bottom-content"><p>架构方法检查待连接 Method Query；当前不形成语言符合性结论。</p></div>
     </section>
+
+    <div
+      class="capture-view-state"
+      data-testid="p03-capture-view-state"
+      :data-read-revision="store.captureViewState.readRevision"
+      :data-selection-kind="store.captureViewState.selectionKind"
+      :data-selection-target-id="store.captureViewState.selectionTargetId"
+      :data-right-open="String(store.captureViewState.rightOpen)"
+      :data-right-mode="store.captureViewState.rightMode"
+      :data-bottom-open="String(store.captureViewState.bottomOpen)"
+      :data-bottom-mode="store.captureViewState.bottomMode"
+      :data-relation-candidate-state="store.captureViewState.relationCandidateState"
+      :data-relation-candidate-capability-id="store.captureViewState.relationCandidateCapabilityId"
+      :data-relation-candidate-id="store.captureViewState.relationCandidateId"
+      :data-relation-candidate-source-target-id="store.captureViewState.relationCandidateSourceTargetId"
+      :data-relation-candidate-target-target-id="store.captureViewState.relationCandidateTargetTargetId"
+      :data-catalog-open="String(store.captureViewState.catalogOpen)"
+      :data-catalog-search="store.captureViewState.catalogSearch"
+      :data-catalog-procedural-count="store.captureViewState.catalogProceduralCount"
+      :data-catalog-control-count="store.captureViewState.catalogControlCount"
+      :data-catalog-structural-count="store.captureViewState.catalogStructuralCount"
+      :data-finding-selected-id="store.captureViewState.findingSelectedId"
+      :data-finding-highlighted-target-id="store.captureViewState.findingHighlightedTargetId"
+      :data-feedback-current-code="store.captureViewState.feedbackCurrentCode"
+      aria-hidden="true"
+    ><span v-for="code in store.captureViewState.historyCodes" :key="code" :data-opm-history-code="code"></span></div>
 
     <div class="validation-status"><div><span>校验</span><strong>{{ validationLabel }}</strong></div><progress :value="store.workbench.validationProgress" max="100" /><span>阻断 {{ store.workbench.blockingFindings }}</span></div>
   </section>
@@ -186,6 +242,9 @@ const bottomTabs = [
 ] as const;
 const stateRoles = ["INITIAL", "DEFAULT", "FINAL"] as const;
 const selectionKind = computed(() => store.selectedRelation ? "关系" : store.selectedNode?.kind === "process" ? "过程" : store.selectedNode?.kind === "state" ? "状态" : store.selectedNode ? "对象" : "未选择");
+const relationPreview = computed(() => store.relationCandidate.phase === "previewing" && store.relationCandidate.candidateId
+  ? { candidateId: store.relationCandidate.candidateId, sourceId: store.relationCandidate.sourceId, targetId: store.relationCandidate.targetId }
+  : undefined);
 const validationLabel = computed(() => store.workbench.validationState === "running" ? "运行中" : store.workbench.validationState === "failed" ? "校验失败，可重试" : store.workbench.validationState === "current" ? "结果当前" : "结果过期");
 
 watch([projectId, modelId, () => route.query.context, () => route.query.revision], ([nextProject, nextModel, context, revision]) => {
