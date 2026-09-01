@@ -10,6 +10,11 @@
 
 不实现 Project/Baseline 的 SQLite 写入、身份重映射、草稿创建、外部扩展解释、签名或加密。Reader 仅产生已验证的 inspection 或 `SemanticRevision`，不得修改数据库或活动项目。
 
+`PROJECT_FULL` 与 `BASELINE_ASSET` 的持久化适配由后继
+`opm-native-exchange-import-design.md` 的 `EXCHANGE-02` 单独定义。该后继
+适配复用本契约的 Reader inspection，不改变本节的低层安全、Manifest、摘要或
+`MODEL_REVISION` 行为。
+
 ## 2. Manifest 与目录
 
 机器 Schema 固定为 `docs/contracts/schemas/opm-native-exchange-package-v1.schema.json`。首发包仅接受：
