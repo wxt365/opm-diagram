@@ -31,6 +31,10 @@
 1. `design/opm-modeling-tool-architecture.md`：系统边界、分层、模块依赖、事务和架构决策。
 2. `design/opm-modeling-tool-module-design.md`：M01-M12 职责、逻辑契约、数据所有权和关键流程。
 
+智能助手扩展（2026-10-05）：[对话式智能建模助手设计](design/opm-conversational-modeling-design.md)的第一版已按[实现规格](../specs/opm-conversational-modeling-implementation-task-spec.md)实施，并按[实时整图规格](../specs/opm-assistant-live-plan-task-spec.md)支持当前 OPD 连续预览、最终校验与一次原子确认；父子 OPD 读取和共享影响阻断继续保留。[运行说明](../apps/assistant/README.md)、[实现验证记录](checklists/opm-conversational-modeling-implementation-checklist.md)、[历史设计检查](checklists/opm-conversational-modeling-design-checklist.md)。跨图批量写入、自动细化及语义撤销尚未开放，首期设计基线不变。
+
+脑图分析扩展（2026-10-05，阶段 A/B 已实施，C/D 后置）：[脑图分析与 OPD 转换设计](design/opm-mindmap-analysis-design.md)，覆盖模型级分析、独立会话、单图实时转换、来源追踪和增量更新；原[设计检查记录](checklists/opm-mindmap-analysis-design-checklist.md)保留设计阶段边界，实际实现与证据见[实施规格](../specs/opm-mindmap-implementation-task-spec.md)。不改写既有冻结基线。
+
 ### 2.4 页面与交互
 
 1. `design/opm-modeling-workbench-page-design.md`：P01-P06 页面组、工作台 IA、主动作、守卫和回流。

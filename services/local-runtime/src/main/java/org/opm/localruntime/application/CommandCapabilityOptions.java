@@ -264,15 +264,28 @@ final class CommandCapabilityOptions {
 
     static ApiEdtContract.CommandCapabilityOption propertyUpdateOption(String queryId, String revisionId, SemanticRevision.Element element, String reason) {
         String symbolId = element.coreKind() == SemanticRevision.CoreKind.OBJECT ? "symbol.object.basic" : "symbol.process.basic";
+        String kind = element.coreKind() == SemanticRevision.CoreKind.OBJECT ? "Object" : "Process";
+        return propertyUpdateOption(queryId, revisionId, "ELEMENT", element.id(), element.capability().capabilityId(), symbolId, kind, reason);
+    }
+
+    static ApiEdtContract.CommandCapabilityOption propertyUpdateOption(String queryId, String revisionId, SemanticRevision.Feature feature, String reason) {
+        String symbolId = feature.kind() == SemanticRevision.FeatureKind.ATTRIBUTE ? "symbol.feature.attribute" : "symbol.feature.operation";
+        String kind = feature.kind() == SemanticRevision.FeatureKind.ATTRIBUTE ? "Attribute" : "Operation";
+        return propertyUpdateOption(queryId, revisionId, "FEATURE", feature.id(), feature.capability().capabilityId(), symbolId, kind, reason);
+    }
+
+    private static ApiEdtContract.CommandCapabilityOption propertyUpdateOption(String queryId, String revisionId, String targetKind,
+                                                                                String targetId, String capabilityId, String symbolId,
+                                                                                String kind, String reason) {
         List<ApiEdtContract.RequiredField> fields = List.of(
                 new ApiEdtContract.RequiredField("target_ref", "ENDPOINT", true, List.of()),
                 new ApiEdtContract.RequiredField("property_name", "ENUM", true, List.of("name")),
                 new ApiEdtContract.RequiredField("value", "TEXT", true, List.of()));
         List<ApiEdtContract.NormalizedEndpoint> endpoints = List.of(new ApiEdtContract.NormalizedEndpoint(
-                "PROPERTY_TARGET", new ApiEdtContract.TargetLocator("ELEMENT", element.id(), null), 0, null));
+                "PROPERTY_TARGET", new ApiEdtContract.TargetLocator(targetKind, targetId, null), 0, null));
         return new ApiEdtContract.CommandCapabilityOption(queryId, propertyOptionId(queryId), ApiEdtContract.CommandType.UPDATE_PROPERTY,
-                element.capability().capabilityId(), null, "编辑" + (element.coreKind() == SemanticRevision.CoreKind.OBJECT ? " Object" : " Process") + "名称",
-                List.of("Element", "名称"), endpoints, fields, List.of(),
+                capabilityId, null, "编辑 " + kind + " 名称",
+                List.of(targetKind.equals("ELEMENT") ? "Element" : "Feature", "名称"), endpoints, fields, List.of(),
                 new ApiEdtContract.AssetReference(symbolId, SYMBOL_VERSION, SYMBOL_DIGEST),
                 new ApiEdtContract.AssetReference(GRAMMAR_ID, GRAMMAR_VERSION, GRAMMAR_DIGEST),
                 List.of(new ApiEdtContract.AssetReference(RULE_ID, RULE_VERSION, RULE_DIGEST)), reason == null,

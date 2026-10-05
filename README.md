@@ -42,6 +42,8 @@ OPM 用对象、过程及其关系描述一个系统：系统中有什么，这�
 | 图文联动 | OPL 文本生成，以及通过 Trace 追踪模型来源 |
 | 编辑与版本 | 草稿编辑、手动和自动保存、Revision 与只读永久链接 |
 | 规则资产 | Profile binding，以及规则、符号和文本资产加载 |
+| 智能助手 | 基于 DeepSeek 的多轮建模对话、实时预览、诊断与确认后提交 |
+| 脑图分析 | 模型级脑图编辑、独立保存、JSON 交换与单 OPD 转换 |
 
 已有实现不等于全部验收完成。完整规则校验、发布级验证和交付仍在推进；多人实时协作、动画仿真不是当前已交付能力。ISO 19450:2024 是设计参考和验证目标，当前不宣称完整标准符合性。
 
@@ -57,7 +59,7 @@ OPM 用对象、过程及其关系描述一个系统：系统中有什么，这�
 
 ## 本地开发
 
-准备 **Node.js 22 LTS、npm 10 和 JDK 21**。仓库提供 Maven Wrapper，无需另外安装 Maven。以下命令以 macOS/Linux 为例，均在仓库根目录执行。
+准备 **Node.js 22 LTS（22.22 或更高版本）、npm 10 和 JDK 21**。仓库提供 Maven Wrapper，无需另外安装 Maven。以下命令以 macOS/Linux 为例，均在仓库根目录执行。
 
 ```bash
 git clone https://github.com/wxt365/opm-diagram.git
@@ -85,10 +87,26 @@ npm run dev --workspace=@opm/web -- --host 127.0.0.1 --port 5173 --strictPort
 
 上述流程用于本地开发体验。正式发布还需要满足冻结的依赖输入和验证要求，不能以开发服务启动成功代替发布验收。
 
+### 可选：启动智能助手
+
+在第三个终端配置并启动助手服务：
+
+```bash
+cp apps/assistant/.env.example apps/assistant/.env.local
+chmod 600 apps/assistant/.env.local
+# 在 .env.local 中填写自己的 DEEPSEEK_API_KEY，再启动服务。
+npm run assistant:dev
+```
+
+助手默认监听 `127.0.0.1:17860`，使用 `deepseek-flash`。真实生成会调用 DeepSeek API；密钥仅放在服务端本地文件，`.env.local` 已被 Git 忽略，不要写入前端代码或提交。无密钥仍可使用基础建模工作台与手工脑图编辑。助手会话与模型数据库需共同备份；生成和标准审查结果仍需用户核对。
+
+更多说明见[智能助手文档](apps/assistant/README.md)，包括服务更新、数据恢复和能力边界。已有数据库升级使用运行时的一致备份与迁移流程，不要删除恢复标记或直接降级数据库。
+
 ## 仓库结构
 
 ```text
 apps/web/                 前端页面与建模工作台
+apps/assistant/           智能建模与脑图分析助手服务
 services/local-runtime/  后端 API、语义编辑、文本生成与本地存储
 packages/profiles/       Profile、规则、符号、文本和 Golden 资产
 docs/                    需求、设计、契约、检查清单与验证报告

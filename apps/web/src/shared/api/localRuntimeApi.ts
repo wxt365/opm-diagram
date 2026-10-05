@@ -12,8 +12,12 @@ import type {
 } from "./generated/apiEdtContract";
 import type * as Draft from "./generated/draftWorkspaceContract";
 import type { PinResult, SaveResult } from "./generated/draftSaveContract";
+import { sameDraftToken } from "./draftRequestIdentity";
 
 export interface DraftQueryContracts {
+  mindmap: [Draft.MindmapRequest, Draft.MindmapResult];
+  "method-summary": [Draft.MethodSummaryRequest, Draft.MethodSummaryResult];
+  "operation-history": [Draft.OperationHistoryRequest, Draft.OperationHistoryResult];
   open: [Draft.OpenDraftRequest, Draft.OpenDraftResult];
   projection: [Draft.DraftQueryRequest, Draft.DraftProjectionResult];
   text: [Draft.DraftQueryRequest, Draft.DraftTextResult];
@@ -27,6 +31,9 @@ export interface DraftQueryContracts {
 export interface DraftMutationResults { EDIT: Draft.DraftEditResult; SAVE: SaveResult; PIN: PinResult }
 
 export type ResourceAccessMode = "EDITABLE_DRAFT" | "READONLY_SNAPSHOT" | "READONLY_BASELINE";
+export type ModelArchiveState = "ACTIVE" | "ARCHIVED";
+export type ModelLifecycleAction = "TRASH" | "RESTORE" | "PURGE";
+export interface ModelLifecycleResult { project_id: string; model_id: string; lifecycle_state: ModelArchiveState | "PURGED" }
 
 export interface ProjectWire {
   project_id: string;
@@ -83,6 +90,8 @@ export interface NavigationNodeWire {
   label: string;
   context_kind: string;
   has_children: boolean;
+  parent_context_id?: string;
+  refinee_element_id?: string;
 }
 
 export interface ProjectionConstructWire {
@@ -185,6 +194,7 @@ export interface ValidationTaskWire {
 
 export type P0Command =
   | { commandType: "CREATE_ELEMENT"; payload: { kind: "OBJECT" | "PROCESS"; name: string; layout: { x: number; y: number } } }
+  | { commandType: "CREATE_CONTEXT"; payload: { context_id: string; refinee_element_id: string; name: string; capability_query_id: string; selected_option_id: string } }
   | { commandType: "CREATE_FEATURE"; payload: { context_id: string; owner_element_id: string; feature_kind: "ATTRIBUTE" | "OPERATION"; capability_ref: { capability_id: string }; name: string; occurrence: { ownership: "OWNED"; construct_role: string }; layout: { x: number; y: number }; capability_query_id: string; selected_option_id: string } }
   | { commandType: "CREATE_FACT"; payload: { kind: "CONSUMPTION"; object_id: string; state_id?: string; process_id: string; layout: { x: number; y: number } } }
   | { commandType: "CREATE_FACT"; payload: ApiEdtCreateFactPayload }
@@ -224,7 +234,34 @@ export class LocalRuntimeApiError extends Error {
   }
 }
 
+export interface OpdJsonPackageWire {
+  format: "OPM-OPD-JSON";
+  format_version: "1.0";
+  entry_context_id: string;
+  exported_at: string;
+  source: { project_id: string; model_id: string; context_id: string };
+  semantic_revision: { contexts: Array<{ context_id: string; name: { local_name: string } }>; elements: unknown[]; states: unknown[]; facts: unknown[]; [key: string]: unknown };
+}
+
 class LocalRuntimeApi {
+  async methodSummary(project: string, model: string, context: string, source: Draft.MethodSource) {
+    const request = { request_id: requestId("query.method"), context_id: context, source };
+    const result = await this.draftQuery(project, model, "method-summary", request);
+    const returned = result.meta.source;
+    const sameSource = "draft_token" in source ? "draft_token" in returned && sameDraftToken(source.draft_token, returned.draft_token)
+      : "revision_id" in returned && source.revision_id === returned.revision_id;
+    if (result.meta.request_id !== request.request_id || result.meta.context_id !== context
+      || !sameSource || result.data.coverage !== "RELATION_EVIDENCE_ONLY")
+      throw new LocalRuntimeApiError("WORKSPACE_INVALID", "架构方法响应身份不一致。");
+    return result.data;
+  }
+  async operationHistory(project: string, model: string, revision: string, before: string | null = null) {
+    const request = { request_id: requestId("query.history"), revision, before };
+    const result = await this.draftQuery(project, model, "operation-history", request);
+    if (result.meta.request_id !== request.request_id || result.meta.project_id !== project || result.meta.model_id !== model || result.meta.revision !== revision)
+      throw new LocalRuntimeApiError("WORKSPACE_INVALID", "操作历史响应身份不一致。");
+    return result.data;
+  }
   draftQuery<K extends keyof DraftQueryContracts>(project: string, model: string, operation: K,
     request: DraftQueryContracts[K][0]): Promise<DraftQueryContracts[K][1]> {
     return this.writeRaw(draftPath(project, model, operation), JSON.stringify(request));
@@ -256,8 +293,28 @@ class LocalRuntimeApi {
     return (await this.request<QueryEnvelope<ProjectWire>>(`/api/v1/projects/${encodeURIComponent(projectId)}?${queryRequestId("project")}`)).data;
   }
 
-  async listModels(projectId: string): Promise<ModelWire[]> {
-    return (await this.request<QueryEnvelope<ModelWire[]>>(`/api/v1/projects/${encodeURIComponent(projectId)}/models?${queryRequestId("models")}`)).data;
+  async listModels(projectId: string, archiveState: ModelArchiveState = "ACTIVE"): Promise<ModelWire[]> {
+    return (await this.request<QueryEnvelope<ModelWire[]>>(`/api/v1/projects/${encodeURIComponent(projectId)}/models?${queryRequestId("models")}&archive_state=${archiveState}`)).data;
+  }
+
+  async changeModelLifecycle(projectId: string, modelId: string, action: ModelLifecycleAction, commandId: string, confirmationName?: string): Promise<ModelLifecycleResult> {
+    return (await this.write<CommandEnvelope<ModelLifecycleResult>>(`/api/v1/projects/${encodeURIComponent(projectId)}/models/${encodeURIComponent(modelId)}/lifecycle`, {
+      request_id: requestId("request.model-lifecycle"), command_id: commandId,
+      action, expected_state: action === "TRASH" ? "ACTIVE" : "ARCHIVED",
+      ...(confirmationName === undefined ? {} : { confirmation_name: confirmationName }),
+    })).data;
+  }
+
+  exportOpdJson(project: string, model: string, context: string, source: { draft_token: Draft.DraftToken } | { revision_id: string }): Promise<OpdJsonPackageWire> {
+    return this.write(`/api/v1/projects/${encodeURIComponent(project)}/models/${encodeURIComponent(model)}/opd-json/export`, {
+      request_id: requestId("request.opd-export"), context_id: context, ...source,
+    });
+  }
+
+  async importOpdJson(project: string, name: string, packageFile: OpdJsonPackageWire, commandId: string): Promise<ModelWire & { context_id: string }> {
+    return (await this.write<CommandEnvelope<ModelWire & { context_id: string }>>(`/api/v1/projects/${encodeURIComponent(project)}/opd-json/import`, {
+      request_id: requestId("request.opd-import"), command_id: commandId, name, binding: activeBinding(), opd_package: packageFile,
+    })).data;
   }
 
   async createModel(projectId: string, name: string): Promise<ModelWire> {

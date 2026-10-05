@@ -14,6 +14,30 @@ describe("ProjectLibraryView", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     delete window.__OPM_LOCAL_SESSION__;
+    delete window.__OPM_ACTIVE_PROFILE_BINDING__;
+  });
+
+  it.each([
+    ["profile.iso19450.2024.draft", "0.2.0", "ISO 19450:2024 草案 0.2.0"],
+    ["profile.iso19450.2024.draft", "0.7.0", "ISO 19450:2024 草案 0.7.0"],
+    ["profile.custom", "1.2.3", "profile.custom 1.2.3"],
+    ["", "", "本地默认 Profile（版本未提供）"],
+  ])("创建弹窗按启动信息显示 Profile：%s %s", async (profileId, version, label) => {
+    if (profileId) window.__OPM_ACTIVE_PROFILE_BINDING__ = {
+      profile_id: profileId, profile_version: version, rule_set_id: "rule.test", rule_version: "1.0.0",
+    };
+    const router = createRouter({ history: createMemoryHistory(), routes: [{ path: "/projects", component: ProjectLibraryView }] });
+    await router.push("/projects");
+    vi.stubGlobal("fetch", vi.fn(async () => response(200, query([]))));
+    const wrapper = mount(ProjectLibraryView, { global: { plugins: [router] } });
+    await flushPromises();
+    await wrapper.get('[data-testid="p01-create-project"]').trigger("click");
+
+    const fields = wrapper.findAll(".form-readonly");
+    expect(fields[0]?.text()).toBe(`默认 Profile${label}`);
+    expect(fields[1]?.text()).toBe("本地位置由本地运行时管理");
+    expect(wrapper.text()).not.toContain("~/OPM Studio/");
+    wrapper.unmount();
   });
 
   it("创建项目后进入项目详情", async () => {

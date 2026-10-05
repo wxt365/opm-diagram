@@ -4,7 +4,7 @@ import { parseWorkbenchLocation, workbenchLocationQuery } from "@/app/workbenchL
 import type { useWorkbenchRuntimeStore } from "@/stores/workbenchRuntime";
 
 interface WorkbenchNavigationDependencies {
-  store: Pick<ReturnType<typeof useWorkbenchRuntimeStore>, "draftToken" | "saving" | "saveDraft" | "isReadonly" | "pollDraftState" | "leaveWorkbench" | "workbench" | "load" | "setViewportZoom">;
+  store: Pick<ReturnType<typeof useWorkbenchRuntimeStore>, "draftToken" | "saving" | "saveDraft" | "isReadonly" | "pollDraftState" | "leaveWorkbench" | "workbench" | "load" | "setViewportZoom" | "undoLayout" | "redoLayout">;
   route: RouteLocationNormalizedLoaded;
   router: Router;
   finishInputs: () => Promise<boolean>;
@@ -25,7 +25,16 @@ export function useWorkbenchNavigation({ store, route, router, finishInputs, pro
     try { if (await finishInputs() && route.fullPath === location) await store.saveDraft(); } finally { savePreparing = false; }
   }
   function saveKey(event: KeyboardEvent) {
-    if (!(event.ctrlKey || event.metaKey) || event.altKey || event.key.toLowerCase() !== "s") return;
+    if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
+    const target = event.target;
+    const editing = target instanceof HTMLElement && (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName));
+    const key = event.key.toLowerCase();
+    if ((key === "z" || key === "y") && !editing) {
+      event.preventDefault();
+      if (!event.isComposing && !event.repeat && !store.isReadonly) void (event.shiftKey || key === "y" ? store.redoLayout() : store.undoLayout());
+      return;
+    }
+    if (key !== "s") return;
     event.preventDefault();
     if (event.isComposing || event.repeat || store.isReadonly) return;
     void requestSave();

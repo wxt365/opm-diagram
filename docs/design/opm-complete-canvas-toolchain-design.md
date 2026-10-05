@@ -171,7 +171,7 @@ panel-opd-editor
 | --- | --- | --- | --- | --- |
 | Object | `symbol.object.basic` 缩略符号 | 在画布创建 Object | 可用 | 可用 |
 | Process | `symbol.process.basic` 缩略符号 | 在画布创建 Process | 可用 | 可用 |
-| State | `symbol.state.basic` 置于 Object 轮廓内的缩略符号 | 给 Object/Attribute 创建 State | 禁用并提示“先选择对象或属性” | 进入 owner 锁定创建态 |
+| State | `symbol.state.basic` 置于 Object 轮廓内的缩略符号 | 给 Object 直接创建 State | 禁用并提示“先选择对象” | 单击即以 Runtime option 创建默认命名 State |
 | Relation palette | 当前 `symbol_descriptor.id` 对应的标准缩略符号 | 直接选择 Runtime 关系能力 | Procedural/Structural 可选；Control 禁用 | 按选择刷新 Control 可用性 |
 | Semantic refinement | Symbol Catalog 的显式/抑制、折叠、语义 zoom 图标 + 文本 | 打开语义动作菜单 | 按 Context 决定 | 按选择与 Profile 过滤 |
 
@@ -200,27 +200,23 @@ panel-opd-editor
 ```mermaid
 stateDiagram-v2
     [*] --> unavailable
-    unavailable --> ready: 选择合法 Object/Attribute
-    ready --> placing: 点击 State 工具
-    placing --> editing: 点击 owner 内部位置
-    editing --> preview: 名称和角色通过本地格式检查
-    preview --> submitting: 提交 CREATE_STATE
+    unavailable --> ready: 选择合法 Object
+    ready --> submitting: 点击 State 工具并提交 CREATE_STATE
     submitting --> committed: 返回 committed_revision
     submitting --> blocked: Profile/领域/文本阻断
     submitting --> failed: 持久化或系统失败
-    blocked --> editing: 修正输入
-    failed --> submitting: 重试
+    blocked --> ready: 修正选择或等待能力可用
+    failed --> ready: 保留反馈后重试
     committed --> ready: 采用新 Projection
 ```
 
 主路径：
 
-1. 用户选择 Object 或 Profile 允许拥有 State 的 Attribute；
-2. 点击 State 工具，owner 被锁定并以焦点轮廓显示；
-3. 用户点击 owner content box 内的位置，生成 State 候选并打开内联名称编辑；
-4. 输入名称，按 Profile 返回的规则选择 `INITIAL/DEFAULT/FINAL` 零到多个角色；
-5. 前端提交 `CREATE_STATE` 候选命令；
-6. 成功后使用新 Revision 的 Context Projection 替换候选；失败时保留名称、角色和位置。
+1. 用户选择 Object；Process、Attribute、Operation、State 或空选择均禁用 State 工具；
+2. 点击 State 工具，前端使用当前 Runtime option 直接提交 `CREATE_STATE`；
+3. 默认名称按同一 owner 下的可见 State 数量生成为 `State N`，角色默认为空，位置按 owner 内容区纵向排列；
+4. 成功后使用新 Revision 的 Context Projection 显示 State；用户选择该 State 后继续通过既有右侧检查器编辑名称与角色；
+5. 创建失败时沿用统一命令反馈，不展示临时候选表单，也不显示“取消/创建”按钮。
 
 禁止在空白画布直接创建 State。将 State 拖出 owner 只显示阻断反馈；跨 owner 移动是未来专用语义命令，不降级成 `UPDATE_LAYOUT`。
 
@@ -538,7 +534,11 @@ State 删除遵守统一构造生命周期：先以 selected State occurrence �
 
 `CREATE_FEATURE` 只接受已存在 Element 作为 owner，并原子维护 owner 的 `feature_ids`。它不创建独立 Thing，不接收自由 `value_schema_ref`，也不替代 `CREATE_ELEMENT`。首期 P03 使用两个目录入口“属性”“操作”：用户先选择 owner Element，Runtime 对 `CREATE_FEATURE` 返回唯一可用 option；未选 owner 时返回 `ENDPOINT_KIND_MISMATCH`。投影 construct role 固定为 `ATTRIBUTE_NODE` 或 `OPERATION_NODE`，Feature Value State 为 `FEATURE_STATE_NODE`。Feature 结点和 Feature Value State 均由 Runtime Projection 返回，前端不得由关系端点临时拼接。
 
-`CREATE_STATE.owner_ref` 允许 `ELEMENT` 或 `FEATURE`。当 owner 是 Feature 时，Runtime 只返回 `CAP-FEAT-STATE-001`，投影为 `FEATURE_STATE_NODE`；当 owner 是 Element 时，保持既有 `CAP-STATE-001` Object State 行为。
+Feature Projection 必须将语义 Feature 的 `owner_element_id` 原样投影为 construct `owner_id`。画布据此为 Object/Process 与 owned Attribute/Operation 绘制无方向、不可交互且无 capture anchor 的装饰所有权线；该线不是 Fact。拥有 Feature 的 Object/Process 在节点内显示 `-/+` 控件，用于在当前画布会话内收起或展开其 Feature 子树；收起同时隐藏 Feature Value State 和触及隐藏节点的普通关系，普通节点点击仍只负责选择。已有及新建 Feature 的 owner 默认收起，点击 `+` 后才显示 Feature、所属线和 Feature State；该显示状态不提交命令、不产生 Revision，刷新或切换画布后恢复默认收起。
+
+`UPDATE_PROPERTY` 的名称切片支持 `target_ref.target_kind=ELEMENT | FEATURE`：Object/Process 使用 `ELEMENT`，Attribute/Operation 使用 `FEATURE`。四类节点共用右侧名称属性组件和画布双击 HTML input；Feature 成功改名只替换 `QualifiedName.local_name`，稳定 ID、owner、kind、capability、布局、State 所属及非目标集合保持不变。
+
+`CREATE_STATE.owner_ref` 的 Runtime 契约仍允许 `ELEMENT` 或 `FEATURE`，既有 Feature State 继续投影为 `FEATURE_STATE_NODE`；当前 P03 State 工具仅对 Object 开放并提交 `owner_ref.target_kind=ELEMENT`，不从 Attribute/Operation 创建新 Feature State。
 
 ### 12.4 `API-EDT-001` 候选返回
 
@@ -634,6 +634,14 @@ CommandCapabilityOption {
 1. 保证查看、选择、定位、视口缩放、Object/Process/State 基本创建和单关系创建主路径。
 2. 检查器和底部 OPL 不得覆盖单排主工具栏；画布与主工具栏分别滚动，展开目录锚定当前箭头并保持在视口可见区域。
 3. 所有按钮、标签和错误文案允许换行；不得缩小字体适配长术语。
+
+### 15.4 工作台头部与检查器
+
+1. 工作台头部保持单一 full-width band：左侧承载项目、模型和 Profile；右侧先排列活动版本、只读/保存状态和版本选择，再以分隔线连接链接、恢复与校验命令。状态标签不得与命令按钮使用相同视觉权重。
+2. 复制永久链接、恢复待确认和运行校验使用 Lucide 图标加文字；运行校验是该区域唯一 primary 按钮。既有禁用条件、可访问名称和 `data-testid` 不因视觉重排变化。
+3. 桌面检查器宽度为 `320px`，采用固定标题和独立滚动内容。State、Element/Feature、Relation、Structural 编辑、Control 候选与空态共享 section 标题、表单、元数据行和操作区节奏，不使用嵌套卡片。
+4. State 检查器按名称、角色、显示方式、标识信息排序；Element/Feature 按基本信息、标识信息、已抑制 State 排序；Relation 按关系信息、端点与约束、Structural/Control 操作排序。长 ID 必须在值列内换行，不得挤压字段标签或溢出检查器。
+5. 中等视口允许头部分为上下两行；`<=980px` 时检查器进入画布下方并限制高度独立滚动；紧凑屏的命令按钮按两列排列，文本允许换行且页面不得产生横向溢出。
 
 ## 16. 大图、性能与错误状态
 

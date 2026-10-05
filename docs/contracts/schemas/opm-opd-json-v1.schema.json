@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://opm.local/schemas/opd-json/1.0",
+  "title": "OPD JSON 可编辑迁移包",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "format_version", "entry_context_id", "exported_at", "source", "semantic_revision"],
+  "properties": {
+    "format": {"const": "OPM-OPD-JSON"},
+    "format_version": {"const": "1.0"},
+    "entry_context_id": {"$ref": "#/$defs/id"},
+    "exported_at": {"type": "string", "format": "date-time"},
+    "source": {
+      "type": "object", "additionalProperties": false,
+      "required": ["project_id", "model_id", "context_id"],
+      "properties": {"project_id": {"$ref": "#/$defs/id"}, "model_id": {"$ref": "#/$defs/id"}, "context_id": {"$ref": "#/$defs/id"}}
+    },
+    "semantic_revision": {
+      "description": "完整草稿文档的OPD及引用闭包；允许保留既有持久字段，语义引用与Profile另由Runtime校验。派生文本重新生成，不携带历史或符合性保证。",
+      "type": "object", "additionalProperties": true,
+      "required": ["schema_id", "schema_version", "revision_id", "model_id", "revision_sequence", "model_header", "profile_binding", "elements", "states", "facts", "contexts", "occurrences", "layouts"],
+      "properties": {
+        "schema_id": {"const": "MS-REV-001"},
+        "schema_version": {"enum": ["0.2", "0.3", "0.4", "0.5"]},
+        "revision_id": {"$ref": "#/$defs/id"},
+        "model_id": {"$ref": "#/$defs/id"},
+        "revision_sequence": {"type": "integer", "minimum": 1},
+        "model_header": {"type": "object", "required": ["model_id", "root_context_id", "identity_namespace"], "properties": {"model_id": {"$ref": "#/$defs/id"}, "root_context_id": {"$ref": "#/$defs/id"}, "identity_namespace": {"type": "object", "required": ["namespace", "local_name"], "properties": {"namespace": {"type": "string", "minLength": 1}, "local_name": {"type": "string", "minLength": 1}}}}, "additionalProperties": true},
+        "profile_binding": {"type": "object"},
+        "elements": {"$ref": "#/$defs/records"}, "features": {"$ref": "#/$defs/records"}, "states": {"$ref": "#/$defs/records"}, "facts": {"$ref": "#/$defs/records"},
+        "contexts": {"type": "array", "minItems": 1, "items": {"type": "object", "required": ["context_id", "name", "occurrence_ids"], "properties": {"context_id": {"$ref": "#/$defs/id"}, "name": {"type": "object", "required": ["local_name"], "properties": {"local_name": {"type": "string", "minLength": 1}}}, "occurrence_ids": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/id"}}}}},
+        "occurrences": {"$ref": "#/$defs/records"}, "layouts": {"$ref": "#/$defs/records"}, "refinement_edges": {"$ref": "#/$defs/records"}, "state_presentations": {"$ref": "#/$defs/records"}
+      }
+    }
+  },
+  "$defs": {"id": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9._:-]{2,127}$"}, "records": {"type": "array", "items": {"type": "object"}}}
+}

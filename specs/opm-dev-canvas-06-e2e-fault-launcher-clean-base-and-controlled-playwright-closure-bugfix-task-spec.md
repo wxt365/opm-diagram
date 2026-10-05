@@ -76,6 +76,8 @@ git show --format= --no-ext-diff --binary 0dcaa27a92693feaf28b731ebed2f81a9ccea0
 
 ### 4.2 活动输入指纹
 
+下表保留本规格指定历史 controlled source 的精确指纹。现行源码的 Fault Schema pin 已由[合并后修正规格](./opm-integrated-failed-items-bugfix-task-spec.md)及[实现规格第 4.1 节](./opm-dev-canvas-06-e2e-fault-launcher-implementation-task-spec.md#41-生产java与构建文件7-read_only_baseline)升级；不得把本表或旧发布证据套用于当前源码，也不得回写历史指纹。
+
 | 输入 | byte_length | SHA-256 |
 | --- | ---: | --- |
 | `docs/contracts/schemas/opm-dev-canvas-06-e2e-attempt-artifact-v02.schema.json` | `55716` | `3508290bf1d1d5f7d297ea48e69fdb4e1ebaf4f907b936b30cd4b769d6a916b4` |

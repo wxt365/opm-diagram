@@ -55,7 +55,8 @@ public final class SemanticRevisionReader {
                     contexts(requiredArray(root, "contexts", "revision")),
                     occurrences(requiredArray(root, "occurrences", "revision")),
                     layouts(requiredArray(root, "layouts", "revision")),
-                    statePresentations(requiredArrayOrEmpty(root, "state_presentations", "revision")));
+                    statePresentations(requiredArrayOrEmpty(root, "state_presentations", "revision")),
+                    refinementEdges(requiredArrayOrEmpty(root, "refinement_edges", "revision")));
         } catch (IOException exception) {
             throw new SemanticReadException("Revision document is not valid JSON", exception);
         } catch (IllegalArgumentException exception) {
@@ -75,9 +76,21 @@ public final class SemanticRevisionReader {
 
     private void requireSupportedSchemaVersion(JsonNode node, String scope) {
         String schemaVersion = requiredText(node, "schema_version", scope);
-        if (!"0.1".equals(schemaVersion) && !"0.2".equals(schemaVersion)) {
-            throw new SemanticReadException(scope + " field schema_version must be 0.1 or 0.2");
+        if (!"0.1".equals(schemaVersion) && !"0.2".equals(schemaVersion) && !"0.3".equals(schemaVersion) && !"0.4".equals(schemaVersion) && !"0.5".equals(schemaVersion)) {
+            throw new SemanticReadException(scope + " field schema_version must be 0.1, 0.2, 0.3, 0.4 or 0.5");
         }
+        if ("0.3".equals(schemaVersion) || "0.4".equals(schemaVersion) || "0.5".equals(schemaVersion)) requiredArray(node, "refinement_edges", scope);
+    }
+
+    private List<SemanticRevision.RefinementEdge> refinementEdges(JsonNode nodes) {
+        List<SemanticRevision.RefinementEdge> result = new ArrayList<>();
+        for (JsonNode node : nodes) result.add(new SemanticRevision.RefinementEdge(
+                requiredText(node, "refinement_id", "refinement"),
+                requiredText(node, "parent_context_id", "refinement"),
+                requiredText(node, "child_context_id", "refinement"),
+                requiredText(node, "refinee_element_id", "refinement"),
+                enumValue(SemanticRevision.CoreKind.class, requiredText(node, "refinement_kind", "refinement"), "refinement kind")));
+        return result;
     }
 
     private SemanticRevision.AssetReference assetReference(JsonNode node) {
@@ -190,6 +203,14 @@ public final class SemanticRevisionReader {
         return result;
     }
 
+    private List<SemanticRevision.ArchitectureLink> architectureLinks(JsonNode nodes) {
+        var links = new ArrayList<SemanticRevision.ArchitectureLink>();
+        for (var node : nodes) links.add(new SemanticRevision.ArchitectureLink(requiredText(node, "link_id", "architecture link"),
+                requiredText(node, "target_context_id", "architecture link"),
+                enumValue(SemanticRevision.ArchitectureLinkKind.class, requiredText(node, "kind", "architecture link"), "architecture link kind")));
+        return links;
+    }
+
     private List<SemanticRevision.Context> contexts(JsonNode nodes) {
         List<SemanticRevision.Context> result = new ArrayList<>();
         for (JsonNode node : nodes) {
@@ -199,7 +220,9 @@ public final class SemanticRevisionReader {
                     capability(requiredObject(node, "capability_ref", "context")),
                     qualifiedName(requiredObject(node, "name", "context")),
                     stableIdList(requiredArray(node, "occurrence_ids", "context"), "context occurrence_ids"),
-                    source(requiredObject(node, "source", "context"))));
+                    source(requiredObject(node, "source", "context")),
+                    node.has("architecture_level") ? enumValue(SemanticRevision.ArchitectureLevel.class,
+                            requiredText(node, "architecture_level", "context"), "architecture level") : null, architectureLinks(requiredArrayOrEmpty(node, "architecture_links", "context"))));
         }
         return result;
     }

@@ -5,19 +5,24 @@ interface Point {
   readonly y: number;
 }
 
+interface NodeCenter extends Point {
+  readonly width?: number;
+  readonly height?: number;
+}
+
 interface ParallelCandidate {
   readonly spec: RelationRenderSpec;
   readonly source: string;
   readonly target: string;
-  readonly sourceCenter: Point;
-  readonly targetCenter: Point;
+  readonly sourceCenter: NodeCenter;
+  readonly targetCenter: NodeCenter;
 }
 
 export const PARALLEL_RELATION_LANE_GAP = 24;
 
 export function layoutParallelBinaryRelations(
   specs: readonly RelationRenderSpec[],
-  nodeCenter: (nodeId: string) => Point | undefined,
+  nodeCenter: (nodeId: string) => NodeCenter | undefined,
 ): RelationRenderSpec[] {
   const groups = new Map<string, ParallelCandidate[]>();
   const replacements = new Map<string, RelationRenderSpec>();
@@ -48,9 +53,16 @@ export function layoutParallelBinaryRelations(
     if (length === 0) return;
     const normal = { x: -dy / length, y: dx / length };
     const midpoint = { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 };
+    const sourceAlong = projectedExtent(start, dx / length, dy / length);
+    const targetAlong = projectedExtent(end, dx / length, dy / length);
+    const clearance = Math.max(projectedExtent(start, normal.x, normal.y), projectedExtent(end, normal.x, normal.y)) + 12;
+    const routeOutside = clearance > 12 && length - sourceAlong - targetAlong < clearance * 2;
 
     ordered.forEach((candidate, index) => {
-      const offset = (index - (ordered.length - 1) / 2) * PARALLEL_RELATION_LANE_GAP;
+      const lane = index - (ordered.length - 1) / 2;
+      const offset = routeOutside && lane !== 0
+        ? Math.sign(lane) * (clearance + (Math.abs(lane) - (ordered.length % 2 === 0 ? 0.5 : 1)) * PARALLEL_RELATION_LANE_GAP)
+        : lane * PARALLEL_RELATION_LANE_GAP;
       const cells = candidate.spec.cells.map((cell) => cell.id === candidate.spec.primaryCellId && cell.kind === "edge"
         ? { ...cell, vertices: [{ x: midpoint.x + normal.x * offset, y: midpoint.y + normal.y * offset }] }
         : cell);
@@ -59,4 +71,8 @@ export function layoutParallelBinaryRelations(
   });
 
   return specs.map((spec) => replacements.get(spec.occurrenceId) ?? spec);
+}
+
+function projectedExtent(center: NodeCenter, x: number, y: number) {
+  return (Math.abs(x) * (center.width ?? 0) + Math.abs(y) * (center.height ?? 0)) / 2;
 }

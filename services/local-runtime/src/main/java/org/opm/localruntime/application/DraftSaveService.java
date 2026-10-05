@@ -10,6 +10,7 @@ import org.opm.localruntime.assets.ProfilePackageAssembler;
 import org.opm.localruntime.semantic.*;
 import org.opm.localruntime.storage.DraftSaveRepository;
 import org.opm.localruntime.storage.ProjectDatabaseFactory;
+import org.opm.localruntime.storage.ProjectDatabaseOpenResult;
 import org.opm.localruntime.text.OplTextGenerationService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -56,6 +57,11 @@ public final class DraftSaveService implements AutoCloseable {
     }
     public SaveState state(String project, String model) { return coordinator(project, model).state(); }
 
+    public synchronized void forget(String project, String model) {
+        var coordinator = coordinators.remove(new Key(project, model));
+        if (coordinator != null) coordinator.close();
+    }
+
     public PinResult pin(String project, String model, PinRequest request) {
         var coordinator = coordinator(project, model);
         var result = coordinator.requestPin(request); coordinator.poll();
@@ -73,6 +79,9 @@ public final class DraftSaveService implements AutoCloseable {
         var key = new Key(project, model); var existing = coordinators.get(key); if (existing != null) return existing;
         var path = databases.databasePath(project);
         if (!Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)) throw new DraftWorkspaceService.Failure("NOT_FOUND", null);
+        if (databases.usesJournaledDrafts()
+                && !(databases.open(project) instanceof ProjectDatabaseOpenResult.Ready))
+            throw new DraftWorkspaceService.Failure("DRAFT_RECOVERY_REQUIRED", null);
         var repository = new DraftSaveRepository(path, clock); repository.read(project, model);
         var created = new DraftSaveCoordinator(project, model, repository, this::validate, clock, nanoTime);
         created.start(executor); coordinators.put(key, created); return created;

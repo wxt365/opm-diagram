@@ -1,7 +1,8 @@
 import { computed, ref } from "vue";
 import { defineStore } from "pinia";
 
-import { LocalRuntimeApiError, localRuntimeApi, type ModelWire, type ProjectWire } from "@/shared/api/localRuntimeApi";
+import { LocalRuntimeApiError, localRuntimeApi, type ModelWire, type ProjectWire, type ModelArchiveState, type ModelLifecycleAction } from "@/shared/api/localRuntimeApi";
+import { DraftDelivery } from "@/shared/api/draftDelivery";
 import type { ResourceState } from "@/shared/types/modeling";
 
 export interface ProjectListItem {
@@ -38,6 +39,9 @@ export const useProjectModelStore = defineStore("project-model", () => {
   const projectListError = ref("");
   const projectError = ref("");
   const modelError = ref("");
+  const modelArchiveState = ref<ModelArchiveState>("ACTIVE");
+  const lifecycleError = ref("");
+  const lifecycleBusy = ref(false);
   let projectListSequence = 0;
   let projectDetailSequence = 0;
 
@@ -82,6 +86,8 @@ export const useProjectModelStore = defineStore("project-model", () => {
     modelListResource.value = "loading";
     projectError.value = "";
     modelError.value = "";
+    modelArchiveState.value = "ACTIVE";
+    lifecycleError.value = "";
     try {
       const [projectResult, modelResult] = await Promise.all([localRuntimeApi.getProject(projectId), localRuntimeApi.listModels(projectId)]);
       if (sequence !== projectDetailSequence) return;
@@ -117,6 +123,45 @@ export const useProjectModelStore = defineStore("project-model", () => {
     }
   }
 
+  async function loadModels(projectId: string, archiveState: ModelArchiveState) {
+    const sequence = ++projectDetailSequence;
+    modelListResource.value = "loading";
+    modelError.value = "";
+    lifecycleError.value = "";
+    modelArchiveState.value = archiveState;
+    try {
+      const [items, summary] = await Promise.all([localRuntimeApi.listModels(projectId, archiveState), localRuntimeApi.getProject(projectId)]);
+      if (sequence !== projectDetailSequence) return;
+      models.value = items.map(toModelItem);
+      project.value = toProjectItem(summary);
+      modelListResource.value = items.length ? "ready" : "empty";
+    } catch (error) {
+      if (sequence !== projectDetailSequence) return;
+      modelListResource.value = "error";
+      modelError.value = message(error);
+    }
+  }
+
+  async function changeModelLifecycle(projectId: string, modelId: string, action: ModelLifecycleAction, commandId: string, confirmationName?: string) {
+    if (lifecycleBusy.value) return;
+    lifecycleBusy.value = true;
+    lifecycleError.value = "";
+    try {
+      if (action !== "RESTORE" && (await new DraftDelivery().pending(projectId, modelId)).length) {
+        throw new LocalRuntimeApiError("DRAFT_PENDING_EXISTS", "该模型有尚未确认的编辑或保存，请先打开工作台完成恢复后再删除。");
+      }
+      const result = await localRuntimeApi.changeModelLifecycle(projectId, modelId, action, commandId, confirmationName);
+      if (result.model_id !== modelId || result.project_id !== projectId
+        || result.lifecycle_state !== (action === "TRASH" ? "ARCHIVED" : action === "RESTORE" ? "ACTIVE" : "PURGED")) {
+        throw new LocalRuntimeApiError("INPUT_INVALID", "模型操作响应不一致，请刷新列表确认状态。");
+      }
+      await loadModels(projectId, modelArchiveState.value);
+    } catch (error) {
+      lifecycleError.value = message(error);
+      throw error;
+    } finally { lifecycleBusy.value = false; }
+  }
+
   async function openWorkspace(projectId: string, modelId: string) {
     openWorkspaceState.value = "opening";
     modelError.value = "";
@@ -143,11 +188,16 @@ export const useProjectModelStore = defineStore("project-model", () => {
     projectListError,
     projectError,
     modelError,
+    modelArchiveState,
+    lifecycleError,
+    lifecycleBusy,
     hasProjects,
     loadProjects,
     createProject,
     loadProject,
     createModel,
+    loadModels,
+    changeModelLifecycle,
     openWorkspace,
   };
 });

@@ -250,6 +250,9 @@
         },
         "layout": {
           "$ref": "#/$defs/NodeLayoutInput"
+        },
+        "context_id": {
+          "$ref": "#/$defs/StableId"
         }
       }
     },
@@ -791,7 +794,11 @@
           ],
           "properties": {
             "target_kind": {
-              "const": "ELEMENT"
+              "type": "string",
+              "enum": [
+                "ELEMENT",
+                "FEATURE"
+              ]
             },
             "target_id": {
               "$ref": "#/$defs/StableId"
@@ -898,10 +905,755 @@
         }
       }
     },
+    "LayoutGeometry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "x",
+        "y",
+        "width",
+        "height"
+      ],
+      "properties": {
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        },
+        "width": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "height": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "UpdateLayoutBatchPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "layouts"
+      ],
+      "properties": {
+        "layouts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "occurrence_id",
+              "layout"
+            ],
+            "properties": {
+              "occurrence_id": {
+                "$ref": "#/$defs/StableId"
+              },
+              "layout": {
+                "$ref": "#/$defs/LayoutGeometry"
+              }
+            }
+          },
+          "minItems": 1,
+          "maxItems": 1000
+        }
+      }
+    },
+    "CreateContextPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "context_id",
+        "refinee_element_id",
+        "name"
+      ],
+      "properties": {
+        "context_id": {
+          "$ref": "#/$defs/StableId"
+        },
+        "refinee_element_id": {
+          "$ref": "#/$defs/StableId"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      }
+    },
+    "DeleteContextPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "context_id",
+        "impact_token"
+      ],
+      "properties": {
+        "context_id": {
+          "$ref": "#/$defs/StableId"
+        },
+        "impact_token": {
+          "type": "string"
+        }
+      }
+    },
+    "ArchitectureLinkKind": {
+      "type": "string",
+      "enum": [
+        "INPUT",
+        "GENERATES",
+        "TRACE"
+      ]
+    },
+    "CreateArchitectureLinkPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "context_id",
+        "target_context_id",
+        "kind"
+      ],
+      "properties": {
+        "context_id": {
+          "$ref": "#/$defs/StableId"
+        },
+        "target_context_id": {
+          "$ref": "#/$defs/StableId"
+        },
+        "kind": {
+          "$ref": "#/$defs/ArchitectureLinkKind"
+        }
+      }
+    },
+    "DeleteArchitectureLinkPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "context_id",
+        "link_id"
+      ],
+      "properties": {
+        "context_id": {
+          "$ref": "#/$defs/StableId"
+        },
+        "link_id": {
+          "$ref": "#/$defs/StableId"
+        }
+      }
+    },
+    "ArchitectureLink": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "link_id",
+        "source_context_id",
+        "target_context_id",
+        "kind"
+      ],
+      "properties": {
+        "link_id": {
+          "$ref": "#/$defs/StableId"
+        },
+        "source_context_id": {
+          "$ref": "#/$defs/StableId"
+        },
+        "target_context_id": {
+          "$ref": "#/$defs/StableId"
+        },
+        "kind": {
+          "$ref": "#/$defs/ArchitectureLinkKind"
+        }
+      }
+    },
+    "ArchitectureLevel": {
+      "type": "string",
+      "enum": [
+        "MISSION",
+        "FUNCTION",
+        "PRODUCT"
+      ]
+    },
+    "ArchitectureClassificationPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "context_id",
+        "architecture_level"
+      ],
+      "properties": {
+        "context_id": {
+          "$ref": "#/$defs/StableId"
+        },
+        "architecture_level": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ArchitectureLevel"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "ModelPlanStep": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "local_id",
+            "command_type",
+            "kind",
+            "name",
+            "layout"
+          ],
+          "properties": {
+            "local_id": {
+              "$ref": "#/$defs/StableId"
+            },
+            "command_type": {
+              "const": "CREATE_ELEMENT"
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "OBJECT",
+                "PROCESS"
+              ]
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "layout": {
+              "$ref": "#/$defs/NodeLayoutInput"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "local_id",
+            "command_type",
+            "target",
+            "name"
+          ],
+          "properties": {
+            "local_id": {
+              "$ref": "#/$defs/StableId"
+            },
+            "command_type": {
+              "const": "CREATE_STATE"
+            },
+            "target": {
+              "$ref": "#/$defs/StableId"
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "state_roles": {
+              "$ref": "#/$defs/StateRoles"
+            },
+            "layout": {
+              "$ref": "#/$defs/NodeLayoutInput"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "local_id",
+            "command_type",
+            "endpoints",
+            "capability_id"
+          ],
+          "properties": {
+            "local_id": {
+              "$ref": "#/$defs/StableId"
+            },
+            "command_type": {
+              "const": "CREATE_FACT"
+            },
+            "endpoints": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/StableId"
+              },
+              "minItems": 2,
+              "maxItems": 3
+            },
+            "capability_id": {
+              "$ref": "#/$defs/StableId"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "local_id",
+            "command_type",
+            "target",
+            "name"
+          ],
+          "properties": {
+            "local_id": {
+              "$ref": "#/$defs/StableId"
+            },
+            "command_type": {
+              "const": "UPDATE_PROPERTY"
+            },
+            "target": {
+              "$ref": "#/$defs/StableId"
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "local_id",
+            "command_type",
+            "target",
+            "name"
+          ],
+          "properties": {
+            "local_id": {
+              "$ref": "#/$defs/StableId"
+            },
+            "command_type": {
+              "const": "UPDATE_STATE"
+            },
+            "target": {
+              "$ref": "#/$defs/StableId"
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "state_roles": {
+              "$ref": "#/$defs/StateRoles"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "local_id",
+            "command_type",
+            "target",
+            "layout"
+          ],
+          "properties": {
+            "local_id": {
+              "$ref": "#/$defs/StableId"
+            },
+            "command_type": {
+              "const": "UPDATE_LAYOUT"
+            },
+            "target": {
+              "$ref": "#/$defs/StableId"
+            },
+            "layout": {
+              "$ref": "#/$defs/NodeLayoutInput"
+            }
+          }
+        }
+      ]
+    },
+    "ModelPlanPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "context_id",
+        "steps"
+      ],
+      "properties": {
+        "context_id": {
+          "$ref": "#/$defs/StableId"
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ModelPlanStep"
+          },
+          "minItems": 1,
+          "maxItems": 100
+        }
+      }
+    },
+    "MindmapNode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "parent_id",
+        "order",
+        "label",
+        "note",
+        "kind",
+        "owner_id",
+        "entity_ref",
+        "target_id",
+        "collapsed"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/StableId"
+        },
+        "parent_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/StableId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "order": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 300
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "note": {
+          "type": "string",
+          "maxLength": 4000
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "TOPIC",
+            "OBJECT",
+            "PROCESS",
+            "STATE",
+            "ATTRIBUTE",
+            "CONSTRAINT",
+            "UNCLASSIFIED"
+          ]
+        },
+        "owner_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/StableId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "entity_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/StableId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "target_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/StableId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "collapsed": {
+          "type": "boolean"
+        }
+      }
+    },
+    "MindmapRelation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "label",
+        "capability_id",
+        "endpoints"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/StableId"
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "capability_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/StableId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "endpoints": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/StableId"
+          },
+          "minItems": 2,
+          "maxItems": 3
+        }
+      }
+    },
+    "MindmapDocument": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "format_version",
+        "id",
+        "revision",
+        "root_id",
+        "nodes",
+        "relations"
+      ],
+      "properties": {
+        "format_version": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1
+        },
+        "id": {
+          "$ref": "#/$defs/StableId"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "root_id": {
+          "$ref": "#/$defs/StableId"
+        },
+        "nodes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/MindmapNode"
+          },
+          "minItems": 1,
+          "maxItems": 300
+        },
+        "relations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/MindmapRelation"
+          },
+          "maxItems": 100
+        }
+      }
+    },
+    "AnalysisSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mindmap_id",
+        "revision",
+        "digest",
+        "bindings",
+        "excluded_ids"
+      ],
+      "properties": {
+        "mindmap_id": {
+          "$ref": "#/$defs/StableId"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "digest": {
+          "type": "string"
+        },
+        "bindings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "source_id",
+              "target_ref"
+            ],
+            "properties": {
+              "source_id": {
+                "$ref": "#/$defs/StableId"
+              },
+              "target_ref": {
+                "$ref": "#/$defs/StableId"
+              }
+            }
+          },
+          "minItems": 1,
+          "maxItems": 400
+        },
+        "excluded_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/StableId"
+          },
+          "maxItems": 400
+        }
+      }
+    },
+    "MindmapMapping": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_id",
+        "target_id",
+        "source_json",
+        "target_name",
+        "target_kind"
+      ],
+      "properties": {
+        "source_id": {
+          "$ref": "#/$defs/StableId"
+        },
+        "target_id": {
+          "$ref": "#/$defs/StableId"
+        },
+        "source_json": {
+          "type": "string"
+        },
+        "target_name": {
+          "type": "string"
+        },
+        "target_kind": {
+          "type": "string"
+        }
+      }
+    },
+    "MindmapConversion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command_id",
+        "context_id",
+        "revision",
+        "mappings",
+        "excluded_ids"
+      ],
+      "properties": {
+        "command_id": {
+          "$ref": "#/$defs/StableId"
+        },
+        "context_id": {
+          "$ref": "#/$defs/StableId"
+        },
+        "revision": {
+          "type": "integer"
+        },
+        "mappings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/MindmapMapping"
+          }
+        },
+        "excluded_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/StableId"
+          },
+          "maxItems": 400
+        }
+      }
+    },
+    "MindmapRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "request_id",
+        "action",
+        "draft_token"
+      ],
+      "properties": {
+        "request_id": {
+          "$ref": "#/$defs/StableId"
+        },
+        "action": {
+          "type": "string",
+          "enum": [
+            "OPEN",
+            "SAVE"
+          ]
+        },
+        "draft_token": {
+          "$ref": "#/$defs/DraftToken"
+        },
+        "document": {
+          "$ref": "#/$defs/MindmapDocument"
+        },
+        "expected_revision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      }
+    },
+    "MindmapResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "request_id",
+        "document",
+        "digest",
+        "conversions"
+      ],
+      "properties": {
+        "request_id": {
+          "$ref": "#/$defs/StableId"
+        },
+        "document": {
+          "$ref": "#/$defs/MindmapDocument"
+        },
+        "digest": {
+          "type": "string"
+        },
+        "conversions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/MindmapConversion"
+          }
+        }
+      }
+    },
     "DraftCommandType": {
       "type": "string",
       "enum": [
+        "APPLY_MODEL_PLAN",
+        "CREATE_ARCHITECTURE_LINK",
+        "DELETE_ARCHITECTURE_LINK",
+        "UPDATE_ARCHITECTURE_CLASSIFICATION",
         "CREATE_ELEMENT",
+        "CREATE_CONTEXT",
+        "DELETE_CONTEXT",
         "CREATE_FEATURE",
         "CREATE_FACT",
         "CREATE_STATE",
@@ -909,6 +1661,7 @@
         "UPDATE_FACT",
         "UPDATE_PROPERTY",
         "UPDATE_LAYOUT",
+        "UPDATE_LAYOUT_BATCH",
         "DELETE_CONSTRUCT",
         "STATE_EXPLICIT",
         "STATE_SUPPRESS",
@@ -927,10 +1680,106 @@
           ],
           "properties": {
             "command_type": {
+              "const": "APPLY_MODEL_PLAN"
+            },
+            "payload": {
+              "$ref": "#/$defs/ModelPlanPayload"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "command_type",
+            "payload"
+          ],
+          "properties": {
+            "command_type": {
+              "const": "CREATE_ARCHITECTURE_LINK"
+            },
+            "payload": {
+              "$ref": "#/$defs/CreateArchitectureLinkPayload"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "command_type",
+            "payload"
+          ],
+          "properties": {
+            "command_type": {
+              "const": "DELETE_ARCHITECTURE_LINK"
+            },
+            "payload": {
+              "$ref": "#/$defs/DeleteArchitectureLinkPayload"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "command_type",
+            "payload"
+          ],
+          "properties": {
+            "command_type": {
+              "const": "UPDATE_ARCHITECTURE_CLASSIFICATION"
+            },
+            "payload": {
+              "$ref": "#/$defs/ArchitectureClassificationPayload"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "command_type",
+            "payload"
+          ],
+          "properties": {
+            "command_type": {
               "const": "CREATE_ELEMENT"
             },
             "payload": {
               "$ref": "#/$defs/CreateElementPayload"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "command_type",
+            "payload"
+          ],
+          "properties": {
+            "command_type": {
+              "const": "CREATE_CONTEXT"
+            },
+            "payload": {
+              "$ref": "#/$defs/CreateContextPayload"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "command_type",
+            "payload"
+          ],
+          "properties": {
+            "command_type": {
+              "const": "DELETE_CONTEXT"
+            },
+            "payload": {
+              "$ref": "#/$defs/DeleteContextPayload"
             }
           }
         },
@@ -1043,6 +1892,22 @@
             },
             "payload": {
               "$ref": "#/$defs/UpdateLayoutPayload"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "command_type",
+            "payload"
+          ],
+          "properties": {
+            "command_type": {
+              "const": "UPDATE_LAYOUT_BATCH"
+            },
+            "payload": {
+              "$ref": "#/$defs/UpdateLayoutBatchPayload"
             }
           }
         },
@@ -1207,6 +2072,9 @@
         },
         "command": {
           "$ref": "#/$defs/DraftCommand"
+        },
+        "analysis_source": {
+          "$ref": "#/$defs/AnalysisSource"
         }
       }
     },
@@ -1227,6 +2095,446 @@
         },
         "context_id": {
           "$ref": "#/$defs/StableId"
+        }
+      }
+    },
+    "MethodSource": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "draft_token"
+          ],
+          "properties": {
+            "draft_token": {
+              "$ref": "#/$defs/DraftToken"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "revision_id"
+          ],
+          "properties": {
+            "revision_id": {
+              "$ref": "#/$defs/StableId"
+            }
+          }
+        }
+      ]
+    },
+    "MethodSummaryRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "request_id",
+        "context_id",
+        "source"
+      ],
+      "properties": {
+        "request_id": {
+          "$ref": "#/$defs/StableId"
+        },
+        "context_id": {
+          "$ref": "#/$defs/StableId"
+        },
+        "source": {
+          "$ref": "#/$defs/MethodSource"
+        }
+      }
+    },
+    "MethodEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fact_id",
+        "capability_id",
+        "description",
+        "context_ids",
+        "target_ids"
+      ],
+      "properties": {
+        "fact_id": {
+          "$ref": "#/$defs/StableId"
+        },
+        "capability_id": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "context_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/StableId"
+          }
+        },
+        "target_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/StableId"
+          }
+        }
+      }
+    },
+    "MethodRole": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "role",
+        "status",
+        "guidance",
+        "evidence"
+      ],
+      "properties": {
+        "role": {
+          "type": "string",
+          "enum": [
+            "SUBJECT",
+            "OBJECT",
+            "INSTRUMENT",
+            "RESOURCE",
+            "ENVIRONMENT",
+            "INFORMATION"
+          ]
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "EVIDENCE",
+            "NO_EVIDENCE",
+            "MANUAL"
+          ]
+        },
+        "guidance": {
+          "type": "string"
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/MethodEvidence"
+          }
+        }
+      }
+    },
+    "MethodProcess": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "process_id",
+        "name",
+        "context_ids",
+        "roles"
+      ],
+      "properties": {
+        "process_id": {
+          "$ref": "#/$defs/StableId"
+        },
+        "name": {
+          "type": "string"
+        },
+        "context_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/StableId"
+          }
+        },
+        "roles": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/MethodRole"
+          },
+          "minItems": 6,
+          "maxItems": 6
+        }
+      }
+    },
+    "MethodSummaryResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "meta",
+        "data"
+      ],
+      "properties": {
+        "meta": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "request_id",
+            "context_id",
+            "source"
+          ],
+          "properties": {
+            "request_id": {
+              "$ref": "#/$defs/StableId"
+            },
+            "context_id": {
+              "$ref": "#/$defs/StableId"
+            },
+            "source": {
+              "$ref": "#/$defs/MethodSource"
+            }
+          }
+        },
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "coverage",
+            "processes",
+            "contexts",
+            "architecture_links",
+            "refinements"
+          ],
+          "properties": {
+            "coverage": {
+              "const": "RELATION_EVIDENCE_ONLY"
+            },
+            "processes": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/MethodProcess"
+              }
+            },
+            "contexts": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "context_id",
+                  "name",
+                  "architecture_level"
+                ],
+                "properties": {
+                  "context_id": {
+                    "$ref": "#/$defs/StableId"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "architecture_level": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/ArchitectureLevel"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                }
+              }
+            },
+            "architecture_links": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ArchitectureLink"
+              }
+            },
+            "refinements": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "refinement_id",
+                  "parent_context_id",
+                  "child_context_id",
+                  "refinee_element_id",
+                  "refinee_name",
+                  "refinement_kind"
+                ],
+                "properties": {
+                  "refinement_id": {
+                    "$ref": "#/$defs/StableId"
+                  },
+                  "parent_context_id": {
+                    "$ref": "#/$defs/StableId"
+                  },
+                  "child_context_id": {
+                    "$ref": "#/$defs/StableId"
+                  },
+                  "refinee_element_id": {
+                    "$ref": "#/$defs/StableId"
+                  },
+                  "refinee_name": {
+                    "type": "string"
+                  },
+                  "refinement_kind": {
+                    "type": "string",
+                    "enum": [
+                      "PROCESS",
+                      "OBJECT"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "OperationHistoryRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "request_id",
+        "revision",
+        "before"
+      ],
+      "properties": {
+        "request_id": {
+          "$ref": "#/$defs/StableId"
+        },
+        "revision": {
+          "$ref": "#/$defs/StableId"
+        },
+        "before": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "OperationHistoryItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "record_id",
+        "occurred_at",
+        "operation",
+        "title",
+        "context_id",
+        "context_name",
+        "status",
+        "revision_id",
+        "detail_available"
+      ],
+      "properties": {
+        "record_id": {
+          "$ref": "#/$defs/StableId"
+        },
+        "occurred_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "operation": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "context_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/StableId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "context_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "status": {
+          "type": "string"
+        },
+        "revision_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/StableId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "detail_available": {
+          "type": "boolean"
+        }
+      }
+    },
+    "OperationHistoryResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "meta",
+        "data"
+      ],
+      "properties": {
+        "meta": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "request_id",
+            "project_id",
+            "model_id",
+            "revision"
+          ],
+          "properties": {
+            "request_id": {
+              "$ref": "#/$defs/StableId"
+            },
+            "project_id": {
+              "$ref": "#/$defs/StableId"
+            },
+            "model_id": {
+              "$ref": "#/$defs/StableId"
+            },
+            "revision": {
+              "$ref": "#/$defs/StableId"
+            }
+          }
+        },
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "items",
+            "next_before"
+          ],
+          "properties": {
+            "items": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/OperationHistoryItem"
+              },
+              "maxItems": 100
+            },
+            "next_before": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 2048
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
         }
       }
     },
@@ -1488,7 +2796,9 @@
             "command_type": {
               "type": "string",
               "enum": [
+                "APPLY_MODEL_PLAN",
                 "CREATE_ELEMENT",
+                "CREATE_CONTEXT",
                 "CREATE_FEATURE",
                 "CREATE_FACT",
                 "CREATE_STATE",
@@ -1496,6 +2806,7 @@
                 "UPDATE_FACT",
                 "UPDATE_PROPERTY",
                 "UPDATE_LAYOUT",
+                "UPDATE_LAYOUT_BATCH",
                 "STATE_EXPLICIT",
                 "STATE_SUPPRESS",
                 "UNFOLD",
@@ -1675,6 +2986,166 @@
             },
             "delete_target": {
               "$ref": "#/$defs/DeleteTarget"
+            },
+            "expires_with_token": {
+              "$ref": "#/$defs/DraftToken"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "capability_query_id",
+            "option_id",
+            "command_type",
+            "capability_ref",
+            "display_name",
+            "group_path",
+            "normalized_endpoints",
+            "required_fields",
+            "allowed_modifiers",
+            "symbol_descriptor",
+            "template_family",
+            "rule_refs",
+            "enabled",
+            "reason_codes",
+            "expires_with_token",
+            "context_impact",
+            "impact_token"
+          ],
+          "properties": {
+            "capability_query_id": {
+              "$ref": "#/$defs/StableId"
+            },
+            "option_id": {
+              "$ref": "#/$defs/StableId"
+            },
+            "command_type": {
+              "const": "DELETE_CONTEXT"
+            },
+            "capability_ref": {
+              "$ref": "#/$defs/CapabilityReference"
+            },
+            "base_fact_capability_ref": {
+              "$ref": "#/$defs/CapabilityReference"
+            },
+            "display_name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "group_path": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              }
+            },
+            "normalized_endpoints": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/NormalizedEndpoint"
+              }
+            },
+            "required_fields": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/RequiredField"
+              }
+            },
+            "allowed_modifiers": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/AllowedModifier"
+              }
+            },
+            "symbol_descriptor": {
+              "$ref": "#/$defs/AssetReference"
+            },
+            "template_family": {
+              "$ref": "#/$defs/AssetReference"
+            },
+            "rule_refs": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/AssetReference"
+              }
+            },
+            "enabled": {
+              "type": "boolean"
+            },
+            "reason_codes": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/CapabilityReasonCode"
+              }
+            },
+            "expires_with_token": {
+              "$ref": "#/$defs/DraftToken"
+            },
+            "context_impact": {
+              "$ref": "#/$defs/ContextDeleteImpact"
+            },
+            "impact_token": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "capability_query_id",
+            "option_id",
+            "command_type",
+            "option_kind",
+            "target_context_id",
+            "display_name",
+            "required_fields",
+            "enabled",
+            "reason_codes",
+            "expires_with_token"
+          ],
+          "properties": {
+            "capability_query_id": {
+              "$ref": "#/$defs/StableId"
+            },
+            "option_id": {
+              "$ref": "#/$defs/StableId"
+            },
+            "command_type": {
+              "type": "string",
+              "enum": [
+                "UPDATE_ARCHITECTURE_CLASSIFICATION",
+                "CREATE_ARCHITECTURE_LINK",
+                "DELETE_ARCHITECTURE_LINK"
+              ]
+            },
+            "option_kind": {
+              "const": "METHOD_METADATA"
+            },
+            "target_context_id": {
+              "$ref": "#/$defs/StableId"
+            },
+            "display_name": {
+              "type": "string"
+            },
+            "required_fields": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/RequiredField"
+              }
+            },
+            "enabled": {
+              "type": "boolean"
+            },
+            "reason_codes": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/CapabilityReasonCode"
+              }
             },
             "expires_with_token": {
               "$ref": "#/$defs/DraftToken"
@@ -1977,6 +3448,68 @@
           "type": "integer",
           "minimum": 0,
           "maximum": 9007199254740991
+        }
+      }
+    },
+    "ContextDeleteImpact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "input_token",
+        "context_id",
+        "parent_context_id",
+        "context_ids",
+        "counts",
+        "blockers"
+      ],
+      "properties": {
+        "input_token": {
+          "$ref": "#/$defs/DraftToken"
+        },
+        "context_id": {
+          "$ref": "#/$defs/StableId"
+        },
+        "parent_context_id": {
+          "$ref": "#/$defs/StableId"
+        },
+        "context_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/StableId"
+          }
+        },
+        "counts": {
+          "$ref": "#/$defs/DeleteImpactCounts"
+        },
+        "blockers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "id"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "ELEMENT",
+                  "FEATURE",
+                  "STATE",
+                  "FACT",
+                  "OCCURRENCE",
+                  "CONTEXT"
+                ]
+              },
+              "id": {
+                "$ref": "#/$defs/StableId"
+              },
+              "context_id": {
+                "$ref": "#/$defs/StableId"
+              }
+            }
+          }
         }
       }
     },
@@ -2297,6 +3830,93 @@
         }
       }
     },
+    "DraftModelPlanPreviewRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "request_id",
+        "draft_token",
+        "context_id",
+        "plan_id",
+        "steps",
+        "next_scope"
+      ],
+      "properties": {
+        "request_id": {
+          "$ref": "#/$defs/StableId"
+        },
+        "draft_token": {
+          "$ref": "#/$defs/DraftToken"
+        },
+        "context_id": {
+          "$ref": "#/$defs/StableId"
+        },
+        "plan_id": {
+          "$ref": "#/$defs/StableId"
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ModelPlanStep"
+          },
+          "maxItems": 100
+        },
+        "next_scope": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DraftScope"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "finalize": {
+          "type": "boolean"
+        },
+        "analysis_source": {
+          "$ref": "#/$defs/AnalysisSource"
+        }
+      }
+    },
+    "DraftModelPlanPreviewResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "meta",
+        "data",
+        "capabilities",
+        "findings"
+      ],
+      "properties": {
+        "meta": {
+          "$ref": "#/$defs/DraftQueryMeta"
+        },
+        "data": {
+          "$ref": "#/$defs/DraftProjectionData"
+        },
+        "capabilities": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DraftCapabilitiesData"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "findings": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DraftFindingsData"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
     "DraftTextData": {
       "type": "object",
       "required": [
@@ -2393,6 +4013,12 @@
         },
         "has_children": {
           "type": "boolean"
+        },
+        "parent_context_id": {
+          "$ref": "#/$defs/StableId"
+        },
+        "refinee_element_id": {
+          "$ref": "#/$defs/StableId"
         }
       },
       "additionalProperties": false
@@ -2613,7 +4239,8 @@
             "INVALID_STATE_PRESENTATION",
             "CONTEXT_CLOSURE_VIOLATION",
             "INVALID_LAYOUT",
-            "INVALID_OWNERSHIP"
+            "INVALID_OWNERSHIP",
+            "INVALID_REFINEMENT"
           ]
         },
         "context_id": {

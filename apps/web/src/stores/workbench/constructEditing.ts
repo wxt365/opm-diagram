@@ -5,6 +5,7 @@ import type { ApiEdtStateRole } from "@/shared/api/generated/apiEdtContract";
 import type { WorkbenchCapabilityOption } from "@/shared/types/workbenchCapability";
 import type { WorkbenchState } from "./workbenchState";
 import { message } from "./runtimeError";
+import { nextStatePosition } from "./ownedNodePlacement";
 
 interface ConstructEditingDependencies {
   workbench: WorkbenchState;
@@ -24,53 +25,31 @@ interface ConstructEditingDependencies {
 /** State 编辑及删除候选；异步有效性依赖会话所有者提供的当前序号。 */
 export function createConstructEditing({ workbench, projectId, modelId, isReadonly, selectedNode, selectedObjectSuppressedStates, stateCreateOption, queryCapabilities, execute, block, getLoadSequence, isDraftSession }: ConstructEditingDependencies) {
   const constructActions = reactive({ open: false, selectionId: "", anchor: { x: 16, y: 16 }, options: [] as WorkbenchCapabilityOption[], submitting: false });
-  const stateCandidate = reactive({ phase: "idle" as "idle" | "placing" | "editing", ownerId: "", name: "", roles: ["INITIAL"] as ApiEdtStateRole[], x: 0, y: 0 });
   const stateEditor = reactive({ name: "", roles: [] as ApiEdtStateRole[] });
   let constructActionsRequestId = 0;
 
-  function armStateCreation() {
+  async function armStateCreation() {
     const owner = selectedNode.value;
     if (isReadonly.value) return block("当前修订为只读版本，不能创建 State。");
-    if (!owner || (owner.kind !== "object" && owner.kind !== "attribute" && owner.kind !== "operation")) return block("请先选择一个 Object 或 Feature，再创建 State。");
+    if (!owner || owner.kind !== "object") return block("请先选择一个 Object，再创建 State。");
     if (!stateCreateOption.value?.enabled) return block("当前 Object 不支持创建 State。");
-    stateCandidate.phase = "placing";
-    stateCandidate.ownerId = owner.id;
-    stateCandidate.name = "";
-    stateCandidate.roles = ["INITIAL"];
-    workbench.lastAction = "请在已选择 Object 内点击 State 位置。";
-  }
-
-  function placeState(ownerId: string) {
-    const owner = workbench.nodes.find((node) => node.id === ownerId);
-    if (stateCandidate.phase !== "placing" || !owner || ownerId !== stateCandidate.ownerId) return;
-    const stateCount = workbench.nodes.filter((node) => node.kind === "state" && node.ownerId === ownerId).length;
-    stateCandidate.phase = "editing";
-    stateCandidate.x = owner.x + 36;
-    stateCandidate.y = owner.y + 32 + stateCount * 34;
-    workbench.lastAction = "请输入 State 名称并选择角色。";
-  }
-
-  function cancelStateCandidate() {
-    stateCandidate.phase = "idle";
-    stateCandidate.ownerId = "";
-  }
-
-  async function submitStateCandidate() {
     const option = stateCreateOption.value;
-    if (!option || stateCandidate.phase !== "editing") return;
-    if (!stateCandidate.name.trim()) return block("State 名称不能为空。");
-    await execute({ commandType: "CREATE_STATE", payload: {
+    const stateCount = workbench.nodes.filter((node) => node.kind === "state" && node.ownerId === owner.id).length;
+    const name = `State ${stateCount + 1}`;
+    const layout = nextStatePosition(owner, workbench.nodes);
+    if (!layout) return block("当前对象周围没有安全的状态空间，请先移动对象或邻近元素，再创建 State。");
+    const created = await execute({ commandType: "CREATE_STATE", payload: {
       context_id: workbench.activeContextId,
-      owner_ref: { target_kind: selectedNode.value?.kind === "attribute" || selectedNode.value?.kind === "operation" ? "FEATURE" : "ELEMENT", target_id: stateCandidate.ownerId },
+      owner_ref: { target_kind: "ELEMENT", target_id: owner.id },
       capability_ref: option.capability_ref,
-      name_or_value: stateCandidate.name.trim(),
-      state_roles: stateCandidate.roles,
-      occurrence: { ownership: "OWNED", construct_role: selectedNode.value?.kind === "attribute" || selectedNode.value?.kind === "operation" ? "FEATURE_STATE_NODE" : "STATE_NODE" },
-      layout: { x: stateCandidate.x, y: stateCandidate.y },
+      name_or_value: name,
+      state_roles: [],
+      occurrence: { ownership: "OWNED", construct_role: "STATE_NODE" },
+      layout,
       capability_query_id: option.capability_query_id,
       selected_option_id: option.option_id,
     } });
-    if (workbench.commandState === "idle") cancelStateCandidate();
+    if (created) workbench.lastAction = `已创建 ${name}。`;
   }
 
   async function saveSelectedState() {
@@ -117,13 +96,15 @@ export function createConstructEditing({ workbench, projectId, modelId, isReadon
     anchor: { x: number; y: number } = { x: 16, y: 16 },
     activation: "menu" | "direct" = "menu",
   ) {
-    if (isReadonly.value) return;
+    if (workbench.resourceState !== "ready" || (isReadonly.value && activation === "direct")) return;
     if (!projectId.value || !modelId.value || !workbench.revision || !workbench.activeContextId || constructActions.submitting) return;
     const requestId = ++constructActionsRequestId;
     constructActions.selectionId = selectionId;
     constructActions.anchor = Number.isFinite(anchor.x) && Number.isFinite(anchor.y) ? anchor : { x: 16, y: 16 };
     constructActions.options = [];
     constructActions.open = activation === "menu";
+    // 只读菜单仅提供属性及子图导航，不查询删除候选。
+    if (isReadonly.value) return;
     try {
       const relation = workbench.relations.find((item) => item.occurrenceId === selectionId);
       const controlRemoval = relation?.controlCapability;
@@ -192,5 +173,5 @@ export function createConstructEditing({ workbench, projectId, modelId, isReadon
       .find((option) => option !== undefined);
   }
 
-  return { constructActions, stateCandidate, stateEditor, armStateCreation, placeState, cancelStateCandidate, submitStateCandidate, saveSelectedState, changeStatePresentation, makeSuppressedStateExplicit, requestConstructActions, chooseConstructDelete, cancelConstructDelete };
+  return { constructActions, stateEditor, armStateCreation, saveSelectedState, changeStatePresentation, makeSuppressedStateExplicit, requestConstructActions, chooseConstructDelete, cancelConstructDelete };
 }

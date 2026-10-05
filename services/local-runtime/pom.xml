@@ -49,6 +49,11 @@
     <build>
         <resources>
             <resource>
+                <directory>../../docs/contracts/migrations/sqlite-mindmap</directory>
+                <targetPath>db/mindmap</targetPath>
+                <includes><include>V8__mindmap_analysis.sql</include></includes>
+            </resource>
+            <resource>
                 <directory>src/main/resources</directory>
             </resource>
             <resource>

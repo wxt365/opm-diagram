@@ -75,7 +75,7 @@ Build准入：`BLOCKED_BY_FINAL_PRODUCTION_SOURCE_CHAIN_IMPLEMENTATION`
 
 上述bytes已进入base，本2A包不得修改。既有`services/local-runtime/pom.xml`资源映射只允许从`../../docs/contracts/schemas`选择`opm-dev-canvas-06-e2e-attempt-artifact-v02.schema.json`，并以原始bytes写入JAR路径`releaseevidence/schema/opm-dev-canvas-06-e2e-attempt-artifact-v02.schema.json`；后继独立bugfix若需修复，也不得改依赖、插件版本或其他resource。
 
-该活动Schema raw SHA-256固定为`3508290bf1d1d5f7d297ea48e69fdb4e1ebaf4f907b936b30cd4b769d6a916b4`。实现把该值写为`E2EFaultPlanVerifier.EXPECTED_SCHEMA_SHA256`常量；Schema bytes或常量任一变化都必须先升级本规格，不得运行时读取checkout补齐。
+现行源码的活动 Schema raw SHA-256 固定为 `d8c34923a1342cdffd5eb4e22ddf328969bf3c1f6b6804e7acebb56dd51891d8`，byte_length 为 `61432`，由[合并后修正规格](./opm-integrated-failed-items-bugfix-task-spec.md)升级。原 `3508290bf1d1d5f7d297ea48e69fdb4e1ebaf4f907b936b30cd4b769d6a916b4` 对应历史受控 source，不再作为当前资源的运行常量；历史报告与 source 指纹不回写。实现把现行值写为 `E2EFaultPlanVerifier.EXPECTED_SCHEMA_SHA256` 常量，仍只校验 JAR 内嵌 bytes；Schema bytes 或常量任一变化都必须先升级本规格，不得运行时读取 checkout 补齐。本次身份同步不提升发布 Gate，也不使历史 release evidence 自动适用于新源码。
 
 ### 4.2 Fault Launcher Java：`10 READ_ONLY_BASELINE`
 

@@ -9,6 +9,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.opm.localruntime.api.generated.DraftSaveContract;
 import org.opm.localruntime.application.*;
 import org.opm.localruntime.assets.FileProfilePackageLoader;
+import org.opm.localruntime.semantic.SaveContentDigestV1;
 import org.opm.localruntime.storage.*;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
@@ -45,6 +46,94 @@ class DraftSaveControllerTest {
         mvc = MockMvcBuilders.standaloneSetup(new DraftSaveController(host), new DraftWorkspaceController(new DraftWorkspaceService(factory, domain, loader, CLOCK, host)), new LocalApiController(domain))
                 .setControllerAdvice(new DraftSaveExceptionHandler(), new DraftWorkspaceExceptionHandler(), new ApiExceptionHandler())
                 .addMappedInterceptors(new String[]{"/api/v2/**"}, new DraftWriteRequestGuard(new LocalSessionToken("test-session"))).build();
+    }
+
+    @Test void operationHistoryCapturesNamesAndSavedCutoffAcrossRestart() throws Exception {
+        var token = rename(open().get("draft_token"), "历史第一名称");
+        var first = history("HEAD", null, 200);
+        assertEquals(1, first.at("/data/items").size());
+        assertTrue(first.at("/data/items/0/title").asText().contains("历史第一名称"));
+        assertTrue(first.at("/data/items/0/detail_available").asBoolean());
+        assertEquals(CONTEXT, first.at("/data/items/0/context_id").asText());
+        var edit = lastHistoryEdit.deepCopy(); postCall("commands", edit, 200);
+        assertEquals(1, history("HEAD", null, 200).at("/data/items").size());
+        var saved = postCall("save", saveRequest("save.history", token), 200);
+        postCall("save", saveRequest("save.history", token), 200);
+        String revision = saved.path("revision_id").asText();
+        var atSave = history(revision, null, 200).get("data");
+        assertTrue(atSave.toString().contains("手动保存模型"));
+        assertTrue(atSave.toString().contains(revision));
+        // 固定时钟下，同一 seq 的无变化编辑/重复保存/固定也不能混入之前版本。
+        rename(token, "历史第一名称");
+        postCall("save", saveRequest("save.history.later-unchanged", token), 200);
+        postCall("pin", pinRequest("pin.history.later-same-seq", token, "PERMALINK"), 200);
+        assertEquals(atSave, history(revision, null, 200).get("data"));
+        token = rename(token, "历史第二名称");
+        assertEquals(atSave, history(revision, null, 200).get("data"));
+        assertTrue(history("HEAD", null, 200).toString().contains("历史第一名称 → 历史第二名称"));
+        new DraftSaveRepository(database, CLOCK).checkpoint(PROJECT, MODEL, ignored -> { });
+        assertTrue(history("HEAD", null, 200).toString().contains("自动保存草稿"));
+        int count = history("HEAD", null, 200).at("/data/items").size();
+        new DraftSaveRepository(database, CLOCK).checkpoint(PROJECT, MODEL, ignored -> { });
+        assertEquals(count, history("HEAD", null, 200).at("/data/items").size());
+        postCall("pin", pinRequest("pin.history", token, "PERMALINK"), 200);
+        assertTrue(history("HEAD", null, 200).toString().contains("固定模型版本"));
+        var current = history("HEAD", null, 200).get("data");
+        setupMvc(root().resolve("packages/profiles"));
+        assertEquals(current, history("HEAD", null, 200).get("data"));
+    }
+
+    @Test void operationHistoryAuditFailureRollsBackEntireEditAndRetryWorks() throws Exception {
+        var token = open().get("draft_token");
+        try (var c = java.sql.DriverManager.getConnection("jdbc:sqlite:" + database); var s = c.createStatement()) {
+            s.execute("CREATE TRIGGER test_history_failure BEFORE INSERT ON idempotency_record WHEN NEW.operation_id='DRAFT_OPERATION_HISTORY_V1' BEGIN SELECT RAISE(ABORT,'测试历史事务失败'); END");
+        }
+        assertThrows(AssertionError.class, () -> rename(token, "不得留下的名称"));
+        assertEquals(token, open().get("draft_token"));
+        assertEquals(0, history("HEAD", null, 200).at("/data/items").size());
+        assertEquals(0, count(database, "draft_journal")); assertEquals(0, count(database, "draft_receipt"));
+        try (var c = java.sql.DriverManager.getConnection("jdbc:sqlite:" + database); var s = c.createStatement()) { s.execute("DROP TRIGGER test_history_failure"); }
+        postCall("commands", lastHistoryEdit, 200);
+        assertEquals(1, history("HEAD", null, 200).at("/data/items").size());
+    }
+
+    @Test void operationHistoryFallsBackToHonestLegacyEditWithoutGuessingName() throws Exception {
+        rename(open().get("draft_token"), "旧名称不可反推");
+        try (var c = java.sql.DriverManager.getConnection("jdbc:sqlite:" + database); var s = c.createStatement()) {
+            s.execute("DELETE FROM idempotency_record WHERE operation_id='DRAFT_OPERATION_HISTORY_V1'");
+        }
+        var row = history("HEAD", null, 200).at("/data/items/0");
+        assertFalse(row.path("detail_available").asBoolean());
+        assertTrue(row.path("title").asText().contains("旧记录"));
+        assertFalse(row.toString().contains("旧名称不可反推"));
+        assertEquals("NOT_FOUND", history("revision.other-model", null, 404).path("code").asText());
+        assertEquals("INPUT_INVALID", history("HEAD", "bad.cursor", 400).path("code").asText());
+        perform(authorized(post(URL.replace(MODEL, "model.other") + "operation-history")).contentType(MediaType.APPLICATION_JSON)
+                .content(JSON.createObjectNode().put("request_id", "request.history").put("revision", "HEAD").putNull("before").toString()), 404);
+    }
+
+    @Test void operationHistoryPaginationIsStableWhenTimesTieAndRejectsCrossScopeCursor() throws Exception {
+        try (var c = java.sql.DriverManager.getConnection("jdbc:sqlite:" + database); var s = c.prepareStatement("INSERT INTO idempotency_record VALUES ('DRAFT_OPERATION_HISTORY_V1',?,?,?,'DURABLE',NULL,?,?,NULL)")) {
+            for (int i = 0; i < 105; i++) {
+                s.setString(1, MODEL); s.setString(2, "EDIT.command.pagination." + i); s.setString(3, "a".repeat(64));
+                s.setString(4, JSON.createObjectNode().put("draft_id", "draft.http").put("edit_seq", 0).put("operation", "UPDATE_LAYOUT")
+                        .put("title", "移动对象 " + i).put("context_id", CONTEXT).put("context_name", "根图").put("status", "DURABLE").toString());
+                s.setString(5, NOW); s.executeUpdate();
+            }
+        }
+        var first = history("HEAD", null, 200); assertEquals(100, first.at("/data/items").size());
+        String cursor = first.at("/data/next_before").asText();
+        var second = history("HEAD", cursor, 200); assertEquals(5, second.at("/data/items").size()); assertTrue(second.at("/data/next_before").isNull());
+        var ids = new java.util.HashSet<String>();
+        for (var page : List.of(first, second)) for (var row : page.at("/data/items")) assertTrue(ids.add(row.path("record_id").asText()));
+        var decoded = (ObjectNode) JSON.readTree(java.util.Base64.getUrlDecoder().decode(cursor)); decoded.put("model", "model.other");
+        String foreign = java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(decoded.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        assertEquals("INPUT_INVALID", history("HEAD", foreign, 400).path("code").asText());
+    }
+
+    private ObjectNode lastHistoryEdit;
+    private JsonNode history(String revision, String before, int status) throws Exception {
+        return postCall("operation-history", JSON.createObjectNode().put("request_id", "request.history").put("revision", revision).put("before", before), status);
     }
 
     @Test void pinnedCaptureKeepsNewerEditsAndOpensImmutableHistoryAcrossRestart() throws Exception {
@@ -133,6 +222,34 @@ class DraftSaveControllerTest {
         assertEquals(secondSave.get("revision_id"), state.get("last_manual_revision")); assertEquals(state, open().get("save_state"));
         setupMvc(root().resolve("packages/profiles")); assertEquals(text.get("data"), historical("text", revision).get("data")); assertEquals(state, open().get("save_state"));
         setupMvc(temporary.resolve("missing-assets-after-save")); assertEquals(saved, postCall("save", request, 200));
+    }
+
+    @Test void refinementSavePinAndExactHistorySurviveRestartWithDigestV2() throws Exception {
+        var token = open().get("draft_token");
+        token = createContext(token, CONTEXT, "occurrence.raw", "element.raw.material", "原料细化");
+        var document = SaveContentDigestV1.read(new DraftJournalRepository(database, CLOCK).read(PROJECT, MODEL).documentJson());
+        String child = document.at("/refinement_edges/0/child_context_id").asText();
+        assertEquals("0.3", document.path("schema_version").asText());
+        assertEquals("SaveContentDigest/2", SaveContentDigestV1.version(document));
+        var saved = postCall("save", saveRequest("save.refinement", token), 200);
+        var pinned = postCall("pin", pinRequest("pin.refinement", token, "PERMALINK"), 200);
+        String revision = saved.get("revision_id").asText();
+        assertNotEquals(revision, pinned.get("revision_id").asText());
+        var navigation = historicalContext("navigation", revision, child).get("data");
+        assertEquals(CONTEXT, navigation.at("/current_path/0").asText());
+        assertEquals(child, navigation.at("/current_path/1").asText());
+        assertEquals(CONTEXT, navigation.at("/object_forest/0/parent_context_id").asText());
+        assertTrue(historicalContext("projection", revision, child).at("/data/constructs").isEmpty());
+        assertTrue(historicalContext("text", revision, child).at("/data/sentences").isEmpty());
+        try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + database);
+             var statement = connection.createStatement();
+             var rows = statement.executeQuery("SELECT digest_version FROM draft_content WHERE content_digest='" + SaveContentDigestV1.sha256(document) + "'")) {
+            assertTrue(rows.next()); assertEquals("SaveContentDigest/2", rows.getString(1));
+        }
+        setupMvc(root().resolve("packages/profiles"));
+        assertEquals(token, open().get("draft_token"));
+        assertEquals(navigation, historicalContext("navigation", revision, child).get("data"));
+        assertEquals(saved, postCall("save", saveRequest("save.refinement", token), 200));
     }
 
     @Test void saveAndStateRequireHostOriginAndSessionWithClosedSaveError() throws Exception {
@@ -309,6 +426,19 @@ class DraftSaveControllerTest {
         edit.putObject("authorization").set("capability_query_id", option.get("capability_query_id")); ((ObjectNode) edit.get("authorization")).set("selected_option_id", option.get("option_id"));
         var payload = edit.putObject("command").put("command_type", "UPDATE_PROPERTY").putObject("payload").put("property_name", "name").put("value", name);
         payload.putObject("target_ref").put("target_kind", "ELEMENT").put("target_id", "element.raw.material");
+        lastHistoryEdit = edit.deepCopy();
+        return postCall("commands", edit, 200).get("result_token");
+    }
+    private JsonNode createContext(JsonNode token, String context, String occurrence, String element, String name) throws Exception {
+        var query = JSON.createObjectNode().put("request_id", "request.refinement.capabilities"); query.set("draft_token", token);
+        query.putObject("scope").put("context_id", context).put("selection_id", occurrence).put("intent", "CREATE_CONTEXT").putArray("endpoints");
+        var option = postCall("capabilities", query, 200).at("/data/options/0"); assertTrue(option.isObject());
+        var edit = JSON.createObjectNode().put("request_id", "request.refinement.edit").put("command_id", "command." + java.util.UUID.randomUUID());
+        edit.set("expected_draft_token", token); edit.set("scope", query.get("scope"));
+        edit.putObject("authorization").set("capability_query_id", option.get("capability_query_id"));
+        ((ObjectNode) edit.get("authorization")).set("selected_option_id", option.get("option_id"));
+        edit.putObject("command").put("command_type", "CREATE_CONTEXT").putObject("payload")
+                .put("context_id", context).put("refinee_element_id", element).put("name", name);
         return postCall("commands", edit, 200).get("result_token");
     }
     private ObjectNode pinRequest(String id, JsonNode token, String purpose) { var value = JSON.createObjectNode().put("pin_id", id).put("purpose", purpose); value.set("target_draft_token", token); return value; }
@@ -326,6 +456,7 @@ class DraftSaveControllerTest {
     private static void migrate(Path database) {
         Flyway.configure().dataSource("jdbc:sqlite:" + database, "", "").locations("filesystem:" + root().resolve("docs/contracts/migrations/sqlite"),
                 "filesystem:" + root().resolve("docs/contracts/migrations/sqlite-checkpoint"),
-                "filesystem:" + root().resolve("docs/contracts/migrations/sqlite-pin")).target("5").mixed(true).load().migrate();
+                "filesystem:" + root().resolve("docs/contracts/migrations/sqlite-pin"),
+                "classpath:db/digestv2").target("6").mixed(true).load().migrate();
     }
 }

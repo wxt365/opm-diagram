@@ -15,6 +15,10 @@ export default defineConfig({
   server: {
     host: "127.0.0.1",
     proxy: {
+      "/api/assistant": {
+        target: process.env.VITE_ASSISTANT_ORIGIN ?? "http://127.0.0.1:17860",
+        changeOrigin: true,
+      },
       "/opm-bootstrap.js": {
         target: runtimeOrigin,
         changeOrigin: true,

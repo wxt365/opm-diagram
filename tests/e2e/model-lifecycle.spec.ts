@@ -1,0 +1,90 @@
+import { expect, test } from "@playwright/test";
+
+test("模型回收站保留画布和历史，恢复可编辑，永久删除需要名称确认", async ({ page }) => {
+  const base = process.env.OPM_MODEL_LIFECYCLE_BASE;
+  const existingProject = process.env.OPM_MODEL_LIFECYCLE_PROJECT;
+  const target = (path: string) => base ? new URL(path, base).href : path;
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  if (existingProject) await page.goto(target(`/projects/${existingProject}`));
+  else {
+    await page.goto(target("/projects"));
+    await page.getByTestId("p01-create-project").click();
+    await page.getByTestId("ov01-project-name").fill(`模型回收站回归 ${Date.now()}`);
+    await page.getByTestId("ov01-create-project").getByRole("button", { name: "创建并继续" }).click();
+  }
+  await expect(page.getByTestId("p02-project-detail")).toBeVisible();
+  await expect(page.getByTestId("p02-create-model")).toBeVisible();
+  const projectUrl = page.url();
+  const initialCount = await page.locator(".model-card").count();
+  const name = `回收站验证模型 ${Date.now()}`;
+  await page.getByTestId("p02-create-model").click();
+  await page.getByTestId("ov02-model-name").fill(name);
+  await page.getByTestId("ov02-create-model").getByRole("button", { name: "创建并打开工作台" }).click();
+  await expect(page.getByTestId("p03-tool-object")).toBeEnabled();
+  await page.getByTestId("p03-tool-object").click();
+  await expect(page.locator(".x6-node")).toHaveCount(1);
+  await expect(page.getByTestId("p03-tool-process")).toBeEnabled();
+  await page.getByTestId("p03-tool-process").click();
+  await expect(page.locator(".x6-node")).toHaveCount(2);
+  await expect(page.getByTestId("hs-save")).toBeEnabled();
+  await page.getByTestId("hs-save").click();
+  await expect(page.getByTestId("hs-save-state")).toHaveText("已手动保存");
+  const workbenchUrl = page.url();
+  const modelId = new URL(workbenchUrl).pathname.split("/models/")[1]!.split("/")[0]!;
+  const beforeNodes = await page.locator(".x6-node").allTextContents();
+  await page.goto(projectUrl);
+  await expect(page.locator(".model-card")).toHaveCount(initialCount + 1);
+  const card = () => page.locator(".model-card").filter({ has: page.getByRole("heading", { name, exact: true }) });
+  const lifecycle = () => page.getByTestId("p02-lifecycle-dialog");
+  await card().getByTestId(`p02-trash-${modelId}`).click();
+  await lifecycle().getByRole("button", { name: "取消", exact: true }).click();
+  await expect(card()).toBeVisible();
+  await card().getByTestId(`p02-trash-${modelId}`).click();
+  await page.getByTestId("p02-lifecycle-confirm").click();
+  await expect(lifecycle()).not.toBeVisible();
+  await expect(page.locator(".model-card")).toHaveCount(initialCount);
+  await page.getByTestId("p02-trash-tab").click();
+  await expect(card()).toBeVisible();
+  for (const width of [1600, 390, 320]) {
+    await page.setViewportSize({ width, height: 1000 });
+    await expect(card()).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    const footer = card().locator(".model-card__footer");
+    await footer.screenshot({ path: test.info().outputPath(`trash-footer-${width}.png`) });
+  }
+  await card().getByTestId(`p02-purge-${modelId}`).click();
+  await expect(page.getByTestId("p02-lifecycle-confirm")).toBeDisabled();
+  await page.getByTestId("p02-purge-name").fill("错误名称");
+  await expect(page.getByTestId("p02-lifecycle-confirm")).toBeDisabled();
+  await lifecycle().screenshot({ path: test.info().outputPath("purge-confirm-mobile.png") });
+  await lifecycle().getByRole("button", { name: "取消", exact: true }).click();
+
+  await page.goto(workbenchUrl);
+  await expect(page.getByTestId("p03-tool-object")).toBeDisabled();
+  await expect(page.getByTestId("p03-command-feedback")).toContainText(/NOT_FOUND|不存在|回收站/);
+  await page.goto(projectUrl);
+  await page.getByTestId("p02-trash-tab").click();
+  await card().getByTestId(`p02-restore-${modelId}`).click();
+  await page.getByTestId("p02-lifecycle-confirm").click();
+  await expect(lifecycle()).not.toBeVisible();
+  await page.goto(workbenchUrl);
+  await expect(page.getByTestId("p03-tool-object")).toBeEnabled();
+  await expect(page.locator(".x6-node")).toHaveCount(2);
+  expect(await page.locator(".x6-node").allTextContents()).toEqual(beforeNodes);
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  await page.locator(".canvas-frame").screenshot({ path: test.info().outputPath("restored-canvas.png") });
+
+  await page.goto(projectUrl);
+  await card().getByTestId(`p02-trash-${modelId}`).click();
+  await page.getByTestId("p02-lifecycle-confirm").click();
+  await expect(lifecycle()).not.toBeVisible();
+  await page.getByTestId("p02-trash-tab").click();
+  await card().getByTestId(`p02-purge-${modelId}`).click();
+  await page.getByTestId("p02-purge-name").fill(name);
+  await page.getByTestId("p02-lifecycle-confirm").click();
+  await expect(lifecycle()).not.toBeVisible();
+  await expect(card()).toHaveCount(0);
+  await page.goto(projectUrl);
+  await expect(page.locator(".model-card")).toHaveCount(initialCount);
+  await page.screenshot({ path: test.info().outputPath("model-list-desktop.png") });
+});

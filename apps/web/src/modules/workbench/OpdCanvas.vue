@@ -3,10 +3,17 @@
     <div
       ref="canvasElement"
       class="opd-canvas"
+      :class="{ 'opd-canvas--dragging-blank': blankPan.dragging.value }"
       data-testid="p03-canvas"
+      title="滚轮缩放，以鼠标位置为中心；拖动空白处平移画布"
       :data-canvas-tool="interactionTool ?? 'select'"
       :data-relation-gesture-phase="relationGesturePhase ?? 'idle'"
       :data-relation-preview-id="relationPreview?.candidateId ?? ''"
+      @pointerdown="startCanvasPointer"
+      @pointermove="blankPan.move"
+      @pointerup="blankPan.finish"
+      @pointercancel="blankPan.finish"
+      @lostpointercapture="blankPan.finish"
     />
     <input
       v-if="nameEditor.active"
@@ -30,105 +37,149 @@
 </template>
 
 <script setup lang="ts">
+import { createCanvasMovement } from "./opd/core/canvas-movement";
+import { createCanvasScene } from "./opd/core/canvas-scene";
 import { Graph, type EdgeView } from "@antv/x6";
-import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 
 import { useCanvasNameEditor } from "./opd/useCanvasNameEditor";
 import { createX6NodeLayer } from "./opd/core/x6-node-layer";
 import type { ConsumptionRelation, OpdNode } from "@/shared/types/modeling";
-import { layoutParallelBinaryRelations } from "./opd/core/parallel-relation-layout";
 import type { RelationGesturePhase } from "./opd/core/relation-gesture-state";
 import { addRelationPreviewRenderSpec } from "./opd/core/relation-preview-renderer";
 import type { RelationPreviewRenderSpec } from "./opd/core/relation-preview-render-spec";
-import { buildRelationRenderSpec } from "./opd/core/relation-renderer";
-import { reconcileRelationRenderSpecs, type X6RelationRenderState } from "./opd/core/x6-relation-adapter";
 import { createX6RelationGestureAdapter, type RelationGestureIntent } from "./opd/core/x6-relation-gesture-adapter";
-import { createBuiltInControlDecoratorRegistry, createBuiltInRelationRegistry } from "./opd/relations/built-in-relation-registries";
-import { nodeDimensions } from "./opd/core/node-geometry";
+import type { NodeLayout } from "@/stores/workbench/layoutSelection";
+import { createCanvasViewport } from "./opd/core/canvas-viewport";
+import { useBlankCanvasPan } from "./opd/useBlankCanvasPan";
 
 const props = defineProps<{
   nodes: OpdNode[];
   relations: ConsumptionRelation[];
   selectedId: string;
+  selectedIds?: string[];
+  highlightedTextNodeIds?: readonly string[];
+  highlightedTextRelationIds?: readonly string[];
+  refinedElementIds?: readonly string[];
   zoom: number;
   readonly?: boolean;
+  keyboardDisabled?: boolean;
   interactionTool?: "select" | "pan";
-  statePlacementOwnerId?: string;
   relationGesturePhase?: RelationGesturePhase;
   relationPreview?: RelationPreviewRenderSpec;
   highlightedFindingTargetId?: string;
+  highlightedFindingNodeIds?: readonly string[];
   beginNameEdit?: (elementId: string) => Promise<boolean>;
   submitNameEdit?: (elementId: string, value: string) => Promise<boolean>;
   relationEditorTarget?: { cellId: string; ratio: number };
+  layoutPreview?: boolean;
 }>();
 
 const emit = defineEmits<{
   select: [id: string];
+  selection: [ids: string[]];
+  viewportZoom: [zoom: number];
+  moveBatch: [layouts: NodeLayout[]];
   move: [occurrenceId: string, x: number, y: number];
-  placeState: [ownerId: string];
   relationIntent: [intent: RelationGestureIntent];
   relationLabelEditRequested: [relationId: string];
   relationEditorAnchor: [anchor: { clientX: number; clientY: number } | null];
+  blankMenuRequested: [anchor: { clientX: number; clientY: number }];
   constructActionsMenuRequested: [occurrenceId: string, anchor: { clientX: number; clientY: number }, activation: "menu" | "direct"];
 }>();
 
 const canvasHost = ref<HTMLDivElement>();
 const canvasElement = ref<HTMLDivElement>();
 const nameInput = ref<HTMLInputElement>();
+const collapsedFeatureOwnerIds = ref(new Set(countFeaturesByOwner(props.nodes).keys()));
+let featureCountsByOwner = countFeaturesByOwner(props.nodes);
+const featureOwnerIds = computed(() => new Set(props.nodes
+  .filter((node) => isFeature(node) && node.ownerId)
+  .map((node) => node.ownerId as string)));
+const effectiveCollapsedFeatureOwnerIds = computed(() => {
+  const collapsed = new Set(collapsedFeatureOwnerIds.value);
+  props.nodes.filter(node => isFeature(node) && (props.highlightedTextNodeIds?.includes(node.id) || props.highlightedFindingNodeIds?.includes(node.id)))
+    .forEach(node => { if (node.ownerId) collapsed.delete(node.ownerId); });
+  return collapsed;
+});
+const visibleNodes = computed(() => {
+  const hiddenFeatureIds = new Set(props.nodes
+    .filter((node) => isFeature(node) && node.ownerId && effectiveCollapsedFeatureOwnerIds.value.has(node.ownerId))
+    .map((node) => node.id));
+  return props.nodes.filter((node) => !hiddenFeatureIds.has(node.id)
+    && !(node.kind === "state" && node.ownerId && hiddenFeatureIds.has(node.ownerId)));
+});
 let graph: Graph | undefined;
+const blankPan = useBlankCanvasPan(() => graph, () => (props.interactionTool ?? "select") === "select"
+  && (props.relationGesturePhase ?? "idle") === "idle");
+let pointerPressed = false;
+function startCanvasPointer(event: PointerEvent) { pointerPressed = true; blankPan.start(event); }
+function releaseCanvasPointer() { pointerPressed = false; }
 const { nameEditor, updateNameEditorPosition, openNameEditor, closeNameEditor, finishNameEdit, handleNameKeydown, handleNameBlur, handleNameCompositionEnd } = useCanvasNameEditor(props, canvasHost, nameInput, () => graph, updateRelationEditorAnchor);
-defineExpose({ finishNameEdit });
-const { renderNodes, graphNodeStructure, syncGraphPresentation, movePresentation } = createX6NodeLayer(props, () => graph, updateNameEditorPosition);
-let renderedNodeStructure = "";
+const viewport = createCanvasViewport(() => graph, () => canvasElement.value, zoom => emit("viewportZoom", zoom),
+  () => props.layoutPreview && window.innerWidth > 820 ? 88 : 32);
+defineExpose({ finishNameEdit, fitToView: viewport.fitToView, resetZoom: viewport.resetZoom,
+  captureViewport: viewport.captureViewport, restoreViewport: viewport.restoreViewport, locateConstruct });
+function locateConstruct(id: string) {
+  const cell = graph?.getCellById(id);
+  if (cell) graph?.centerCell(cell);
+}
+let viewportObserver: ResizeObserver | undefined;
+const nodeLayerProps = {
+  get nodes() { return visibleNodes.value; },
+  get selectedId() { return props.selectedId; },
+  get selectedIds() { return props.selectedIds; },
+  get highlightedTextNodeIds() { return props.highlightedTextNodeIds; },
+  get highlightedFindingNodeIds() { return props.highlightedFindingNodeIds; },
+  get refinedElementIds() { return props.refinedElementIds; },
+  get featureOwnerIds() { return featureOwnerIds.value; },
+  get collapsedFeatureOwnerIds() { return effectiveCollapsedFeatureOwnerIds.value; },
+};
+const { renderNodes, reset: resetNodeLayer, syncGraphPresentation, movePresentation, syncOwnedFeatureRelations } = createX6NodeLayer(nodeLayerProps, () => graph, updateNameEditorPosition);
+let suppressDragClick = false;
+function selectionForDrag(id: string) { return props.selectedIds?.includes(id) ? props.selectedIds : [id]; }
+const movement = createCanvasMovement({ graph: () => graph, nodes: () => props.nodes, visibleNodes: () => visibleNodes.value, selection: selectionForDrag, syncFeatures: syncOwnedFeatureRelations });
 let renderedCandidateCellIds: string[] = [];
-let relationRenderState = new Map<string, X6RelationRenderState>();
-const relationDefinitions = createBuiltInRelationRegistry();
-const controlDecorators = createBuiltInControlDecoratorRegistry();
+const scene = createCanvasScene({ graph: () => graph, nodes: () => visibleNodes.value, relations: () => props.relations,
+  selectedId: () => props.selectedId, highlightedRelations: () => props.highlightedTextRelationIds ?? [], findingId: () => props.highlightedFindingTargetId,
+  renderNodes, updateEditors: updateNameEditorPosition });
+const relationForCell = scene.relationForCell;
 const relationGestureAdapter = createX6RelationGestureAdapter((intent) => emit("relationIntent", intent));
 const dragCellId = "candidate.relation.drag";
-
-function nodeCenter(nodeId: string) {
-  const node = props.nodes.find((item) => item.id === nodeId);
-  if (!node) return undefined;
-  const size = nodeDimensions(node);
-  return { x: node.x + size.width / 2, y: node.y + size.height / 2 };
-}
-
 function renderGraph() {
-  if (!graph) return;
-  let relationSpecs;
-  try {
-    relationSpecs = layoutParallelBinaryRelations(props.relations.map((relation) => buildRelationRenderSpec(
-      relation,
-      { nodes: props.nodes, highlightedFindingTargetId: props.highlightedFindingTargetId },
-      relationDefinitions,
-      controlDecorators,
-    )), nodeCenter);
-  } catch (error) {
-    graph.clearCells();
-    renderedNodeStructure = "";
-    renderedCandidateCellIds = [];
-    relationRenderState = new Map();
+  try { scene.render(); reconcileCandidatePreview(); }
+  catch (error) {
+    graph?.clearCells(); resetNodeLayer(); scene.reset(); renderedCandidateCellIds = [];
     throw error;
   }
-  const nodeStructure = graphNodeStructure();
-  const rebuiltNodeLayer = nodeStructure !== renderedNodeStructure;
-  if (rebuiltNodeLayer) {
-    graph.clearCells();
-    relationRenderState = new Map();
-    renderedCandidateCellIds = [];
-    renderNodes();
-    renderedNodeStructure = nodeStructure;
-  } else {
-    syncGraphPresentation();
-  }
-  relationRenderState = reconcileRelationRenderSpecs(graph, relationRenderState, relationSpecs);
-  if (rebuiltNodeLayer && props.relationPreview) reconcileCandidatePreview();
-  graph.zoomTo(props.zoom / 100);
-  updateNameEditorPosition();
+}
+
+function toggleOwnedFeatures(ownerId: string, wasCollapsed = effectiveCollapsedFeatureOwnerIds.value.has(ownerId)) {
+  const owner = props.nodes.find((node) => node.id === ownerId);
+  if (!owner || (owner.kind !== "object" && owner.kind !== "process")
+    || !props.nodes.some((node) => isFeature(node) && node.ownerId === ownerId)) return;
+  const next = new Set(collapsedFeatureOwnerIds.value);
+  if (wasCollapsed) next.delete(ownerId);
+  else next.add(ownerId);
+  collapsedFeatureOwnerIds.value = next;
+  renderGraph();
+  viewport.scheduleFit();
+}
+
+function isFeature(node: OpdNode) {
+  return node.kind === "attribute" || node.kind === "operation";
+}
+
+function countFeaturesByOwner(nodes: readonly OpdNode[]) {
+  const counts = new Map<string, number>();
+  nodes.forEach((node) => {
+    if (isFeature(node) && node.ownerId) counts.set(node.ownerId, (counts.get(node.ownerId) ?? 0) + 1);
+  });
+  return counts;
 }
 
 function reconcileCandidatePreview() {
+  if (!props.relationPreview && !renderedCandidateCellIds.length) return;
   const candidateCellIds = new Set(renderedCandidateCellIds);
   graph?.getCells().forEach((cell) => {
     if (cell.id !== dragCellId && (cell.id.startsWith("candidate.relation.") || cell.id.startsWith("candidate.control."))) {
@@ -208,13 +259,14 @@ function cancelRelationDrag(reason: "EMPTY_RELEASE" | "INVALID_CELL" | "ESCAPE" 
 }
 
 function handleCanvasKeydown(event: KeyboardEvent) {
+  if (props.keyboardDisabled || event.defaultPrevented) return;
   if (event.key === "Escape" && props.relationGesturePhase && props.relationGesturePhase !== "idle") cancelRelationDrag("ESCAPE");
   if ((event.key === "Delete" || event.key === "Backspace") && !nameEditor.active && !isTextEntryTarget(event.target)) {
     event.preventDefault();
     const node = props.nodes.find((item) => item.id === props.selectedId);
     const relation = props.relations.find((item) => item.id === props.selectedId);
     if (node || relation) {
-      const selectedCellId = node?.id ?? (relation ? relationRenderState.get(relation.occurrenceId)?.spec.primaryCellId : undefined);
+      const selectedCellId = node?.id ?? (relation ? scene.relationState().get(relation.occurrenceId)?.spec.primaryCellId : undefined);
       emit("constructActionsMenuRequested", (node ?? relation)?.occurrenceId ?? "", constructMenuAnchor(selectedCellId), "direct");
     }
   }
@@ -240,6 +292,15 @@ onMounted(() => {
   graph = new Graph({
     container: canvasElement.value,
     autoResize: true,
+    scaling: { min: 0.0001, max: 4 },
+    mousewheel: {
+      enabled: true,
+      global: false,
+      zoomAtMousePosition: true,
+      minScale: 0.0001,
+      maxScale: 4,
+      guard: (event) => !pointerPressed && !event.buttons && Number.isFinite(event.deltaY) && event.deltaY !== 0 && !isTextEntryTarget(event.target),
+    },
     background: { color: "#fbfcfd" },
     grid: { visible: true, size: 16 },
     interacting: {
@@ -254,16 +315,35 @@ onMounted(() => {
     },
     panning: {
       enabled: (props.interactionTool ?? "select") === "pan",
-      eventTypes: ["leftMouseDown", "mouseWheel"],
+      eventTypes: ["leftMouseDown"],
     },
   });
-  graph.on("node:click", ({ node }) => {
+  graph.on("node:click", ({ node, e }) => {
     if ((props.interactionTool ?? "select") === "pan") return;
     if (props.relationGesturePhase && props.relationGesturePhase !== "idle") return;
-    if (props.statePlacementOwnerId === node.id) emit("placeState", node.id);
-    else emit("select", node.id);
+    if (suppressDragClick) return;
+    const relation = relationForCell(node.id);
+    if (relation) { emit("select", relation.id); return; }
+    if (props.selectedIds !== undefined && (e?.shiftKey || e?.ctrlKey || e?.metaKey)) {
+      const ids = new Set(props.selectedIds);
+      if (ids.has(node.id)) ids.delete(node.id); else ids.add(node.id);
+      emit("selection", [...ids]);
+    } else emit("select", node.id);
   });
-  graph.on("node:mousedown", ({ node, x, y }) => startRelationDrag(node.id, x, y));
+  graph.on("blank:click", () => {
+    if (blankPan.consumesClick()) return;
+    if ((props.interactionTool ?? "select") === "select" && (props.relationGesturePhase ?? "idle") === "idle") emit("selection", []);
+  });
+  graph.on("node:toggle-features", ({ node, e }: { node: { id: string }; e?: { stopPropagation?: () => void } }) => {
+    e?.stopPropagation?.();
+    const wasCollapsed = effectiveCollapsedFeatureOwnerIds.value.has(node.id);
+    emit("select", node.id);
+    toggleOwnedFeatures(node.id, wasCollapsed);
+  });
+  graph.on("node:mousedown", ({ node, x, y }) => {
+    movement.start(node.id);
+    startRelationDrag(node.id, x, y);
+  });
   graph.on("node:mousemove", ({ x, y }) => moveRelationDrag(x, y));
   graph.on("blank:mousemove", ({ x, y }) => moveRelationDrag(x, y));
   graph.on("edge:mousemove", ({ edge, x, y }) => {
@@ -277,22 +357,36 @@ onMounted(() => {
   graph.on("node:dblclick", ({ node }) => {
     if ((props.interactionTool ?? "select") === "pan") return;
     const model = props.nodes.find((item) => item.id === node.id);
-    if (!model || (model.kind !== "object" && model.kind !== "process")) return;
+    if (!model || model.kind === "state") return;
     emit("select", model.id);
     void openNameEditor(model);
   });
   graph.on("node:moved", ({ node }) => {
     const model = props.nodes.find((item) => item.id === node.id);
     if (!model || !canMoveNode(model)) return;
-    const position = movePresentation(model, node.getPosition());
+    suppressDragClick = true;
+    setTimeout(() => { suppressDragClick = false; }, 0);
+    if (props.selectedIds !== undefined) {
+      emit("moveBatch", movement.finish(node.id, node.getPosition()));
+    } else {
+      const position = movePresentation(model, node.getPosition());
+      emit("move", model.occurrenceId, position.x, position.y);
+    }
+    movement.cancel();
     updateNameEditorPosition();
-    emit("move", model.occurrenceId, position.x, position.y);
   });
   graph.on("node:moving", ({ node }) => {
     const model = props.nodes.find((item) => item.id === node.id);
-    if (model && canMoveNode(model)) movePresentation(model, node.getPosition());
+    if (model && canMoveNode(model)) {
+      if (props.selectedIds !== undefined) movement.schedule(node.id, node.getPosition());
+      else movePresentation(model, node.getPosition());
+    }
   });
-  graph.on("edge:click", ({ edge }) => emit("select", edge.getData()?.relationId ?? edge.id));
+  graph.on("edge:click", ({ edge }) => {
+    if ((props.interactionTool ?? "select") === "pan" || (props.relationGesturePhase ?? "idle") !== "idle") return;
+    const relation = relationForCell(edge.id);
+    if (relation) emit("select", relation.id);
+  });
   graph.on("edge:dblclick", ({ edge }) => {
     if ((props.interactionTool ?? "select") === "pan" || (props.relationGesturePhase ?? "idle") !== "idle") return;
     const relation = props.relations.find((item) => item.id === (edge.getData()?.relationId ?? edge.id));
@@ -301,8 +395,12 @@ onMounted(() => {
   graph.on("render:done", updateRelationEditorAnchor);
   // 单独 addEdge 不触发批量 render:done，等新视图挂载并完成路径更新后再定位。
   graph.on("view:mounted", () => { void nextTick(updateRelationEditorAnchor); });
+  graph.on("blank:contextmenu", ({ e }) => {
+    e.preventDefault();
+    emit("blankMenuRequested", { clientX: e.clientX, clientY: e.clientY });
+  });
   graph.on("node:contextmenu", ({ node, e }) => {
-    const model = props.nodes.find((item) => item.id === node.id);
+    const model = props.nodes.find((item) => item.id === node.id) ?? relationForCell(node.id);
     if (!model) return;
     e.preventDefault();
     emit("select", model.id);
@@ -318,27 +416,74 @@ onMounted(() => {
   graph.on("scale", updateNameEditorPosition);
   graph.on("translate", updateNameEditorPosition);
   graph.on("resize", updateNameEditorPosition);
+  graph.on("scale", viewport.viewportChanged);
+  graph.on("scale", ({ sx }) => emit("viewportZoom", Math.round(sx * 10000) / 100));
+  graph.on("translate", viewport.viewportChanged);
+  graph.on("resize", viewport.scheduleFit);
+  graph.on("render:done", viewport.scheduleFit);
+  if (typeof ResizeObserver !== "undefined") {
+    viewportObserver = new ResizeObserver(viewport.scheduleFit);
+    if (canvasHost.value?.parentElement) viewportObserver.observe(canvasHost.value.parentElement);
+  }
   window.addEventListener("resize", updateNameEditorPosition);
   window.addEventListener("keydown", handleCanvasKeydown);
+  window.addEventListener("blur", blankPan.stop);
+  window.addEventListener("blur", releaseCanvasPointer);
+  window.addEventListener("pointerup", releaseCanvasPointer);
+  window.addEventListener("pointercancel", releaseCanvasPointer);
   renderGraph();
+  viewport.setZoom(props.zoom);
 });
 
 onBeforeUnmount(() => {
+  movement.cancel();
   closeNameEditor();
+  blankPan.stop();
+  window.removeEventListener("blur", blankPan.stop);
+  window.removeEventListener("blur", releaseCanvasPointer);
+  window.removeEventListener("pointerup", releaseCanvasPointer);
+  window.removeEventListener("pointercancel", releaseCanvasPointer);
+  viewportObserver?.disconnect();
+  viewport.dispose();
   window.removeEventListener("resize", updateNameEditorPosition);
   window.removeEventListener("keydown", handleCanvasKeydown);
   graph?.getCellById(dragCellId)?.remove();
   graph?.dispose();
 });
 
-watch(() => [props.nodes, props.relations, props.selectedId, props.zoom, props.highlightedFindingTargetId], renderGraph, { deep: true });
+watch(() => [props.nodes, props.relations, props.highlightedTextNodeIds, props.highlightedFindingNodeIds], () => {
+  movement.cancel();
+  const nextFeatureCounts = countFeaturesByOwner(props.nodes);
+  const nextCollapsed = new Set(collapsedFeatureOwnerIds.value);
+  nextCollapsed.forEach((ownerId) => {
+    if (!nextFeatureCounts.has(ownerId)) nextCollapsed.delete(ownerId);
+  });
+  nextFeatureCounts.forEach((count, ownerId) => {
+    if (count > (featureCountsByOwner.get(ownerId) ?? 0)) nextCollapsed.add(ownerId);
+  });
+  featureCountsByOwner = nextFeatureCounts;
+  collapsedFeatureOwnerIds.value = nextCollapsed;
+  renderGraph();
+}, { deep: true });
+watch(() => [props.selectedId, props.selectedIds, props.refinedElementIds, props.highlightedTextRelationIds, props.highlightedFindingTargetId], () => {
+  syncGraphPresentation(); scene.paintSelection();
+}, { deep: true });
+watch(() => [props.nodes, props.relations, props.layoutPreview], viewport.scheduleFit, { deep: true, flush: "post" });
+watch(() => props.zoom, viewport.setZoom);
 watch(() => props.relationPreview, () => { reconcileCandidatePreview(); void nextTick(updateRelationEditorAnchor); }, { deep: true, flush: "sync" });
 watch(() => props.relationEditorTarget, () => { void nextTick(updateRelationEditorAnchor); }, { deep: true });
 watch(() => props.relationGesturePhase, (phase) => {
+  blankPan.stop();
   if (phase !== "dragging") graph?.getCellById(dragCellId)?.remove();
 });
 watch(() => props.interactionTool, (tool) => {
+  blankPan.stop();
   if (tool === "pan") graph?.enablePanning();
   else graph?.disablePanning();
 });
 </script>
+
+<style scoped>
+.opd-canvas--dragging-blank,
+.opd-canvas--dragging-blank :deep(*) { cursor: grabbing !important; }
+</style>

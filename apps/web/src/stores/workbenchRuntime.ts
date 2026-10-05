@@ -1,13 +1,19 @@
+import { createFindingsWorkflow } from "./workbench/findingsWorkflow";
+import { createWorkbenchLayout } from "./workbench/workbenchLayout";
 import { createConstructEditing } from "./workbench/constructEditing";
 import { createWorkbenchState } from "./workbench/workbenchState";
 import { toContexts, toNode, toConsumption, toTextLines, operationHistoryCode, type RuntimeContext, type RuntimeTextLine } from "./workbench/projectionMapping";
+import type { ArchitectureLinkCommand, ArchitectureClassificationCommand, LayoutBatchCommand, ContextDeleteCommand, ContextDeleteOption } from "@/shared/api/draftWorkbenchSession";
+import { nextFeaturePosition } from "./workbench/ownedNodePlacement";
 import { isJavaBlank } from "./workbench/candidateRules";
 import { message } from "./workbench/runtimeError";
-import { computed, reactive, ref } from "vue";
+import { createOperationHistory } from "./workbench/operationHistory";
+import { createMethodSummary } from "./workbench/methodSummary";
+import { computed, reactive, ref, watch } from "vue";
 import { defineStore } from "pinia";
 import { DraftWorkbenchSession, optionIsCurrent } from "@/shared/api/draftWorkbenchSession";
 import { sameDraftToken, draftRawJson } from "@/shared/api/draftRequestIdentity";
-import type { DraftToken, SaveState, DraftCommandType, OpenDraftResult, DraftFinding } from "@/shared/api/generated/draftWorkspaceContract";
+import type { DraftToken, SaveState, DraftCommandType, OpenDraftResult, DraftFinding, MethodEvidence } from "@/shared/api/generated/draftWorkspaceContract";
 
 import { createRelationEditing } from "./workbench/relationEditing";
 
@@ -37,18 +43,37 @@ export const useWorkbenchRuntimeStore = defineStore("workbench-runtime", () => {
   const profileLabel = ref("");
   const contexts = ref<RuntimeContext[]>([]);
   const textLines = ref<RuntimeTextLine[]>([]);
+  const textProjectionError = ref("");
+  const selectedTextLineId = ref("");
+  const highlightedTextRelationIds = computed(() => textLines.value.find(line => line.id === selectedTextLineId.value)?.factIds ?? []);
+  const highlightedTextNodeIds = computed(() => {
+    const line = textLines.value.find(line => line.id === selectedTextLineId.value);
+    if (!line) return [];
+    const ids = new Set(workbench.nodes.filter(node => line.occurrenceIds.includes(node.occurrenceId)).map(node => node.id));
+    // 状态/特征定位包含所属元素，避免只高亮框内的小节点。
+    for (const id of ids) {
+      const owner = workbench.nodes.find(node => node.id === id)?.ownerId;
+      if (owner) ids.add(owner);
+    }
+    return [...ids];
+  });
   const suppressedStates = ref<SuppressedStateWire[]>([]);
   const revisions = ref<Array<{ id: string; sequence: number; kind: string; createdAt: string }>>([]);
   const findings = ref<Array<FindingWire | DraftFinding>>([]);
   const operationRecords = ref<OperationRecordWire[]>([]);
   const selectedFindingId = ref("");
   const highlightedFindingTargetId = ref("");
+  const validationError = ref("");
+  const findingLocationBusy = ref(false);
+  const findingLocations = ref<Record<string, { contextId: string; targetId: string; label: string }>>({});
+  const validatedInput = ref("");
   const releaseVisualCommonFaultCommand = ref<ReleaseVisualCommonFaultCommandWire | null>(null);
   const allowedCommands = ref<string[]>([]);
   const stateCreateOption = ref<WorkbenchCapabilityOption | null>(null);
   const elementNameOption = ref<WorkbenchCapabilityOption | null>(null);
   const relationCatalog = reactive({ open: true, loading: true, search: "", expandedFamilies: [...relationCatalogFamilies] as RelationCatalogFamily[], items: [] as RelationCatalogItemWire[] });
   const rightPanel = reactive({ open: false });
+  const selectedIds = ref<string[]>([]);
   let loadSequence = 0;
   let draftSession: DraftWorkbenchSession | null = null;
   const draftToken = ref<DraftToken | null>(null);
@@ -85,13 +110,90 @@ export const useWorkbenchRuntimeStore = defineStore("workbench-runtime", () => {
     if (!intent) throw new LocalRuntimeApiError("INPUT_INVALID", "草稿候选必须带明确意图。");
     const result = await session.capabilities(token, context, selection, intent as DraftCommandType, endpoints);
     if (session !== draftSession || !draftToken.value || !sameDraftToken(token, draftToken.value) || context !== workbench.activeContextId) throw new LocalRuntimeApiError("DRAFT_CONFLICT", "草稿查询已过期。");
-    return { data: { ...result.data, options: result.data.options as WorkbenchCapabilityOption[] } };
+    return { data: { ...result.data, options: result.data.options.filter(option => !("option_kind" in option && option.option_kind === "METHOD_METADATA")) as WorkbenchCapabilityOption[] } };
   }
 
   const workbench = createWorkbenchState();
+  const methodLoader = createMethodSummary(() => localRuntimeApi.methodSummary(projectId.value, modelId.value, workbench.activeContextId,
+    draftToken.value ? { draft_token: { ...draftToken.value } } : { revision_id: workbench.revision }));
+  const methodSummary = methodLoader.state;
+  const highlightedMethodFactId = ref("");
+  const highlightedMethodNodeIds = ref<string[]>([]);
+  const methodInput = computed(() => `${projectId.value}/${modelId.value}/${editingIdentity.value}`);
+  let pendingMethod: { input: string; context: string; factId: string; targetIds: string[] } | null = null;
+  function clearMethodHighlight() { highlightedMethodFactId.value = ""; highlightedMethodNodeIds.value = []; pendingMethod = null; }
+  async function refreshMethodSummary() {
+    clearMethodHighlight();
+    if (workbench.resourceState === "ready" && workbench.commandState !== "submitting") await methodLoader.refresh();
+  }
+  function locateMethodEvidence(evidence: MethodEvidence): string | undefined {
+    if (!methodSummary.data || workbench.resourceState !== "ready" || workbench.commandState === "submitting"
+      || !methodSummary.data.processes.some(process => process.roles.some(role => role.evidence.includes(evidence)))) return;
+    const context = evidence.context_ids.includes(workbench.activeContextId) ? workbench.activeContextId : evidence.context_ids[0];
+    if (!context) return;
+    selectedTextLineId.value = ""; highlightedFindingTargetId.value = ""; clearPendingFinding();
+    pendingMethod = { input: methodInput.value, context, factId: evidence.fact_id, targetIds: evidence.target_ids };
+    resumeMethodLocation(); return context;
+  }
+  async function updateArchitectureClassification(level: ArchitectureClassificationCommand["payload"]["architecture_level"]) {
+    const context = workbench.activeContextId;
+    if (!draftToken.value || isReadonly.value || !methodSummary.data?.contexts.some(item => item.context_id === context)
+      || methodSummary.loading || methodSummary.error) return false;
+    return execute({ commandType: "UPDATE_ARCHITECTURE_CLASSIFICATION", payload: { context_id: context, architecture_level: level } });
+  }
+  async function createArchitectureLink(target: string, kind: Extract<ArchitectureLinkCommand, { commandType: "CREATE_ARCHITECTURE_LINK" }>["payload"]["kind"]) {
+    const context = workbench.activeContextId;
+    if (!methodEditable() || target === context || !methodSummary.data?.contexts.some(item => item.context_id === target)) return false;
+    return execute({ commandType: "CREATE_ARCHITECTURE_LINK", payload: { context_id: context, target_context_id: target, kind } });
+  }
+  async function deleteArchitectureLink(id: string) {
+    const context = workbench.activeContextId;
+    if (!methodEditable() || !methodSummary.data?.architecture_links.some(link => link.link_id === id && [link.source_context_id, link.target_context_id].includes(context))) return false;
+    return execute({ commandType: "DELETE_ARCHITECTURE_LINK", payload: { context_id: context, link_id: id } });
+  }
+  function methodEditable() {
+    return !!draftToken.value && !isReadonly.value && workbench.resourceState === "ready" && workbench.commandState !== "submitting"
+      && !!methodSummary.data && !methodSummary.loading && !methodSummary.error;
+  }
+  function locateMethodContext(context: string, target?: string): string | undefined {
+    if (!methodSummary.data?.contexts.some(item => item.context_id === context) || workbench.resourceState !== "ready"
+      || workbench.commandState === "submitting") return;
+    if (target && !methodSummary.data.refinements.some(edge => edge.parent_context_id === context && edge.refinee_element_id === target)) return;
+    selectedTextLineId.value = ""; highlightedFindingTargetId.value = ""; clearPendingFinding();
+    pendingMethod = { input: methodInput.value, context, factId: "", targetIds: target ? [target] : [] };
+    resumeMethodLocation(); return context;
+  }
+  function resumeMethodLocation() {
+    if (!pendingMethod || pendingMethod.input !== methodInput.value || pendingMethod.context !== workbench.activeContextId
+      || workbench.resourceState !== "ready") return;
+    highlightedMethodFactId.value = pendingMethod.factId;
+    highlightedMethodNodeIds.value = workbench.nodes.filter(node => pendingMethod!.targetIds.includes(node.id)).map(node => node.id);
+    pendingMethod = null;
+  }
+  watch(() => [methodInput.value, workbench.activeContextId, workbench.resourceState, workbench.bottomTab, workbench.bottomPanelExpanded], () => {
+    methodLoader.reset(); highlightedMethodFactId.value = ""; highlightedMethodNodeIds.value = [];
+    if (pendingMethod?.input !== methodInput.value) pendingMethod = null;
+    resumeMethodLocation();
+    if (workbench.resourceState === "ready" && workbench.bottomTab === "method" && workbench.bottomPanelExpanded) void methodLoader.refresh();
+  });
+  const historyLoader = createOperationHistory(before => localRuntimeApi.operationHistory(projectId.value, modelId.value,
+    workbench.locationMode === "HEAD" ? "HEAD" : workbench.revision, before));
+  const operationHistory = historyLoader.state;
+  const refreshOperationHistory = historyLoader.refresh;
+  watch(() => [projectId.value, modelId.value, editingIdentity.value, workbench.locationMode, workbench.activeContextId,
+    workbench.resourceState, workbench.bottomTab, workbench.bottomPanelExpanded], () => {
+    historyLoader.reset();
+    if (workbench.resourceState === "ready" && workbench.bottomTab === "history" && workbench.bottomPanelExpanded) void refreshOperationHistory();
+  });
+
+  const validationInput = computed(() => `${projectId.value}/${modelId.value}/${editingIdentity.value}`);
+  const { canRunValidation, validationLabel, findingRows, highlightedFindingNodeIds, runValidation, resumeFindingLocation, selectFinding, locateFinding, clearPendingFinding } = createFindingsWorkflow({ workbench, projectId, modelId, contexts, findings, draftToken, pendingDelivery, selectedFindingId, highlightedFindingTargetId, selectedTextLineId, validationError, findingLocationBusy, validatedInput, validationInput, findingLocations, getDraftSession: () => draftSession, getLoadSequence: () => loadSequence, clearMethodHighlight, block });
 
   const isReadonly = computed(() => workbench.resourceState !== "ready" || workbench.accessMode === "readonly" || workbench.locationMode === "EXACT");
   const selectedNode = computed(() => workbench.nodes.find((node) => node.id === workbench.selectedId));
+  watch(() => workbench.selectedId, id => {
+    if (!selectedIds.value.includes(id)) selectedIds.value = workbench.nodes.some(node => node.id === id) ? [id] : [];
+  });
   const selectedRelation = computed(() => workbench.relations.find((relation) => relation.id === workbench.selectedId));
   const { relationCandidate, controlCandidate, structuralUpdateCandidate, activateRelationCatalogItem, armRelationCreation, cancelRelationCandidate, handleRelationGesture, resolveRelationCandidates, submitRelationCandidate, chooseRelationCandidate, rebuildRelationPreview, continueRelationEndpoints, confirmRelationCandidate, armControlUpdate, cancelControlCandidate, chooseControlCandidate, submitControlCandidate, confirmControlCandidate, armStructuralUpdate, cancelStructuralUpdate, submitStructuralUpdate } = createRelationEditing({ workbench, projectId, modelId, isReadonly, selectedRelation, allowedCommands, rightPanel, relationCatalog, editingIdentity, queryCapabilities, currentOption, execute, canEdit, block });
 
@@ -100,7 +202,52 @@ export const useWorkbenchRuntimeStore = defineStore("workbench-runtime", () => {
     if (!selected || selected.kind !== "object") return [];
     return suppressedStates.value.filter((state) => state.owner_ref.target_kind === "ELEMENT" && state.owner_ref.target_id === selected.id);
   });
-  const { constructActions, stateCandidate, stateEditor, armStateCreation, placeState, cancelStateCandidate, submitStateCandidate, saveSelectedState, changeStatePresentation, makeSuppressedStateExplicit, requestConstructActions, chooseConstructDelete, cancelConstructDelete } = createConstructEditing({ workbench, projectId, modelId, isReadonly, selectedNode, selectedObjectSuppressedStates, stateCreateOption, queryCapabilities, execute, block, getLoadSequence: () => loadSequence, isDraftSession: () => Boolean(draftSession) });
+  const { constructActions, stateEditor, armStateCreation, saveSelectedState, changeStatePresentation, makeSuppressedStateExplicit, requestConstructActions, chooseConstructDelete, cancelConstructDelete } = createConstructEditing({ workbench, projectId, modelId, isReadonly, selectedNode, selectedObjectSuppressedStates, stateCreateOption, queryCapabilities, execute, block, getLoadSequence: () => loadSequence, isDraftSession: () => Boolean(draftSession) });
+
+  const { clearLayoutHistory, canUndoLayout, canRedoLayout, autoLayoutPreview, applyingAutoLayout, canAutoLayout, autoLayoutNodes, cancelAutoLayout, previewAutoLayout, applyAutoLayout, layoutArrangement, arrangeSelection, moveElements, undoLayout, redoLayout } = createWorkbenchLayout({ workbench, draftToken, isReadonly, selectedIds, projectId, modelId, editingIdentity, relationCandidate, controlCandidate, structuralUpdateCandidate, getLoadSequence: () => loadSequence, hasDraftSession: () => !!draftSession, canEdit, execute, block });
+
+  const contextDelete = reactive({ open: false, loading: false, submitting: false, target: "", error: "", option: null as ContextDeleteOption | null });
+  let contextDeleteSequence = 0;
+  function cancelContextDelete() {
+    if (contextDelete.submitting) return;
+    contextDeleteSequence++; Object.assign(contextDelete, { open: false, loading: false, target: "", error: "", option: null });
+  }
+  watch(editingIdentity, () => {
+    selectedTextLineId.value = "";
+    if (!contextDelete.open || contextDelete.submitting) return;
+    contextDeleteSequence++; contextDelete.option = null; contextDelete.loading = false;
+    contextDelete.error = "草稿已变化，请取消并重新预览删除范围。";
+  });
+  async function requestContextDelete(target: string) {
+    const session = draftSession, token = draftToken.value, context = workbench.activeContextId;
+    if (!session || !token || isReadonly.value || workbench.commandState === "submitting" || saving.value || contextDelete.submitting
+      || !contexts.value.find(item => item.id === target)?.parentId) return;
+    const sequence = ++contextDeleteSequence, load = loadSequence;
+    Object.assign(contextDelete, { open: true, loading: true, target, error: "", option: null });
+    try {
+      const result = await session.capabilities(token, context, target, "DELETE_CONTEXT");
+      if (sequence !== contextDeleteSequence || load !== loadSequence || session !== draftSession
+        || !draftToken.value || !sameDraftToken(token, draftToken.value) || context !== workbench.activeContextId) return;
+      contextDelete.option = result.data.options.find((option): option is ContextDeleteOption => option.command_type === "DELETE_CONTEXT") ?? null;
+      if (!contextDelete.option) contextDelete.error = "当前子图不可删除，请重新加载后重试。";
+    } catch (error) { if (sequence === contextDeleteSequence && load === loadSequence) contextDelete.error = message(error); }
+    finally { if (sequence === contextDeleteSequence) contextDelete.loading = false; }
+  }
+  async function confirmContextDelete(): Promise<string | null> {
+    const option = contextDelete.option;
+    if (!option?.enabled || contextDelete.loading || contextDelete.submitting || isReadonly.value || saving.value
+      || workbench.commandState === "submitting" || !draftToken.value || !sameDraftToken(option.expires_with_token, draftToken.value)) return null;
+    contextDelete.submitting = true;
+    const parent = option.context_impact.parent_context_id;
+    try {
+      const success = await execute({ commandType: "DELETE_CONTEXT", payload: { context_id: option.context_impact.context_id, impact_token: option.impact_token } }, parent);
+      if (!success) { contextDelete.error = workbench.commandFeedback || "删除未完成，请重新加载后重试。"; return null; }
+      return parent;
+    } finally {
+      contextDelete.submitting = false;
+      if (workbench.activeContextId === parent && !contexts.value.some(item => item.id === option.context_impact.context_id)) cancelContextDelete();
+    }
+  }
 
   const activeContext = computed(() => contexts.value.find((context) => context.id === workbench.activeContextId));
   const captureViewState = computed(() => {
@@ -179,8 +326,15 @@ export const useWorkbenchRuntimeStore = defineStore("workbench-runtime", () => {
   }
 
   async function load(nextProjectId: string, nextModelId: string, requestedContext?: string, requestedRevision?: string, retainReady = false, refreshHead = false): Promise<boolean> {
+    cancelContextDelete(); cancelAutoLayout(); clearLayoutHistory(); selectedIds.value = []; selectedTextLineId.value = "";
+    highlightedFindingTargetId.value = "";
+    findingLocationBusy.value = false;
+    textProjectionError.value = "";
+    if (projectId.value !== nextProjectId || modelId.value !== nextModelId) { validatedInput.value = ""; clearPendingFinding(); }
+    if (workbench.validationState === "running") workbench.validationState = validatedInput.value === validationInput.value ? "current" : "unvalidated";
     const sequence = ++loadSequence;
     const head = refreshHead || requestedRevision === undefined || requestedRevision === "head";
+    if (!head) validatedInput.value = "";
     saving.value = false;
     manualCapture.value = null; automaticCapture.value = null;
     projectId.value = nextProjectId;
@@ -190,7 +344,6 @@ export const useWorkbenchRuntimeStore = defineStore("workbench-runtime", () => {
     if (!refreshHead) workbench.commandState = "idle";
     cancelRelationCandidate();
     cancelControlCandidate();
-    cancelStateCandidate();
     cancelStructuralUpdate();
     cancelConstructDelete();
     if (!retainReady) workbench.resourceState = "loading";
@@ -261,9 +414,12 @@ export const useWorkbenchRuntimeStore = defineStore("workbench-runtime", () => {
       textLines.value = toTextLines(text.data.sentences, text.data.traces);
       revisions.value = history.map((item) => ({ id: item.revision_id, sequence: item.sequence, kind: item.kind, createdAt: item.created_at }));
       findings.value = nextFindings.data;
+      workbench.validationState = "unvalidated"; workbench.validationProgress = 0;
+      workbench.blockingFindings = nextFindings.data.filter(item => item.severity === "BLOCKING").length;
       operationRecords.value = nextOperationRecords.data;
       selectedFindingId.value = "";
       highlightedFindingTargetId.value = "";
+      resumeFindingLocation();
       rightPanel.open = false;
       releaseVisualCommonFaultCommand.value = releaseCommand?.data ?? null;
       relationCatalog.open = true;
@@ -316,21 +472,26 @@ export const useWorkbenchRuntimeStore = defineStore("workbench-runtime", () => {
     workbench.activeContextId = snapshot.opened.context_id;
     contexts.value = toContexts(snapshot.navigation, workbench.activeContextId);
     const selected = workbench.selectedId;
+    const multiSelection = selectedIds.value;
     applyProjection(snapshot.constructs);
     if ([...workbench.nodes, ...workbench.relations].some(item => item.id === selected)) workbench.selectedId = selected;
+    selectedIds.value = multiSelection.filter(id => workbench.nodes.some(node => node.id === id));
     suppressedStates.value = snapshot.suppressed;
     textLines.value = toTextLines(snapshot.text.sentences, snapshot.text.traces);
+    textProjectionError.value = snapshot.textError ?? "";
     findings.value = snapshot.findings.items;
     workbench.blockingFindings = snapshot.findings.validation_summary.blocking;
     operationRecords.value = []; releaseVisualCommonFaultCommand.value = null;
     revisions.value = snapshot.history.map(item => ({ id: item.revision_id, sequence: item.sequence, kind: item.kind, createdAt: item.created_at }));
     relationCatalog.items = snapshot.catalog; relationCatalog.loading = false;
     // 只开放已实现命令的入口，提交仍必须经过 Runtime 的 exact token 候选授权。
-    allowedCommands.value = ["CREATE_ELEMENT", "CREATE_FEATURE", "CREATE_STATE", "CREATE_FACT", "UPDATE_PROPERTY", "UPDATE_LAYOUT", "UPDATE_STATE", "UPDATE_FACT", "DELETE_CONSTRUCT", "STATE_EXPLICIT", "STATE_SUPPRESS", "UNFOLD", "FOLD"];
+    allowedCommands.value = ["CREATE_ELEMENT", "CREATE_CONTEXT", "CREATE_FEATURE", "CREATE_STATE", "CREATE_FACT", "UPDATE_PROPERTY", "UPDATE_LAYOUT", "UPDATE_LAYOUT_BATCH", "UPDATE_STATE", "UPDATE_FACT", "DELETE_CONSTRUCT", "STATE_EXPLICIT", "STATE_SUPPRESS", "UNFOLD", "FOLD"];
     workbench.resourceState = "ready"; workbench.accessMode = pendingDelivery.value ? "readonly" : "editable";
     workbench.locationMode = "HEAD"; workbench.commandState = "idle";
     workbench.commandFeedback = saveError.value; workbench.lastAction = `活动草稿 · 编辑 ${draftToken.value.edit_seq}`;
-    workbench.validationState = "stale"; stateCreateOption.value = null; elementNameOption.value = null;
+    workbench.validationState = validatedInput.value === validationInput.value ? "current" : validatedInput.value ? "stale" : "unvalidated";
+    stateCreateOption.value = null; elementNameOption.value = null;
+    resumeFindingLocation();
     if (selectedNode.value && ["object", "attribute", "operation"].includes(selectedNode.value.kind) && !isReadonly.value) void refreshStateCreateOption(selectedNode.value.id);
   }
 
@@ -339,9 +500,12 @@ export const useWorkbenchRuntimeStore = defineStore("workbench-runtime", () => {
   }
 
   function leaveWorkbench() {
+    historyLoader.reset();
+    cancelAutoLayout(); clearLayoutHistory(); selectedIds.value = []; selectedTextLineId.value = "";
     loadSequence++;
     draftSession = null; draftToken.value = null; draftSaveState.value = null;
     saving.value = false; workbench.accessMode = "readonly";
+    clearPendingFinding(); validatedInput.value = ""; highlightedFindingTargetId.value = "";
   }
 
   async function pollDraftState() {
@@ -352,11 +516,15 @@ export const useWorkbenchRuntimeStore = defineStore("workbench-runtime", () => {
       const opened = await session.open(workbench.activeContextId);
       if (sequence !== loadSequence || session !== draftSession || editInFlight || !draftToken.value || !sameDraftToken(token, draftToken.value)) return;
       if (!sameDraftToken(opened.draft_token, token)) {
+        clearLayoutHistory();
         workbench.accessMode = "readonly"; saveError.value = "草稿已在其他页面更新，请重新加载。";
         workbench.commandFeedback = saveError.value; return;
       }
       if (draftSaveState.value?.dirty_since && opened.save_state.dirty_since === null && opened.save_state.checkpoint_token
-        && !saving.value && !pendingDelivery.value) automaticCapture.value = opened.save_state.checkpoint_token;
+        && !saving.value && !pendingDelivery.value) {
+        automaticCapture.value = opened.save_state.checkpoint_token;
+        if (workbench.bottomTab === "history" && workbench.bottomPanelExpanded) void refreshOperationHistory();
+      }
       draftSaveState.value = opened.save_state;
     } catch (error) { if (sequence === loadSequence) saveError.value = message(error); }
     finally { statusPolling = false; }
@@ -368,7 +536,7 @@ export const useWorkbenchRuntimeStore = defineStore("workbench-runtime", () => {
     const pendingEdit = editInFlight;
     if (pendingEdit && !await pendingEdit) return null;
     if (sequence !== loadSequence || session !== draftSession || isReadonly.value || saving.value || !draftToken.value) return null;
-    if (stateCandidate.phase !== "idle" || controlCandidate.phase !== "idle" || structuralUpdateCandidate.phase !== "idle"
+    if (controlCandidate.phase !== "idle" || structuralUpdateCandidate.phase !== "idle"
       || !["idle", "relation-armed"].includes(relationCandidate.phase)) { block("请先完成或取消当前候选，再保存。"); return null; }
     const captured = { ...draftToken.value };
     saving.value = true; saveError.value = "";
@@ -380,7 +548,9 @@ export const useWorkbenchRuntimeStore = defineStore("workbench-runtime", () => {
       if (sequence !== loadSequence || session !== draftSession) return null;
       revisions.value = history.map(item => ({ id: item.revision_id, sequence: item.sequence, kind: item.kind, createdAt: item.created_at }));
       workbench.revision = [...history].sort((a, b) => b.sequence - a.sequence)[0]?.revision_id ?? result.revision_id;
-      await pollDraftState(); return result.revision_id;
+      await pollDraftState();
+      if (sequence === loadSequence && workbench.bottomTab === "history" && workbench.bottomPanelExpanded) await refreshOperationHistory();
+      return result.revision_id;
     } catch (error) {
       if (sequence === loadSequence) {
         saveError.value = message(error); workbench.commandFeedback = saveError.value;
@@ -392,17 +562,31 @@ export const useWorkbenchRuntimeStore = defineStore("workbench-runtime", () => {
     } finally { if (session === draftSession) saving.value = false; }
   }
 
-  async function selectConstruct(id: string) {
+  async function selectConstruct(id: string, retainSelection = false) {
+    clearMethodHighlight();
+    selectedTextLineId.value = "";
+    highlightedFindingTargetId.value = ""; clearPendingFinding();
+    if (!retainSelection) selectedIds.value = workbench.nodes.some(node => node.id === id) ? [id] : [];
     if (!workbench.nodes.some((node) => node.id === id) && !workbench.relations.some((relation) => relation.id === id)) return;
     workbench.selectedId = id;
     const node = workbench.nodes.find((item) => item.id === id);
-    if (node?.kind === "object" || node?.kind === "attribute" || node?.kind === "operation") await refreshStateCreateOption(node.id);
+    if (node?.kind === "object") await refreshStateCreateOption(node.id);
     else stateCreateOption.value = null;
     if (node?.kind === "state") {
       stateEditor.name = node.label;
       stateEditor.roles = [...(node.stateRoles ?? [])];
     }
     await refreshRelationCatalog(workbench.relations.some((relation) => relation.id === id) ? id : undefined);
+  }
+
+  function selectNodes(ids: string[]) {
+    clearMethodHighlight();
+    selectedTextLineId.value = "";
+    highlightedFindingTargetId.value = ""; clearPendingFinding();
+    selectedIds.value = ids.filter(id => workbench.nodes.some(node => node.id === id));
+    const primary = selectedIds.value.at(-1);
+    if (primary) void selectConstruct(primary, true);
+    else { workbench.selectedId = ""; stateCreateOption.value = null; }
   }
 
   function setBottomTab(tab: BottomTab) {
@@ -420,7 +604,7 @@ export const useWorkbenchRuntimeStore = defineStore("workbench-runtime", () => {
   }
 
   function setViewportZoom(nextZoom: number) {
-    workbench.zoom = Math.max(25, Math.min(400, nextZoom));
+    if (Number.isFinite(nextZoom)) workbench.zoom = Math.round(Math.max(0.01, Math.min(400, nextZoom)) * 100) / 100;
   }
 
   async function addElement(kind: "OBJECT" | "PROCESS") {
@@ -428,8 +612,31 @@ export const useWorkbenchRuntimeStore = defineStore("workbench-runtime", () => {
     const nodeKind = kind === "OBJECT" ? "object" : "process";
     const ordinal = workbench.nodes.filter((node) => node.kind === nodeKind).length + 1;
     const x = kind === "OBJECT" ? 80 : 420;
-    const y = 80 + ordinal * 96;
+    const y = 80 + ordinal * 176;
     await execute({ commandType: "CREATE_ELEMENT", payload: { kind, name: `${kind === "OBJECT" ? "Object" : "Process"} ${ordinal}`, layout: { x, y } } });
+  }
+
+  async function createRefinement(name: string): Promise<string | null> {
+    const owner = selectedNode.value;
+    if (!draftSession || !owner || (owner.kind !== "object" && owner.kind !== "process")
+      || !owner.occurrenceId || isReadonly.value || !projectId.value || !modelId.value || !workbench.revision) return null;
+    const title = name.trim();
+    if (!title || title.length > 256) return null;
+    const context = workbench.activeContextId;
+    const known = new Set(contexts.value.map(item => item.id));
+    try {
+      const result = await queryCapabilities(projectId.value, modelId.value, context, workbench.revision, owner.occurrenceId, "CREATE_CONTEXT");
+      const option = result.data.options.find(item => item.command_type === "CREATE_CONTEXT" && item.enabled);
+      if (!option) { block("当前元素不能创建子 OPD。"); return null; }
+      const accepted = await execute({ commandType: "CREATE_CONTEXT", payload: {
+        context_id: context, refinee_element_id: owner.id, name: title,
+        capability_query_id: option.capability_query_id, selected_option_id: option.option_id,
+      } });
+      return accepted ? contexts.value.find(item => !known.has(item.id))?.id ?? null : null;
+    } catch (error) {
+      workbench.commandFeedback = message(error);
+      return null;
+    }
   }
 
   async function addFeature(kind: "ATTRIBUTE" | "OPERATION") {
@@ -449,7 +656,7 @@ export const useWorkbenchRuntimeStore = defineStore("workbench-runtime", () => {
         capability_ref: option.capability_ref,
         name: `${kind === "ATTRIBUTE" ? "Attribute" : "Operation"} ${ordinal}`,
         occurrence: { ownership: "OWNED", construct_role: kind === "ATTRIBUTE" ? "ATTRIBUTE_NODE" : "OPERATION_NODE" },
-        layout: { x: owner.x + 210, y: owner.y + ordinal * 52 },
+        layout: nextFeaturePosition(owner, workbench.nodes),
         capability_query_id: option.capability_query_id,
         selected_option_id: option.option_id,
       } });
@@ -481,7 +688,7 @@ export const useWorkbenchRuntimeStore = defineStore("workbench-runtime", () => {
   async function beginElementNameEdit(elementId: string): Promise<boolean> {
     const node = workbench.nodes.find((item) => item.id === elementId);
     elementNameOption.value = null;
-    if (!node || (node.kind !== "object" && node.kind !== "process")) return false;
+    if (!node || node.kind === "state") return false;
     if (isReadonly.value) {
       block("当前修订为只读版本，不能编辑名称。");
       return false;
@@ -512,22 +719,23 @@ export const useWorkbenchRuntimeStore = defineStore("workbench-runtime", () => {
 
   async function renameElement(elementId: string, value: string): Promise<boolean> {
     const node = workbench.nodes.find((item) => item.id === elementId);
-    if (!node || (node.kind !== "object" && node.kind !== "process")) return false;
+    if (!node || node.kind === "state") return false;
     if (value === node.label) return true;
     if (isJavaBlank(value) || [...value].length > 256) {
       workbench.feedbackCode = "INVALID_ARGUMENT";
-      block("Element 名称必须为非空白且不超过 256 个 Unicode code point。");
+      block("名称必须为非空白且不超过 256 个 Unicode code point。");
       return false;
     }
     let option = elementNameOption.value;
-    const optionTarget = option?.normalized_endpoints.find((endpoint) => endpoint.role === "PROPERTY_TARGET")?.target_ref.target_id;
-    if (!option || optionTarget !== elementId || !currentOption(option)) {
+    const optionRef = option?.normalized_endpoints.find((endpoint) => endpoint.role === "PROPERTY_TARGET")?.target_ref;
+    const targetKind = node.kind === "attribute" || node.kind === "operation" ? "FEATURE" : "ELEMENT";
+    if (!option || optionRef?.target_id !== elementId || optionRef.target_kind !== targetKind || !currentOption(option)) {
       if (!await beginElementNameEdit(elementId)) return false;
       option = elementNameOption.value;
     }
     if (!option) return false;
     const succeeded = await execute({ commandType: "UPDATE_PROPERTY", payload: {
-      target_ref: { target_kind: "ELEMENT", target_id: elementId },
+      target_ref: { target_kind: targetKind, target_id: elementId },
       property_name: "name",
       value,
       capability_query_id: option.capability_query_id,
@@ -537,41 +745,14 @@ export const useWorkbenchRuntimeStore = defineStore("workbench-runtime", () => {
     return succeeded;
   }
 
-  async function runValidation() {
-    if (draftSession) { workbench.commandFeedback = "当前显示草稿核心校验（INCOMPLETE）；完整规则校验尚未接入。"; return; }
-    if (!projectId.value || !modelId.value || !workbench.revision) return;
-    workbench.validationState = "running";
-    workbench.validationProgress = 0;
-    try {
-      const result = await localRuntimeApi.validate(projectId.value, modelId.value, workbench.revision);
-      workbench.validationState = result.data.state === "FAILED" ? "failed" : "current";
-      workbench.validationProgress = result.data.progress ?? 100;
-      workbench.lastAction = `校验任务 ${result.data.task_id} 已${result.data.state === "FAILED" ? "失败" : "完成"}`;
-    } catch (error) {
-      workbench.validationState = "failed";
-      workbench.commandFeedback = message(error);
-    }
-  }
-
   function locateText(line: RuntimeTextLine) {
+    clearMethodHighlight();
+    highlightedFindingTargetId.value = ""; clearPendingFinding();
+    if (!textLines.value.some(item => item.id === line.id)) return;
     const relation = workbench.relations.find((item) => line.factIds.includes(item.id));
-    if (relation) selectConstruct(relation.id);
-  }
-
-  function selectFinding(findingId: string) {
-    if (!findings.value.some((finding) => finding.finding_id === findingId)) return;
-    selectedFindingId.value = findingId;
-    workbench.lastAction = `已选择 Finding ${findingId}`;
-  }
-
-  async function locateFinding() {
-    const finding = findings.value.find((item) => item.finding_id === selectedFindingId.value);
-    if (!finding) return block("请先选择 Finding。");
-    if (!workbench.nodes.some((node) => node.id === finding.entity_id) && !workbench.relations.some((relation) => relation.id === finding.entity_id)) {
-      return block("Finding 引用的构造不在当前 Context。");
-    }
-    highlightedFindingTargetId.value = finding.entity_id;
-    workbench.lastAction = `已定位 Finding ${finding.finding_id}`;
+    const node = workbench.nodes.find(item => line.occurrenceIds.includes(item.occurrenceId));
+    if (relation || node) void selectConstruct(relation?.id ?? node!.id);
+    selectedTextLineId.value = line.id;
   }
 
   async function submitReleaseVisualCommonFaultCommand() {
@@ -610,15 +791,16 @@ export const useWorkbenchRuntimeStore = defineStore("workbench-runtime", () => {
     block(reason);
   }
 
-  function execute(command: Parameters<typeof localRuntimeApi.executeP0Command>[4]): Promise<boolean> {
+  function execute(command: Parameters<typeof localRuntimeApi.executeP0Command>[4] | LayoutBatchCommand | ContextDeleteCommand | ArchitectureClassificationCommand | ArchitectureLinkCommand, readContext?: string): Promise<boolean> {
     if (editInFlight) return Promise.resolve(false);
-    const promise = executeCommand(command);
+    if (command.commandType !== "UPDATE_LAYOUT_BATCH") clearLayoutHistory();
+    const promise = executeCommand(command, readContext);
     editInFlight = promise;
     void promise.finally(() => { if (editInFlight === promise) editInFlight = null; });
     return promise;
   }
 
-  async function executeCommand(command: Parameters<typeof localRuntimeApi.executeP0Command>[4]): Promise<boolean> {
+  async function executeCommand(command: Parameters<typeof localRuntimeApi.executeP0Command>[4] | LayoutBatchCommand | ContextDeleteCommand | ArchitectureClassificationCommand | ArchitectureLinkCommand, readContext?: string): Promise<boolean> {
     if (isReadonly.value || workbench.commandState === "submitting") return false;
     if (!projectId.value || !modelId.value || !workbench.revision || !workbench.activeContextId) return false;
     workbench.commandState = "submitting";
@@ -630,12 +812,13 @@ export const useWorkbenchRuntimeStore = defineStore("workbench-runtime", () => {
         const session = draftSession;
         const result = await session.edit(draftToken.value, workbench.activeContextId, command);
         if (sequence !== loadSequence || session !== draftSession) return false;
-        const opened = await session.open(workbench.activeContextId);
+        const opened = await session.open(readContext ?? workbench.activeContextId);
         if (!sameDraftToken(opened.draft_token, result.result_token)) throw new LocalRuntimeApiError("DRAFT_CONFLICT", "草稿已被其他页面推进，请重新加载。");
         const snapshot = await session.read(opened);
         if (sequence !== loadSequence || session !== draftSession) return false;
         applyDraftSnapshot(snapshot); return true;
       }
+      if (command.commandType === "UPDATE_LAYOUT_BATCH" || command.commandType === "DELETE_CONTEXT" || command.commandType === "UPDATE_ARCHITECTURE_CLASSIFICATION" || command.commandType === "CREATE_ARCHITECTURE_LINK" || command.commandType === "DELETE_ARCHITECTURE_LINK") return false;
       const result = await localRuntimeApi.executeP0Command(projectId.value, modelId.value, workbench.activeContextId, workbench.revision, command);
       if (sequence !== loadSequence) return false;
       if (!result.meta.committed_revision) throw new LocalRuntimeApiError("COMMAND_NOT_COMMITTED", "命令未返回已提交修订。", true);
@@ -700,5 +883,5 @@ export const useWorkbenchRuntimeStore = defineStore("workbench-runtime", () => {
     }
   }
 
-  return { leaveWorkbench, draftToken, draftSaveState, saving, pendingDelivery, saveError, saveLabel, editingIdentity, saveDraft, retryDraftDelivery, pollDraftState, projectId, modelId, projectName, modelName, profileLabel, contexts, textLines, revisions, findings, operationRecords, selectedFindingId, highlightedFindingTargetId, releaseVisualCommonFaultCommand, workbench, isReadonly, selectedNode, selectedRelation, selectedObjectSuppressedStates, stateCreateOption, constructActions, stateCandidate, stateEditor, relationCandidate, relationCatalog, relationCatalogFamilies, rightPanel, controlCandidate, structuralUpdateCandidate, captureViewState, load, selectContext, selectConstruct, setBottomTab, openRightPanel, closeRightPanel, setViewportZoom, addElement, addFeature, addConsumption, moveElement, beginElementNameEdit, renameElement, openRelationCatalog, closeRelationCatalog, relationCatalogItems, isRelationCatalogExpanded, toggleRelationCatalogFamily, activateRelationCatalogItem, armRelationCreation, handleRelationGesture, cancelRelationCandidate, resolveRelationCandidates, submitRelationCandidate, chooseRelationCandidate, rebuildRelationPreview, continueRelationEndpoints, confirmRelationCandidate, armControlUpdate, cancelControlCandidate, chooseControlCandidate, submitControlCandidate, confirmControlCandidate, armStructuralUpdate, cancelStructuralUpdate, submitStructuralUpdate, armStateCreation, placeState, cancelStateCandidate, submitStateCandidate, saveSelectedState, changeStatePresentation, makeSuppressedStateExplicit, requestConstructActions, chooseConstructDelete, cancelConstructDelete, runValidation, locateText, selectFinding, locateFinding, submitReleaseVisualCommonFaultCommand, unavailable };
+  return { createArchitectureLink, deleteArchitectureLink, updateArchitectureClassification, locateMethodContext, methodSummary, refreshMethodSummary, locateMethodEvidence, highlightedMethodFactId, highlightedMethodNodeIds, textProjectionError, canRunValidation, validationLabel, validationError, findingRows, findingLocationBusy, highlightedFindingNodeIds, selectedTextLineId, highlightedTextNodeIds, highlightedTextRelationIds, contextDelete, requestContextDelete, cancelContextDelete, confirmContextDelete, canAutoLayout, autoLayoutPreview, autoLayoutNodes, applyingAutoLayout, previewAutoLayout, applyAutoLayout, cancelAutoLayout, layoutArrangement, arrangeSelection, selectedIds, selectNodes, moveElements, canUndoLayout, canRedoLayout, undoLayout, redoLayout, leaveWorkbench, draftToken, draftSaveState, saving, pendingDelivery, saveError, saveLabel, editingIdentity, saveDraft, retryDraftDelivery, pollDraftState, projectId, modelId, projectName, modelName, profileLabel, contexts, textLines, revisions, findings, operationRecords, operationHistory, refreshOperationHistory, selectedFindingId, highlightedFindingTargetId, releaseVisualCommonFaultCommand, workbench, isReadonly, selectedNode, selectedRelation, selectedObjectSuppressedStates, stateCreateOption, constructActions, stateEditor, relationCandidate, relationCatalog, relationCatalogFamilies, rightPanel, controlCandidate, structuralUpdateCandidate, captureViewState, load, selectContext, selectConstruct, setBottomTab, openRightPanel, closeRightPanel, setViewportZoom, addElement, createRefinement, addFeature, addConsumption, moveElement, beginElementNameEdit, renameElement, openRelationCatalog, closeRelationCatalog, relationCatalogItems, isRelationCatalogExpanded, toggleRelationCatalogFamily, activateRelationCatalogItem, armRelationCreation, handleRelationGesture, cancelRelationCandidate, resolveRelationCandidates, submitRelationCandidate, chooseRelationCandidate, rebuildRelationPreview, continueRelationEndpoints, confirmRelationCandidate, armControlUpdate, cancelControlCandidate, chooseControlCandidate, submitControlCandidate, confirmControlCandidate, armStructuralUpdate, cancelStructuralUpdate, submitStructuralUpdate, armStateCreation, saveSelectedState, changeStatePresentation, makeSuppressedStateExplicit, requestConstructActions, chooseConstructDelete, cancelConstructDelete, runValidation, locateText, selectFinding, locateFinding, submitReleaseVisualCommonFaultCommand, unavailable };
 });

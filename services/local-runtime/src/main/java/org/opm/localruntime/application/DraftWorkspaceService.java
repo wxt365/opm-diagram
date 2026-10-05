@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import org.opm.localruntime.api.DraftCapabilityIdentity;
 import org.opm.localruntime.api.DraftWorkspaceSchema;
 import org.opm.localruntime.api.generated.DraftWorkspaceContract;
 import org.opm.localruntime.assets.FileProfilePackageLoader;
@@ -29,13 +28,12 @@ import static org.opm.localruntime.api.generated.DraftWorkspaceContract.Type.*;
 @Service
 public final class DraftWorkspaceService {
     private static final ObjectMapper JSON = new ObjectMapper();
-    private static final List<String> SUPPORTED = List.of("CREATE_ELEMENT", "UPDATE_PROPERTY", "UPDATE_LAYOUT",
-            "CREATE_FEATURE", "CREATE_STATE", "UPDATE_STATE", "STATE_EXPLICIT", "STATE_SUPPRESS", "UNFOLD", "FOLD", "CREATE_FACT", "UPDATE_FACT", "DELETE_CONSTRUCT");
     private final ProjectDatabaseFactory databases;
     private final LocalApiService domain;
     private final ProfilePackageAssembler profiles;
     private final Clock clock;
     private final DraftSaveService saves;
+    private final DraftCapabilityQuery capabilityQuery;
     private final OplTextGenerationService text = new OplTextGenerationService();
 
     public static final class Failure extends RuntimeException {
@@ -57,15 +55,81 @@ public final class DraftWorkspaceService {
     }
     public DraftWorkspaceService(ProjectDatabaseFactory databases, LocalApiService domain, FileProfilePackageLoader loader, Clock clock, DraftSaveService saves) {
         this.databases = databases; this.domain = domain; this.profiles = new ProfilePackageAssembler(loader); this.clock = clock; this.saves = saves;
+        this.capabilityQuery = new DraftCapabilityQuery(domain, profiles);
     }
 
     public JsonNode execute(String project, String model, DraftWorkspaceContract.Document request) {
         DraftWorkspaceSchema.validate(JSON.valueToTree(project), "StableId"); DraftWorkspaceSchema.validate(JSON.valueToTree(model), "StableId");
         var repository = repository(project); JsonNode input = request.value();
+        if (request.type() == MindmapRequest) {
+            require(databases.open(project) instanceof org.opm.localruntime.storage.ProjectDatabaseOpenResult.Ready, "PERSISTENCE_FAILED", null);
+            return new org.opm.localruntime.storage.MindmapRepository(databases.databasePath(project), clock).execute(project, model, input);
+        }
+        if (request.type() == DraftModelPlanPreviewRequest) {
+            if (input.has("analysis_source")) new org.opm.localruntime.storage.MindmapRepository(databases.databasePath(project), clock).check(project, model, input.get("analysis_source"));
+            var snapshot = repository.read(project, model); var token = input.get("draft_token");
+            require(sameToken(token, snapshot), "DRAFT_CONFLICT", null);
+            var before = SaveContentDigestV1.read(snapshot.documentJson()); String context = input.get("context_id").asText();
+            context(semantic(before), context);
+            var built = modelPlan(project, model, context, input.get("plan_id").asText(), token, input.get("steps"), before);
+            var revision = semantic(built.document());
+            var result = JSON.createObjectNode();
+            result.set("meta", envelope(input, context, JSON.createObjectNode()).get("meta"));
+            result.set("data", projection(revision, built.document(), context)); result.putNull("capabilities"); result.putNull("findings");
+            if (input.path("finalize").asBoolean(false)) {
+                result.set("findings", planFindings(project, model, token, revision));
+                if (input.has("analysis_source")) {
+                    var analysis = new org.opm.localruntime.storage.MindmapRepository(databases.databasePath(project), clock).source(project, model, input.get("analysis_source"));
+                    MindmapConversions.bind(analysis, input.get("analysis_source"), result.get("data"), built.aliases(), input.get("steps"));
+                }
+            }
+            if (!input.get("next_scope").isNull()) {
+                ObjectNode scope = input.get("next_scope").deepCopy();
+                require(scope.path("context_id").asText().equals(context) && DraftModelPlan.TYPES.contains(scope.path("intent").asText()), "INPUT_INVALID", null);
+                if (!scope.get("selection_id").isNull()) scope.put("selection_id", DraftModelPlan.resolve(scope.get("selection_id").asText(), built.aliases(), revision, context));
+                var endpoints = JSON.createArrayNode();
+                for (var endpoint : scope.get("endpoints")) endpoints.add(DraftModelPlan.resolve(endpoint.asText(), built.aliases(), revision, context));
+                scope.set("endpoints", endpoints); result.set("capabilities", candidates(project, model, token, scope, revision));
+            }
+            return checked(result, DraftModelPlanPreviewResult);
+        }
+        if (request.type() == MethodSummaryRequest) {
+            JsonNode source = input.get("source"); ObjectNode document;
+            if (source.has("draft_token")) {
+                var snapshot = repository.read(project, model); var token = source.get("draft_token");
+                require(token.path("binding_digest").asText().equals(snapshot.token().binding_digest()), "RULE_VERSION_CONFLICT", null);
+                require(sameToken(token, snapshot), "DRAFT_CONFLICT", "DRAFT_CONFLICT");
+                document = SaveContentDigestV1.read(snapshot.documentJson());
+            } else {
+                try { document = domain.transferDocument(project, model, source.get("revision_id").asText()); }
+                catch (org.opm.localruntime.api.ApiException exception) {
+                    // 历史查询保留读取错误，避免进入旧草稿编辑错误映射。
+                    throw failure(switch (exception.code()) {
+                        case NOT_FOUND -> "NOT_FOUND";
+                        case PERSISTENCE_FAILED -> "PERSISTENCE_FAILED";
+                        case INVALID_ARGUMENT -> "INPUT_INVALID";
+                        default -> "DRAFT_EDIT_REJECTED";
+                    }, null);
+                }
+            }
+            var revision = semantic(document); String context = input.get("context_id").asText(); context(revision, context);
+            var result = JSON.createObjectNode();
+            var meta = result.putObject("meta").put("request_id", input.get("request_id").asText()).put("context_id", context);
+            meta.set("source", source); result.set("data", MethodSummaryQuery.summarize(revision));
+            return checked(result, MethodSummaryResult);
+        }
         if (request.type() == DraftEditRequest) {
-            return repository.commit(project, model, request, document -> edit(project, model, input, document)).value();
+            return repository.commit(project, model, request, document -> DraftOperationDescription.describe(input, document,
+                    edit(project, model, input, document.deepCopy()))).value();
         }
         if (request.type() == DraftReceiptRequest) return repository.receipt(project, model, request).value();
+        if (request.type() == OperationHistoryRequest) {
+            var data = new org.opm.localruntime.storage.OperationHistoryRepository(databases.databasePath(project), clock)
+                    .read(project, model, input.path("revision").asText(), input.path("before").isNull() ? null : input.path("before").asText());
+            var meta = JSON.createObjectNode().put("request_id", input.path("request_id").asText()).put("project_id", project).put("model_id", model).put("revision", input.path("revision").asText());
+            var result = JSON.createObjectNode(); result.set("meta", meta); result.set("data", data);
+            return checked(result, OperationHistoryResult);
+        }
         var snapshot = repository.read(project, model);
         ObjectNode document = SaveContentDigestV1.read(snapshot.documentJson()); var revision = semantic(document);
         if (request.type() == OpenDraftRequest) {
@@ -105,27 +169,13 @@ public final class DraftWorkspaceService {
         var assets = profiles.assemble(revision.profileBinding());
         if (operation.equals("navigation")) return checked(envelope(input, context, DraftWorkspaceQueries.navigation(revision, context)), DraftNavigationResult);
         if (operation.equals("findings")) {
-            var data = DraftWorkspaceQueries.findings(project, model, token, revision);
-            if (data.get("items").isEmpty()) generate(revision, context);
+            var data = DraftModelValidation.findings(project, model, token, revision, assets);
             return checked(envelope(input, context, data), DraftFindingsResult);
         }
         if (operation.equals("relation-catalog")) return checked(envelope(input, context,
                 DraftWorkspaceQueries.catalog(domain, revision, context, input.get("selection_id"), assets)), DraftRelationCatalogResult);
         if (operation.equals("projection")) {
-            ObjectNode data = JSON.valueToTree(domain.projectionData(revision, context));
-            for (var construct : data.get("constructs")) {
-                var occurrence = find(document.get("occurrences"), "occurrence_id", construct.get("occurrence_id").asText());
-                var layout = find(document.get("layouts"), "layout_id", occurrence.get("layout_id").asText()).deepCopy(); layout.remove("layout_id");
-                ((ObjectNode) construct).set("layout", layout);
-                if (construct.has("endpoints")) {
-                    var fact = find(document.get("facts"), "fact_id", construct.get("target_id").asText());
-                    for (int i = 0; i < construct.get("endpoints").size(); i++) {
-                        var endpoint = fact.get("endpoints").get(i);
-                        if (endpoint.has("state_qualification_id")) ((ObjectNode) construct.get("endpoints").get(i)).set("state_qualification", endpoint.get("state_qualification_id"));
-                    }
-                }
-            }
-            return checked(envelope(input, context, data), DraftProjectionResult);
+            return checked(envelope(input, context, projection(revision, document, context)), DraftProjectionResult);
         }
         if (operation.equals("text")) {
             var generated = generate(revision, context);
@@ -142,6 +192,53 @@ public final class DraftWorkspaceService {
         throw failure("DRAFT_EDIT_REJECTED", "COMMAND_NOT_IMPLEMENTED");
     }
 
+    private ObjectNode projection(SemanticRevision revision, ObjectNode document, String context) {
+            ObjectNode data = JSON.valueToTree(domain.projectionData(revision, context));
+            for (var construct : data.get("constructs")) {
+                var occurrence = find(document.get("occurrences"), "occurrence_id", construct.get("occurrence_id").asText());
+                var layout = find(document.get("layouts"), "layout_id", occurrence.get("layout_id").asText()).deepCopy(); layout.remove("layout_id");
+                ((ObjectNode) construct).set("layout", layout);
+                if (construct.has("endpoints")) {
+                    var fact = find(document.get("facts"), "fact_id", construct.get("target_id").asText());
+                    for (int i = 0; i < construct.get("endpoints").size(); i++) {
+                        var endpoint = fact.get("endpoints").get(i);
+                        if (endpoint.has("state_qualification_id")) ((ObjectNode) construct.get("endpoints").get(i)).set("state_qualification", endpoint.get("state_qualification_id"));
+                    }
+                }
+            }
+            return data;
+    }
+
+    private DraftModelPlan.Result modelPlan(String project, String model, String context, String planId, JsonNode token, JsonNode steps, ObjectNode document) {
+        var built = DraftModelPlan.build(context, planId, token, steps, document,
+                (scope, revision) -> candidates(project, model, token, scope, revision),
+                (input, current) -> edit(project, model, input, current), this::guardPlanTarget);
+        if (steps.isEmpty()) return built;
+        var generated = generate(semantic(built.document()), semantic(document).rootContextId());
+        DraftTextMetadataWriter.write(built.document(), generated);
+        return new DraftModelPlan.Result(built.document(), new DraftJournalRepository.Proposal(built.document().toString(), built.proposal().affectedIds(),
+                generated.traces().stream().map(OplTextTrace::traceId).toList(), built.proposal().validationSummaryJson()), built.aliases());
+    }
+
+    /** 对语义身份的修改不得通过整体方案扩大到其他图。 */
+    private void guardPlanTarget(SemanticRevision revision, String context, String target) {
+        require(revision.refinementEdges().stream().noneMatch(edge -> edge.refineeElementId().equals(target)), "DRAFT_EDIT_REJECTED", "CONTEXT_NOT_ALLOWED");
+        for (var other : revision.contexts()) if (!other.id().equals(context)) {
+            JsonNode projection = JSON.valueToTree(domain.projectionData(revision, other.id()));
+            for (var construct : projection.path("constructs")) {
+                if (construct.path("target_kind").asText().equals("FACT")) {
+                    var fact = revision.facts().stream().filter(item -> item.id().equals(construct.path("target_id").asText())).findFirst().orElseThrow();
+                    require(fact.endpoints().stream().noneMatch(endpoint -> target.equals(endpoint.stateQualificationId())), "DRAFT_EDIT_REJECTED", "CONTEXT_NOT_ALLOWED");
+                }
+                require(!construct.path("target_id").asText().equals(target) && !construct.path("owner_id").asText().equals(target), "DRAFT_EDIT_REJECTED", "CONTEXT_NOT_ALLOWED");
+                for (var endpoint : construct.path("endpoints")) require(!endpoint.path("target_id").asText().equals(target)
+                        && !endpoint.path("state_qualification").asText().equals(target), "DRAFT_EDIT_REJECTED", "CONTEXT_NOT_ALLOWED");
+            }
+            for (var suppressed : projection.path("suppressed_states")) require(!suppressed.path("state_id").asText().equals(target)
+                    && !suppressed.at("/owner_ref/target_id").asText().equals(target), "DRAFT_EDIT_REJECTED", "CONTEXT_NOT_ALLOWED");
+        }
+    }
+
     private DraftJournalRepository.Proposal edit(String project, String model, JsonNode input, ObjectNode document) {
         String beforeDigest = SaveContentDigestV1.sha256(document);
         var base = semantic(document); JsonNode scope = input.get("scope"); context(base, scope.get("context_id").asText());
@@ -155,13 +252,61 @@ public final class DraftWorkspaceService {
             throw failure("DRAFT_EDIT_REJECTED", reason);
         }
         JsonNode payload = input.at("/command/payload");
-        if (type.equals("CREATE_ELEMENT")) require(chosen.at("/capability_ref/capability_id").asText().equals("CAP-" + payload.get("kind").asText() + "-001"), "DRAFT_EDIT_REJECTED", "ENDPOINT_KIND_MISMATCH");
-        else if (type.equals("UPDATE_PROPERTY")) require(chosen.at("/normalized_endpoints/0/target_ref/target_id").equals(payload.at("/target_ref/target_id")), "DRAFT_EDIT_REJECTED", "ENDPOINT_KIND_MISMATCH");
+        if (type.equals("APPLY_MODEL_PLAN")) {
+            require(scope.get("selection_id").isNull() && scope.get("endpoints").isEmpty()
+                    && payload.get("context_id").equals(scope.get("context_id")), "INPUT_INVALID", null);
+            var built = modelPlan(project, model, scope.get("context_id").asText(), input.get("command_id").asText(), input.get("expected_draft_token"), payload.get("steps"), document);
+            var findings = planFindings(project, model, input.get("expected_draft_token"), semantic(built.document()));
+            require(findings.at("/validation_summary/blocking").asInt() == 0, "DRAFT_EDIT_REJECTED", null);
+            String mappings = null;
+            if (input.has("analysis_source")) {
+                var analysis = new org.opm.localruntime.storage.MindmapRepository(databases.databasePath(project), clock).source(project, model, input.get("analysis_source"));
+                mappings = MindmapConversions.bind(analysis, input.get("analysis_source"), projection(semantic(built.document()), built.document(), scope.get("context_id").asText()), built.aliases(), payload.get("steps"));
+            }
+            return new DraftJournalRepository.Proposal(built.proposal().documentJson(), built.proposal().affectedIds(), built.proposal().textTraceIds(), findings.get("validation_summary").toString(), null, mappings);
+        }
+        if (type.equals("UPDATE_ARCHITECTURE_CLASSIFICATION") || MethodArchitectureLinks.COMMANDS.contains(type)) {
+            require(scope.path("intent").asText().equals(type) && scope.path("selection_id").isNull()
+                    && scope.path("endpoints").isEmpty() && scope.get("context_id").equals(payload.get("context_id"))
+                    && chosen.path("command_type").asText().equals(type)
+                    && chosen.path("option_kind").asText().equals("METHOD_METADATA")
+                    && chosen.get("target_context_id").equals(payload.get("context_id")), "DRAFT_EDIT_REJECTED", "CONTEXT_NOT_ALLOWED");
+            return MethodArchitectureLinks.COMMANDS.contains(type) ? MethodArchitectureLinks.apply(document, type, payload) : MethodClassificationEdit.apply(document, payload);
+        }
+        if (type.equals("DELETE_CONTEXT")) {
+            require(scope.get("intent").asText().equals(type) && scope.get("selection_id").equals(payload.get("context_id")),
+                    "DRAFT_EDIT_REJECTED", "ENDPOINT_KIND_MISMATCH");
+            require(chosen.path("enabled").asBoolean(), "DRAFT_EDIT_REJECTED", "DELETE_DEPENDENCY_EXISTS");
+            require(chosen.get("impact_token").equals(payload.get("impact_token")), "DRAFT_EDIT_REJECTED", "IMPACT_TOKEN_STALE");
+            var affected = DraftContextDeletion.apply(document, DraftContextDeletion.plan(base, payload.get("context_id").asText()));
+            require(new SemanticRevisionValidator().validate(semantic(document)).isEmpty(), "DRAFT_EDIT_REJECTED", null);
+            var generated = generate(semantic(document), base.rootContextId()); DraftTextMetadataWriter.write(document, generated);
+            return new DraftJournalRepository.Proposal(document.toString(), affected,
+                    generated.traces().stream().map(OplTextTrace::traceId).toList(),
+                    "{\"blocking\":0,\"warning\":0,\"suggestion\":0,\"coverage_state\":\"INCOMPLETE\"}");
+        }
+        if (type.equals("CREATE_ELEMENT")) require(chosen.at("/capability_ref/capability_id").asText().equals("CAP-" + payload.get("kind").asText() + "-001")
+                && (payload.has("context_id") ? scope.get("context_id").equals(payload.get("context_id"))
+                    : base.rootContextId().equals(scope.get("context_id").asText())), "DRAFT_EDIT_REJECTED", "CONTEXT_NOT_ALLOWED");
+        else if (type.equals("UPDATE_PROPERTY")) require(
+                chosen.at("/normalized_endpoints/0/target_ref/target_id").equals(payload.at("/target_ref/target_id"))
+                        && chosen.at("/normalized_endpoints/0/target_ref/target_kind").equals(payload.at("/target_ref/target_kind")),
+                "DRAFT_EDIT_REJECTED", "ENDPOINT_KIND_MISMATCH");
         else if (type.equals("UPDATE_LAYOUT")) require(chosen.at("/normalized_endpoints/0/target_ref/occurrence_id").equals(payload.get("occurrence_id")), "DRAFT_EDIT_REJECTED", "ENDPOINT_KIND_MISMATCH");
+        else if (type.equals("UPDATE_LAYOUT_BATCH")) {
+            var targets = JSON.createArrayNode();
+            for (var item : payload.get("layouts")) targets.add(item.get("occurrence_id"));
+            require(scope.get("intent").asText().equals(type) && scope.get("endpoints").equals(targets), "DRAFT_EDIT_REJECTED", "ENDPOINT_KIND_MISMATCH");
+        }
+        else if (type.equals("CREATE_CONTEXT")) require(scope.get("context_id").equals(payload.get("context_id"))
+                && chosen.at("/normalized_endpoints/0/target_ref/target_id").equals(payload.get("refinee_element_id")),
+                "DRAFT_EDIT_REJECTED", "ENDPOINT_KIND_MISMATCH");
         else if (DraftFactEdits.TYPES.contains(type)) DraftFactEdits.validate(base, scope, chosen, type, payload);
-        else validateOwnedPayload(base, scope, chosen, type, payload);
+        else DraftCapabilityQuery.validateOwnedPayload(base, scope, chosen, type, payload);
         Map<String, Object> commandPayload = JSON.convertValue(payload, new TypeReference<Map<String, Object>>() { });
-        var candidate = DraftFactEdits.TYPES.contains(type) ? domain.editDraftFact(base, type, commandPayload) : domain.editDraftElement(base, type, commandPayload);
+        var candidate = type.equals("CREATE_CONTEXT") ? domain.editDraftContext(base, commandPayload)
+                : DraftFactEdits.TYPES.contains(type) ? domain.editDraftFact(base, type, commandPayload)
+                : domain.editDraftElement(base, type, commandPayload);
         require(new SemanticRevisionValidator().validate(candidate).isEmpty(), "DRAFT_EDIT_REJECTED", null);
         var affected = new ArrayList<String>();
         if (type.equals("CREATE_ELEMENT")) {
@@ -170,14 +315,25 @@ public final class DraftWorkspaceService {
                 var target = (ArrayNode) document.get(collection); var source = serialized.get(collection);
                 for (int i = target.size(); i < source.size(); i++) target.add(source.get(i).deepCopy());
             }
-            var context = find(document.get("contexts"), "context_id", base.rootContextId());
-            context.set("occurrence_ids", find(serialized.get("contexts"), "context_id", base.rootContextId()).get("occurrence_ids"));
+            String contextId = scope.get("context_id").asText();
+            var context = find(document.get("contexts"), "context_id", contextId);
+            context.set("occurrence_ids", find(serialized.get("contexts"), "context_id", contextId).get("occurrence_ids"));
             affected.add(candidate.elements().getLast().id()); affected.add(candidate.occurrences().getLast().id());
+        } else if (type.equals("CREATE_CONTEXT")) {
+            ObjectNode serialized = (ObjectNode) org.opm.localruntime.storage.DraftJsonDelta.read(new SemanticRevisionJsonWriter().write(candidate));
+            if (!List.of("0.4", "0.5").contains(document.path("schema_version").asText())) document.put("schema_version", "0.3");
+            ((ArrayNode) document.get("contexts")).add(serialized.get("contexts").get(serialized.get("contexts").size() - 1).deepCopy());
+            if (!document.has("refinement_edges")) document.putArray("refinement_edges");
+            ((ArrayNode) document.get("refinement_edges")).add(serialized.get("refinement_edges").get(serialized.get("refinement_edges").size() - 1).deepCopy());
+            affected.add(candidate.contexts().getLast().id()); affected.add(candidate.refinementEdges().getLast().id());
         } else if (type.equals("UPDATE_PROPERTY")) {
             String id = payload.at("/target_ref/target_id").asText();
-            ((ObjectNode) find(document.get("elements"), "element_id", id).get("name")).set("local_name", payload.get("value")); affected.add(id);
-        } else if (type.equals("UPDATE_LAYOUT")) {
-            affected.add(payload.get("occurrence_id").asText());
+            boolean feature = payload.at("/target_ref/target_kind").asText().equals("FEATURE");
+            JsonNode collection = document.get(feature ? "features" : "elements");
+            String idField = feature ? "feature_id" : "element_id";
+            ((ObjectNode) find(collection, idField, id).get("name")).set("local_name", payload.get("value")); affected.add(id);
+        } else if (type.equals("UPDATE_LAYOUT") || type.equals("UPDATE_LAYOUT_BATCH")) {
+            if (type.equals("UPDATE_LAYOUT")) affected.add(payload.get("occurrence_id").asText());
             DraftOwnedConstructEdits.syncLayoutGeometry(document, base, candidate, affected);
         } else if (DraftFactEdits.TYPES.contains(type)) affected.addAll(DraftFactEdits.apply(document, candidate, type, payload));
         else affected.addAll(DraftOwnedConstructEdits.apply(document, base, candidate, type, payload));
@@ -188,173 +344,21 @@ public final class DraftWorkspaceService {
     }
 
     private ObjectNode candidates(String project, String model, JsonNode token, JsonNode scope, SemanticRevision revision) {
-        require(revision.profileBinding().equals(RuntimeActiveBindingProvider.current()), "RULE_VERSION_CONFLICT", null);
-        var assets = profiles.assemble(revision.profileBinding()); String intent = scope.get("intent").asText(); String context = scope.get("context_id").asText();
-        String query = DraftCapabilityIdentity.query(project, model, token, scope);
-        var data = JSON.createObjectNode(); data.set("scope", scope); var allowed = data.putArray("allowed"); var forbidden = data.putArray("forbidden");
-        data.put("capability_query_id", query); var options = data.putArray("options");
-        String selection = scope.get("selection_id").isNull() ? null : scope.get("selection_id").asText();
-        String reason = !SUPPORTED.contains(intent) ? "COMMAND_NOT_IMPLEMENTED" : !revision.rootContextId().equals(context) ? "CONTEXT_NOT_ALLOWED"
-                : !DraftFactEdits.TYPES.contains(intent) && !scope.get("endpoints").isEmpty() ? "ENDPOINT_KIND_MISMATCH" : null;
-        if (DraftFactEdits.TYPES.contains(intent)) {
-            if (intent.equals("DELETE_CONSTRUCT") && revision.contexts().size() != 1) reason = "CONTEXT_NOT_ALLOWED";
-            if (reason == null) {
-                OplGenerationResult generated = null;
-                if (intent.equals("DELETE_CONSTRUCT")) {
-                    require(new SemanticRevisionValidator().validate(revision).isEmpty(), "DRAFT_EDIT_REJECTED", null);
-                    generated = generate(revision, context);
-                }
-                options.addAll(DraftFactEdits.options(domain, revision, scope, token, query, assets, generated));
-                if (options.isEmpty()) reason = "ENDPOINT_KIND_MISMATCH";
-                else for (var option : options) if (option.get("enabled").asBoolean()) { allowed.add(intent); break; }
-            }
-            if (reason != null) forbidden.addObject().put("command_type", intent).put("reason_code", reason);
-            return data;
-        }
-        var occurrence = revision.occurrences().stream().filter(item -> item.contextId().equals(context) && item.id().equals(selection)).findFirst().orElse(null);
-        String target = occurrence == null ? selection : occurrence.targetId();
-        var element = revision.elements().stream().filter(item -> item.id().equals(target)).findFirst().orElse(null);
-        if (reason == null) switch (intent) {
-            case "CREATE_ELEMENT" -> {
-                if (selection != null) reason = "ENDPOINT_KIND_MISMATCH";
-                else for (String kind : List.of("OBJECT", "PROCESS")) options.add(option(query, token, intent, "CAP-" + kind + "-001", null, null, null, assets));
-            }
-            case "UPDATE_PROPERTY" -> {
-                boolean visible = element != null && (element.coreKind() == SemanticRevision.CoreKind.OBJECT || element.coreKind() == SemanticRevision.CoreKind.PROCESS)
-                        && revision.occurrences().stream().anyMatch(item -> item.contextId().equals(context) && item.targetId().equals(element.id()) && item.targetKind() == SemanticRevision.TargetKind.ELEMENT);
-                if (!visible) reason = "ENDPOINT_KIND_MISMATCH";
-                else options.add(option(query, token, intent, element.capability().capabilityId(), "ELEMENT", element.id(), null, assets));
-            }
-            case "UPDATE_LAYOUT" -> {
-                if (occurrence == null || !domain.draftLayoutAllowed(revision, selection)) reason = "ENDPOINT_KIND_MISMATCH";
-                else {
-                    String capability = occurrence.targetKind() == SemanticRevision.TargetKind.ELEMENT ? element.capability().capabilityId()
-                            : occurrence.targetKind() == SemanticRevision.TargetKind.STATE
-                            ? revision.states().stream().filter(item -> item.id().equals(target)).findFirst().orElseThrow().capability().capabilityId()
-                            : revision.features().stream().filter(item -> item.id().equals(target)).findFirst().orElseThrow().capability().capabilityId();
-                    options.add(option(query, token, intent, capability, occurrence.targetKind().name(), target, occurrence.id(), assets));
-                }
-            }
-            case "CREATE_FEATURE" -> {
-                if (element == null || !visible(revision, context, "ELEMENT", target)) reason = "ENDPOINT_KIND_MISMATCH";
-                else for (String kind : List.of("ATTRIBUTE", "OPERATION"))
-                    options.add(option(query, token, intent, "CAP-FEAT-" + kind + "-001", "ELEMENT", target, occurrence == null ? null : occurrence.id(), assets));
-            }
-            case "CREATE_STATE" -> {
-                var feature = revision.features().stream().filter(item -> item.id().equals(target)).findFirst().orElse(null);
-                String kind = element != null && element.coreKind() == SemanticRevision.CoreKind.OBJECT ? "ELEMENT" : feature != null ? "FEATURE" : null;
-                if (kind == null || !visible(revision, context, kind, target)) reason = "ENDPOINT_KIND_MISMATCH";
-                else options.add(option(query, token, intent, kind.equals("ELEMENT") ? "CAP-STATE-001" : "CAP-FEAT-STATE-001", kind, target, occurrence == null ? null : occurrence.id(), assets));
-            }
-            case "UPDATE_STATE", "STATE_EXPLICIT", "STATE_SUPPRESS", "UNFOLD", "FOLD" -> {
-                var state = revision.states().stream().filter(item -> item.id().equals(target)).findFirst().orElse(null);
-                boolean suppressed = state != null && occurrence == null && revision.statePresentations().stream().anyMatch(item -> item.contextId().equals(context)
-                        && item.stateId().equals(target) && item.explicitness() == SemanticRevision.StateExplicitness.SUPPRESSED)
-                        && visible(revision, context, state.ownerTargetKind().name(), state.ownerElementId());
-                if (state == null || !(visible(revision, context, "STATE", target) || suppressed)) reason = "ENDPOINT_KIND_MISMATCH";
-                else options.add(option(query, token, intent, state.capability().capabilityId(), "STATE", target, occurrence == null ? null : occurrence.id(), assets));
-            }
-            default -> throw failure("DRAFT_EDIT_REJECTED", "COMMAND_NOT_IMPLEMENTED");
-        }
-        if (reason != null) forbidden.addObject().put("command_type", intent).put("reason_code", reason);
-        else if (!options.isEmpty()) allowed.add(intent);
-        return data;
-    }
-
-    private ObjectNode option(String query, JsonNode token, String type, String capability, String targetKind, String target, String occurrence, TextGenerationAssets assets) {
-        String symbol = switch (capability) {
-            case "CAP-OBJECT-001" -> "symbol.object.basic";
-            case "CAP-PROCESS-001" -> "symbol.process.basic";
-            case "CAP-FEAT-ATTRIBUTE-001" -> "symbol.feature.attribute";
-            case "CAP-FEAT-OPERATION-001" -> "symbol.feature.operation";
-            case "CAP-STATE-001" -> "symbol.state.basic";
-            case "CAP-FEAT-STATE-001" -> "symbol.feature.state";
-            default -> throw failure("DRAFT_EDIT_REJECTED", "PROFILE_CAPABILITY_DISABLED");
-        };
-        require(assets.symbolCatalog().containsSymbol(symbol), "DRAFT_EDIT_REJECTED", "SYMBOL_ASSET_MISSING");
-        var option = JSON.createObjectNode().put("capability_query_id", query).put("command_type", type)
-                .put("display_name", switch (type) {
-                    case "CREATE_ELEMENT" -> "创建 " + (capability.equals("CAP-OBJECT-001") ? "Object" : "Process");
-                    case "UPDATE_PROPERTY" -> "编辑名称"; case "UPDATE_LAYOUT" -> "移动元素";
-                    case "CREATE_FEATURE" -> capability.equals("CAP-FEAT-ATTRIBUTE-001") ? "创建属性" : "创建操作";
-                    case "CREATE_STATE" -> "创建状态"; case "UPDATE_STATE" -> "编辑状态";
-                    case "STATE_EXPLICIT" -> "显示状态"; case "STATE_SUPPRESS" -> "隐藏状态";
-                    case "UNFOLD" -> "展开状态"; case "FOLD" -> "折叠状态";
-                    default -> throw failure("DRAFT_EDIT_REJECTED", "COMMAND_NOT_IMPLEMENTED"); });
-        option.putObject("capability_ref").put("capability_id", capability); option.putArray("group_path").add("元素");
-        var endpoints = option.putArray("normalized_endpoints");
-        if (target != null) {
-            String role = switch (type) { case "UPDATE_PROPERTY" -> "PROPERTY_TARGET"; case "UPDATE_LAYOUT" -> "LAYOUT_TARGET";
-                case "CREATE_FEATURE" -> "FEATURE_OWNER"; case "CREATE_STATE" -> "STATE_OWNER"; default -> "STATE_TARGET"; };
-            var endpoint = endpoints.addObject().put("role", role).put("ordinal", 0);
-            var ref = endpoint.putObject("target_ref").put("target_kind", targetKind).put("target_id", target);
-            if (occurrence != null) ref.put("occurrence_id", occurrence);
-        }
-        var fields = option.putArray("required_fields");
-        if (type.equals("CREATE_ELEMENT")) { field(fields, "kind", "ENUM", capability.equals("CAP-OBJECT-001") ? "OBJECT" : "PROCESS"); field(fields, "name", "TEXT"); field(fields, "layout", "LAYOUT"); }
-        else if (type.equals("UPDATE_PROPERTY")) { field(fields, "target_ref", "ENDPOINT"); field(fields, "property_name", "ENUM", "name"); field(fields, "value", "TEXT"); }
-        else if (type.equals("UPDATE_LAYOUT")) { field(fields, "occurrence_id", "TEXT"); field(fields, "layout", "LAYOUT"); }
-        else if (type.equals("CREATE_FEATURE")) {
-            field(fields, "owner_element_id", "TEXT"); field(fields, "feature_kind", "ENUM", capability.equals("CAP-FEAT-ATTRIBUTE-001") ? "ATTRIBUTE" : "OPERATION");
-            field(fields, "name", "TEXT"); field(fields, "layout", "LAYOUT");
-        } else if (type.equals("CREATE_STATE")) { field(fields, "owner_ref", "ENDPOINT"); field(fields, "name_or_value", "TEXT"); field(fields, "state_roles", "LIST", "INITIAL", "DEFAULT", "FINAL"); field(fields, "layout", "LAYOUT"); }
-        else if (type.equals("UPDATE_STATE")) { field(fields, "state_id", "TEXT"); field(fields, "expected_owner_ref", "ENDPOINT"); field(fields, "changes", "LIST", "name_or_value", "state_roles"); }
-        else field(fields, "state_id", "TEXT");
-        option.putArray("allowed_modifiers"); option.set("symbol_descriptor", asset(symbol, assets.binding().symbolCatalog()));
-        option.set("template_family", asset(assets.binding().textGrammar().id(), assets.binding().textGrammar())); option.putArray("rule_refs").add(asset(assets.binding().ruleSet().id(), assets.binding().ruleSet()));
-        option.put("enabled", true).putArray("reason_codes"); option.set("expires_with_token", token);
-        option.put("option_id", DraftCapabilityIdentity.option(query, option)); return option;
-    }
-
-    private static boolean visible(SemanticRevision revision, String context, String kind, String target) {
-        return revision.occurrences().stream().anyMatch(item -> item.contextId().equals(context) && item.targetKind().name().equals(kind) && item.targetId().equals(target));
-    }
-
-    private static void validateOwnedPayload(SemanticRevision base, JsonNode scope, JsonNode chosen, String type, JsonNode payload) {
-        String context = scope.get("context_id").asText(); JsonNode endpoint = chosen.at("/normalized_endpoints/0/target_ref");
-        String target = endpoint.get("target_id").asText();
-        if (payload.has("context_id")) require(context.equals(payload.get("context_id").asText()), "DRAFT_EDIT_REJECTED", "CONTEXT_NOT_ALLOWED");
-        if (type.equals("CREATE_FEATURE") || type.equals("CREATE_STATE")) {
-            JsonNode capability = payload.get("capability_ref"); String selectedCapability = chosen.at("/capability_ref/capability_id").asText();
-            require(selectedCapability.equals(capability.path("capability_id").asText())
-                    && (!capability.has("version") || base.profileBinding().profile().version().equals(capability.get("version").asText())), "DRAFT_EDIT_REJECTED", "ENDPOINT_KIND_MISMATCH");
-            String role;
-            if (type.equals("CREATE_FEATURE")) {
-                require(target.equals(payload.path("owner_element_id").asText())
-                        && selectedCapability.equals("CAP-FEAT-" + payload.path("feature_kind").asText() + "-001"), "DRAFT_EDIT_REJECTED", "ENDPOINT_KIND_MISMATCH");
-                role = payload.get("feature_kind").asText() + "_NODE";
-            } else {
-                ownerLocator(base, context, payload.get("owner_ref"), endpoint.get("target_kind").asText(), target);
-                role = endpoint.get("target_kind").asText().equals("FEATURE") ? "FEATURE_STATE_NODE" : "STATE_NODE";
-            }
-            require(payload.at("/occurrence/ownership").asText().equals("OWNED") && payload.at("/occurrence/construct_role").asText().equals(role), "DRAFT_EDIT_REJECTED", "ENDPOINT_KIND_MISMATCH");
-            String name = payload.get(type.equals("CREATE_FEATURE") ? "name" : "name_or_value").asText();
-            require(!name.isBlank(), "INPUT_INVALID", null);
-        } else {
-            require(target.equals(payload.get("state_id").asText()), "DRAFT_EDIT_REJECTED", "ENDPOINT_KIND_MISMATCH");
-            if (type.equals("UPDATE_STATE")) {
-                var state = base.states().stream().filter(item -> item.id().equals(target)).findFirst().orElseThrow();
-                ownerLocator(base, context, payload.get("expected_owner_ref"), state.ownerTargetKind().name(), state.ownerElementId());
-                if (payload.get("changes").has("name_or_value")) require(!payload.at("/changes/name_or_value").asText().isBlank(), "INPUT_INVALID", null);
-            }
-        }
-    }
-
-    private static void ownerLocator(SemanticRevision base, String context, JsonNode locator, String kind, String target) {
-        require(locator.path("target_kind").asText().equals(kind) && locator.path("target_id").asText().equals(target), "DRAFT_EDIT_REJECTED", "ENDPOINT_KIND_MISMATCH");
-        if (locator.has("occurrence_id")) require(base.occurrences().stream().anyMatch(item -> item.id().equals(locator.get("occurrence_id").asText())
-                && item.contextId().equals(context) && item.targetKind().name().equals(kind) && item.targetId().equals(target)), "DRAFT_EDIT_REJECTED", "ENDPOINT_KIND_MISMATCH");
+        return capabilityQuery.candidates(project, model, token, scope, revision);
     }
 
     private OplGenerationResult generate(SemanticRevision revision, String context) {
         var assets = profiles.assemble(revision.profileBinding()); var result = text.generate(revision, context, assets);
         text.validateActiveWriteEvidence(revision, assets, result); return result;
     }
+    private ObjectNode planFindings(String project, String model, JsonNode token, SemanticRevision revision) {
+        return DraftModelValidation.findings(project, model, token, revision, profiles.assemble(revision.profileBinding()));
+    }
     private DraftJournalRepository repository(String project) {
         var path = databases.databasePath(project); require(Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS), "NOT_FOUND", null);
         return new DraftJournalRepository(path, clock);
     }
-    private SemanticRevision semantic(ObjectNode document) {
+    static SemanticRevision semantic(ObjectNode document) {
         try { return DraftSemanticView.read(document); }
         catch (IllegalArgumentException exception) { throw failure("DRAFT_EDIT_REJECTED", null); }
     }
@@ -366,10 +370,6 @@ public final class DraftWorkspaceService {
     private static ObjectNode envelope(JsonNode input, String context, JsonNode data) {
         var result = JSON.createObjectNode(); var meta = result.putObject("meta").put("request_id", input.get("request_id").asText()).put("context_id", context);
         meta.set("draft_token", input.get("draft_token")); result.set("data", data); return result;
-    }
-    private static ObjectNode asset(String id, SemanticRevision.AssetReference asset) { return JSON.createObjectNode().put("id", id).put("version", asset.version()).put("digest", asset.sha256()); }
-    private static void field(ArrayNode fields, String name, String kind, String... values) {
-        var field = fields.addObject().put("field_id", name).put("field_kind", kind).put("required", true); var allowed = field.putArray("allowed_values"); for (String value : values) allowed.add(value);
     }
     private static JsonNode checked(JsonNode value, DraftWorkspaceContract.Type type) { return DraftWorkspaceContract.read(value.toString(), type).value(); }
     private static boolean sameToken(JsonNode token, DraftJournalRepository.Snapshot snapshot) {

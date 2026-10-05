@@ -119,7 +119,9 @@
     "test": "npm run contract:validate && npm run test --workspace=@opm/web",
     "build": "npm run contract:validate && npm run build --workspace=@opm/web",
     "test:e2e": "playwright test --config=tests/e2e/playwright.config.ts",
-    "backend:verify": "./mvnw verify"
+    "backend:verify": "./mvnw verify",
+    "assistant:dev": "npm run dev --workspace=@opm/assistant",
+    "assistant:test": "npm run test --workspace=@opm/assistant"
   },
   "devDependencies": {
     "@apidevtools/swagger-parser": "10.1.1",

@@ -17,7 +17,8 @@ public record SemanticRevision(
         List<Context> contexts,
         List<Occurrence> occurrences,
         List<Layout> layouts,
-        List<StatePresentation> statePresentations) {
+        List<StatePresentation> statePresentations,
+        List<RefinementEdge> refinementEdges) {
 
     public SemanticRevision {
         requireStableId(revisionId, "revisionId");
@@ -35,6 +36,15 @@ public record SemanticRevision(
         occurrences = List.copyOf(Objects.requireNonNull(occurrences, "occurrences must not be null"));
         layouts = List.copyOf(Objects.requireNonNull(layouts, "layouts must not be null"));
         statePresentations = List.copyOf(Objects.requireNonNull(statePresentations, "statePresentations must not be null"));
+        refinementEdges = List.copyOf(Objects.requireNonNull(refinementEdges, "refinementEdges must not be null"));
+    }
+
+    public SemanticRevision(String revisionId, String modelId, int revisionSequence, ProfileBinding profileBinding,
+                            String rootContextId, List<Element> elements, List<Feature> features, List<State> states,
+                            List<Fact> facts, List<Context> contexts, List<Occurrence> occurrences, List<Layout> layouts,
+                            List<StatePresentation> statePresentations) {
+        this(revisionId, modelId, revisionSequence, profileBinding, rootContextId, elements, features, states,
+                facts, contexts, occurrences, layouts, statePresentations, List.of());
     }
 
     public SemanticRevision(String revisionId, String modelId, int revisionSequence, ProfileBinding profileBinding,
@@ -277,21 +287,57 @@ public record SemanticRevision(
         }
     }
 
+    public enum ArchitectureLinkKind { INPUT, GENERATES, TRACE }
+    public record ArchitectureLink(String id, String targetContextId, ArchitectureLinkKind kind) {
+        public ArchitectureLink {
+            requireStableId(id, "architecture link id"); requireStableId(targetContextId, "architecture target context id");
+            Objects.requireNonNull(kind, "architecture link kind must not be null");
+        }
+    }
+
+    public enum ArchitectureLevel { MISSION, FUNCTION, PRODUCT }
+
     public record Context(
             String id,
             ContextKind kind,
             CapabilityReference capability,
             QualifiedName name,
             List<String> occurrenceIds,
-            SourceProvenance source) {
+            SourceProvenance source,
+            ArchitectureLevel architectureLevel,
+            List<ArchitectureLink> architectureLinks) {
+
+        public Context(String id, ContextKind kind, CapabilityReference capability, QualifiedName name,
+                       List<String> occurrenceIds, SourceProvenance source) {
+            this(id, kind, capability, name, occurrenceIds, source, null, List.of());
+        }
+
+        public Context(String id, ContextKind kind, CapabilityReference capability, QualifiedName name,
+                       List<String> occurrenceIds, SourceProvenance source, ArchitectureLevel level) {
+            this(id, kind, capability, name, occurrenceIds, source, level, List.of());
+        }
 
         public Context {
+            architectureLinks = List.copyOf(architectureLinks);
             requireStableId(id, "context id");
             Objects.requireNonNull(kind, "kind must not be null");
             capability = Objects.requireNonNull(capability, "capability must not be null");
             name = Objects.requireNonNull(name, "name must not be null");
             occurrenceIds = immutableStableIds(occurrenceIds, "occurrenceIds");
             source = Objects.requireNonNull(source, "source must not be null");
+        }
+    }
+
+    public record RefinementEdge(String id, String parentContextId, String childContextId,
+                                 String refineeElementId, CoreKind kind) {
+        public RefinementEdge {
+            requireStableId(id, "refinement id");
+            requireStableId(parentContextId, "refinement parentContextId");
+            requireStableId(childContextId, "refinement childContextId");
+            requireStableId(refineeElementId, "refinement refineeElementId");
+            if (kind != CoreKind.OBJECT && kind != CoreKind.PROCESS) {
+                throw new IllegalArgumentException("refinement kind must be OBJECT or PROCESS");
+            }
         }
     }
 

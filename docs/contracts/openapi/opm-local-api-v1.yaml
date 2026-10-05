@@ -94,6 +94,10 @@ paths:
       parameters:
         - $ref: "#/components/parameters/Cursor"
         - $ref: "#/components/parameters/PageSize"
+        - name: archive_state
+          in: query
+          description: 活动列表或模型回收站；默认保持活动模型查询。
+          schema: {type: string, enum: [ACTIVE, ARCHIVED], default: ACTIVE}
       responses:
         "200":
           description: 模型页
@@ -122,6 +126,74 @@ paths:
                 $ref: "#/components/schemas/ModelCommandResult"
         "409":
           $ref: "#/components/responses/ErrorResponse"
+        default:
+          $ref: "#/components/responses/ErrorResponse"
+  /projects/{projectId}/models/{modelId}/opd-json/export:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+      - $ref: "#/components/parameters/ModelId"
+    post:
+      tags: [Contexts]
+      operationId: API-OPD-001
+      summary: 导出OPD可编辑JSON
+      description: 只读操作，需本地会话。草稿token一致或固定revision二选一；含选中图及子图、必要父级和语义依赖，最大10MiB，不产生模型写入。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/OpdJsonExportRequest"}
+      responses:
+        "200":
+          description: OPD JSON 1.0迁移包
+          content:
+            application/json:
+              schema: {$ref: "../schemas/opm-opd-json-v1.schema.json"}
+        default:
+          $ref: "#/components/responses/ErrorResponse"
+  /projects/{projectId}/opd-json/import:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+    post:
+      tags: [Models]
+      operationId: API-OPD-002
+      summary: 导入OPD JSON为独立模型
+      description: 最大10MiB。校验格式、语义与活动Profile，拒绝未知版本或断裂引用；新模型事务失败整体回滚。command_id忽略request_id绑定文件和名称，重试只创建一次。不覆盖目标模型、不导入源历史。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/OpdJsonImportRequest"}
+      responses:
+        "201":
+          description: 新模型及可编辑草稿已创建，data.context_id为文件入口图
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/OpdJsonImportResult"}
+        default:
+          $ref: "#/components/responses/ErrorResponse"
+  /projects/{projectId}/models/{modelId}/lifecycle:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+      - $ref: "#/components/parameters/ModelId"
+    post:
+      tags: [Models]
+      operationId: API-PRJ-013
+      summary: 模型移入回收站、恢复或永久删除
+      description: >-
+        TRASH 保留全部内容；RESTORE 恢复同一模型。PURGE 只接受 ARCHIVED 模型及完整模型名称确认，
+        在单模型事务中清除 OPD、草稿、历史和基线。command_id 绑定去除 request_id 后的请求及项目/模型身份；
+        同一命令重复请求回放收据，不同内容重用命令返回 409。归档模型的工作台和草稿访问返回 404。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/ModelLifecycleRequest"}
+      responses:
+        "200":
+          description: 生命周期操作已原子提交
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ModelLifecycleCommandResult"}
         default:
           $ref: "#/components/responses/ErrorResponse"
   /projects/{projectId}/models/{modelId}/workspace-session:
@@ -670,6 +742,91 @@ components:
           properties:
             name: {type: string, minLength: 1, maxLength: 256}
             description: {type: string, maxLength: 4000}
+    ModelLifecycleRequest:
+      type: object
+      additionalProperties: false
+      required: [request_id, command_id, action, expected_state]
+      properties:
+        request_id: {$ref: "#/components/schemas/StableId"}
+        command_id: {$ref: "#/components/schemas/StableId"}
+        action: {type: string, enum: [TRASH, RESTORE, PURGE]}
+        expected_state: {type: string, enum: [ACTIVE, ARCHIVED]}
+        confirmation_name: {type: string, minLength: 1, maxLength: 256}
+      oneOf:
+        - properties:
+            action: {const: TRASH}
+            expected_state: {const: ACTIVE}
+          not: {required: [confirmation_name]}
+        - properties:
+            action: {const: RESTORE}
+            expected_state: {const: ARCHIVED}
+          not: {required: [confirmation_name]}
+        - properties:
+            action: {const: PURGE}
+            expected_state: {const: ARCHIVED}
+          required: [confirmation_name]
+    ModelLifecycleCommandResult:
+      type: object
+      additionalProperties: false
+      required: [meta, data]
+      properties:
+        meta: {$ref: "#/components/schemas/CommandMeta"}
+        data:
+          type: object
+          additionalProperties: false
+          required: [project_id, model_id, lifecycle_state]
+          properties:
+            project_id: {$ref: "#/components/schemas/StableId"}
+            model_id: {$ref: "#/components/schemas/StableId"}
+            lifecycle_state: {type: string, enum: [ACTIVE, ARCHIVED, PURGED]}
+    OpdJsonExportRequest:
+      type: object
+      additionalProperties: false
+      required: [request_id, context_id]
+      oneOf:
+        - required: [draft_token]
+        - required: [revision_id]
+      properties:
+        request_id: {$ref: "#/components/schemas/StableId"}
+        context_id: {$ref: "#/components/schemas/StableId"}
+        draft_token:
+          type: object
+          additionalProperties: false
+          required: [draft_id, edit_seq, binding_digest]
+          properties:
+            draft_id: {$ref: "#/components/schemas/StableId"}
+            edit_seq: {type: integer, minimum: 0}
+            binding_digest: {type: string, pattern: "^[0-9a-f]{64}$"}
+        revision_id: {$ref: "#/components/schemas/StableId"}
+    OpdJsonImportRequest:
+      type: object
+      additionalProperties: false
+      required: [request_id, command_id, name, binding, opd_package]
+      properties:
+        request_id: {$ref: "#/components/schemas/StableId"}
+        command_id: {$ref: "#/components/schemas/StableId"}
+        name: {type: string, minLength: 1, maxLength: 256}
+        binding: {$ref: "#/components/schemas/ProfileRuleGuard"}
+        opd_package: {$ref: "../schemas/opm-opd-json-v1.schema.json"}
+    OpdJsonImportResult:
+      type: object
+      required: [meta, data]
+      properties:
+        meta: {$ref: "#/components/schemas/CommandMeta"}
+        data:
+          type: object
+          additionalProperties: false
+          required: [model_id, project_id, name, head_revision, profile_id, profile_version, rule_version, context_id]
+          properties:
+            model_id: {$ref: "#/components/schemas/StableId"}
+            project_id: {$ref: "#/components/schemas/StableId"}
+            name: {type: string}
+            head_revision: {$ref: "#/components/schemas/StableId"}
+            profile_id: {$ref: "#/components/schemas/StableId"}
+            profile_version: {$ref: "#/components/schemas/Version"}
+            rule_version: {$ref: "#/components/schemas/Version"}
+            access_mode: {type: string, enum: [EDITABLE_DRAFT]}
+            context_id: {$ref: "#/components/schemas/StableId"}
     CreateModelRequest:
       type: object
       unevaluatedProperties: false
@@ -728,6 +885,8 @@ components:
         label: {type: string}
         context_kind: {type: string}
         has_children: {type: boolean}
+        parent_context_id: {$ref: "#/components/schemas/StableId"}
+        refinee_element_id: {$ref: "#/components/schemas/StableId"}
     ContextProjectionResult:
       type: object
       required: [meta, data]
@@ -1296,7 +1455,7 @@ components:
           additionalProperties: false
           required: [target_kind, target_id]
           properties:
-            target_kind: {const: ELEMENT}
+            target_kind: {type: string, enum: [ELEMENT, FEATURE]}
             target_id: {$ref: "#/components/schemas/StableId"}
         property_name: {const: name}
         value: {type: string, minLength: 1, maxLength: 256}

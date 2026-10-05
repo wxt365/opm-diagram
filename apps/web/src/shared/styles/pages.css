@@ -289,7 +289,7 @@ textarea {
 
 .model-list {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
   gap: 14px;
 }
 
@@ -305,6 +305,59 @@ textarea {
 .model-card > div:first-child {
   display: flex;
   gap: 10px;
+}
+
+.model-card__header > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.model-card__header h3,
+.model-lifecycle__name {
+  overflow-wrap: anywhere;
+}
+
+.model-card__trash {
+  flex-shrink: 0;
+}
+
+.model-list__tabs,
+.model-card__actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 8px;
+}
+
+.model-list__tabs .button {
+  white-space: nowrap;
+}
+
+.model-list__tabs .button[aria-pressed="true"] {
+  color: #0b5fae;
+  background: #e9f3ff;
+  border-color: #a7c9e7;
+}
+
+.model-lifecycle__danger {
+  color: #b42318;
+}
+
+.model-card__footer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+}
+
+.model-card__footer .profile-tag {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.model-card__footer .button {
+  white-space: nowrap;
 }
 
 .model-card dl {

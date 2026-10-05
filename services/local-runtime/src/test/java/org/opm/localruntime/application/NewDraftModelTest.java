@@ -29,7 +29,8 @@ class NewDraftModelTest {
         String model = first.get("model_id").toString(), other = second.get("model_id").toString();
         assertEquals(first, data(domain.createModel(project, modelRequest(domain, "first"))));
         var database = factory.databasePath(project);
-        assertEquals("5", scalar(database, "SELECT count(*) FROM flyway_schema_history WHERE success=1"));
+        assertEquals("8", scalar(database, "SELECT count(*) FROM flyway_schema_history WHERE success=1"));
+        assertEquals("2", scalar(database, "SELECT count(*) FROM sqlite_master WHERE type='table' AND name IN ('mindmap_document', 'mindmap_conversion')"));
         assertInstanceOf(ProjectDatabaseOpenResult.Ready.class, factory.open(project));
         assertEquals("2", scalar(database, "SELECT count(*) FROM draft_stream"));
         var repository = new DraftJournalRepository(database, Clock.systemUTC());

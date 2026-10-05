@@ -48,8 +48,8 @@ function effectSpec(relation: ConsumptionRelation, context: RelationRenderContex
   const endpoints = orderedEndpoints(relation);
   const [input, process, output] = endpoints;
   if (!input || !process || !output) throw new OpdRelationRenderError("OPD_RELATION_RENDER_SPEC_INVALID", `Effect ${relation.id} 缺少三个端点`);
-  const inputEdge = edgeSpec(`${relation.id}.input`, input.targetId, process.targetId, relation, context, "PROCESS_INPUT", relation.occurrenceId, arrowMarker, [], undefined, undefined, arrowMarker);
-  const outputEdge = edgeSpec(`${relation.id}.output`, process.targetId, output.targetId, relation, context, undefined, undefined, arrowMarker, [], undefined, undefined, arrowMarker);
+  const inputEdge = edgeSpec(`${relation.id}.input`, input.targetId, process.targetId, relation, context, "PROCESS_INPUT", relation.occurrenceId, arrowMarker, []);
+  const outputEdge = edgeSpec(`${relation.id}.output`, process.targetId, output.targetId, relation, context, undefined, undefined, arrowMarker, []);
   return { relationId: relation.id, occurrenceId: relation.occurrenceId, family: "PROCEDURAL", symbolId: relation.symbolRef, cells: [inputEdge, outputEdge], primaryCellId: inputEdge.id };
 }
 
@@ -65,12 +65,13 @@ function edgeSpec(
   labels: RelationEdgeSpec["labels"],
   vertices?: RelationEdgeSpec["vertices"],
   router?: RelationEdgeSpec["router"],
-  sourceMarker?: Record<string, unknown>,
 ): RelationEdgeSpec {
+  const touchesState = relation.endpoints?.some((endpoint) =>
+    endpoint.targetKind === "STATE" && (endpoint.targetId === source || endpoint.targetId === target));
   return {
-    kind: "edge", id, source, target, role,
+    kind: "edge", id, source, target, role, ...(touchesState ? { zIndex: 2.5 } : {}),
     data: relationData(relation),
-    line: { stroke: "#20242a", strokeWidth: 2, sourceMarker, targetMarker, captureAnchor, findingHighlighted: relation.id === context.highlightedFindingTargetId },
+    line: { stroke: "#20242a", strokeWidth: 2, targetMarker, captureAnchor, findingHighlighted: relation.id === context.highlightedFindingTargetId },
     labels, vertices, router,
   };
 }
@@ -90,8 +91,8 @@ function relationData(relation: ConsumptionRelation) {
 }
 
 function lightningVertices(sourceId: string, targetId: string, context: RelationRenderContext) {
-  const source = context.nodes.find((node) => node.id === sourceId);
-  const target = context.nodes.find((node) => node.id === targetId);
+  const source = (context.nodeById?.get(sourceId) ?? context.nodes.find((node) => node.id === sourceId));
+  const target = (context.nodeById?.get(targetId) ?? context.nodes.find((node) => node.id === targetId));
   if (!source || !target) return [];
   const sourceX = source.x + 84;
   const sourceY = source.y + 42;

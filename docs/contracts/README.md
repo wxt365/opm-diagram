@@ -56,3 +56,13 @@ OpenAPI 与生成产物漂移。
 本扩展不表示 State、完整关系、Capability 选择或前端工具已经通过运行验收。实际 handler、
 generated client、兼容 reader、roundtrip 和生产启用状态只能由 DEV-CANVAS-00~06 的 exact
 报告证明，不能从 OpenAPI 文件存在推导。
+
+## 脑图分析契约与 SQLite V8
+
+新增模型级 `draft/mindmap` 操作，OPEN/SAVE 使用 MindmapRequest/MindmapResult，保存以脑图独立 revision 做 CAS，并验证当前模型 DraftToken。脑图 JSON 版本固定为 1，节点上限 300、关系上限 100；节点树、状态 owner 和同类型 entity_ref 分别验证。
+
+整图 preview/commands 增加可选 analysis_source，旧请求的必填字段保持兼容。最终预览和确认校验来源覆盖及类型/归属/端点，确认事务检查源 revision/digest，并共同写入模型、来源快照、映射、明确排除项和回执。重复命令先恢复原成功回执，即使来源随后改变也不再次提交。
+
+唯一迁移来源为 [sqlite-mindmap/V8__mindmap_analysis.sql](migrations/sqlite-mindmap/V8__mindmap_analysis.sql)，构建复制到 classpath db/mindmap。journaled Runtime 允许 V7→V8 受控升级并保留迁移前恢复点；正常空库建库与重复打开已验证。转换表的 source_json 包含 document 和 analysis_source，读取兼容本轮早期只保存 document 的记录，缺少排除记录时返回空数组。该兼容只针对来源记录，不修改既有 Flyway SQL/checksum。
+
+实际验证、回滚和未覆盖边界见[脑图实施规格](../../specs/opm-mindmap-implementation-task-spec.md)。

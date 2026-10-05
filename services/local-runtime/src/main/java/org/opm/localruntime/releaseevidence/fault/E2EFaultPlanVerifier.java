@@ -25,7 +25,7 @@ import java.util.Set;
 
 /** Fault Plan 分支唯一 Java validator，不是通用 JSON Schema 引擎。 */
 public final class E2EFaultPlanVerifier {
-    public static final String EXPECTED_SCHEMA_SHA256 = "3508290bf1d1d5f7d297ea48e69fdb4e1ebaf4f907b936b30cd4b769d6a916b4";
+    public static final String EXPECTED_SCHEMA_SHA256 = "d8c34923a1342cdffd5eb4e22ddf328969bf3c1f6b6804e7acebb56dd51891d8";
     static final String SCHEMA_RESOURCE = "/releaseevidence/schema/opm-dev-canvas-06-e2e-attempt-artifact-v02.schema.json";
     static final String DOMAIN = "OPM-DEV-CANVAS-06-E2E-FAULT-LAUNCHER-001\0";
     private static final Set<String> FIELDS = Set.of("schema_id", "schema_version", "case_id", "attempt_ordinal",

@@ -5,6 +5,9 @@ export interface RuntimeContext {
   id: string;
   label: string;
   kind: string;
+  parentId?: string;
+  refineeId?: string;
+  depth: number;
 }
 
 export interface RuntimeTextLine {
@@ -24,7 +27,20 @@ export function operationHistoryCode(record: OperationRecordWire): string | null
 
 export function toContexts(data: { process_tree: NavigationNodeWire[]; object_forest: NavigationNodeWire[]; views: NavigationNodeWire[] }, fallbackId: string): RuntimeContext[] {
   const nodes = [...data.process_tree, ...data.object_forest, ...data.views];
-  return (nodes.length ? nodes : [{ context_id: fallbackId, label: fallbackId, context_kind: "SYSTEM_DIAGRAM", has_children: false }]).map((item) => ({ id: item.context_id, label: item.label, kind: item.context_kind }));
+  const all = nodes.length ? nodes : [{ context_id: fallbackId, label: fallbackId, context_kind: "SYSTEM_DIAGRAM", has_children: false }];
+  const ordered: RuntimeContext[] = [];
+  const seen = new Set<string>();
+  function visit(node: NavigationNodeWire, depth: number) {
+    if (seen.has(node.context_id)) return;
+    seen.add(node.context_id);
+    ordered.push({ id: node.context_id, label: node.label, kind: node.context_kind,
+      parentId: node.parent_context_id, refineeId: node.refinee_element_id, depth });
+    all.filter(item => item.parent_context_id === node.context_id).sort((a, b) => a.context_id.localeCompare(b.context_id))
+      .forEach(item => visit(item, depth + 1));
+  }
+  all.filter(item => !item.parent_context_id).sort((a, b) => a.context_id.localeCompare(b.context_id)).forEach(item => visit(item, 0));
+  all.filter(item => !seen.has(item.context_id)).sort((a, b) => a.context_id.localeCompare(b.context_id)).forEach(item => visit(item, 0));
+  return ordered;
 }
 
 

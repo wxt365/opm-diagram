@@ -48,7 +48,7 @@ export function validateDraftWorkspace(name, value) {
   if (name === 'DraftEditRequest') {
     const { scope, command } = value;
     if (scope.intent !== command.command_type) invalid();
-    if (command.payload.context_id !== undefined && command.payload.context_id !== scope.context_id) invalid();
+    if (command.payload.context_id !== undefined && command.payload.context_id !== (command.command_type === 'DELETE_CONTEXT' ? scope.selection_id : scope.context_id)) invalid();
     if (command.command_type === 'DELETE_CONSTRUCT' && command.payload.selection_id !== scope.selection_id) invalid();
   }
   if (name === 'DraftEditResult') {
@@ -78,6 +78,7 @@ export function validateDraftWorkspace(name, value) {
       if (!sameToken(option.expires_with_token, meta.draft_token) || option.capability_query_id !== data.capability_query_id || ids.has(option.option_id)
         || option.command_type !== data.scope.intent) invalid();
       ids.add(option.option_id);
+      if (option.command_type === 'DELETE_CONTEXT' && (!sameToken(option.context_impact.input_token, meta.draft_token) || option.context_impact.context_id !== data.scope.selection_id)) invalid();
       if (option.command_type === 'DELETE_CONSTRUCT') {
         const impact = option.impact_summary;
         if (!sameToken(impact.input_token, meta.draft_token) || impact.selected_occurrence_id !== data.scope.selection_id

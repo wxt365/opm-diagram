@@ -12,6 +12,10 @@ public final class NewDraftModelRepository {
     private NewDraftModelRepository() { }
 
     public static void initialize(Connection connection, String projectId, String modelId, String revisionId, String now) throws Exception {
+        initialize(connection, projectId, modelId, revisionId, now, false);
+    }
+    /** 仅用于创建包含细化图的新模型，既有旧模型准备入口仍只接受0.2。 */
+    public static void initialize(Connection connection, String projectId, String modelId, String revisionId, String now, boolean newRefinementModel) throws Exception {
         if (connection.getAutoCommit()) throw new IllegalStateException("草稿初始化必须属于新模型事务");
         String raw;
         try (var statement = connection.prepareStatement("SELECT document_json FROM revision_document WHERE model_id=? AND revision_id=?")) {
@@ -25,7 +29,7 @@ public final class NewDraftModelRepository {
         var request = new DraftPreparationRequest(projectId, modelId, revisionId, HybridSavePreparation.hash(raw),
                 document.at("/profile_binding/binding_digest/digest").asText(), id("draft"), id("checkpoint"),
                 new DateTimeFormatterBuilder().appendInstant(3).toFormatter().format(Instant.parse(now)));
-        var source = PreparedDraftRepository.source(connection, request);
+        var source = PreparedDraftRepository.source(connection, request, newRefinementModel);
         PreparedDraftRepository.seed(connection, request, source, ignored -> { });
         try (var statement = connection.prepareStatement("INSERT INTO model_save_mode VALUES (?,'JOURNALED_DRAFT_V2',?)")) {
             statement.setString(1, modelId); statement.setString(2, request.draft_id());

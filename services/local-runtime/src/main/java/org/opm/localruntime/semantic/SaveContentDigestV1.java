@@ -20,6 +20,7 @@ public final class SaveContentDigestV1 {
     private static final JsonMapper JSON = JsonMapper.builder()
             .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION).build();
     private static final Set<String> CONTENT_KEYS = Set.copyOf(SaveContentSchemaV1.keys(SaveContentSchemaV1.definition("Content").required("properties")));
+    private static final Set<String> CONTENT_KEYS_V2 = Set.copyOf(SaveContentSchemaV1.keys(SaveContentSchemaV1.definitionV2("Content").required("properties")));
     private static final Pattern GEOMETRY = Pattern.compile("^/layouts/[0-9]+/(?:x|y|width|height|route_points/[0-9]+/(?:x|y))$");
     private static final double MAX_INTEGER = 9_007_199_254_740_991d;
 
@@ -71,16 +72,18 @@ public final class SaveContentDigestV1 {
 
     public static Parts split(JsonNode document) {
         validate(document);
+        Set<String> keys = contentKeys(document);
         ObjectNode content = JSON.createObjectNode(), metadata = JSON.createObjectNode();
-        document.fields().forEachRemaining(field -> (CONTENT_KEYS.contains(field.getKey()) ? content : metadata)
+        document.fields().forEachRemaining(field -> (keys.contains(field.getKey()) ? content : metadata)
                 .set(field.getKey(), field.getValue().deepCopy()));
         return new Parts(content, metadata);
     }
 
     public static ObjectNode join(Parts parts) {
         if (parts == null || parts.content() == null || parts.metadata() == null) throw new Invalid("SAVE_CONTENT_INPUT_INVALID", "");
-        for (String key : SaveContentSchemaV1.keys(parts.content())) if (!CONTENT_KEYS.contains(key)) throw new Invalid("SAVE_CONTENT_INPUT_INVALID", SaveContentSchemaV1.child("/content", key));
-        for (String key : SaveContentSchemaV1.keys(parts.metadata())) if (CONTENT_KEYS.contains(key)) throw new Invalid("SAVE_CONTENT_INPUT_INVALID", SaveContentSchemaV1.child("/metadata", key));
+        Set<String> keys = v2(parts.metadata()) ? CONTENT_KEYS_V2 : CONTENT_KEYS;
+        for (String key : SaveContentSchemaV1.keys(parts.content())) if (!keys.contains(key)) throw new Invalid("SAVE_CONTENT_INPUT_INVALID", SaveContentSchemaV1.child("/content", key));
+        for (String key : SaveContentSchemaV1.keys(parts.metadata())) if (keys.contains(key)) throw new Invalid("SAVE_CONTENT_INPUT_INVALID", SaveContentSchemaV1.child("/metadata", key));
         // 先验证后复制，循环 JsonNode 不得引起递归复制溢出。
         ObjectNode document = JSON.createObjectNode().setAll(parts.content());
         document.setAll(parts.metadata());
@@ -98,10 +101,14 @@ public final class SaveContentDigestV1 {
         normalizeIntegers(content);
         ObjectNode result = JSON.createObjectNode();
         result.put("schema_id", "OPM-SAVE-CONTENT-DIGEST");
-        result.put("schema_version", "1");
+        boolean v2 = v2(document);
+        result.put("schema_version", v2 ? "2" : "1");
         result.put("float_encoding", "IEEE754_BINARY64_BE_HEX");
         result.set("content", content);
-        SaveContentSchemaV1.validate(result, "Preimage");
+        if ("0.5".equals(document.path("schema_version").asText())) SaveContentSchemaV1.validateTrace(result, "Preimage");
+        else if ("0.4".equals(document.path("schema_version").asText())) SaveContentSchemaV1.validateMethod(result, "Preimage");
+        else if (v2) SaveContentSchemaV1.validateV2(result, "Preimage");
+        else SaveContentSchemaV1.validate(result, "Preimage");
         return result;
     }
 
@@ -132,8 +139,22 @@ public final class SaveContentDigestV1 {
     private static void validate(JsonNode value) {
         if (value == null) throw new Invalid("SAVE_CONTENT_INPUT_INVALID", "");
         scan(value, "", Collections.newSetFromMap(new IdentityHashMap<>()));
-        SaveContentSchemaV1.validate(value, "Document");
+        if ("0.5".equals(value.path("schema_version").asText())) SaveContentSchemaV1.validateTrace(value, "Document");
+        else if ("0.4".equals(value.path("schema_version").asText())) SaveContentSchemaV1.validateMethod(value, "Document");
+        else if ("0.3".equals(value.path("schema_version").asText())) SaveContentSchemaV1.validateV2(value, "Document");
+        else SaveContentSchemaV1.validate(value, "Document");
         if (!value.get("model_id").equals(value.get("model_header").get("model_id"))) throw new Invalid("SAVE_CONTENT_INPUT_INVALID", "/model_header/model_id");
+    }
+
+    public static String version(JsonNode document) {
+        validate(document);
+        return v2(document) ? "SaveContentDigest/2" : "SaveContentDigest/1";
+    }
+
+    private static boolean v2(JsonNode document) { return Set.of("0.3", "0.4", "0.5").contains(document.path("schema_version").asText()); }
+
+    private static Set<String> contentKeys(JsonNode document) {
+        return v2(document) ? CONTENT_KEYS_V2 : CONTENT_KEYS;
     }
 
     private static void scan(JsonNode value, String pointer, Set<JsonNode> ancestors) {

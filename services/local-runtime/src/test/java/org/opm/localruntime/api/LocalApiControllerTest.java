@@ -95,7 +95,8 @@ class LocalApiControllerTest {
         perform(get("/api/v1/projects/{projectId}/models/{modelId}/revisions", projectId, modelId).param("request_id", "request.revisions.001")).andExpect(status().isOk());
 
         String token = "evidence." + digest(taskId + revision).substring(0, 32);
-        perform(write(post("/api/v1/projects/{projectId}/models/{modelId}/baselines", projectId, modelId), baselineRequest("request.baseline.001", "command.baseline.001", revision, token))).andExpect(status().isCreated());
+        // 当前校验仅覆盖部分规则，不能用零问题结果创建正式基线。
+        perform(write(post("/api/v1/projects/{projectId}/models/{modelId}/baselines", projectId, modelId), baselineRequest("request.baseline.001", "command.baseline.001", revision, token))).andExpect(status().isUnprocessableEntity());
         perform(get("/api/v1/tasks/{taskId}", taskId).param("request_id", "request.task.001")).andExpect(status().isOk());
         perform(get("/api/v1/tasks/{taskId}/events", taskId).param("request_id", "request.events.001")).andExpect(status().isOk());
     }
@@ -242,6 +243,7 @@ class LocalApiControllerTest {
                 .map(Map.class::cast)
                 .filter(item -> "feature.mvc.attribute-layout.temperature".equals(item.get("target_id")))
                 .findFirst().orElseThrow();
+        assertEquals(fixture.firstObjectId(), attribute.get("owner_id"));
 
         String movedRevision = committed(response(perform(write(command(featureFixture), editRequest(
                         "request.mvc.attribute-layout.move.001", "command.mvc.attribute-layout.move.001", featureRevision,

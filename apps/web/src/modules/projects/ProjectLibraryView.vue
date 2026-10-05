@@ -128,11 +128,11 @@
         </label>
         <div class="form-readonly">
           <span>默认 Profile</span>
-          <strong>ISO 19450:2024 草案 0.1.0</strong>
+          <strong>{{ defaultProfileLabel }}</strong>
         </div>
         <div class="form-readonly">
           <span>本地位置</span>
-          <code>~/OPM Studio/&lt;项目名称&gt;</code>
+          <strong>由本地运行时管理</strong>
         </div>
         <p v-if="store.projectListError" class="dialog-note" role="alert">{{ store.projectListError }}</p>
         <p v-else class="dialog-note">提交后将创建本地项目并进入项目详情。</p>
@@ -170,6 +170,12 @@ const projectName = ref("智能仓储系统");
 const projectDescription = ref("仓储作业与设备协同建模");
 const projectSearch = ref("");
 const isDialogOpen = ref(false);
+const defaultProfileLabel = computed(() => {
+  const binding = window.__OPM_ACTIVE_PROFILE_BINDING__;
+  if (!binding?.profile_id || !binding.profile_version) return "本地默认 Profile（版本未提供）";
+  const name = binding.profile_id === "profile.iso19450.2024.draft" ? "ISO 19450:2024 草案" : binding.profile_id;
+  return `${name} ${binding.profile_version}`;
+});
 const { captureTrigger, closeDialog, onDialogKeydown, setDialogElement } = useDialogFocus(
   computed(() => isDialogOpen.value),
   () => { isDialogOpen.value = false; },

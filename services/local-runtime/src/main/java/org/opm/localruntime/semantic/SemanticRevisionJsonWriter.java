@@ -31,7 +31,9 @@ public final class SemanticRevisionJsonWriter {
     private ObjectNode tree(SemanticRevision revision) {
         ObjectNode root = objectMapper.createObjectNode();
         root.put("schema_id", "MS-REV-001");
-        root.put("schema_version", "0.2");
+        boolean classified = revision.contexts().stream().anyMatch(context -> context.architectureLevel() != null);
+        boolean linked = revision.contexts().stream().anyMatch(context -> !context.architectureLinks().isEmpty());
+        root.put("schema_version", linked ? "0.5" : classified ? "0.4" : revision.refinementEdges().isEmpty() ? "0.2" : "0.3");
         root.put("revision_id", revision.revisionId());
         root.put("model_id", revision.modelId());
         root.put("revision_sequence", revision.revisionSequence());
@@ -45,6 +47,7 @@ public final class SemanticRevisionJsonWriter {
         root.set("states", states(revision));
         root.set("facts", facts(revision));
         root.set("contexts", contexts(revision));
+        if (linked || classified || !revision.refinementEdges().isEmpty()) root.set("refinement_edges", refinementEdges(revision));
         root.set("occurrences", occurrences(revision));
         root.set("layouts", layouts(revision));
         root.set("state_presentations", statePresentations(revision));
@@ -165,6 +168,24 @@ public final class SemanticRevisionJsonWriter {
             node.set("name", name(context.name()));
             strings(node.putArray("occurrence_ids"), context.occurrenceIds());
             node.set("source", source(context.source()));
+            if (context.architectureLevel() != null) node.put("architecture_level", context.architectureLevel().name());
+            if (!context.architectureLinks().isEmpty()) {
+                var links = node.putArray("architecture_links");
+                for (var link : context.architectureLinks()) links.addObject().put("link_id", link.id())
+                        .put("target_context_id", link.targetContextId()).put("kind", link.kind().name());
+            }
+        }
+        return result;
+    }
+
+    private ArrayNode refinementEdges(SemanticRevision revision) {
+        ArrayNode result = objectMapper.createArrayNode();
+        for (SemanticRevision.RefinementEdge edge : revision.refinementEdges()) {
+            result.addObject().put("refinement_id", edge.id())
+                    .put("parent_context_id", edge.parentContextId())
+                    .put("child_context_id", edge.childContextId())
+                    .put("refinee_element_id", edge.refineeElementId())
+                    .put("refinement_kind", edge.kind().name());
         }
         return result;
     }

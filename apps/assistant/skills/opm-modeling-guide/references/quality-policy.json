@@ -1,0 +1,11 @@
+{
+  "guide_version": "1.0.0",
+  "policy_version": "1.0.0",
+  "coverage": "CURRENT_OPD_HEURISTICS",
+  "max_nodes_per_view": 12,
+  "min_node_gap": 24,
+  "max_endpoint_span": 640,
+  "max_report_items": 50,
+  "basis": "MODELING_PREFERENCE",
+  "note": "所有质量项都是非阻断建议；不设最小细化深度，不按近义词合并身份，不以同一对端点多种关系直接判错。"
+}

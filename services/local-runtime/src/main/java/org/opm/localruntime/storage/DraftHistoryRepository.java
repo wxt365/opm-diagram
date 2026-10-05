@@ -28,12 +28,12 @@ public final class DraftHistoryRepository {
             try (var rows = statement.executeQuery()) {
                 if (!rows.next()) return Optional.empty();
                 try {
-                    require("SaveContentDigest/1".equals(rows.getString("digest_version")), "DRAFT_RECOVERY_REQUIRED");
                     String metadata = rows.getString("artifact_json");
                     require(metadata != null && HybridSavePreparation.hash(metadata).equals(rows.getString("artifact_digest")), "DRAFT_RECOVERY_REQUIRED");
                     var document = SaveContentDigestV1.join(new SaveContentDigestV1.Parts(
                             (ObjectNode) DraftJsonDelta.read(rows.getString("model_json")), (ObjectNode) DraftJsonDelta.read(metadata)));
-                    require(model.equals(document.path("model_id").asText())
+                    require(SaveContentDigestV1.version(document).equals(rows.getString("digest_version"))
+                            && model.equals(document.path("model_id").asText())
                             && SaveContentDigestV1.sha256(document).equals(rows.getString("content_digest")), "DRAFT_RECOVERY_REQUIRED");
                     var entry = new Entry(revision, sequence(rows.getLong("legacy_sequence"), rows.getLong("history_sequence")), rows.getString("purpose"), rows.getString("created_at"));
                     return Optional.of(new Saved(entry, document.toString()));

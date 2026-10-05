@@ -6,9 +6,7 @@ import org.opm.localruntime.api.ApiErrorCode;
 import org.opm.localruntime.api.ApiException;
 import org.opm.localruntime.storage.ProjectDatabaseFactory;
 
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
-import java.security.MessageDigest;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -63,6 +61,33 @@ class ElementNameEditingServiceTest {
     }
 
     @Test
+    void renamesAttributeAndOperationWhileKeepingFeatureOwnershipAndLayout() {
+        Fixture fixture = fixture("features");
+        String revision = createElement(fixture, fixture.initialRevision(), "command.object", "element.object", "OBJECT", "Device", 80, 96);
+        revision = createElement(fixture, revision, "command.process", "element.process", "PROCESS", "Transform", 420, 96);
+        revision = createFeature(fixture, revision, "element.object", "feature.attribute", "ATTRIBUTE", "Temperature", 260, 96);
+        revision = createFeature(fixture, revision, "element.process", "feature.operation", "OPERATION", "Calibrate", 620, 96);
+
+        for (List<String> target : List.of(
+                List.of("feature.attribute", "Renamed Attribute", "element.object", "symbol.feature.attribute"),
+                List.of("feature.operation", "Renamed Operation", "element.process", "symbol.feature.operation"))) {
+            Map<String, Object> option = propertyOption(fixture, revision, target.get(0));
+            Map<String, Object> endpoint = mapValue(list(option.get("normalized_endpoints")).getFirst());
+            assertEquals("FEATURE", mapValue(endpoint.get("target_ref")).get("target_kind"));
+            assertEquals(target.get(3), mapValue(option.get("symbol_descriptor")).get("id"));
+            Map<String, Object> before = construct(fixture, revision, target.get(0));
+            revision = committed(fixture.service().edit(fixture.projectId(), fixture.modelId(), fixture.contextId(), editRequest(
+                    "request.rename." + target.get(0), "command.rename." + target.get(0), revision, "UPDATE_PROPERTY",
+                    renamePayload(option, "FEATURE", target.get(0), target.get(1)))));
+            Map<String, Object> after = construct(fixture, revision, target.get(0));
+            assertEquals(target.get(1), after.get("label"));
+            assertEquals(target.get(2), after.get("owner_id"));
+            assertEquals(before.get("occurrence_id"), after.get("occurrence_id"));
+            assertEquals(before.get("layout"), after.get("layout"));
+        }
+    }
+
+    @Test
     void rejectsInvalidUnchangedAndUnsupportedNamesWithoutAdvancingHead() {
         Fixture fixture = fixture("invalid");
         String revision = createElement(fixture, fixture.initialRevision(), "command.object", "element.object", "OBJECT", "Material", 80, 96);
@@ -90,7 +115,7 @@ class ElementNameEditingServiceTest {
     }
 
     @Test
-    void distinguishesStaleAndBaselineAndReplaysDuplicateCommandBeforeRevisionChecks() {
+    void distinguishesStaleAndBaselineAndReplaysDuplicateCommandBeforeRevisionChecks() throws Exception {
         Fixture fixture = fixture("guards");
         Map<String, Object> createRequest = editRequest("request.object", "command.object", fixture.initialRevision(), "CREATE_ELEMENT",
                 map("kind", "OBJECT", "element_id", "element.object", "name", "Material", "layout", map("x", 80, "y", 96)));
@@ -106,11 +131,30 @@ class ElementNameEditingServiceTest {
         Map<String, Object> validation = data(fixture.service().validate(fixture.projectId(), fixture.modelId(), map(
                 "request_id", "request.validation", "command_id", "command.validation", "input_revision", baselineRevision,
                 "binding", binding(), "scope", "FULL")));
-        String taskId = validation.get("task_id").toString();
-        String evidence = "evidence." + digest(taskId + baselineRevision).substring(0, 32);
-        fixture.service().baseline(fixture.projectId(), fixture.modelId(), map(
+        Path database = new ProjectDatabaseFactory(temporaryDirectory.resolve("guards")).databasePath(fixture.projectId());
+        Map<?, ?> summary;
+        try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + database);
+             var query = connection.prepareStatement("SELECT result_json FROM background_task WHERE task_id = ?")) {
+            query.setString(1, validation.get("task_id").toString());
+            try (var rows = query.executeQuery()) {
+                assertTrue(rows.next());
+                summary = new com.fasterxml.jackson.databind.ObjectMapper().readValue(rows.getString(1), Map.class);
+            }
+        }
+        assertEquals("INCOMPLETE", summary.get("coverage_state"));
+        assertCode(ApiErrorCode.VALIDATION_BLOCKED, () -> fixture.service().baseline(fixture.projectId(), fixture.modelId(), map(
                 "request_id", "request.baseline", "command_id", "command.baseline", "base_revision", baselineRevision,
-                "binding", binding(), "name", "Frozen", "evidence_summary_token", evidence));
+                "binding", binding(), "name", "Frozen", "evidence_summary_token", summary.get("evidence_summary_token"))));
+
+        // 历史基线只读保护与创建门禁分开验证；夹具不伪称部分校验生成了完整证据。
+        try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + database);
+             var insert = connection.prepareStatement("INSERT INTO baseline(baseline_id, model_id, revision_id, name, normalized_name, validation_report_digest, evidence_summary_json, created_at) VALUES ('baseline.history', ?, ?, 'Frozen', 'frozen', 'historical-fixture', '{}', '2026-10-05')")) {
+            try (var query = connection.createStatement(); var rows = query.executeQuery("SELECT COUNT(*) FROM baseline")) {
+                assertTrue(rows.next());
+                assertEquals(0, rows.getInt(1));
+            }
+            insert.setString(1, fixture.modelId()); insert.setString(2, baselineRevision); insert.executeUpdate();
+        }
 
         Map<String, Object> baselineOption = propertyOption(fixture, baselineRevision, "element.object");
         String currentRevision = rename(fixture, baselineRevision, "command.rename.current", baselineOption, "Current Name");
@@ -140,6 +184,20 @@ class ElementNameEditingServiceTest {
                 map("kind", kind, "element_id", elementId, "name", name, "layout", map("x", x, "y", y)))));
     }
 
+    private String createFeature(Fixture fixture, String revision, String ownerId, String featureId, String kind, String name, int x, int y) {
+        Map<String, Object> capabilities = data(fixture.service().capabilities(
+                "request.capabilities." + featureId, fixture.projectId(), fixture.modelId(), revision, ownerId, "CREATE_FEATURE"));
+        Map<String, Object> option = list(capabilities.get("options")).stream().map(this::mapValue)
+                .filter(item -> ("CAP-FEAT-" + kind + "-001").equals(mapValue(item.get("capability_ref")).get("capability_id")))
+                .findFirst().orElseThrow();
+        return committed(fixture.service().edit(fixture.projectId(), fixture.modelId(), fixture.contextId(), editRequest(
+                "request.create." + featureId, "command.create." + featureId, revision, "CREATE_FEATURE",
+                map("context_id", fixture.contextId(), "owner_element_id", ownerId, "feature_id", featureId,
+                        "feature_kind", kind, "capability_ref", map("capability_id", "CAP-FEAT-" + kind + "-001"), "name", name,
+                        "occurrence", map("ownership", "OWNED", "construct_role", kind + "_NODE"), "layout", map("x", x, "y", y),
+                        "capability_query_id", option.get("capability_query_id"), "selected_option_id", option.get("option_id")))));
+    }
+
     private String rename(Fixture fixture, String revision, String commandId, Map<String, Object> option, String name) {
         return rename(fixture, revision, commandId, option, name, "element.object");
     }
@@ -164,7 +222,11 @@ class ElementNameEditingServiceTest {
     }
 
     private Map<String, Object> renamePayload(Map<String, Object> option, String elementId, String name) {
-        return map("target_ref", map("target_kind", "ELEMENT", "target_id", elementId), "property_name", "name", "value", name,
+        return renamePayload(option, "ELEMENT", elementId, name);
+    }
+
+    private Map<String, Object> renamePayload(Map<String, Object> option, String targetKind, String targetId, String name) {
+        return map("target_ref", map("target_kind", targetKind, "target_id", targetId), "property_name", "name", "value", name,
                 "capability_query_id", option.get("capability_query_id"), "selected_option_id", option.get("option_id"));
     }
 
@@ -212,17 +274,6 @@ class ElementNameEditingServiceTest {
 
     private String committed(Map<String, Object> envelope) {
         return mapValue(envelope.get("meta")).get("committed_revision").toString();
-    }
-
-    private String digest(String value) {
-        try {
-            byte[] bytes = MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8));
-            StringBuilder result = new StringBuilder();
-            for (byte item : bytes) result.append(String.format("%02x", item));
-            return result.toString();
-        } catch (Exception exception) {
-            throw new IllegalStateException(exception);
-        }
     }
 
     private Map<String, Object> map(Object... values) {

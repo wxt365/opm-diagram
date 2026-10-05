@@ -5,6 +5,14 @@ import { DraftDelivery } from "./draftDelivery";
 import { draftRawJson, sameDraftToken, validDraftToken } from "./draftRequestIdentity";
 import type { WorkbenchCapabilityOption } from "@/shared/types/workbenchCapability";
 
+export type ArchitectureLinkCommand = { commandType: "CREATE_ARCHITECTURE_LINK"; payload: Draft.CreateArchitectureLinkPayload } | { commandType: "DELETE_ARCHITECTURE_LINK"; payload: Draft.DeleteArchitectureLinkPayload };
+export type ArchitectureClassificationCommand = { commandType: "UPDATE_ARCHITECTURE_CLASSIFICATION"; payload: Draft.ArchitectureClassificationPayload };
+
+export type LayoutBatchCommand = { commandType: "UPDATE_LAYOUT_BATCH"; payload: Draft.UpdateLayoutBatchPayload };
+
+export type ContextDeleteCommand = { commandType: "DELETE_CONTEXT"; payload: Draft.DeleteContextPayload };
+export type ContextDeleteOption = Extract<Draft.CommandCapabilityOption, { command_type: "DELETE_CONTEXT" }>;
+
 export class DraftWorkbenchSession {
   private readonly authorizations = new Map<string, { scope: Draft.DraftScope; option: Draft.CommandCapabilityOption }>();
   constructor(readonly project: string, readonly model: string,
@@ -28,20 +36,24 @@ export class DraftWorkbenchSession {
     const token = opened.draft_token, context = opened.context_id;
     const projectionRequest = query(token, context), textRequest = query(token, context), navigationRequest = query(token, context), findingsRequest = query(token, context);
     const catalogRequest = { ...query(token, context), selection_id: null };
-    const [projection, text, navigation, findings, catalog, project, models, history] = await Promise.all([
+    const [projection, textResult, navigation, findings, catalog, project, models, history] = await Promise.all([
       this.api.draftQuery(this.project, this.model, "projection", projectionRequest),
-      this.api.draftQuery(this.project, this.model, "text", textRequest),
+      this.api.draftQuery(this.project, this.model, "text", textRequest).then(value => ({ value, error: null as unknown }))
+        .catch((error: unknown) => ({ value: null, error })),
       this.api.draftQuery(this.project, this.model, "navigation", navigationRequest),
       this.api.draftQuery(this.project, this.model, "findings", findingsRequest),
       this.api.draftQuery(this.project, this.model, "relation-catalog", catalogRequest),
       this.api.getProject(this.project), this.api.listModels(this.project), this.api.revisions(this.project, this.model),
     ]);
-    for (const [result, request] of [[projection, projectionRequest], [text, textRequest], [navigation, navigationRequest], [findings, findingsRequest], [catalog, catalogRequest]] as const)
+    for (const [result, request] of [[projection, projectionRequest], [navigation, navigationRequest], [findings, findingsRequest], [catalog, catalogRequest]] as const)
       checkMeta(result.meta, request);
+    if (textResult.value) checkMeta(textResult.value.meta, textRequest);
+    else if (!(textResult.error instanceof LocalRuntimeApiError) || textResult.error.code !== "DRAFT_EDIT_REJECTED" || !findings.data.items.length) throw textResult.error;
     if (projection.data.context_id !== context || findings.data.validation_scope !== "MODEL" || findings.data.validation_summary.coverage_state !== "INCOMPLETE") invalid();
     const model = models.find(item => item.model_id === this.model && item.project_id === this.project);
     if (!model) invalid();
-    return { opened, project, model, history, text: text.data, navigation: navigation.data, findings: findings.data,
+    return { opened, project, model, history, text: textResult.value?.data ?? { artifact_id: "artifact.unavailable", modality: "OPL" as const, sentences: [], traces: [] },
+      textError: textResult.value ? "" : "当前 OPD 的 OPL 生成受模型问题阻断，请在“问题”面板查看详情。", navigation: navigation.data, findings: findings.data,
       catalog: catalog.data.items, constructs: projection.data.constructs.map(projectConstruct), suppressed: projection.data.suppressed_states.map(projectSuppressed) };
   }
 
@@ -49,6 +61,22 @@ export class DraftWorkbenchSession {
     const request = { ...query(token, context), selection_id: selection ?? null };
     const result = await this.api.draftQuery(this.project, this.model, "relation-catalog", request);
     checkMeta(result.meta, request); return result;
+  }
+
+  async findings(token: Draft.DraftToken, context: string) {
+    const request = query(token, context);
+    const result = await this.api.draftQuery(this.project, this.model, "findings", request);
+    checkMeta(result.meta, request);
+    if (result.data.validation_scope !== "MODEL" || result.data.validation_summary.coverage_state !== "INCOMPLETE") invalid();
+    return result.data;
+  }
+
+  async projection(token: Draft.DraftToken, context: string) {
+    const request = query(token, context);
+    const result = await this.api.draftQuery(this.project, this.model, "projection", request);
+    checkMeta(result.meta, request);
+    if (result.data.context_id !== context) invalid();
+    return result.data.constructs.map(projectConstruct);
   }
 
   async capabilities(token: Draft.DraftToken, context: string, selection: string | undefined, intent: Draft.DraftCommandType, endpoints: string[] = []) {
@@ -66,13 +94,16 @@ export class DraftWorkbenchSession {
       ids.add(option.option_id);
       if (option.command_type === "DELETE_CONSTRUCT" && (!sameDraftToken(option.impact_summary.input_token, token)
         || option.impact_summary.selected_occurrence_id !== scope.selection_id)) invalid();
+      if (option.command_type === "DELETE_CONTEXT" && (!sameDraftToken(option.context_impact.input_token, token)
+        || option.context_impact.context_id !== scope.selection_id)) invalid();
     }
     for (const option of result.data.options) this.authorizations.set(option.option_id, JSON.parse(draftRawJson({ scope, option })));
     return result;
   }
 
-  async edit(token: Draft.DraftToken, context: string, input: P0Command) {
+  async edit(token: Draft.DraftToken, context: string, input: P0Command | LayoutBatchCommand | ContextDeleteCommand | ArchitectureClassificationCommand | ArchitectureLinkCommand) {
     const payload = cleanPayload(input.payload) as Record<string, unknown>;
+    if (input.commandType === "CREATE_ELEMENT") payload.context_id = context;
     if (input.commandType === "CREATE_FACT" && "kind" in payload) throw new LocalRuntimeApiError("INPUT_INVALID", "草稿关系请从 Runtime 关系目录创建。");
     let authorization = typeof payload.selected_option_id === "string" ? this.authorizations.get(payload.selected_option_id) : undefined;
     if (payload.selected_option_id && (!authorization || authorization.option.capability_query_id !== payload.capability_query_id)) stale();
@@ -81,11 +112,17 @@ export class DraftWorkbenchSession {
         && item.option.impact_token === payload.impact_token && item.scope.selection_id === payload.selection_id);
       if (!authorization) stale();
     }
+    if (input.commandType === "DELETE_CONTEXT") {
+      authorization = [...this.authorizations.values()].find(item => item.option.command_type === "DELETE_CONTEXT"
+        && item.option.impact_token === payload.impact_token && item.scope.selection_id === payload.context_id);
+      if (!authorization) stale();
+    }
     if (!authorization) {
       const selection = input.commandType === "UPDATE_LAYOUT" ? String(payload.occurrence_id)
         : ["STATE_EXPLICIT", "STATE_SUPPRESS", "UNFOLD", "FOLD"].includes(input.commandType) ? String(payload.state_id) : undefined;
-      if (input.commandType !== "CREATE_ELEMENT" && !selection) stale();
-      const result = await this.capabilities(token, context, selection, input.commandType);
+      if (input.commandType !== "CREATE_ELEMENT" && input.commandType !== "UPDATE_LAYOUT_BATCH" && !["UPDATE_ARCHITECTURE_CLASSIFICATION", "CREATE_ARCHITECTURE_LINK", "DELETE_ARCHITECTURE_LINK"].includes(input.commandType) && !selection) stale();
+      const endpoints = input.commandType === "UPDATE_LAYOUT_BATCH" ? input.payload.layouts.map(item => item.occurrence_id) : [];
+      const result = await this.capabilities(token, context, selection, input.commandType, endpoints);
       const options = result.data.options.filter(option => option.enabled && (input.commandType !== "CREATE_ELEMENT"
         || option.required_fields.some(field => field.field_id === "kind" && field.allowed_values?.includes(String(payload.kind)))));
       if (options.length !== 1) throw new LocalRuntimeApiError("DRAFT_EDIT_REJECTED", result.data.forbidden[0]?.reason_code ?? "没有唯一可用的 Runtime 候选。");
@@ -93,6 +130,8 @@ export class DraftWorkbenchSession {
     }
     if (!authorization || !authorization.option.enabled || authorization.scope.intent !== input.commandType
       || authorization.scope.context_id !== context || !sameDraftToken(authorization.option.expires_with_token, token)) stale();
+    if (["UPDATE_ARCHITECTURE_CLASSIFICATION", "CREATE_ARCHITECTURE_LINK", "DELETE_ARCHITECTURE_LINK"].includes(input.commandType) && (payload.context_id !== context
+      || authorization.option.command_type !== input.commandType || !("target_context_id" in authorization.option) || authorization.option.target_context_id !== context)) stale();
     delete payload.capability_query_id; delete payload.selected_option_id;
     // payload 来自已有编辑 union，只移除 V1 授权字段；具体领域合法性仍由 Runtime 的封闭 Schema 检查。
     const command = { command_type: input.commandType, payload } as Draft.DraftCommand;

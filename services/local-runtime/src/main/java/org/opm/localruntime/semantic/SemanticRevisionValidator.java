@@ -28,6 +28,8 @@ public final class SemanticRevisionValidator {
         validateStatePresentations(revision, states, contexts, problems);
         validateFacts(revision, elements, features, states, facts, problems);
         validateContexts(revision, elements, features, states, facts, contexts, occurrences, layouts, problems);
+        validateRefinements(revision, elements, contexts, problems);
+        validateArchitectureLinks(revision, contexts, problems);
         validateLayouts(revision.layouts(), problems);
         return List.copyOf(problems);
     }
@@ -41,6 +43,62 @@ public final class SemanticRevisionValidator {
         registerAll(revision.contexts(), SemanticRevision.Context::id, identifiers, problems);
         registerAll(revision.occurrences(), SemanticRevision.Occurrence::id, identifiers, problems);
         registerAll(revision.layouts(), SemanticRevision.Layout::id, identifiers, problems);
+        registerAll(revision.refinementEdges(), SemanticRevision.RefinementEdge::id, identifiers, problems);
+        for (var context : revision.contexts()) registerAll(context.architectureLinks(), SemanticRevision.ArchitectureLink::id, identifiers, problems);
+    }
+
+    private void validateArchitectureLinks(SemanticRevision revision, Map<String, SemanticRevision.Context> contexts,
+                                           List<SemanticValidationProblem> problems) {
+        for (var source : revision.contexts()) {
+            var seen = new HashSet<String>();
+            for (var link : source.architectureLinks()) {
+                if (!contexts.containsKey(link.targetContextId()))
+                    problem(SemanticValidationCode.MISSING_REFERENCE, link.id(), "架构关联的目标 OPD 不存在", problems);
+                if (source.id().equals(link.targetContextId()) || !seen.add(link.kind().name() + "\u001f" + link.targetContextId()))
+                    problem(SemanticValidationCode.DUPLICATE_ID, link.id(), "架构关联自连或重复", problems);
+            }
+        }
+    }
+
+    private void validateRefinements(SemanticRevision revision, Map<String, SemanticRevision.Element> elements,
+                                     Map<String, SemanticRevision.Context> contexts, List<SemanticValidationProblem> problems) {
+        Map<String, String> parents = new HashMap<>();
+        Set<String> refined = new HashSet<>();
+        for (var edge : revision.refinementEdges()) {
+            var parent = contexts.get(edge.parentContextId());
+            var child = contexts.get(edge.childContextId());
+            var element = elements.get(edge.refineeElementId());
+            if (parent == null || child == null || element == null) {
+                problem(SemanticValidationCode.MISSING_REFERENCE, edge.id(), "refinement endpoint does not exist", problems);
+                continue;
+            }
+            if (edge.parentContextId().equals(edge.childContextId()) || edge.childContextId().equals(revision.rootContextId())
+                    || parents.putIfAbsent(edge.childContextId(), edge.parentContextId()) != null
+                    || !refined.add(edge.parentContextId() + "\u001f" + edge.refineeElementId())
+                    || element.coreKind() != edge.kind()
+                    || child.kind() != (edge.kind() == SemanticRevision.CoreKind.PROCESS
+                        ? SemanticRevision.ContextKind.PROCESS_REFINEMENT : SemanticRevision.ContextKind.OBJECT_REFINEMENT)
+                    || revision.occurrences().stream().noneMatch(item -> item.contextId().equals(parent.id())
+                        && item.targetKind() == SemanticRevision.TargetKind.ELEMENT && item.targetId().equals(element.id())
+                        && item.ownership() == SemanticRevision.OccurrenceOwnership.OWNED)) {
+                problem(SemanticValidationCode.INVALID_REFINEMENT, edge.id(), "refinement parent, child or refinee is invalid", problems);
+            }
+        }
+        if (!revision.refinementEdges().isEmpty()) {
+            for (var context : revision.contexts()) {
+                if (context.kind() == SemanticRevision.ContextKind.PROCESS_REFINEMENT
+                        || context.kind() == SemanticRevision.ContextKind.OBJECT_REFINEMENT) {
+                    if (!parents.containsKey(context.id())) problem(SemanticValidationCode.INVALID_REFINEMENT,
+                            context.id(), "refinement context has no parent edge", problems);
+                }
+            }
+        }
+        for (String child : parents.keySet()) {
+            Set<String> visited = new HashSet<>();
+            String current = child;
+            while (current != null && visited.add(current)) current = parents.get(current);
+            if (current != null) problem(SemanticValidationCode.INVALID_REFINEMENT, child, "refinement cycle", problems);
+        }
     }
 
     private void validateCapabilities(SemanticRevision revision, List<SemanticValidationProblem> problems) {

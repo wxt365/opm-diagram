@@ -47,7 +47,9 @@ final class SemanticElementEditor {
         if (owner != null) replaceElementStateIds(elements, ownerId, append(owner.stateIds(), stateId));
         appendOccurrence(base, stateId, SemanticRevision.TargetKind.STATE, owner == null ? "FEATURE_STATE_NODE" : "STATE_NODE", payload, contexts, occurrences, layouts);
         containState(states.getLast(), occurrences.getLast(), occurrences, layouts, true);
-        presentations.add(new SemanticRevision.StatePresentation(base.rootContextId(), stateId, SemanticRevision.StateExplicitness.EXPLICIT, SemanticRevision.StateFoldState.UNFOLDED));
+        String contextId = optional(payload, "context_id");
+        presentations.add(new SemanticRevision.StatePresentation(contextId == null ? base.rootContextId() : contextId,
+                stateId, SemanticRevision.StateExplicitness.EXPLICIT, SemanticRevision.StateFoldState.UNFOLDED));
     }
 
     static void updateStateConstruct(Map<String, Object> payload, List<SemanticRevision.State> states) {
@@ -67,7 +69,7 @@ final class SemanticElementEditor {
     static void updateStatePresentation(SemanticRevision base, String type, Map<String, Object> payload, List<SemanticRevision.State> states, List<SemanticRevision.Context> contexts, List<SemanticRevision.Occurrence> occurrences, List<SemanticRevision.Layout> layouts, List<SemanticRevision.StatePresentation> presentations) {
         String contextId = required(payload, "context_id");
         String stateId = required(payload, "state_id");
-        if (!base.rootContextId().equals(contextId) || contexts.stream().noneMatch(context -> context.id().equals(contextId))) throw domain("State presentation Context 不存在或不可编辑");
+        if (contexts.stream().noneMatch(context -> context.id().equals(contextId))) throw domain("State presentation Context 不存在或不可编辑");
         if (states.stream().noneMatch(state -> state.id().equals(stateId))) throw domain("State 不存在");
         SemanticRevision.StatePresentation current = presentations.stream()
                 .filter(presentation -> presentation.contextId().equals(contextId) && presentation.stateId().equals(stateId))
@@ -99,6 +101,20 @@ final class SemanticElementEditor {
                 elements.set(index, new SemanticRevision.Element(element.id(), element.coreKind(), element.capability(),
                         new SemanticRevision.QualifiedName(element.name().namespace(), name), element.featureIds(), element.stateIds(),
                         element.source(), element.normalization()));
+                return;
+            }
+        }
+    }
+
+    static void renameFeature(List<SemanticRevision.Feature> features, SemanticRevision.Feature current, Object value, boolean rejectUnchanged) {
+        String name = elementName(value);
+        if (rejectUnchanged && name.equals(current.name().localName())) throw domain("Feature 名称未发生变化");
+        for (int index = 0; index < features.size(); index++) {
+            SemanticRevision.Feature feature = features.get(index);
+            if (feature.id().equals(current.id())) {
+                features.set(index, new SemanticRevision.Feature(feature.id(), feature.ownerElementId(), feature.kind(),
+                        feature.capability(), new SemanticRevision.QualifiedName(feature.name().namespace(), name),
+                        feature.source(), feature.normalization()));
                 return;
             }
         }
@@ -161,7 +177,7 @@ final class SemanticElementEditor {
             SemanticRevision.Context context = contexts.get(index);
             if (context.id().equals(contextId)) {
                 contexts.set(index, new SemanticRevision.Context(context.id(), context.kind(), context.capability(), context.name(),
-                        context.occurrenceIds().stream().filter(id -> !removedOccurrenceIds.contains(id)).toList(), context.source()));
+                        context.occurrenceIds().stream().filter(id -> !removedOccurrenceIds.contains(id)).toList(), context.source(), context.architectureLevel(), context.architectureLinks()));
             }
         }
     }

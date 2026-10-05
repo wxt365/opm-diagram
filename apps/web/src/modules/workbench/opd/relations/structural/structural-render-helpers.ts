@@ -4,7 +4,7 @@ import { OpdRelationRenderError } from "../../core/relation-definition-registry"
 import { nodeDimensions } from "../../core/node-geometry";
 import type { OpdRelationDefinition, RelationCellSpec, RelationEdgeSpec, RelationRenderContext, RelationRenderSpec } from "../../core/relation-render-spec";
 
-type StructuralMode = "DIRECTED" | "BIDIRECTIONAL" | "FAN_FILLED" | "FAN_OPEN" | "FAN_EXHIBITION";
+type StructuralMode = "DIRECTED" | "BIDIRECTIONAL" | "FAN_FILLED" | "FAN_OPEN" | "FAN_EXHIBITION" | "FAN_CLASSIFICATION";
 
 interface StructuralDefinitionConfig {
   readonly capabilityId: string;
@@ -12,7 +12,8 @@ interface StructuralDefinitionConfig {
   readonly mode: StructuralMode;
 }
 
-const arrowMarker = { name: "classic", width: 10, height: 8, fill: "#ffffff", stroke: "#20242a" };
+const openArrowMarker = { name: "block", width: 10, height: 8, open: true, fill: "none", stroke: "#20242a" };
+const harpoonMarker = { name: "path", d: "M 0 4 L 8 10", fill: "none", stroke: "#20242a", strokeWidth: 1.6 };
 
 export function createStructuralDefinition(config: StructuralDefinitionConfig): OpdRelationDefinition {
   return {
@@ -34,7 +35,7 @@ function binarySpec(relation: ConsumptionRelation, context: RelationRenderContex
     kind: "edge", id: relation.id, source: source.targetId, target: target.targetId,
     data: relationData(relation), labels: structuralLabels(relation),
     line: {
-      stroke: "#20242a", strokeWidth: 2, sourceMarker: bidirectional ? arrowMarker : undefined, targetMarker: arrowMarker,
+      stroke: "#20242a", strokeWidth: 2, sourceMarker: bidirectional ? harpoonMarker : undefined, targetMarker: bidirectional ? harpoonMarker : openArrowMarker,
       captureAnchor: relation.occurrenceId, findingHighlighted: relation.id === context.highlightedFindingTargetId,
     },
   };
@@ -43,8 +44,8 @@ function binarySpec(relation: ConsumptionRelation, context: RelationRenderContex
 
 function fanSpec(relation: ConsumptionRelation, context: RelationRenderContext, mode: StructuralMode): RelationRenderSpec {
   const [root, ...members] = orderedEndpoints(relation);
-  const rootNode = root ? context.nodes.find((node) => node.id === root.targetId) : undefined;
-  const memberNodes = members.map((member) => context.nodes.find((node) => node.id === member.targetId)).filter((node): node is OpdNode => Boolean(node));
+  const rootNode = root ? (context.nodeById?.get(root.targetId) ?? context.nodes.find((node) => node.id === root.targetId)) : undefined;
+  const memberNodes = members.map((member) => (context.nodeById?.get(member.targetId) ?? context.nodes.find((node) => node.id === member.targetId))).filter((node): node is OpdNode => Boolean(node));
   if (!root || !rootNode || !memberNodes.length) throw new OpdRelationRenderError("OPD_RELATION_RENDER_SPEC_INVALID", `Structural fan ${relation.id} 端点不完整`);
   const averageX = memberNodes.reduce((total, node) => total + node.x + nodeDimensions(node).width / 2, 0) / memberNodes.length;
   const averageY = memberNodes.reduce((total, node) => total + node.y + nodeDimensions(node).height / 2, 0) / memberNodes.length;
@@ -71,6 +72,10 @@ function fanSpec(relation: ConsumptionRelation, context: RelationRenderContext, 
   if (mode === "FAN_EXHIBITION") cells.push({
     kind: "node", id: `${junctionId}.inner`, shape: "polygon", x: junctionX - 6, y: junctionY - 6, width: 12, height: 12, zIndex: 4, angle,
     body: { refPoints: "0,12 6,0 12,12", fill: "#20242a", stroke: "#20242a", strokeWidth: 1, pointerEvents: "none" }, label: { text: "" },
+  });
+  if (mode === "FAN_CLASSIFICATION") cells.push({
+    kind: "node", id: `${junctionId}.inner`, shape: "ellipse", x: junctionX - 2.5, y: junctionY - 2.5, width: 5, height: 5, zIndex: 4,
+    body: { fill: "#20242a", stroke: "none", pointerEvents: "none" }, label: { text: "" },
   });
   if (relation.collectionCompleteness === "INCOMPLETE") {
     cells.push({ kind: "node", id: `${relation.id}.incomplete`, shape: "rect", x: junctionX - 10, y: junctionY + 14, width: 20, height: 12, zIndex: 4, body: { fill: "transparent", stroke: "transparent" }, label: { text: "...", fill: "#20242a", fontSize: 12, fontWeight: 700 } });

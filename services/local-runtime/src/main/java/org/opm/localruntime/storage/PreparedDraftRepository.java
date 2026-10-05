@@ -22,6 +22,9 @@ final class PreparedDraftRepository {
     private PreparedDraftRepository() { }
 
     static Source source(Connection connection, DraftPreparationRequest request) throws Exception {
+        return source(connection, request, false);
+    }
+    static Source source(Connection connection, DraftPreparationRequest request, boolean newRefinementModel) throws Exception {
         try (var statement = connection.prepareStatement("""
                 SELECT r.document_json,r.document_digest,r.revision_id,r.model_id,r.revision_sequence,r.schema_version,
                        r.profile_binding_json AS revision_binding,m.profile_binding_json AS model_binding,
@@ -45,7 +48,8 @@ final class PreparedDraftRepository {
                 require(request.model_id().equals(document.required("model_id").asText())
                         && request.expected_revision_id().equals(document.required("revision_id").asText())
                         && rows.getLong("revision_sequence") == document.required("revision_sequence").longValue()
-                        && "0.2".equals(rows.getString("schema_version"))
+                        && ("0.2".equals(rows.getString("schema_version")) || newRefinementModel && java.util.List.of("0.3", "0.4", "0.5").contains(rows.getString("schema_version"))
+                            && rows.getString("schema_version").equals(document.path("schema_version").asText()) && document.path("refinement_edges").isArray())
                         && rows.getLong("head_sequence") > 0 && rows.getLong("head_sequence") <= 9_007_199_254_740_991L
                         && request.expected_binding_digest().equals(binding.at("/binding_digest/digest").asText())
                         && binding.equals(JSON.readTree(rows.getString("revision_binding")))
@@ -66,8 +70,8 @@ final class PreparedDraftRepository {
         var parts = SaveContentDigestV1.split(source.document());
         String content = parts.content().toString(), artifact = parts.metadata().toString();
         String digest = SaveContentDigestV1.sha256(source.document());
-        execute(connection, "INSERT INTO draft_content VALUES (?,?,'SaveContentDigest/1',?,?,?)",
-                request.model_id(), digest, content, artifact, HybridSavePreparation.hash(artifact));
+        execute(connection, "INSERT INTO draft_content VALUES (?,?,?,?,?,?)",
+                request.model_id(), digest, SaveContentDigestV1.version(source.document()), content, artifact, HybridSavePreparation.hash(artifact));
         stage.accept("CONTENT");
         execute(connection, "INSERT INTO draft_stream VALUES (?,?,0,?,?,?,NULL,NULL)", request.model_id(),
                 request.draft_id(), request.expected_binding_digest(), request.expected_revision_id(), request.checkpoint_id());
@@ -108,7 +112,7 @@ final class PreparedDraftRepository {
                         && request.checkpoint_id().equals(rows.getString("checkpoint_id"))
                         && request.requested_at().equals(rows.getString("created_at"))
                         && rows.getString("dirty_since") == null && rows.getString("deadline") == null
-                        && "SaveContentDigest/1".equals(rows.getString("digest_version")), "CONTENT_MISMATCH");
+                        && SaveContentDigestV1.version(source.document()).equals(rows.getString("digest_version")), "CONTENT_MISMATCH");
                 String artifact = rows.getString("artifact_json"), artifactDigest = rows.getString("artifact_digest");
                 require(HybridSavePreparation.hash(artifact).equals(artifactDigest), "CONTENT_MISMATCH");
                 JsonNode model = JSON.readTree(rows.getString("model_json")), metadata = JSON.readTree(artifact);

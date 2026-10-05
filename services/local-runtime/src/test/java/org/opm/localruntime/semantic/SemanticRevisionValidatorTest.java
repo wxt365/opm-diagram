@@ -45,6 +45,30 @@ class SemanticRevisionValidatorTest {
     }
 
     @Test
+    void rejectsDanglingWrongKindAndDuplicateRefinementEdges() {
+        var revision = validRevision();
+        var root = revision.contexts().getFirst();
+        var child = new SemanticRevision.Context("context.child", SemanticRevision.ContextKind.OBJECT_REFINEMENT,
+                root.capability(), root.name(), List.of(), root.source());
+        var contexts = new ArrayList<>(revision.contexts()); contexts.add(child);
+        var valid = new SemanticRevision.RefinementEdge("refinement.valid", root.id(), child.id(),
+                "element.raw.material", SemanticRevision.CoreKind.OBJECT);
+        assertTrue(validator.validate(withRefinements(revision, contexts, List.of(valid))).isEmpty());
+        var dangling = new SemanticRevision.RefinementEdge("refinement.dangling", root.id(), child.id(),
+                "element.missing", SemanticRevision.CoreKind.OBJECT);
+        assertContains(SemanticValidationCode.MISSING_REFERENCE,
+                validator.validate(withRefinements(revision, contexts, List.of(dangling))));
+        var wrongKind = new SemanticRevision.RefinementEdge("refinement.wrong", root.id(), child.id(),
+                "element.raw.material", SemanticRevision.CoreKind.PROCESS);
+        assertContains(SemanticValidationCode.INVALID_REFINEMENT,
+                validator.validate(withRefinements(revision, contexts, List.of(wrongKind))));
+        var duplicate = new SemanticRevision.RefinementEdge("refinement.duplicate", root.id(), child.id(),
+                "element.raw.material", SemanticRevision.CoreKind.OBJECT);
+        assertContains(SemanticValidationCode.INVALID_REFINEMENT,
+                validator.validate(withRefinements(revision, contexts, List.of(valid, duplicate))));
+    }
+
+    @Test
     void reportsDuplicateStableId() {
         SemanticRevision revision = validRevision();
         SemanticRevision.Element original = revision.elements().getFirst();
@@ -183,6 +207,14 @@ class SemanticRevisionValidatorTest {
 
     private SemanticRevision validRevision() {
         return new SemanticRevisionReader().read(findFixture());
+    }
+
+    private SemanticRevision withRefinements(SemanticRevision revision, List<SemanticRevision.Context> contexts,
+                                            List<SemanticRevision.RefinementEdge> edges) {
+        return new SemanticRevision(revision.revisionId(), revision.modelId(), revision.revisionSequence(),
+                revision.profileBinding(), revision.rootContextId(), revision.elements(), revision.features(),
+                revision.states(), revision.facts(), contexts, revision.occurrences(), revision.layouts(),
+                revision.statePresentations(), edges);
     }
 
     private SemanticRevision copy(

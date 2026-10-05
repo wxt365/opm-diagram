@@ -7,6 +7,9 @@ import { useWorkbenchRuntimeStore } from "@/stores/workbenchRuntime";
 
 import WorkbenchView from "./WorkbenchView.vue";
 import { LocalRuntimeApiError, localRuntimeApi } from "@/shared/api/localRuntimeApi";
+import { assistantRequest, watchAssistant } from "@/shared/api/assistantApi";
+
+vi.mock("@/shared/api/assistantApi", () => ({ assistantRequest: vi.fn(async () => []), watchAssistant: vi.fn() }));
 
 vi.mock("@/shared/api/localRuntimeApi", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/shared/api/localRuntimeApi")>();
@@ -82,6 +85,7 @@ function configureApi() {
     { occurrence_id: "occ.process", target_id: "element.process", construct_role: "PROCESS_NODE", label: "Transform", layout: { x: 420, y: 80, width: 168, height: 84, z_order: 2 } },
     { occurrence_id: "occ.process.handler", target_id: "element.process.handler", construct_role: "PROCESS_NODE", label: "Handle exception", layout: { x: 680, y: 80, width: 168, height: 84, z_order: 3 } },
     { occurrence_id: "occ.attribute", target_id: "feature.attribute", construct_role: "ATTRIBUTE_NODE", label: "Temperature", owner_id: "element.object", layout: { x: 260, y: 160, width: 160, height: 72, z_order: 4 } },
+    { occurrence_id: "occ.operation", target_id: "feature.operation", construct_role: "OPERATION_NODE", label: "Calibrate", owner_id: "element.process", layout: { x: 600, y: 160, width: 168, height: 84, z_order: 5 } },
     { occurrence_id: "occ.state", target_id: "state.material.ready", construct_role: "STATE_NODE", label: "Ready", owner_id: "element.object", state_roles: ["INITIAL"], explicitness: "EXPLICIT", fold_state: "UNFOLDED", layout: { x: 116, y: 118, width: 88, height: 28, z_order: 3 } },
     { occurrence_id: "occ.fact", target_id: "fact.consumption", construct_role: "CONSUMPTION_LINK", layout: { x: 250, y: 116, width: 160, height: 2, z_order: 3 }, source_id: "element.object", process_id: "element.process", source_occurrence_id: "occ.object", target_occurrence_id: "occ.process", symbol_ref: "symbol.link.consumption", layout_ref: "layout.fact", capability_id: "CAP-ISO-PROC-001", endpoints: [endpoint("CONSUMED_OBJECT", "ELEMENT", "element.object", 0), endpoint("CONSUMING_PROCESS", "ELEMENT", "element.process", 1)] },
     { occurrence_id: "occ.fact.structural", target_id: "fact.structural", construct_role: "STRUCTURAL_LINK", layout: { x: 250, y: 272, width: 160, height: 2, z_order: 3 }, symbol_ref: "symbol.link.structural.tagged.state", layout_ref: "layout.fact.structural", capability_id: "CAP-ISO-STRUCT-010", direction: "DIRECTED", labels: [{ slot_id: "forward_tag", text: "owns" }], collection_completeness: "NOT_APPLICABLE", endpoints: [endpoint("STATE_TAGGED_SOURCE", "STATE", "state.material.ready", 0), endpoint("STATE_TAGGED_TARGET", "ELEMENT", "element.object.product", 1)] },
@@ -109,11 +113,13 @@ async function mountWorkbench(query = "") {
         OpdCanvas: {
           methods: { async finishNameEdit() { return true; } },
           props: ["beginNameEdit", "submitNameEdit", "interactionTool"],
-          emits: ["select", "move", "placeState", "relationIntent", "constructActionsMenuRequested", "relationLabelEditRequested"],
+          emits: ["select", "move", "relationIntent", "constructActionsMenuRequested", "relationLabelEditRequested"],
           template: `<div :data-interaction-tool="interactionTool">
             <button data-testid="p03-canvas-select-object" type="button" @click="$emit('select', 'element.object')" />
             <button data-testid="p03-canvas-select-product" type="button" @click="$emit('select', 'element.object.product')" />
             <button data-testid="p03-canvas-select-process" type="button" @click="$emit('select', 'element.process')" />
+            <button data-testid="p03-canvas-select-attribute" type="button" @click="$emit('select', 'feature.attribute')" />
+            <button data-testid="p03-canvas-select-operation" type="button" @click="$emit('select', 'feature.operation')" />
             <button data-testid="p03-canvas-select-handler-process" type="button" @click="$emit('select', 'element.process.handler')" />
             <button data-testid="p03-canvas-select-state" type="button" @click="$emit('select', 'state.material.ready')" />
             <button data-testid="p03-canvas-select-consumption" type="button" @click="$emit('select', 'fact.consumption')" />
@@ -124,7 +130,6 @@ async function mountWorkbench(query = "") {
             <button data-testid="p03-canvas-delete-fact" type="button" @click="$emit('constructActionsMenuRequested', 'occ.fact')" />
             <button data-testid="p03-canvas-move-object" type="button" @click="$emit('move', 'occ.object', 240, 180)" />
             <button data-testid="p03-canvas-move-attribute" type="button" @click="$emit('move', 'occ.attribute', 300, 220)" />
-            <button data-testid="p03-canvas-place-state" type="button" @click="$emit('placeState', 'element.object')" />
             <button data-testid="p03-canvas-begin-name-edit" type="button" @click="beginNameEdit('element.object')" />
             <button data-testid="p03-canvas-submit-name-edit" type="button" @click="submitNameEdit('element.object', 'Renamed Material')" />
             <button data-testid="p03-canvas-submit-same-name" type="button" @click="submitNameEdit('element.object', 'Material')" />
@@ -173,17 +178,344 @@ describe("WorkbenchView", () => {
     const state = () => ({ durable_token: token(), checkpoint_token: null, last_manual_revision: null,
       dirty_since: seq ? "2026-09-14T00:00:00.000Z" : null, deadline: seq ? "2026-09-14T00:00:10.000Z" : null, in_flight: "NONE" as const, pending_manual_target: null, last_error: null });
     const opened = () => ({ request_id: "request.ui", project_id: "project.1", model_id: "model.1", root_context_id: "context.root", context_id: "context.root", mode: "JOURNALED_DRAFT_V2" as const, draft_token: token(), save_state: state() });
-    vi.spyOn(DraftWorkbenchSession.prototype, "open").mockImplementation(async () => opened());
+    const open = vi.spyOn(DraftWorkbenchSession.prototype, "open").mockImplementation(async () => opened());
     vi.spyOn(DraftWorkbenchSession.prototype, "recover").mockResolvedValue();
     vi.spyOn(DraftWorkbenchSession.prototype, "pending").mockResolvedValue([]);
-    vi.spyOn(DraftWorkbenchSession.prototype, "read").mockImplementation(async () => ({ opened: opened(), project: { name: "项目" }, model: { name: "草稿模型", profile_id: "profile.1", profile_version: "0.2.0", head_revision: "revision.1" }, history: [{ revision_id: "revision.1", sequence: 1, kind: "DRAFT", created_at: "2026-09-14T00:00:00Z" }], navigation: { process_tree: [], object_forest: [], views: [] }, constructs: [{ occurrence_id: "occ.object", target_id: "element.object", target_kind: "ELEMENT", construct_role: "OBJECT_NODE", label: `Object ${seq}`, layout: { x: seq, y: 0, width: 100, height: 60, z_order: 0 }, capability_id: "CAP-OBJECT-001" }], suppressed: [], text: { sentences: [{ sentence_id: `sentence.${seq}`, text: `文本 ${seq}`, ordinal: 0 }], traces: [] }, findings: { items: [], validation_summary: { blocking: 0, coverage_state: "INCOMPLETE" } }, catalog: [] }) as never);
+    const read = vi.spyOn(DraftWorkbenchSession.prototype, "read").mockImplementation(async () => ({ opened: opened(), project: { name: "项目" }, model: { name: "草稿模型", profile_id: "profile.1", profile_version: "0.2.0", head_revision: "revision.1" }, history: [{ revision_id: "revision.1", sequence: 1, kind: "DRAFT", created_at: "2026-09-14T00:00:00Z" }], navigation: { process_tree: [], object_forest: [], views: [] }, constructs: [{ occurrence_id: "occ.object", target_id: "element.object", target_kind: "ELEMENT", construct_role: "OBJECT_NODE", label: `Object ${seq}`, layout: { x: seq, y: 0, width: 100, height: 60, z_order: 0 }, capability_id: "CAP-OBJECT-001" }], suppressed: [], text: { sentences: [{ sentence_id: `sentence.${seq}`, text: `文本 ${seq}`, ordinal: 0 }], traces: [] }, findings: { items: [], validation_summary: { blocking: 0, coverage_state: "INCOMPLETE" } }, catalog: [] }) as never);
     const edit = vi.spyOn(DraftWorkbenchSession.prototype, "edit").mockImplementation(async () => { seq++; return { result_token: token() } as never; });
     const save = vi.spyOn(DraftWorkbenchSession.prototype, "save").mockImplementation(async captured => ({ save_id: "save.ui", status: "SAVED", captured_token: captured, head_token: token(), revision_id: "revision.saved", checkpoint_id: "checkpoint.ui" }));
     const pin = vi.spyOn(DraftWorkbenchSession.prototype, "pin").mockImplementation(async captured => ({ pin_id: "pin.ui", captured_token: captured, revision_id: "revision.pinned" }));
     vi.spyOn(DraftWorkbenchSession.prototype, "catalog").mockResolvedValue({ data: { items: [] } } as never);
     vi.spyOn(DraftWorkbenchSession.prototype, "capabilities").mockResolvedValue({ data: { options: [] } } as never);
-    return { token, edit, save, pin };
+    return { token, open, read, edit, save, pin };
   }
+
+  it("OPD右键删除预览可取消，确认删除当前图后回读父图并更新导航", async () => {
+    const fixture = draftFixture(), originalOpen = fixture.open.getMockImplementation()!, originalRead = fixture.read.getMockImplementation()!, originalEdit = fixture.edit.getMockImplementation()!;
+    let deleted = false;
+    fixture.open.mockImplementation(async context => ({ ...await originalOpen(context), context_id: context ?? "context.root" }));
+    fixture.read.mockImplementation(async opened => {
+      const snapshot = await originalRead(opened);
+      snapshot.opened = opened;
+      snapshot.navigation = { current_path: ["context.root", ...(opened.context_id === "context.child" ? ["context.child"] : [])],
+        process_tree: [{ context_id: "context.root", label: "SD", context_kind: "SYSTEM_DIAGRAM", has_children: !deleted }],
+        object_forest: deleted ? [] : [{ context_id: "context.child", label: "原料细化", context_kind: "OBJECT_REFINEMENT", has_children: false, parent_context_id: "context.root", refinee_element_id: "element.object" }], views: [] } as never;
+      return snapshot;
+    });
+    fixture.edit.mockImplementation(async (token, context, command) => {
+      const result = await originalEdit(token, context, command);
+      if (command.commandType === "DELETE_CONTEXT") deleted = true;
+      return result;
+    });
+    const capabilities = vi.spyOn(DraftWorkbenchSession.prototype, "capabilities").mockImplementation(async (token, _context, selection, intent) => ({ data: { options: intent === "DELETE_CONTEXT" ? [{
+      command_type: "DELETE_CONTEXT", enabled: true, expires_with_token: token, impact_token: "impact.child",
+      context_impact: { input_token: token, context_id: selection, parent_context_id: "context.root", context_ids: ["context.child"], counts: { contexts: 1, elements: 1, features: 0, states: 0, facts: 0 }, blockers: [] },
+    }] : [] } }) as never);
+    const { wrapper, router } = await mountWorkbench(); const store = useWorkbenchRuntimeStore();
+    await wrapper.get('[data-testid="p03-context-context.root"]').trigger("contextmenu", { clientX: 80, clientY: 90 });
+    expect((wrapper.get('[data-testid="opd-delete-action"]').element as HTMLButtonElement).disabled).toBe(true);
+    await wrapper.get('[data-testid="p03-context-context.child"]').trigger("contextmenu", { clientX: 80, clientY: 110 });
+    await wrapper.get('[data-testid="opd-delete-action"]').trigger("click"); await flushPromises();
+    expect(wrapper.get('[data-testid="opd-delete-dialog"]').text()).toContain("原料细化");
+    expect(wrapper.get('[data-testid="opd-delete-counts"]').text()).toContain("1 张图");
+    await wrapper.get('[data-testid="opd-delete-cancel"]').trigger("click"); expect(fixture.edit).not.toHaveBeenCalled();
+    await wrapper.get('[data-testid="p03-context-context.child"]').trigger("click"); await flushPromises();
+    expect(store.workbench.activeContextId).toBe("context.child");
+    await store.requestContextDelete("context.child"); await flushPromises();
+    await wrapper.get('[data-testid="opd-delete-confirm"]').trigger("click"); await flushPromises();
+    expect(fixture.edit).toHaveBeenLastCalledWith(expect.anything(), "context.child", { commandType: "DELETE_CONTEXT", payload: { context_id: "context.child", impact_token: "impact.child" } });
+    expect(fixture.open).toHaveBeenCalledWith("context.root");
+    expect(store.workbench.activeContextId).toBe("context.root"); expect(router.currentRoute.value.query.context).toBe("context.root");
+    expect(wrapper.find('[data-testid="p03-context-context.child"]').exists()).toBe(false);
+    expect(store.workbench.nodes[0]?.id).toBe("element.object");
+    expect(wrapper.find('[data-testid="opd-delete-dialog"]').exists()).toBe(false);
+    expect(capabilities).toHaveBeenCalledWith(expect.anything(), "context.child", "context.child", "DELETE_CONTEXT");
+    wrapper.unmount();
+  });
+
+  it("子图删除的引用阻断、只读、提交失败与取消后的迟到预览不会误删", async () => {
+    const fixture = draftFixture(); const { wrapper } = await mountWorkbench(); const store = useWorkbenchRuntimeStore();
+    store.contexts.push({ id: "context.child", label: "子图", parentId: "context.root", depth: 1 } as never);
+    const option = { command_type: "DELETE_CONTEXT", enabled: false, expires_with_token: fixture.token(), impact_token: "impact.child", context_impact: {
+      input_token: fixture.token(), context_id: "context.child", parent_context_id: "context.root", context_ids: ["context.child"],
+      counts: { contexts: 1, elements: 1, features: 0, states: 0, facts: 0 }, blockers: [{ kind: "OCCURRENCE", id: "occ.external", context_id: "context.root" }],
+    } };
+    const capabilities = vi.spyOn(DraftWorkbenchSession.prototype, "capabilities").mockResolvedValue({ data: { options: [option] } } as never);
+    await store.requestContextDelete("context.child"); await flushPromises();
+    expect(wrapper.get('[data-testid="opd-delete-blockers"]').text()).toContain("occ.external");
+    expect((wrapper.get('[data-testid="opd-delete-confirm"]').element as HTMLButtonElement).disabled).toBe(true);
+    expect(await store.confirmContextDelete()).toBeNull(); expect(fixture.edit).not.toHaveBeenCalled(); store.cancelContextDelete();
+    store.workbench.accessMode = "readonly"; await store.requestContextDelete("context.child"); expect(store.contextDelete.open).toBe(false);
+    store.workbench.accessMode = "editable";
+    option.enabled = true; option.context_impact.blockers = [];
+    fixture.edit.mockRejectedValueOnce(new LocalRuntimeApiError("DRAFT_EDIT_REJECTED", "删除被拒绝"));
+    await store.requestContextDelete("context.child"); expect(await store.confirmContextDelete()).toBeNull();
+    expect(store.contextDelete.open).toBe(true); expect(store.contextDelete.error).toContain("删除被拒绝"); store.cancelContextDelete();
+    let resolve!: (value: never) => void;
+    capabilities.mockImplementationOnce(() => new Promise(done => { resolve = done; }));
+    const pending = store.requestContextDelete("context.child"); store.cancelContextDelete();
+    resolve({ data: { options: [option] } } as never); await pending;
+    expect(store.contextDelete.open).toBe(false); expect(store.contextDelete.option).toBeNull();
+    await store.requestContextDelete("context.child");
+    store.draftToken = { ...fixture.token(), edit_seq: 2 }; await flushPromises();
+    expect(store.contextDelete.option).toBeNull(); expect(store.contextDelete.error).toContain("草稿已变化");
+    wrapper.unmount();
+  });
+
+  it("布局历史恢复完整几何，新移动清除重做，失败和重载清除历史", async () => {
+    const fixture = draftFixture();
+    const readOriginal = fixture.read.getMockImplementation()!;
+    const editOriginal = fixture.edit.getMockImplementation()!;
+    let layout = { x: 0, y: 0, width: 100, height: 60, z_order: 0 };
+    fixture.read.mockImplementation(async opened => {
+      const snapshot = await readOriginal(opened);
+      snapshot.constructs[0]!.layout = { ...layout };
+      return snapshot;
+    });
+    fixture.edit.mockImplementation(async (token, context, command) => {
+      const result = await editOriginal(token, context, command);
+      if (command.commandType === "UPDATE_LAYOUT_BATCH") layout = { ...command.payload.layouts[0]!.layout, z_order: 0 };
+      return result;
+    });
+    const { wrapper } = await mountWorkbench();
+    const store = useWorkbenchRuntimeStore();
+    const move = () => store.moveElements([{ occurrence_id: "occ.object", layout: { x: 32, y: 16, width: 160, height: 72 } }]);
+    await move(); expect(store.canUndoLayout).toBe(true);
+    await store.undoLayout(); expect(layout).toEqual({ x: 0, y: 0, width: 100, height: 60, z_order: 0 });
+    expect(store.canRedoLayout).toBe(true);
+    const input = document.createElement("input"); document.body.append(input);
+    input.dispatchEvent(new KeyboardEvent("keydown", { key: "z", ctrlKey: true, bubbles: true }));
+    expect(fixture.edit).toHaveBeenCalledTimes(2); input.remove();
+    await store.redoLayout(); expect(layout.x).toBe(32);
+    await store.undoLayout(); await move(); expect(store.canRedoLayout).toBe(false);
+    fixture.edit.mockRejectedValueOnce(new LocalRuntimeApiError("DRAFT_EDIT_REJECTED", "拒绝"));
+    await move(); expect(store.canUndoLayout).toBe(false); expect(store.workbench.nodes[0]!.x).toBe(32);
+    await move(); expect(store.canUndoLayout).toBe(true);
+    await store.load("project.1", "model.1", "context.root"); expect(store.canUndoLayout).toBe(false);
+    wrapper.unmount();
+  });
+
+  function autoLayoutFixture() {
+    const fixture = draftFixture(), readOriginal = fixture.read.getMockImplementation()!, editOriginal = fixture.edit.getMockImplementation()!;
+    const layouts = [
+      { x: 400, y: 300, width: 160, height: 72, z_order: 0 },
+      { x: 600, y: 400, width: 160, height: 100, z_order: 0 },
+    ];
+    fixture.read.mockImplementation(async opened => {
+      const snapshot = await readOriginal(opened), original = snapshot.constructs[0]!;
+      snapshot.constructs = layouts.map((layout, index) => ({ ...original, occurrence_id: `occ.${index}`,
+        target_id: `element.${index}`, label: `布局对象 ${index}`, layout: { ...layout } }));
+      return snapshot;
+    });
+    fixture.edit.mockImplementation(async (token, context, command) => {
+      const result = await editOriginal(token, context, command);
+      if (command.commandType === "UPDATE_LAYOUT_BATCH") for (const item of command.payload.layouts)
+        layouts[Number(item.occurrence_id.split(".")[1])] = { ...item.layout, z_order: 0 };
+      return result;
+    });
+    return { ...fixture, layouts };
+  }
+
+  it("自动布局预览零提交且取消还原；确认一次批量请求、撤销重做和无变化", async () => {
+    const fixture = autoLayoutFixture(), { wrapper } = await mountWorkbench(), store = useWorkbenchRuntimeStore();
+    const original = structuredClone(fixture.layouts);
+    await wrapper.get('[data-testid="opd-layout-menu-toggle"]').trigger("click"); await flushPromises();
+    (document.querySelector('[data-testid="opd-layout-auto"]') as HTMLButtonElement).click(); await flushPromises();
+    expect(wrapper.get('[data-testid="opd-auto-preview"]').text()).toContain("尚未应用");
+    expect(store.workbench.nodes[0]!.x).toBe(400); expect(store.autoLayoutNodes[0]!.x).toBe(80);
+    expect(fixture.edit).not.toHaveBeenCalled(); expect(store.canUndoLayout).toBe(false);
+    await wrapper.get('[data-testid="opd-auto-direction"]').setValue("down"); await flushPromises();
+    expect(store.autoLayoutNodes[1]!.x).toBeGreaterThan(80); expect(store.autoLayoutNodes[1]!.y).toBe(80);
+    await wrapper.get('[data-testid="opd-auto-cancel"]').trigger("click"); await flushPromises();
+    expect(store.autoLayoutPreview).toBeNull(); expect(fixture.layouts).toEqual(original);
+    store.previewAutoLayout(); await store.applyAutoLayout();
+    expect(fixture.edit).toHaveBeenCalledTimes(1);
+    expect(fixture.edit).toHaveBeenLastCalledWith(expect.anything(), "context.root", expect.objectContaining({ commandType: "UPDATE_LAYOUT_BATCH" }));
+    const applied = structuredClone(fixture.layouts); expect(store.autoLayoutPreview).toBeNull(); expect(store.canUndoLayout).toBe(true);
+    await store.undoLayout(); expect(fixture.layouts).toEqual(original);
+    await store.redoLayout(); expect(fixture.layouts).toEqual(applied);
+    store.previewAutoLayout(); expect(store.autoLayoutPreview).toBeNull(); expect(store.workbench.commandFeedback).toContain("已符合该自动布局");
+    expect(fixture.edit).toHaveBeenCalledTimes(3); wrapper.unmount();
+  });
+
+  it("草稿或几何变化取消旧预览，重载、关系编辑、只读和提交中不应用", async () => {
+    const fixture = autoLayoutFixture(), { wrapper } = await mountWorkbench(), store = useWorkbenchRuntimeStore();
+    store.previewAutoLayout(); store.draftToken = { ...store.draftToken!, edit_seq: 1 }; await flushPromises();
+    expect(store.autoLayoutPreview).toBeNull(); await store.applyAutoLayout(); expect(fixture.edit).not.toHaveBeenCalled();
+    store.previewAutoLayout(); store.workbench.nodes[0]!.x++; await flushPromises(); expect(store.autoLayoutPreview).toBeNull();
+    for (const phase of ["relation", "readonly", "submitting"] as const) {
+      if (phase === "relation") store.relationCandidate.phase = "relation-armed";
+      else if (phase === "readonly") store.workbench.accessMode = "readonly";
+      else store.workbench.commandState = "submitting";
+      store.previewAutoLayout(); expect(store.canAutoLayout).toBe(false); expect(store.autoLayoutPreview).toBeNull();
+      store.relationCandidate.phase = "idle"; store.workbench.accessMode = "editable"; store.workbench.commandState = "idle";
+    }
+    store.previewAutoLayout(); await store.load("project.1", "model.1", "context.root"); expect(store.autoLayoutPreview).toBeNull();
+    expect(fixture.edit).not.toHaveBeenCalled(); wrapper.unmount();
+  });
+
+  it("自动布局应用防重复提交，失败清预览并恢复确认几何", async () => {
+    const fixture = autoLayoutFixture(), { wrapper } = await mountWorkbench(), store = useWorkbenchRuntimeStore();
+    const original = structuredClone(fixture.layouts); let reject!: (reason: Error) => void;
+    fixture.edit.mockImplementationOnce(() => new Promise((_resolve, fail) => { reject = fail; }));
+    store.previewAutoLayout(); const applying = store.applyAutoLayout();
+    await store.applyAutoLayout(); expect(fixture.edit).toHaveBeenCalledTimes(1); expect(store.applyingAutoLayout).toBe(true);
+    expect(store.autoLayoutPreview).not.toBeNull();
+    reject(new LocalRuntimeApiError("DRAFT_EDIT_REJECTED", "自动布局应用失败")); await applying;
+    expect(store.autoLayoutPreview).toBeNull(); expect(store.applyingAutoLayout).toBe(false);
+    expect(fixture.layouts).toEqual(original); expect(store.autoLayoutNodes[0]!.x).toBe(400);
+    expect(store.canUndoLayout).toBe(false); expect(store.workbench.commandFeedback).toContain("自动布局应用失败");
+    wrapper.unmount();
+  });
+
+  it("排列菜单按末选基准批量提交，复用历史，无变化和禁用状态零请求", async () => {
+    const fixture = draftFixture();
+    const readOriginal = fixture.read.getMockImplementation()!;
+    const editOriginal = fixture.edit.getMockImplementation()!;
+    const layouts = [
+      { x: 0, y: 0, width: 100, height: 60, z_order: 0 },
+      { x: 200, y: 150, width: 160, height: 72, z_order: 0 },
+      { x: 600, y: 300, width: 120, height: 80, z_order: 0 },
+    ];
+    fixture.read.mockImplementation(async opened => {
+      const snapshot = await readOriginal(opened), original = snapshot.constructs[0]!;
+      snapshot.constructs = layouts.map((layout, index) => ({ ...original, occurrence_id: `occ.${index}`,
+        target_id: `element.${index}`, label: `对象 ${index}`, layout: { ...layout } }));
+      return snapshot;
+    });
+    fixture.edit.mockImplementation(async (token, context, command) => {
+      const result = await editOriginal(token, context, command);
+      if (command.commandType === "UPDATE_LAYOUT_BATCH") for (const item of command.payload.layouts)
+        layouts[Number(item.occurrence_id.split(".")[1])] = { ...item.layout, z_order: 0 };
+      return result;
+    });
+    const { wrapper } = await mountWorkbench(); const store = useWorkbenchRuntimeStore();
+    store.selectNodes(["element.0"]); await flushPromises();
+    expect(store.layoutArrangement.canAlign).toBe(false);
+    store.selectNodes(["element.0", "element.1", "element.2"]); await flushPromises();
+    expect(store.layoutArrangement).toMatchObject({ canAlign: true, canDistribute: true, referenceLabel: "对象 2" });
+    await wrapper.get('[data-testid="opd-layout-menu-toggle"]').trigger("click"); await flushPromises();
+    (document.querySelector('[data-testid="opd-layout-right"]') as HTMLButtonElement).click(); await flushPromises();
+    expect(fixture.edit).toHaveBeenCalledTimes(1);
+    expect(fixture.edit).toHaveBeenLastCalledWith(expect.anything(), "context.root", expect.objectContaining({
+      commandType: "UPDATE_LAYOUT_BATCH", payload: { layouts: [
+        { occurrence_id: "occ.0", layout: { x: 620, y: 0, width: 100, height: 60 } },
+        { occurrence_id: "occ.1", layout: { x: 560, y: 150, width: 160, height: 72 } },
+      ] },
+    }));
+    await store.arrangeSelection("right"); expect(fixture.edit).toHaveBeenCalledTimes(1);
+    expect(store.workbench.commandFeedback).toContain("已符合该布局");
+    await store.undoLayout(); expect(layouts[0]!.x).toBe(0); expect(layouts[1]!.x).toBe(200);
+    await store.redoLayout(); expect(layouts[0]!.x).toBe(620); expect(layouts[1]!.x).toBe(560);
+    const calls = fixture.edit.mock.calls.length;
+    store.workbench.commandState = "submitting"; await store.arrangeSelection("left");
+    expect(store.layoutArrangement.canAlign).toBe(false); expect(fixture.edit).toHaveBeenCalledTimes(calls);
+    store.workbench.commandState = "idle";
+    store.relationCandidate.phase = "armed"; await store.arrangeSelection("left");
+    expect(store.layoutArrangement.canAlign).toBe(false); expect(fixture.edit).toHaveBeenCalledTimes(calls);
+    store.relationCandidate.phase = "idle";
+    wrapper.unmount();
+  });
+
+  it("细化所选 Object 后进入子 OPD，并可沿父边返回", async () => {
+    const { token, open, read, edit } = draftFixture();
+    const originalOpen = open.getMockImplementation()!;
+    open.mockImplementation(async context => ({ ...await originalOpen(context), context_id: context ?? "context.root" }));
+    read.mockImplementation(async opened => ({
+      opened, project: { name: "项目" }, model: { name: "草稿模型", profile_id: "profile.1", profile_version: "0.2.0", head_revision: "revision.1" },
+      history: [{ revision_id: "revision.1", sequence: 1, kind: "DRAFT", created_at: "2026-09-14T00:00:00Z" }],
+      navigation: { current_path: opened.context_id === "context.child" ? ["context.root", "context.child"] : ["context.root"],
+        process_tree: [{ context_id: "context.root", label: "SD", context_kind: "SYSTEM_DIAGRAM", has_children: token().edit_seq > 0 }],
+        object_forest: token().edit_seq > 0 ? [{ context_id: "context.child", label: "原料细化", context_kind: "OBJECT_REFINEMENT", has_children: false,
+          parent_context_id: "context.root", refinee_element_id: "element.object" }] : [], views: [] },
+      constructs: opened.context_id === "context.child" ? [] : [{ occurrence_id: "occ.object", target_id: "element.object", target_kind: "ELEMENT", construct_role: "OBJECT_NODE", label: "Material", layout: { x: 80, y: 80, width: 160, height: 72, z_order: 0 }, capability_id: "CAP-OBJECT-001" }],
+      suppressed: [], text: { sentences: [], traces: [] }, findings: { items: [], validation_summary: { blocking: 0, coverage_state: "INCOMPLETE" } }, catalog: [],
+    }) as never);
+    vi.spyOn(DraftWorkbenchSession.prototype, "capabilities").mockImplementation(async () => ({ data: { options: [{
+      command_type: "CREATE_CONTEXT", enabled: true, capability_query_id: "query.refine", option_id: "option.refine",
+    }] } }) as never);
+    const { wrapper, router } = await mountWorkbench();
+    expect(wrapper.find('[data-testid="opd-refinement-panel"]').exists()).toBe(false);
+    useWorkbenchRuntimeStore().workbench.selectedId = ""; await flushPromises();
+    await wrapper.get('[data-testid="opd-add-context.root"]').trigger("click"); await flushPromises();
+    expect(wrapper.get('[data-testid="opd-refinement-panel"]').text()).toContain("请先在画布选择");
+    await wrapper.get('[data-testid="opd-refinement-cancel"]').trigger("click");
+    expect(edit).not.toHaveBeenCalled();
+    await wrapper.get('[data-testid="p03-canvas-select-object"]').trigger("click");
+    expect(wrapper.find('[data-testid="opd-refinement-panel"]').exists()).toBe(false);
+    // 菜单目标按出现位置确定，不能误用打开菜单前的其他选择。
+    useWorkbenchRuntimeStore().workbench.selectedId = "";
+    await useWorkbenchRuntimeStore().requestConstructActions("occ.object"); await flushPromises();
+    await wrapper.get('[data-testid="p03-construct-add-refinement"]').trigger("click"); await flushPromises();
+    expect(wrapper.find('[data-testid="p03-construct-actions-menu"]').exists()).toBe(false);
+    expect(wrapper.get('[data-testid="opd-refinement-panel"]').text()).toContain("细化：Material");
+    expect(edit).not.toHaveBeenCalled();
+    await useWorkbenchRuntimeStore().requestConstructActions("occ.object"); await flushPromises();
+    await wrapper.get('[data-testid="p03-construct-add-refinement"]').trigger("click"); await flushPromises();
+    expect(wrapper.find('[data-testid="opd-refinement-panel"]').exists()).toBe(true);
+    await wrapper.get('[data-testid="opd-refinement-name"]').setValue("原料细化");
+    await wrapper.get('[data-testid="opd-refine"]').trigger("click"); await flushPromises();
+    expect(edit).toHaveBeenCalledWith(expect.anything(), "context.root", expect.objectContaining({ commandType: "CREATE_CONTEXT",
+      payload: expect.objectContaining({ refinee_element_id: "element.object", name: "原料细化" }) }));
+    expect(router.currentRoute.value.query.context).toBe("context.child");
+    expect(wrapper.get('[data-testid="opd-parent"]').attributes("aria-label")).toBe("返回父 OPD");
+    await wrapper.get('[data-testid="opd-parent"]').trigger("click"); await flushPromises();
+    expect(router.currentRoute.value.query.context).toBe("context.root");
+    const capabilities = vi.mocked(DraftWorkbenchSession.prototype.capabilities);
+    const queried = capabilities.mock.calls.length, edited = edit.mock.calls.length;
+    const store = useWorkbenchRuntimeStore();
+    store.workbench.accessMode = "readonly";
+    await store.requestConstructActions("occ.object"); await flushPromises();
+    expect(capabilities).toHaveBeenCalledTimes(queried);
+    expect(wrapper.find('[data-testid="p03-construct-add-refinement"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="p03-construct-delete-action"]').exists()).toBe(false);
+    expect(wrapper.get('[data-testid="p03-construct-expand-refinement"]').attributes("disabled")).toBeUndefined();
+    store.workbench.commandState = "submitting"; await flushPromises();
+    expect(wrapper.get('[data-testid="p03-construct-expand-refinement"]').attributes("disabled")).toBeDefined();
+    store.workbench.commandState = "idle"; await flushPromises();
+    await wrapper.get('[data-testid="p03-construct-expand-refinement"]').trigger("click"); await flushPromises();
+    expect(router.currentRoute.value.query.context).toBe("context.child");
+    expect(edit).toHaveBeenCalledTimes(edited);
+    wrapper.unmount();
+  });
+
+  it("引用元素与忙碌状态的右键添加子图入口禁用", async () => {
+    const { edit } = draftFixture();
+    const { wrapper } = await mountWorkbench();
+    const store = useWorkbenchRuntimeStore();
+    await store.requestConstructActions("occ.object"); await flushPromises();
+    expect(wrapper.get('[data-testid="p03-construct-add-refinement"]').attributes("disabled")).toBeUndefined();
+    store.workbench.nodes[0]!.occurrenceRole = "reference"; await flushPromises();
+    expect(wrapper.get('[data-testid="p03-construct-add-refinement"]').attributes("disabled")).toBeDefined();
+    expect(wrapper.get('[data-testid="p03-construct-add-refinement"]').attributes("title")).toContain("引用元素");
+    store.workbench.nodes[0]!.occurrenceRole = "owned";
+    store.workbench.commandState = "submitting"; await flushPromises();
+    expect(wrapper.get('[data-testid="p03-construct-add-refinement"]').attributes("disabled")).toBeDefined();
+    expect(edit).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+
+  it("切换已有 OPD 等待读取时不插入顶部加载提示，首次打开仍显示", async () => {
+    let releaseInitial!: () => void;
+    const initialWait = new Promise<void>((resolve) => { releaseInitial = resolve; });
+    const originalSession = api.workspaceSession.getMockImplementation()!;
+    api.workspaceSession.mockImplementationOnce(async (...args: unknown[]) => { await initialWait; return originalSession(...args); });
+    const { wrapper, router } = await mountWorkbench();
+    expect(wrapper.get(".workbench-notices").text()).toContain("正在读取 Local Runtime 工作台会话。");
+    releaseInitial(); await flushPromises();
+
+    let releaseSwitch!: () => void;
+    const switchWait = new Promise<void>((resolve) => { releaseSwitch = resolve; });
+    api.workspaceSession.mockImplementationOnce(async (...args: unknown[]) => { await switchWait; return originalSession(...args); });
+    await router.push({ query: { context: "context.child" } }); await flushPromises();
+    const store = useWorkbenchRuntimeStore();
+    expect(store.workbench.resourceState).toBe("loading");
+    expect(wrapper.find(".workbench-notices").exists()).toBe(false);
+    expect(wrapper.get(".workbench-grid").exists()).toBe(true);
+    releaseSwitch(); await flushPromises();
+    expect(store.workbench.resourceState).toBe("ready");
+    wrapper.unmount();
+  });
 
   it("V2 保存按钮与快捷键不调用 V1，卸载后撤销快捷键", async () => {
     const { save } = draftFixture(); const { wrapper, router } = await mountWorkbench();
@@ -224,9 +556,9 @@ describe("WorkbenchView", () => {
     const { save } = draftFixture(); const { wrapper } = await mountWorkbench();
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "s", ctrlKey: true, isComposing: true })); await flushPromises();
     expect(save).not.toHaveBeenCalled();
-    const store = useWorkbenchRuntimeStore(); store.stateCandidate.phase = "editing";
+    const store = useWorkbenchRuntimeStore(); store.controlCandidate.phase = "choosing";
     await wrapper.get('[data-testid="hs-save"]').trigger("click"); await flushPromises(); expect(save).not.toHaveBeenCalled();
-    store.stateCandidate.phase = "idle";
+    store.controlCandidate.phase = "idle";
     save.mockRejectedValueOnce(new LocalRuntimeApiError("PERSISTENCE_FAILED", "写入失败", true));
     await wrapper.get('[data-testid="hs-save"]').trigger("click"); await flushPromises();
     expect(wrapper.get('[data-testid="hs-save-state"]').text()).toBe("保存失败");
@@ -242,6 +574,17 @@ describe("WorkbenchView", () => {
     await wrapper.get('[data-testid="p03-copy-permalink"]').trigger("click"); await flushPromises(); expect(writeText).not.toHaveBeenCalled();
     await wrapper.get('[data-testid="p03-copy-permalink"]').trigger("click"); await flushPromises();
     expect(writeText).toHaveBeenCalledWith(expect.stringContaining("revision=revision.pinned")); wrapper.unmount();
+  });
+
+  it("头部将版本状态与命令操作分组且保留原控制入口", async () => {
+    const { wrapper } = await mountWorkbench();
+
+    expect(wrapper.get(".workbench-header__revision-group").find('[data-testid="hs-draft-identity"]').exists()).toBe(true);
+    expect(wrapper.get(".workbench-header__revision-group").find('[data-testid="p03-version-select"]').exists()).toBe(true);
+    expect(wrapper.get(".workbench-header__revision-group").find('[data-testid="hs-save-state"]').exists()).toBe(true);
+    expect(wrapper.get(".workbench-header__actions").find('[data-testid="p03-copy-permalink"] svg').exists()).toBe(true);
+    expect(wrapper.get('[data-testid="p03-run-validation"]').classes()).toContain("button--primary");
+    expect(wrapper.get('[data-testid="p03-run-validation"] svg').exists()).toBe(true);
   });
 
   it("V2 读取失败不降级 V1，也不显示旧画布", async () => {
@@ -350,8 +693,53 @@ describe("WorkbenchView", () => {
     wrapper.unmount();
   });
 
+  it("导航宽度跨 TAB 和只读版本保持，调整不提交模型命令", async () => {
+    const { wrapper, router } = await mountWorkbench();
+    await wrapper.get('[data-testid="opd-navigator-resizer"]').trigger("keydown", { key: "ArrowRight" });
+    const style = () => wrapper.get('[data-testid="p03-workbench"]').attributes("style");
+    expect(style()).toContain("--workbench-navigator-width: 250px");
+    await wrapper.get('[data-testid="p03-tab-history"]').trigger("click");
+    await router.push({ query: { revision: "revision.1", context: "context.root" } });
+    await flushPromises();
+    expect(style()).toContain("--workbench-navigator-width: 250px");
+    await wrapper.get('[data-testid="opd-navigator-resizer"]').trigger("keydown", { key: "ArrowLeft" });
+    expect(style()).toContain("--workbench-navigator-width: 230px");
+    expect(api.executeP0Command).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+
+  it("左侧助手独立于底部和属性区，切换保留输入与分别调整的宽度", async () => {
+    vi.mocked(assistantRequest).mockResolvedValue([{ id: 'session.fixed', projectId: 'project.1', modelId: 'model.1', contextId: 'context.root', title: 'OPD 会话', updatedAt: '1', messages: [], proposals: [], run: null }]);
+    const { wrapper } = await mountWorkbench();
+    expect(wrapper.find('[data-testid="assistant-panel"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="p03-tab-assistant"]').exists()).toBe(false);
+    await wrapper.get('[data-testid="opd-navigator-resizer"]').trigger("keydown", { key: "ArrowRight" });
+    await wrapper.get('[data-testid="left-tab-assistant"]').trigger("click"); await flushPromises();
+    const panel = wrapper.get('[data-testid="assistant-panel"]');
+    const input = panel.get('textarea'); await input.setValue('还没发送的建模需求');
+    const style = () => wrapper.get('[data-testid="p03-workbench"]').attributes('style');
+    expect(style()).toContain('--workbench-navigator-width: 360px');
+    await wrapper.get('[data-testid="opd-navigator-resizer"]').trigger("keydown", { key: "ArrowRight" });
+    await wrapper.get('[data-testid="p03-bottom-toggle"]').trigger('click');
+    expect(useWorkbenchRuntimeStore().workbench.bottomPanelExpanded).toBe(false);
+    await wrapper.get('[data-testid="left-tab-navigation"]').trigger('click');
+    expect(style()).toContain('--workbench-navigator-width: 250px');
+    expect(wrapper.get('#left-assistant-content').attributes('style')).toContain('display: none');
+    await wrapper.get('[data-testid="left-tab-navigation"]').trigger('keydown', { key: 'ArrowRight' }); await flushPromises();
+    expect(style()).toContain('--workbench-navigator-width: 380px');
+    expect(wrapper.get('[data-testid="assistant-input"]').element).toBe(input.element);
+    expect((input.element as HTMLTextAreaElement).value).toBe('还没发送的建模需求');
+    await wrapper.get('[data-testid="opd-navigator-resizer"]').trigger('dblclick');
+    expect(style()).toContain('--workbench-navigator-width: 360px');
+    expect(assistantRequest).toHaveBeenCalledTimes(1);
+    expect(watchAssistant).toHaveBeenCalledTimes(1);
+    expect(api.executeP0Command).not.toHaveBeenCalled(); wrapper.unmount();
+  });
+
   it("底部标签均可折叠恢复，保留校验状态且提交不会强制展开", async () => {
     const { wrapper, router } = await mountWorkbench();
+    await wrapper.get('[data-testid="p03-bottom-resizer"]').trigger("keydown", { key: "ArrowUp" });
+    expect(wrapper.get('[data-testid="p03-workbench"]').attributes("style")).toContain("--workbench-bottom-height: 260px");
     const toggle = wrapper.get('[data-testid="p03-bottom-toggle"]');
     const location = router.currentRoute.value.fullPath;
     for (const tab of ["text", "findings", "history", "method"]) {
@@ -359,9 +747,11 @@ describe("WorkbenchView", () => {
       expect(toggle.attributes("aria-expanded")).toBe("true");
       await toggle.trigger("click");
       expect(wrapper.get('#p03-bottom-content').isVisible()).toBe(false);
+      expect(wrapper.find('[data-testid="p03-bottom-resizer"]').exists()).toBe(false);
       expect(wrapper.get('.validation-status').isVisible()).toBe(true);
       expect(wrapper.get('[data-testid="p03-capture-view-state"]').attributes("data-bottom-open")).toBe("false");
       await toggle.trigger("click");
+      expect(wrapper.get('[data-testid="p03-bottom-resizer"]').attributes("aria-valuenow")).toBe("260");
       expect(wrapper.get(`[data-testid="p03-tab-${tab}"]`).attributes("aria-selected")).toBe("true");
       await wrapper.get(`[data-testid="p03-tab-${tab}"]`).trigger("click");
       expect(toggle.attributes("aria-expanded")).toBe("false");
@@ -469,12 +859,42 @@ describe("WorkbenchView", () => {
     const { wrapper, router } = await mountWorkbench();
 
     expect(wrapper.get('[data-testid="p03-opl-sentence"]').text()).toBe("Transform consumes Material.");
-    expect(wrapper.get('[data-testid="p03-context-context.root"]').text()).toContain("SD");
+    expect(wrapper.get('[data-testid="p03-context-context.root"]').text()).toBe("生产模型");
+    expect(wrapper.get('[data-testid="p03-context-context.root"]').attributes("title")).toBe("生产模型（SD · 根图）");
+    expect(wrapper.get('[data-testid="opd-add-context.root"]').attributes("aria-label")).toBe("在 生产模型 下创建子图");
     expect(router.currentRoute.value.query).toEqual({ context: "context.root" });
 
     await wrapper.get('[data-testid="p03-opl-sentence"]').trigger("click");
+    const store = useWorkbenchRuntimeStore();
+    expect(store.highlightedTextNodeIds).toEqual(["element.object", "element.process"]);
+    expect(store.highlightedTextRelationIds).toEqual(["fact.consumption"]);
+    expect(store.selectedIds).toEqual([]);
+    expect(wrapper.get('[data-testid="p03-opl-sentence"]').attributes("aria-pressed")).toBe("true");
     await openRightPanel(wrapper);
     expect(wrapper.text()).toContain("fact.consumption");
+    await wrapper.get('[data-testid="p03-canvas-select-product"]').trigger("click");
+    expect(store.highlightedTextNodeIds).toEqual([]);
+    expect(store.selectedTextLineId).toBe("");
+  });
+
+  it("OPL 状态和属性按 occurrence 定位并包含所属元素，空白和切图清除定位", async () => {
+    const { wrapper } = await mountWorkbench("?revision=revision.1");
+    const store = useWorkbenchRuntimeStore();
+    store.textLines = [{ id: "sentence.state", text: "Ready Material owns Product.", factIds: ["fact.structural"], occurrenceIds: ["occ.state", "occ.object.product"] },
+      { id: "sentence.feature", text: "Material exhibits Temperature.", factIds: [], occurrenceIds: ["occ.attribute"] }];
+    await flushPromises();
+    await wrapper.findAll('[data-testid="p03-opl-sentence"]')[0]!.trigger("click");
+    expect(store.highlightedTextNodeIds).toEqual(["element.object.product", "state.material.ready", "element.object"]);
+    expect(store.workbench.selectedId).toBe("fact.structural");
+    expect(store.isReadonly).toBe(true);
+    await wrapper.findAll('[data-testid="p03-opl-sentence"]')[1]!.trigger("click");
+    expect(store.highlightedTextNodeIds).toEqual(["feature.attribute", "element.object"]);
+    store.selectNodes([]);
+    expect(store.highlightedTextNodeIds).toEqual([]);
+    store.locateText(store.textLines[1]!);
+    await store.selectContext("context.other");
+    expect(store.highlightedTextNodeIds).toEqual([]);
+    wrapper.unmount();
   });
 
   it("选择和平移工具互斥，并把当前工具传给画布", async () => {
@@ -520,6 +940,7 @@ describe("WorkbenchView", () => {
     await wrapper.get('[data-testid="p03-canvas-delete-state"]').trigger("click");
     await flushPromises();
     expect(wrapper.get('[data-testid="p03-construct-open-properties"]').text()).toBe("打开属性");
+    expect(wrapper.find('[data-testid="p03-construct-add-refinement"]').exists()).toBe(false);
     const capabilityCalls = api.commandCapabilities.mock.calls.length;
     await wrapper.get('[data-testid="p03-construct-open-properties"]').trigger("click");
     await flushPromises();
@@ -547,7 +968,11 @@ describe("WorkbenchView", () => {
     expect(wrapper.get('[data-testid="p03-tool-attribute"] svg rect').exists()).toBe(true);
     expect(wrapper.get('[data-testid="p03-tool-operation"] svg ellipse').exists()).toBe(true);
     expect(wrapper.get('[data-testid="p03-tool-state"] svg').findAll("rect")).toHaveLength(2);
-    expect(wrapper.get('[data-testid="p03-zoom-fit"]').attributes("title")).toBe("恢复 100% / Reset zoom to 100%");
+    expect(toolchain.find('[data-testid="p03-zoom-controls"]').exists()).toBe(false);
+    expect(wrapper.find(".canvas-state").exists()).toBe(false);
+    await wrapper.get('[data-testid="p03-zoom-menu-toggle"]').trigger("click");
+    expect(wrapper.get('[data-testid="p03-zoom-fit"]').attributes("title")).toBe("适应画布 / Fit to view");
+    expect(wrapper.get('[data-testid="p03-zoom-reset"]').attributes("title")).toBe("恢复 100% / Reset zoom to 100%");
     expect(wrapper.find(".relation-tool-palette__heading").exists()).toBe(false);
     expect(wrapper.findAll(".relation-tool-palette__separator")).toHaveLength(2);
     expect(wrapper.findAll('[data-testid^="p03-relation-quick-option-CAP-ISO-PROC-"]')).toHaveLength(4);
@@ -592,7 +1017,7 @@ describe("WorkbenchView", () => {
     await wrapper.get('[data-testid="p03-relation-menu-toggle-STRUCTURAL"]').trigger("click");
     expect(wrapper.find('[data-testid="p03-relation-menu-PROCEDURAL"]').exists()).toBe(false);
     expect(wrapper.findAll('[data-testid^="p03-relation-menu-option-CAP-ISO-STRUCT-"]')).toHaveLength(10);
-    expect(wrapper.find('[data-glyph-kind="closed-both"]').exists()).toBe(true);
+    expect(wrapper.find('[data-glyph-kind="state-effect-pair"]').exists()).toBe(true);
     expect(wrapper.find('[data-glyph-kind="filled-circle"]').exists()).toBe(true);
     expect(wrapper.find('[data-glyph-kind="open-circle"]').exists()).toBe(true);
     expect(wrapper.find('[data-glyph-kind="fan-exhibition"]').exists()).toBe(true);
@@ -754,6 +1179,27 @@ describe("WorkbenchView", () => {
     expect(api.projection).toHaveBeenLastCalledWith("project.1", "model.1", "context.root", "revision.2");
   });
 
+  it.each([
+    ["attribute", "feature.attribute", "CAP-FEAT-ATTRIBUTE-001", "属性改名"],
+    ["operation", "feature.operation", "CAP-FEAT-OPERATION-001", "操作改名"],
+  ])("右侧原属性面板可编辑 %s 名称", async (kind, targetId, capabilityId, value) => {
+    api.commandCapabilities.mockImplementation((...args: unknown[]) => args[5] === "UPDATE_PROPERTY"
+      ? Promise.resolve({ data: nameEditCapabilities("FEATURE", targetId, capabilityId) })
+      : Promise.resolve({ data: { allowed: ["CREATE_ELEMENT", "CREATE_FACT", "UPDATE_LAYOUT"], forbidden: [], capability_query_id: "query.1", options: [] } }));
+    const { wrapper } = await mountWorkbench();
+    await wrapper.get(`[data-testid="p03-canvas-select-${kind}"]`).trigger("click");
+    await wrapper.get('[data-testid="p03-right-panel-open"]').trigger("click");
+    expect(wrapper.text()).not.toContain("此类元素暂不支持名称编辑");
+    const field = wrapper.get('[data-testid="p03-inspector-name"]');
+    await field.setValue(value); await field.trigger("keydown", { key: "Enter" }); await flushPromises();
+    expect(api.executeP0Command).toHaveBeenCalledWith("project.1", "model.1", "context.root", "revision.1", {
+      commandType: "UPDATE_PROPERTY", payload: {
+        target_ref: { target_kind: "FEATURE", target_id: targetId }, property_name: "name", value,
+        capability_query_id: "query.property.1", selected_option_id: "option.property.1",
+      },
+    });
+  });
+
   it("名称编辑采用 Runtime option、封闭 payload 并重读 committed revision", async () => {
     api.commandCapabilities.mockImplementation((...args: unknown[]) => args[5] === "UPDATE_PROPERTY"
       ? Promise.resolve({ data: nameEditCapabilities() })
@@ -822,28 +1268,52 @@ describe("WorkbenchView", () => {
     await flushPromises();
     expect(api.executeP0Command).toHaveBeenCalledWith("project.1", "model.1", "context.root", "revision.1", expect.objectContaining({
       commandType: "CREATE_FEATURE",
-      payload: expect.objectContaining({ feature_kind: "ATTRIBUTE", owner_element_id: "element.object" }),
+      payload: expect.objectContaining({ feature_kind: "ATTRIBUTE", owner_element_id: "element.object", layout: { x: 296, y: 272 } }),
     }));
   });
 
-  it("State 候选采用 Runtime option 后提交 CREATE_STATE", async () => {
-    const { wrapper } = await mountWorkbench();
-    api.commandCapabilities.mockResolvedValueOnce({ data: {
+  it("State 仅在选择 Object 时可用并一次点击直接提交 CREATE_STATE", async () => {
+    api.commandCapabilities.mockImplementation((...args: unknown[]) => args[5] === "CREATE_STATE" ? Promise.resolve({ data: {
       allowed: ["CREATE_ELEMENT", "CREATE_FACT", "CREATE_STATE"], forbidden: [], capability_query_id: "query.state.1",
       options: [{ capability_query_id: "query.state.1", option_id: "option.state.1", command_type: "CREATE_STATE", capability_ref: { capability_id: "CAP-STATE-001" }, display_name: "创建 Object State", group_path: ["Object", "State"], normalized_endpoints: [], required_fields: [], allowed_modifiers: [], symbol_descriptor: { id: "symbol.state", version: "0.1.0", digest: "digest" }, template_family: { id: "grammar", version: "0.1.0", digest: "digest" }, rule_refs: [], enabled: true, reason_codes: [], expires_with_revision: "revision.1" }],
-    } });
+    } }) : Promise.resolve({ data: { allowed: [], forbidden: [], capability_query_id: "query.other.1", options: [] } }));
+    const { wrapper } = await mountWorkbench();
+
+    await wrapper.get('[data-testid="p03-canvas-select-process"]').trigger("click");
+    await flushPromises();
+    expect(wrapper.get('[data-testid="p03-tool-state"]').attributes("disabled")).toBeDefined();
+    expect(api.commandCapabilities).not.toHaveBeenCalledWith(
+      "project.1", "model.1", "context.root", "revision.1", "element.process", "CREATE_STATE",
+    );
+
+    await wrapper.get('[data-testid="p03-canvas-select-attribute"]').trigger("click");
+    await flushPromises();
+    expect(wrapper.get('[data-testid="p03-tool-state"]').attributes("disabled")).toBeDefined();
+    expect(api.commandCapabilities).not.toHaveBeenCalledWith(
+      "project.1", "model.1", "context.root", "revision.1", "feature.attribute", "CREATE_STATE",
+    );
 
     await wrapper.get('[data-testid="p03-canvas-select-object"]').trigger("click");
     await flushPromises();
     expect(wrapper.get('[data-testid="p03-tool-state"]').attributes("disabled")).toBeUndefined();
     await wrapper.get('[data-testid="p03-tool-state"]').trigger("click");
-    await wrapper.get('[data-testid="p03-canvas-place-state"]').trigger("click");
-    await flushPromises();
-    await wrapper.get('[data-testid="p03-state-name"]').setValue("Ready");
-    await wrapper.get('[data-testid="p03-state-candidate"]').trigger("submit");
     await flushPromises();
 
-    expect(api.executeP0Command).toHaveBeenLastCalledWith("project.1", "model.1", "context.root", "revision.1", expect.objectContaining({ commandType: "CREATE_STATE", payload: expect.objectContaining({ name_or_value: "Ready", owner_ref: { target_kind: "ELEMENT", target_id: "element.object" } }) }));
+    expect(wrapper.find('[data-testid="p03-state-candidate"]').exists()).toBe(false);
+    expect(api.executeP0Command).toHaveBeenLastCalledWith("project.1", "model.1", "context.root", "revision.1", {
+      commandType: "CREATE_STATE",
+      payload: {
+        context_id: "context.root",
+        owner_ref: { target_kind: "ELEMENT", target_id: "element.object" },
+        capability_ref: { capability_id: "CAP-STATE-001" },
+        name_or_value: "State 2",
+        state_roles: [],
+        occurrence: { ownership: "OWNED", construct_role: "STATE_NODE" },
+        layout: { x: 116, y: 154 },
+        capability_query_id: "query.state.1",
+        selected_option_id: "option.state.1",
+      },
+    });
   });
 
   it("State 删除点击 Runtime 菜单项后直接提交 impact token", async () => {
@@ -890,6 +1360,12 @@ describe("WorkbenchView", () => {
 
     expect(wrapper.get('[data-testid="p03-state-inspector"]').exists()).toBe(true);
     expect(wrapper.get('[data-testid="p03-state-inspector-name"]').element.tagName).toBe("INPUT");
+    expect(wrapper.get(".inspector-panel__body").exists()).toBe(true);
+    expect(wrapper.get(".inspector-panel__title").text()).toContain("属性面板");
+    expect(wrapper.get('[data-testid="p03-state-inspector"]').findAll(".inspector-section__heading").map(section => section.text())).toEqual([
+      "基本信息", "状态角色", "显示方式", "标识信息",
+    ]);
+    expect(wrapper.get('[data-testid="p03-state-inspector"]').get('button.button--primary').text()).toBe("保存 State");
   });
 
   it("Object inspector 通过 Projection 清单显式化抑制 State", async () => {
@@ -1436,7 +1912,7 @@ describe("WorkbenchView", () => {
   });
 });
 
-function endpoint(role: string, targetKind: "ELEMENT" | "STATE", targetId: string, ordinal: number) {
+function endpoint(role: string, targetKind: "ELEMENT" | "STATE" | "FEATURE", targetId: string, ordinal: number) {
   return { role, target_ref: { target_kind: targetKind, target_id: targetId }, ordinal };
 }
 
@@ -1470,7 +1946,7 @@ function stateDeleteOption(mode: "REMOVE_OCCURRENCE" | "DELETE_TARGET" | "CASCAD
   };
 }
 
-function nameEditCapabilities() {
+function nameEditCapabilities(targetKind: "ELEMENT" | "FEATURE" = "ELEMENT", targetId = "element.object", capabilityId = "CAP-OBJECT-001") {
   return {
     allowed: ["UPDATE_PROPERTY"],
     forbidden: [],
@@ -1479,10 +1955,10 @@ function nameEditCapabilities() {
       capability_query_id: "query.property.1",
       option_id: "option.property.1",
       command_type: "UPDATE_PROPERTY",
-      capability_ref: { capability_id: "CAP-OBJECT-001" },
+      capability_ref: { capability_id: capabilityId },
       display_name: "编辑 Object 名称",
       group_path: ["Element", "名称"],
-      normalized_endpoints: [endpoint("PROPERTY_TARGET", "ELEMENT", "element.object", 0)],
+      normalized_endpoints: [endpoint("PROPERTY_TARGET", targetKind, targetId, 0)],
       required_fields: [
         { field_id: "target_ref", field_kind: "ENDPOINT", required: true, allowed_values: [] },
         { field_id: "property_name", field_kind: "ENUM", required: true, allowed_values: ["name"] },

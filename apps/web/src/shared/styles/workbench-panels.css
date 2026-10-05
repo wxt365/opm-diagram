@@ -1,6 +1,9 @@
 .panel-heading {
-  align-items: flex-start;
-  padding-bottom: 10px;
+  flex: 0 0 auto;
+  align-items: center;
+  min-height: 64px;
+  padding: 11px 14px;
+  background: #ffffff;
   border-bottom: 1px solid #dbe3e9;
 }
 
@@ -9,17 +12,25 @@
   display: block;
 }
 
-.panel-heading div > span {
-  margin-bottom: 4px;
+.inspector-panel__title > span {
+  margin-bottom: 2px;
   color: #687582;
-  font-size: 12px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.inspector-panel__title strong {
+  color: #17212b;
+  font-size: 16px;
+  line-height: 1.25;
 }
 
 .panel-heading .profile-tag {
-  max-width: 58%;
+  max-width: 150px;
   text-align: right;
-  white-space: normal;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .inspector-panel__heading-actions {
@@ -51,8 +62,89 @@
   outline: none;
 }
 
+.inspector-panel__body {
+  min-height: 0;
+  overflow: auto;
+  background: #ffffff;
+  scrollbar-width: thin;
+}
+
+.inspector-content {
+  min-width: 0;
+}
+
+.inspector-section {
+  padding: 16px;
+  border-bottom: 1px solid #e5eaee;
+}
+
+.inspector-section:last-child {
+  border-bottom: 0;
+}
+
+.inspector-section--primary {
+  padding-top: 18px;
+}
+
+.inspector-section--meta {
+  background: #f8fafb;
+}
+
+.inspector-section__heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 18px;
+  margin-bottom: 10px;
+  color: #53616d;
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .inspector-panel .form-field {
-  margin-top: 16px;
+  margin: 0;
+}
+
+.inspector-panel .form-field input,
+.inspector-panel .form-field select {
+  min-height: 36px;
+}
+
+.inspector-panel .form-readonly {
+  grid-template-columns: 82px minmax(0, 1fr);
+}
+
+.inspector-section--meta .form-readonly {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 3px;
+}
+
+.inspector-panel .form-readonly code,
+.inspector-panel .form-readonly strong {
+  min-width: 0;
+  text-align: left;
+  word-break: break-word;
+}
+
+.inspector-panel .element-name-property {
+  padding: 0;
+  border-bottom: 0;
+}
+
+.inspector-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.inspector-actions--single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.inspector-actions .button,
+.inspector-section > .button {
+  width: 100%;
 }
 
 .disabled-reason {
@@ -61,13 +153,22 @@
 }
 
 .empty-inspector {
-  margin: 16px 0 0;
+  display: grid;
+  min-height: 180px;
+  padding: 24px;
   color: #687582;
   font-size: 13px;
   line-height: 1.55;
+  text-align: center;
+  place-items: center;
+}
+
+.empty-inspector p {
+  margin: 0;
 }
 
 .bottom-panel {
+  position: relative;
   min-width: 0;
   overflow: hidden;
   background: #ffffff;

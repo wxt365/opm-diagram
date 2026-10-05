@@ -1,8 +1,36 @@
+@media (max-width: 1280px) {
+  .workbench,
+  .workbench.workbench--bottom-collapsed {
+    grid-template-rows: auto minmax(0, 1fr) 38px;
+  }
+
+  .workbench:not(.workbench--bottom-collapsed) {
+    grid-template-rows: auto minmax(0, 1fr) var(--workbench-bottom-height, 240px);
+  }
+
+  .workbench-header {
+    flex-wrap: wrap;
+    gap: 8px 16px;
+    min-height: 64px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+
+  .workbench-header__context,
+  .workbench-header__status {
+    width: 100%;
+  }
+
+  .workbench-header__status {
+    justify-content: space-between;
+  }
+}
+
 @media (max-width: 980px) {
   .workbench {
     height: auto;
     min-height: calc(100vh - 56px);
-    grid-template-rows: auto auto 240px;
+    grid-template-rows: auto auto var(--workbench-bottom-height, 240px);
   }
 
   .workbench.workbench--bottom-collapsed {
@@ -20,11 +48,12 @@
   }
 
   .workbench-grid {
-    grid-template-columns: 210px minmax(0, 1fr);
+    grid-template-columns: var(--workbench-navigator-width, 210px) minmax(0, 1fr);
   }
 
   .inspector-panel {
     grid-column: 1 / -1;
+    max-height: 460px;
     border-top: 1px solid #cdd7df;
     border-left: 0;
   }
@@ -83,6 +112,19 @@
 
   .page-heading .button {
     width: 100%;
+  }
+
+  .model-card__footer {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .project-detail .section-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .model-card__actions .button {
+    flex: 1;
   }
 
   .list-toolbar {
@@ -151,9 +193,30 @@
     width: 100%;
   }
 
+  .workbench-header__status,
+  .workbench-header__revision-group,
+  .workbench-header__actions {
+    flex-wrap: wrap;
+  }
+
   .back-link,
   .workbench-header__context strong {
     max-width: 100%;
+  }
+
+  .workbench-header__divider {
+    display: none;
+  }
+
+  .workbench-header__actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .workbench-header .workbench-header__button {
+    width: 100%;
+    white-space: normal;
   }
 
   .workbench-grid {
@@ -167,6 +230,10 @@
 
   .editor-panel {
     min-height: 420px;
+  }
+
+  .inspector-panel {
+    max-height: 420px;
   }
 
   .editor-toolbar {

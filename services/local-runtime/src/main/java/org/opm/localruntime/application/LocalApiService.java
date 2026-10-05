@@ -16,7 +16,6 @@ import org.opm.localruntime.semantic.SemanticRevisionJsonWriter;
 import org.opm.localruntime.semantic.SemanticRevisionReader;
 import org.opm.localruntime.semantic.SemanticRevisionValidator;
 import org.opm.localruntime.storage.ProjectDatabaseFactory;
-import org.opm.localruntime.storage.ProjectDatabaseOpenResult;
 import org.opm.localruntime.storage.SqliteRevisionCommitRepository;
 import org.opm.localruntime.releaseevidence.fault.E2EFaultPort;
 import org.opm.localruntime.releaseauthoring.visualcommon.VisualCommonCommitFaultPort;
@@ -29,10 +28,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -49,6 +46,8 @@ import static org.opm.localruntime.application.CommandCapabilityOptions.*;
 import static org.opm.localruntime.application.SemanticEditValues.*;
 import static org.opm.localruntime.application.ConstructDeletionPolicy.*;
 
+import static org.opm.localruntime.application.LocalApiResponses.*;
+
 @Service
 public class LocalApiService {
 
@@ -61,6 +60,8 @@ public class LocalApiService {
     private final OpdProjectionQuery projectionQuery = new OpdProjectionQuery();
     private final RelationCatalogQuery relationCatalogQuery = new RelationCatalogQuery();
     private final ProjectDatabaseFactory databaseFactory;
+    private final org.opm.localruntime.storage.LocalApiRepository repository;
+    private final LocalCatalogService catalogService;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final SemanticRevisionReader revisionReader = new SemanticRevisionReader();
     private final SemanticRevisionJsonWriter revisionWriter = new SemanticRevisionJsonWriter();
@@ -89,6 +90,8 @@ public class LocalApiService {
         this.e2eFaultPort = e2eFaultPort;
         this.visualCommonCommitFaultPort = visualCommonCommitFaultPort;
         this.profilePackageAssembler = new ProfilePackageAssembler(profilePackageLoader, e2eFaultPort);
+        this.repository = new org.opm.localruntime.storage.LocalApiRepository(databaseFactory);
+        this.catalogService = new LocalCatalogService(databaseFactory, repository, profilePackageAssembler);
     }
 
     public Map<String, String> activeProfileRuleBinding() {
@@ -100,150 +103,14 @@ public class LocalApiService {
                 "rule_version", binding.ruleSet().version());
     }
 
-    public Map<String, Object> listProjects(String requestId, String query) {
-        List<Map<String, Object>> projects = new ArrayList<>();
-        for (Path database : projectDatabases()) {
-            try (Connection connection = connection(database);
-                 PreparedStatement statement = connection.prepareStatement("""
-                         SELECT p.project_id, p.name, p.description, p.status, p.updated_at,
-                                (SELECT COUNT(*) FROM model_catalog m WHERE m.project_id = p.project_id AND m.status = 'ACTIVE')
-                         FROM project_metadata p WHERE p.status = 'ACTIVE'
-                         """)) {
-                try (ResultSet result = statement.executeQuery()) {
-                    while (result.next()) {
-                        Map<String, Object> project = project(result);
-                        if (query == null || query.isBlank() || string(project.get("name")).contains(query)) projects.add(project);
-                    }
-                }
-            } catch (SQLException exception) {
-                throw persistence(exception);
-            }
-        }
-        projects.sort(Comparator.comparing(item -> string(item.get("updated_at")), Comparator.reverseOrder()));
-        return queryResult(requestId, null, null, null, "not-applicable", projects, true);
-    }
-
-    public Map<String, Object> getProject(String requestId, String projectId) {
-        try (Connection connection = projectConnection(projectId);
-             PreparedStatement statement = connection.prepareStatement("""
-                     SELECT p.project_id, p.name, p.description, p.status, p.updated_at,
-                            (SELECT COUNT(*) FROM model_catalog m WHERE m.project_id = p.project_id AND m.status = 'ACTIVE')
-                     FROM project_metadata p WHERE p.project_id = ?
-                     """)) {
-            statement.setString(1, projectId);
-            try (ResultSet result = statement.executeQuery()) {
-                if (!result.next()) throw notFound("项目不存在");
-                return queryResult(requestId, null, null, null, "not-applicable", project(result), false);
-            }
-        } catch (SQLException exception) {
-            throw persistence(exception);
-        }
-    }
-
-    public synchronized Map<String, Object> createProject(Map<String, Object> request) {
-        String commandId = required(request, "command_id");
-        String requestId = required(request, "request_id");
-        String digest = requestDigest(request);
-        Map<String, Object> replay = findProjectCreateReplay(commandId, digest);
-        if (replay != null) return commandResult(requestId, commandId, "COMMITTED", null, "not-applicable", replay);
-        String projectId = newId("project");
-        ProjectDatabaseOpenResult result = databaseFactory.open(projectId);
-        if (!(result instanceof ProjectDatabaseOpenResult.Ready ready)) throw persistence(new IllegalStateException("项目库需要恢复"));
-        String now = Instant.now().toString();
-        Map<String, Object> project = new LinkedHashMap<>();
-        project.put("project_id", projectId);
-        project.put("name", required(request, "name"));
-        project.put("description", optional(request, "description"));
-        project.put("archive_state", "ACTIVE");
-        project.put("model_count", 0);
-        project.put("updated_at", now);
-        try (Connection connection = connection(ready.database().databasePath())) {
-            connection.setAutoCommit(false);
-            try {
-                try (PreparedStatement statement = connection.prepareStatement("""
-                        INSERT INTO project_metadata(project_id, name, normalized_name, description, status, default_profile_id, default_profile_version, created_at, updated_at)
-                        VALUES (?, ?, ?, ?, 'ACTIVE', ?, ?, ?, ?)
-                        """)) {
-                    statement.setString(1, projectId); statement.setString(2, required(request, "name"));
-                    statement.setString(3, normalized(required(request, "name"))); statement.setString(4, optional(request, "description"));
-                    statement.setString(5, PROFILE_ID); statement.setString(6, PROFILE_VERSION); statement.setString(7, now); statement.setString(8, now);
-                    statement.executeUpdate();
-                }
-                writeIdempotency(connection, "API-PRJ-003", "projects", commandId, digest, null, project, now);
-                writeOperation(connection, projectId, null, "API-PRJ-003", "projects", commandId, null, null, "COMMITTED", now);
-                connection.commit();
-            } catch (Exception exception) {
-                connection.rollback();
-                throw persistence(exception);
-            }
-        } catch (SQLException exception) {
-            throw persistence(exception);
-        }
-        return commandResult(requestId, commandId, "COMMITTED", null, "not-applicable", project);
-    }
-
-    public Map<String, Object> listModels(String requestId, String projectId) {
-        try (Connection connection = projectConnection(projectId);
-             PreparedStatement statement = connection.prepareStatement("""
-                     SELECT m.model_id, m.project_id, m.name, h.draft_head_revision_id, d.profile_id, d.profile_version, d.rule_set_version
-                     FROM model_catalog m JOIN model_head h ON h.model_id = m.model_id
-                     JOIN revision_document d ON d.revision_id = h.draft_head_revision_id
-                     WHERE m.project_id = ? AND m.status = 'ACTIVE' ORDER BY m.normalized_name
-                     """)) {
-            statement.setString(1, projectId);
-            List<Map<String, Object>> models = new ArrayList<>();
-            try (ResultSet result = statement.executeQuery()) { while (result.next()) models.add(model(result)); }
-            return queryResult(requestId, null, null, null, "not-applicable", models, true);
-        } catch (SQLException exception) { throw persistence(exception); }
-    }
-
-    public synchronized Map<String, Object> createModel(String projectId, Map<String, Object> request) {
-        String requestId = required(request, "request_id");
-        String commandId = required(request, "command_id");
-        String digest = requestDigest(request);
-        validateBinding(requiredMap(request, "binding"));
-        try (Connection connection = projectConnection(projectId)) {
-            Map<String, Object> replay = replay(connection, "API-PRJ-007", projectId, commandId, digest);
-            if (replay != null) return commandResult(requestId, commandId, "COMMITTED", string(replay.get("head_revision")), "saved", replay);
-            String now = Instant.now().toString();
-            String modelId = newId("model");
-            String contextId = newId("context.root");
-            String revisionId = newId("revision.initial");
-            SemanticRevision revision = initialRevision(modelId, revisionId, contextId);
-            Map<String, Object> model = Map.of("model_id", modelId, "project_id", projectId, "name", required(request, "name"),
-                    "head_revision", revisionId, "profile_id", PROFILE_ID, "profile_version", PROFILE_VERSION, "rule_version", RULE_VERSION,
-                    "access_mode", "EDITABLE_DRAFT");
-            connection.setAutoCommit(false);
-            try {
-                installBindingPackages(connection, now);
-                try (PreparedStatement statement = connection.prepareStatement("""
-                        INSERT INTO model_catalog(model_id, project_id, name, normalized_name, description, status, profile_binding_json, created_at, updated_at)
-                        VALUES (?, ?, ?, ?, ?, 'ACTIVE', ?, ?, ?)
-                        """)) {
-                    statement.setString(1, modelId); statement.setString(2, projectId); statement.setString(3, required(request, "name"));
-                    statement.setString(4, normalized(required(request, "name"))); statement.setString(5, optional(request, "description"));
-                    statement.setString(6, objectMapper.readTree(revisionWriter.write(revision)).required("profile_binding").toString()); statement.setString(7, now); statement.setString(8, now);
-                    statement.executeUpdate();
-                }
-                insertInitialRevision(connection, revision, now);
-                try (PreparedStatement statement = connection.prepareStatement("INSERT INTO revision_parent(model_id, revision_id, parent_revision_id) VALUES (?, ?, NULL)")) {
-                    statement.setString(1, modelId); statement.setString(2, revisionId); statement.executeUpdate();
-                }
-                try (PreparedStatement statement = connection.prepareStatement("INSERT INTO model_head(model_id, draft_head_revision_id, head_sequence, updated_at) VALUES (?, ?, 1, ?)")) {
-                    statement.setString(1, modelId); statement.setString(2, revisionId); statement.setString(3, now); statement.executeUpdate();
-                }
-                if (databaseFactory.usesJournaledDrafts()) {
-                    org.opm.localruntime.storage.NewDraftModelRepository.initialize(connection, projectId, modelId, revisionId, now);
-                }
-                writeIdempotency(connection, "API-PRJ-007", projectId, commandId, digest, revisionId, model, now);
-                writeOperation(connection, projectId, modelId, "API-PRJ-007", projectId, commandId, null, revisionId, "COMMITTED", now);
-                connection.commit();
-            } catch (Exception exception) {
-                connection.rollback();
-                throw persistence(exception);
-            }
-            return commandResult(requestId, commandId, "COMMITTED", revisionId, "saved", model);
-        } catch (SQLException exception) { throw persistence(exception); }
+    public Map<String, Object> listProjects(String requestId, String query) { return catalogService.listProjects(requestId, query); }
+    public Map<String, Object> getProject(String requestId, String projectId) { return catalogService.getProject(requestId, projectId); }
+    public synchronized Map<String, Object> createProject(Map<String, Object> request) { return catalogService.createProject(request); }
+    public Map<String, Object> listModels(String requestId, String projectId) { return catalogService.listModels(requestId, projectId); }
+    public Map<String, Object> listModels(String requestId, String projectId, String archiveState) { return catalogService.listModels(requestId, projectId, archiveState); }
+    public synchronized Map<String, Object> createModel(String projectId, Map<String, Object> request) { return catalogService.createModel(projectId, request); }
+    synchronized Map<String, Object> createTransferredModel(String projectId, Map<String, Object> request, com.fasterxml.jackson.databind.node.ObjectNode document) {
+        return catalogService.createTransferredModel(projectId, request, document);
     }
 
     public Map<String, Object> workspace(String requestId, String projectId, String modelId) {
@@ -256,12 +123,12 @@ public class LocalApiService {
                 || !requestedRevision.matches("[A-Za-z][A-Za-z0-9._:-]*"))) {
             throw new ApiException(ApiErrorCode.INVALID_ARGUMENT, 400, false, "Revision 格式非法");
         }
-        try (Connection connection = projectConnection(projectId);
+        try (Connection connection = repository.projectConnection(projectId);
              PreparedStatement statement = connection.prepareStatement("""
                      SELECT m.name, h.draft_head_revision_id,
                             (SELECT b.revision_id FROM baseline b WHERE b.model_id = m.model_id ORDER BY b.created_at DESC, b.baseline_id DESC LIMIT 1)
                      FROM model_catalog m LEFT JOIN model_head h ON h.model_id = m.model_id
-                     WHERE m.model_id = ? AND m.project_id = ?
+                     WHERE m.model_id = ? AND m.project_id = ? AND m.status = 'ACTIVE'
                      """)) {
             statement.setString(1, modelId); statement.setString(2, projectId);
             try (ResultSet result = statement.executeQuery()) {
@@ -289,9 +156,9 @@ public class LocalApiService {
 
     public Map<String, Object> navigation(String requestId, String projectId, String modelId, String contextId, String revisionId) {
         SemanticRevision revision = revision(projectId, modelId, revisionId);
-        SemanticRevision.Context context = context(revision, contextId);
-        Map<String, Object> node = Map.of("context_id", context.id(), "label", context.name().localName(), "context_kind", context.kind().name(), "has_children", false);
-        Map<String, Object> data = Map.of("current_path", List.of(contextId), "process_tree", List.of(node), "object_forest", List.of(), "views", List.of());
+        context(revision, contextId);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> data = objectMapper.convertValue(DraftWorkspaceQueries.navigation(revision, contextId), Map.class);
         return queryResult(requestId, revisionId, revision.profileBinding().profile().version(), revision.profileBinding().ruleSet().version(), freshness(projectId, modelId, revisionId), data, false);
     }
 
@@ -333,7 +200,8 @@ public class LocalApiService {
                 ? selectedFact.endpoints().stream().map(SemanticRevision.Endpoint::targetId).toList() : requestedEndpoints;
         String queryId = capabilityQueryId(projectId, modelId, revisionId, selectionId, intent, endpoints);
         boolean objectOwner = owner != null && owner.coreKind() == SemanticRevision.CoreKind.OBJECT;
-        boolean propertyTarget = owner != null && (owner.coreKind() == SemanticRevision.CoreKind.OBJECT || owner.coreKind() == SemanticRevision.CoreKind.PROCESS);
+        boolean propertyTarget = (owner != null && (owner.coreKind() == SemanticRevision.CoreKind.OBJECT || owner.coreKind() == SemanticRevision.CoreKind.PROCESS))
+                || featureOwner != null;
         String propertyReason = !propertyTarget ? "ENDPOINT_KIND_MISMATCH"
                 : !"current".equals(freshness(projectId, modelId, revisionId))
                 ? (isBaselineRevision(projectId, modelId, revisionId) ? "READ_ONLY_REVISION" : "REVISION_STALE") : null;
@@ -342,7 +210,9 @@ public class LocalApiService {
                 : deleteIntent ? deleteOptions(queryId, revision, selectedOccurrence)
                 : factIntent ? factOptions(queryId, revision, endpoints)
                 : factUpdateIntent ? proceduralFactUpdateOptions(queryId, revision, selectedFact, endpoints)
-                : propertyUpdateIntent && propertyTarget ? List.of(propertyUpdateOption(queryId, revisionId, owner, propertyReason)) : List.of();
+                : propertyUpdateIntent && propertyTarget ? List.of(owner != null
+                ? propertyUpdateOption(queryId, revisionId, owner, propertyReason)
+                : propertyUpdateOption(queryId, revisionId, featureOwner, propertyReason)) : List.of();
         List<ApiEdtContract.CommandType> allowed = new ArrayList<>(List.of(ApiEdtContract.CommandType.CREATE_ELEMENT, ApiEdtContract.CommandType.CREATE_FACT, ApiEdtContract.CommandType.UPDATE_LAYOUT));
         if (owner != null) allowed.add(ApiEdtContract.CommandType.CREATE_FEATURE);
         if (objectOwner) allowed.add(ApiEdtContract.CommandType.CREATE_STATE);
@@ -410,8 +280,8 @@ public class LocalApiService {
         ModelRevision current = currentModel(projectId, modelId);
         if (!current.revision().rootContextId().equals(contextId)) throw domain("P0 仅支持根系统图");
         String requestDigest = requestDigest(request);
-        try (Connection connection = projectConnection(projectId)) {
-            Map<String, Object> replay = replay(connection, "API-EDT-002", modelId, commandId, requestDigest);
+        try (Connection connection = repository.projectConnection(projectId)) {
+            Map<String, Object> replay = repository.replay(connection, "API-EDT-002", modelId, commandId, requestDigest);
             if (replay != null) {
                 String committedRevisionId = required(replay, "committed_revision");
                 return commandResult(requestId, commandId, "COMMITTED", committedRevisionId, "saved",
@@ -450,7 +320,7 @@ public class LocalApiService {
         SemanticRevision revision = revision(projectId, modelId, revisionId);
         context(revision, contextId);
         List<Map<String, Object>> findings = new ArrayList<>();
-        try (Connection connection = projectConnection(projectId);
+        try (Connection connection = repository.projectConnection(projectId);
              PreparedStatement statement = connection.prepareStatement("""
                      SELECT finding_id, rule_id, severity, category, context_id, entity_id
                      FROM finding_index
@@ -478,7 +348,7 @@ public class LocalApiService {
         SemanticRevision revision = revision(projectId, modelId, revisionId);
         context(revision, contextId);
         List<Map<String, Object>> records = new ArrayList<>();
-        try (Connection connection = projectConnection(projectId);
+        try (Connection connection = repository.projectConnection(projectId);
              PreparedStatement statement = connection.prepareStatement("""
                      SELECT operation_record_id, project_id, model_id, operation_id, aggregate_id, command_id,
                             input_revision_id, result_revision_id, result_status, diagnostic_id, occurred_at
@@ -519,28 +389,38 @@ public class LocalApiService {
         String revisionId = required(request, "input_revision");
         SemanticRevision revision = revision(projectId, modelId, revisionId);
         validateBinding(requiredMap(request, "binding"));
-        String requestDigest = requestDigest(request);
-        try (Connection connection = projectConnection(projectId)) {
-            Map<String, Object> replay = replay(connection, "API-VAL-001", modelId, commandId, requestDigest);
+        var identity = new LinkedHashMap<>(request);
+        identity.remove("request_id");
+        String requestDigest = requestDigest(identity);
+        try (Connection connection = repository.projectConnection(projectId)) {
+            Map<String, Object> replay = repository.replay(connection, "API-VAL-001", modelId, commandId, requestDigest, requestDigest(request));
             if (replay != null) return commandResult(requestId, commandId, "ACCEPTED", null, "not-applicable", replay);
         } catch (SQLException exception) { throw persistence(exception); }
         String taskId = newId("task.validate");
         String now = Instant.now().toString();
-        int blocking = semanticValidator.validate(revision).size();
+        var inputIdentity = objectMapper.createObjectNode().put("input_revision", revisionId);
+        var checked = DraftModelValidation.findings(projectId, modelId, inputIdentity, revision, profilePackageAssembler.assemble(revision.profileBinding()));
         String evidence = "evidence." + digest(taskId + revisionId).substring(0, 32);
-        Map<String, Object> result = Map.of("blocking", blocking, "warning", 0, "suggestion", 0, "coverage_state", blocking == 0 ? "COMPLETE" : "INCOMPLETE", "evidence_summary_token", evidence);
-        try (Connection connection = projectConnection(projectId)) {
+        Map<String, Object> result = objectMapper.convertValue(checked.get("validation_summary"), new com.fasterxml.jackson.core.type.TypeReference<LinkedHashMap<String, Object>>() { });
+        result.put("evidence_summary_token", evidence);
+        result.put("findings", checked.get("items"));
+        var storedRequest = new LinkedHashMap<>(request);
+        storedRequest.put("project_id", projectId); storedRequest.put("model_id", modelId);
+        try (Connection connection = repository.projectConnection(projectId)) {
             connection.setAutoCommit(false);
-            try (PreparedStatement statement = connection.prepareStatement("""
+            try {
+                String reference = validationRevisionReference(connection, projectId, modelId, revisionId);
+                try (PreparedStatement statement = connection.prepareStatement("""
                      INSERT INTO background_task(task_id, task_type, state, stage, progress, input_revision_id, profile_id, profile_version, rule_set_id, rule_set_version, cancellable, request_json, result_json, created_at, started_at, finished_at, updated_at)
                      VALUES (?, 'VALIDATE_MODEL', 'COMPLETED', 'COMPLETE', 100, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?)
                      """)) {
-            statement.setString(1, taskId); statement.setString(2, revisionId); statement.setString(3, PROFILE_ID); statement.setString(4, PROFILE_VERSION); statement.setString(5, RULE_ID); statement.setString(6, RULE_VERSION);
-            statement.setString(7, objectMapper.writeValueAsString(request)); statement.setString(8, objectMapper.writeValueAsString(result));
-                statement.setString(9, now); statement.setString(10, now); statement.setString(11, now); statement.setString(12, now); statement.executeUpdate();
+                    statement.setString(1, taskId); statement.setString(2, reference); statement.setString(3, PROFILE_ID); statement.setString(4, PROFILE_VERSION); statement.setString(5, RULE_ID); statement.setString(6, RULE_VERSION);
+                    statement.setString(7, objectMapper.writeValueAsString(storedRequest)); statement.setString(8, objectMapper.writeValueAsString(result));
+                    statement.setString(9, now); statement.setString(10, now); statement.setString(11, now); statement.setString(12, now); statement.executeUpdate();
+                }
                 Map<String, Object> descriptor = taskDescriptor(taskId, revisionId, "COMPLETED", "COMPLETE", 100, false, result, now, now, now);
-                writeIdempotency(connection, "API-VAL-001", modelId, commandId, requestDigest, null, descriptor, now);
-                writeOperation(connection, projectId, modelId, "API-VAL-001", modelId, commandId, revisionId, null, "ACCEPTED", now);
+                repository.writeIdempotency(connection, "API-VAL-001", modelId, commandId, requestDigest, null, descriptor, now);
+                repository.writeOperation(connection, projectId, modelId, "API-VAL-001", modelId, commandId, reference, null, "ACCEPTED", now);
                 connection.commit();
                 return commandResult(requestId, commandId, "ACCEPTED", null, "not-applicable", descriptor);
             } catch (Exception exception) {
@@ -551,7 +431,8 @@ public class LocalApiService {
     }
 
     public Map<String, Object> revisions(String requestId, String projectId, String modelId) {
-        try (Connection connection = projectConnection(projectId);
+        requireActiveModel(projectId, modelId);
+        try (Connection connection = repository.projectConnection(projectId);
              PreparedStatement statement = connection.prepareStatement("""
                      SELECT d.revision_id, d.revision_sequence, d.created_at, d.revision_id = h.draft_head_revision_id AS is_head,
                             (SELECT COUNT(*) FROM baseline b WHERE b.revision_id = d.revision_id) AS baseline_count
@@ -577,8 +458,8 @@ public class LocalApiService {
         String requestId = required(request, "request_id"); String commandId = required(request, "command_id"); String revisionId = required(request, "base_revision");
         validateBinding(requiredMap(request, "binding")); revision(projectId, modelId, revisionId);
         String token = required(request, "evidence_summary_token");
-        try (Connection connection = projectConnection(projectId)) {
-            Map<String, Object> replay = replay(connection, "API-VER-004", modelId, commandId, requestDigest(request));
+        try (Connection connection = repository.projectConnection(projectId)) {
+            Map<String, Object> replay = repository.replay(connection, "API-VER-004", modelId, commandId, requestDigest(request));
             if (replay != null) return commandResult(requestId, commandId, "COMMITTED", string(replay.get("revision_id")), "not-applicable", replay);
             if (!hasEvidence(connection, revisionId, token)) throw new ApiException(ApiErrorCode.VALIDATION_BLOCKED, 422, false, "基线需要当前且无阻断的校验证据");
             String baselineId = newId("baseline"); String now = Instant.now().toString();
@@ -592,9 +473,9 @@ public class LocalApiService {
                     statement.setString(5, normalized(required(request, "name"))); statement.setString(6, optional(request, "description")); statement.setString(7, digest(token));
                     statement.setString(8, objectMapper.writeValueAsString(Map.of("evidence_summary_token", token))); statement.setString(9, now); statement.executeUpdate();
                 }
-                writeOperation(connection, projectId, modelId, "API-VER-004", modelId, commandId, revisionId, revisionId, "COMMITTED", now);
+                repository.writeOperation(connection, projectId, modelId, "API-VER-004", modelId, commandId, revisionId, revisionId, "COMMITTED", now);
                 Map<String, Object> data = Map.of("baseline_id", baselineId, "revision_id", revisionId, "immutable", true);
-                writeIdempotency(connection, "API-VER-004", modelId, commandId, requestDigest(request), revisionId, data, now);
+                repository.writeIdempotency(connection, "API-VER-004", modelId, commandId, requestDigest(request), revisionId, data, now);
                 connection.commit();
                 return commandResult(requestId, commandId, "COMMITTED", revisionId, "not-applicable", data);
             } catch (Exception exception) { connection.rollback(); throw persistence(exception); }
@@ -602,15 +483,17 @@ public class LocalApiService {
     }
 
     public Map<String, Object> task(String requestId, String taskId) {
-        for (Path database : projectDatabases()) {
-            try (Connection connection = connection(database);
-                 PreparedStatement statement = connection.prepareStatement("SELECT task_id, state, stage, progress, input_revision_id, cancellable, result_json, created_at, started_at, finished_at FROM background_task WHERE task_id = ?")) {
+        for (Path database : repository.projectDatabases()) {
+            try (Connection connection = repository.connection(database);
+                 PreparedStatement statement = connection.prepareStatement("SELECT task_id, state, stage, progress, input_revision_id, cancellable, result_json, created_at, started_at, finished_at, request_json FROM background_task WHERE task_id = ?")) {
                 statement.setString(1, taskId);
                 try (ResultSet result = statement.executeQuery()) {
                     if (result.next()) {
-                        Map<String, Object> descriptor = taskDescriptor(result.getString(1), result.getString(5), result.getString(2), result.getString(3), result.getObject(4, Integer.class), result.getInt(6) == 1,
+                        String input = result.getString(5);
+                        if (input == null) input = required(map(result.getString(11)), "input_revision");
+                        Map<String, Object> descriptor = taskDescriptor(result.getString(1), input, result.getString(2), result.getString(3), result.getObject(4, Integer.class), result.getInt(6) == 1,
                                 map(result.getString(7)), result.getString(8), result.getString(9), result.getString(10));
-                        return queryResult(requestId, result.getString(5), PROFILE_VERSION, RULE_VERSION, "historical", descriptor, false);
+                        return queryResult(requestId, input, PROFILE_VERSION, RULE_VERSION, "historical", descriptor, false);
                     }
                 }
             } catch (SQLException exception) { throw persistence(exception); }
@@ -626,6 +509,10 @@ public class LocalApiService {
         return semanticEditor.editDraftElement(base, type, payload);
     }
 
+    SemanticRevision editDraftContext(SemanticRevision base, Map<String, Object> payload) {
+        return semanticEditor.editDraftContext(base, payload);
+    }
+
     SemanticRevision editDraftFact(SemanticRevision base, String type, Map<String, Object> payload) {
         return semanticEditor.editDraftFact(base, type, payload);
     }
@@ -638,17 +525,12 @@ public class LocalApiService {
         return semanticEditor.draftFactOptions(query, base, intent, selection, endpoints);
     }
 
-    private SemanticRevision initialRevision(String modelId, String revisionId, String contextId) {
-        SemanticRevision.Context context = new SemanticRevision.Context(contextId, SemanticRevision.ContextKind.SYSTEM_DIAGRAM, capability("CAP-CONTEXT-001"), qualifiedName("SD"), List.of(), source("SystemDiagram"));
-        return new SemanticRevision(revisionId, modelId, 1, profileBinding(), contextId, List.of(), List.of(), List.of(), List.of(context), List.of(), List.of());
-    }
-
     private ModelRevision currentModel(String projectId, String modelId) {
-        try (Connection connection = projectConnection(projectId);
+        try (Connection connection = repository.projectConnection(projectId);
              PreparedStatement statement = connection.prepareStatement("""
                      SELECT m.model_id, m.project_id, m.name, h.draft_head_revision_id, d.profile_id, d.profile_version, d.rule_set_version, d.document_json
                      FROM model_catalog m JOIN model_head h ON h.model_id = m.model_id JOIN revision_document d ON d.revision_id = h.draft_head_revision_id
-                     WHERE m.model_id = ? AND m.project_id = ?
+                     WHERE m.model_id = ? AND m.project_id = ? AND m.status = 'ACTIVE'
                      """)) {
             statement.setString(1, modelId); statement.setString(2, projectId);
             try (ResultSet result = statement.executeQuery()) {
@@ -659,7 +541,8 @@ public class LocalApiService {
     }
 
     private SemanticRevision revision(String projectId, String modelId, String revisionId) {
-        try (Connection connection = projectConnection(projectId);
+        requireActiveModel(projectId, modelId);
+        try (Connection connection = repository.projectConnection(projectId);
              PreparedStatement statement = connection.prepareStatement("SELECT document_json FROM revision_document WHERE model_id = ? AND revision_id = ?")) {
             connection.setAutoCommit(false);
             var saved = org.opm.localruntime.storage.DraftHistoryRepository.find(connection, projectId, modelId, revisionId);
@@ -681,72 +564,38 @@ public class LocalApiService {
         } catch (SQLException exception) { throw persistence(exception); }
     }
 
-    private Connection projectConnection(String projectId) {
-        Path path = databaseFactory.databasePath(projectId);
-        if (!Files.isRegularFile(path)) throw notFound("项目不存在");
-        return connection(path);
-    }
-
-    private Connection connection(Path path) {
-        try {
-            Connection connection = DriverManager.getConnection("jdbc:sqlite:" + path.toAbsolutePath() + "?foreign_keys=on");
-            try (var statement = connection.createStatement()) { statement.execute("PRAGMA foreign_keys = ON"); }
-            return connection;
+    com.fasterxml.jackson.databind.node.ObjectNode transferDocument(String projectId, String modelId, String revisionId) {
+        requireActiveModel(projectId, modelId);
+        try (var connection = repository.projectConnection(projectId)) {
+            connection.setAutoCommit(false);
+            var saved = org.opm.localruntime.storage.DraftHistoryRepository.find(connection, projectId, modelId, revisionId);
+            try (var statement = connection.prepareStatement("SELECT document_json FROM revision_document WHERE model_id=? AND revision_id=?")) {
+                statement.setString(1, modelId); statement.setString(2, revisionId);
+                try (var rows = statement.executeQuery()) {
+                    if (rows.next()) {
+                        if (saved.isPresent()) throw new ApiException(ApiErrorCode.PERSISTENCE_FAILED, 503, false, "保存历史身份冲突");
+                        return org.opm.localruntime.semantic.SaveContentDigestV1.read(rows.getString(1));
+                    }
+                }
+            }
+            if (saved.isEmpty()) throw notFound("修订不存在");
+            var history = saved.get();
+            var document = org.opm.localruntime.semantic.SaveContentDigestV1.read(history.contentDocument());
+            document.put("revision_id", history.entry().revisionId()).put("revision_sequence", history.entry().sequence());
+            return document;
         } catch (SQLException exception) { throw persistence(exception); }
     }
 
-    private List<Path> projectDatabases() {
-        Path projects = databaseFactory.storageRoot().resolve("projects");
-        if (!Files.isDirectory(projects)) return List.of();
-        try (var paths = Files.list(projects)) { return paths.map(path -> path.resolve("project.db")).filter(Files::isRegularFile).toList(); }
-        catch (Exception exception) { throw persistence(exception); }
-    }
-
-    private void installBindingPackages(Connection connection, String now) throws SQLException {
-        insertPackage(connection, "INSERT OR IGNORE INTO profile_package(profile_id, package_version, package_digest, lifecycle_status, package_json, installed_at) VALUES (?, ?, ?, 'DRAFT', '{}', ?)", PROFILE_ID, PROFILE_VERSION, PROFILE_DIGEST, now);
-        insertPackage(connection, "INSERT OR IGNORE INTO rule_set_package(rule_set_id, rule_set_version, rule_set_digest, lifecycle_status, package_json, installed_at) VALUES (?, ?, ?, 'DRAFT', '{}', ?)", RULE_ID, RULE_VERSION, RULE_DIGEST, now);
-        insertPackage(connection, "INSERT OR IGNORE INTO grammar_package(grammar_id, grammar_version, grammar_digest, text_modality, manifest_json, installed_at) VALUES (?, ?, ?, 'OPL', '{}', ?)", GRAMMAR_ID, GRAMMAR_VERSION, GRAMMAR_DIGEST, now);
-    }
-
-    private void insertPackage(Connection connection, String sql, String id, String version, String digest, String now) throws SQLException {
-        try (PreparedStatement statement = connection.prepareStatement(sql)) { statement.setString(1, id); statement.setString(2, version); statement.setString(3, digest); statement.setString(4, now); statement.executeUpdate(); }
-    }
-
-    private void insertInitialRevision(Connection connection, SemanticRevision revision, String now) throws Exception {
-        String document = revisionWriter.write(revision);
-        try (PreparedStatement statement = connection.prepareStatement("""
-                INSERT INTO revision_document(revision_id, model_id, revision_sequence, schema_version, profile_id, profile_version, rule_set_id, rule_set_version, schema_set_json, profile_binding_json, document_json, document_digest, commit_reason, created_at)
-                VALUES (?, ?, 1, '0.2', ?, ?, ?, ?, '{}', ?, ?, ?, 'INITIAL_MODEL', ?)
-                """)) {
-            statement.setString(1, revision.revisionId()); statement.setString(2, revision.modelId()); statement.setString(3, PROFILE_ID); statement.setString(4, PROFILE_VERSION); statement.setString(5, RULE_ID); statement.setString(6, RULE_VERSION);
-            statement.setString(7, objectMapper.readTree(document).required("profile_binding").toString());
-            statement.setString(8, document); statement.setString(9, digest(document)); statement.setString(10, now); statement.executeUpdate();
-        }
-    }
-
-    private Map<String, Object> findProjectCreateReplay(String commandId, String digest) {
-        for (Path database : projectDatabases()) {
-            try (Connection connection = connection(database)) {
-                Map<String, Object> replay = replay(connection, "API-PRJ-003", "projects", commandId, digest);
-                if (replay != null) return replay;
-            } catch (SQLException exception) { throw persistence(exception); }
-        }
-        return null;
-    }
-
-    private Map<String, Object> replay(Connection connection, String operation, String aggregate, String commandId, String digest) throws SQLException {
-        try (PreparedStatement statement = connection.prepareStatement("SELECT request_digest, result_json FROM idempotency_record WHERE operation_id = ? AND aggregate_id = ? AND command_id = ?")) {
-            statement.setString(1, operation); statement.setString(2, aggregate); statement.setString(3, commandId);
-            try (ResultSet result = statement.executeQuery()) {
-                if (!result.next()) return null;
-                if (!digest.equals(result.getString(1))) throw new ApiException(ApiErrorCode.IDEMPOTENCY_MISMATCH, 409, false, "command_id 已绑定不同请求");
-                return map(result.getString(2));
-            }
-        }
+    void requireActiveModel(String projectId, String modelId) {
+        try (var connection = repository.projectConnection(projectId);
+             var statement = connection.prepareStatement("SELECT 1 FROM model_catalog WHERE project_id=? AND model_id=? AND status='ACTIVE'")) {
+            statement.setString(1, projectId); statement.setString(2, modelId);
+            try (var rows = statement.executeQuery()) { if (!rows.next()) throw notFound("模型不存在或已移入回收站"); }
+        } catch (SQLException exception) { throw persistence(exception); }
     }
 
     private boolean isBaselineRevision(String projectId, String modelId, String revisionId) {
-        try (Connection connection = projectConnection(projectId);
+        try (Connection connection = repository.projectConnection(projectId);
              PreparedStatement statement = connection.prepareStatement("SELECT 1 FROM baseline WHERE model_id = ? AND revision_id = ?")) {
             statement.setString(1, modelId);
             statement.setString(2, revisionId);
@@ -758,21 +607,25 @@ public class LocalApiService {
         }
     }
 
-    private void writeIdempotency(Connection connection, String operation, String aggregate, String commandId, String digest, String revision, Map<String, Object> result, String now) throws Exception {
-        try (PreparedStatement statement = connection.prepareStatement("INSERT INTO idempotency_record(operation_id, aggregate_id, command_id, request_digest, result_status, result_revision_id, result_json, created_at) VALUES (?, ?, ?, ?, 'COMMITTED', ?, ?, ?)")) {
-            statement.setString(1, operation); statement.setString(2, aggregate); statement.setString(3, commandId); statement.setString(4, digest); statement.setString(5, revision); statement.setString(6, objectMapper.writeValueAsString(result)); statement.setString(7, now); statement.executeUpdate();
+    private String validationRevisionReference(Connection connection, String project, String model, String revision) throws SQLException {
+        try (var statement = connection.prepareStatement("SELECT 1 FROM revision_document WHERE model_id=? AND revision_id=?")) {
+            statement.setString(1, model); statement.setString(2, revision);
+            try (var rows = statement.executeQuery()) { if (rows.next()) return revision; }
         }
-    }
-
-    private void writeOperation(Connection connection, String projectId, String modelId, String operation, String aggregate, String commandId, String inputRevision, String resultRevision, String status, String now) throws SQLException {
-        try (PreparedStatement statement = connection.prepareStatement("INSERT INTO operation_record(operation_record_id, project_id, model_id, operation_id, aggregate_id, command_id, input_revision_id, result_revision_id, result_status, occurred_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
-            statement.setString(1, newId("operation")); statement.setString(2, projectId); statement.setString(3, modelId); statement.setString(4, operation); statement.setString(5, aggregate); statement.setString(6, commandId); statement.setString(7, inputRevision); statement.setString(8, resultRevision); statement.setString(9, status); statement.setString(10, now); statement.executeUpdate();
-        }
+        // 混合保存版本没有旧 revision_document 外键；完整身份在任务请求及幂等收据中保留。
+        if (org.opm.localruntime.storage.DraftHistoryRepository.find(connection, project, model, revision).isEmpty()) throw notFound("校验输入版本不存在");
+        return null;
     }
 
     private boolean hasEvidence(Connection connection, String revisionId, String token) throws SQLException {
         try (PreparedStatement statement = connection.prepareStatement("SELECT result_json FROM background_task WHERE input_revision_id = ? AND task_type = 'VALIDATE_MODEL' AND state = 'COMPLETED' ORDER BY finished_at DESC")) {
-            statement.setString(1, revisionId); try (ResultSet result = statement.executeQuery()) { while (result.next()) { Map<String, Object> value = map(result.getString(1)); if (Integer.valueOf(0).equals(value.get("blocking")) && token.equals(value.get("evidence_summary_token"))) return true; } }
+            statement.setString(1, revisionId); try (ResultSet result = statement.executeQuery()) { while (result.next()) {
+                Map<String, Object> value = map(result.getString(1));
+                // 旧任务只有汇总数，曾将零结构问题误写成 COMPLETE，不能继续作为完整证据。
+                if (Integer.valueOf(0).equals(value.get("blocking")) && "COMPLETE".equals(value.get("coverage_state"))
+                        && value.get("findings") instanceof List<?> items && items.isEmpty()
+                        && token.equals(value.get("evidence_summary_token"))) return true;
+            } }
         }
         return false;
     }
@@ -796,25 +649,14 @@ public class LocalApiService {
         return descriptor;
     }
 
-    private Map<String, Object> queryResult(String requestId, String revision, String profile, String rule, String freshness, Object data, boolean page) {
-        Map<String, Object> meta = new LinkedHashMap<>(); meta.put("request_id", requestId); meta.put("read_revision", revision); meta.put("profile_version", profile); meta.put("rule_version", rule); meta.put("freshness", freshness); meta.put("generated_at", Instant.now().toString()); if (page) { Map<String, Object> pageInfo = new LinkedHashMap<>(); pageInfo.put("next_cursor", null); pageInfo.put("has_more", false); meta.put("page_info", pageInfo); }
-        return Map.of("meta", meta, "data", data);
-    }
-
-    private Map<String, Object> commandResult(String requestId, String commandId, String status, String revision, String autosave, Object data) {
-        Map<String, Object> meta = new LinkedHashMap<>(); meta.put("request_id", requestId); meta.put("command_id", commandId); meta.put("status", status); meta.put("committed_revision", revision); meta.put("autosave_state", autosave); meta.put("projection_state", Map.of("opd", "current", "text", "current", "validation", "current")); return Map.of("meta", meta, "data", data);
-    }
-
     private Map<String, Object> editResultData(SemanticRevision revision, List<String> traceIds) {
         return Map.of("affected_ids", affectedIds(revision), "text_trace_ids", traceIds,
                 "validation_summary", Map.of("blocking", 0, "warning", 0, "suggestion", 0, "coverage_state", "INCOMPLETE"));
     }
 
-    private Map<String, Object> project(ResultSet result) throws SQLException { return Map.of("project_id", result.getString(1), "name", result.getString(2), "description", result.getString(3) == null ? "" : result.getString(3), "archive_state", result.getString(4), "updated_at", result.getString(5), "model_count", result.getInt(6)); }
-    private Map<String, Object> model(ResultSet result) throws SQLException { return Map.of("model_id", result.getString(1), "project_id", result.getString(2), "name", result.getString(3), "head_revision", result.getString(4), "profile_id", result.getString(5), "profile_version", result.getString(6), "rule_version", result.getString(7), "access_mode", "EDITABLE_DRAFT"); }
     private SemanticRevision readRevision(String document) { return revisionReader.read(new ByteArrayInputStream(document.getBytes(StandardCharsets.UTF_8))); }
     private String freshness(String projectId, String modelId, String revisionId) {
-        try (Connection connection = projectConnection(projectId);
+        try (Connection connection = repository.projectConnection(projectId);
              PreparedStatement statement = connection.prepareStatement("SELECT draft_head_revision_id FROM model_head WHERE model_id = ?")) {
             statement.setString(1, modelId);
             try (ResultSet result = statement.executeQuery()) {
@@ -823,7 +665,6 @@ public class LocalApiService {
         } catch (SQLException exception) { throw persistence(exception); }
     }
     private List<String> affectedIds(SemanticRevision revision) { List<String> ids = new ArrayList<>(); revision.elements().forEach(value -> ids.add(value.id())); revision.facts().forEach(value -> ids.add(value.id())); return ids; }
-    private void validateBinding(Map<String, Object> binding) { if (!PROFILE_ID.equals(required(binding, "profile_id")) || !PROFILE_VERSION.equals(required(binding, "profile_version")) || !RULE_ID.equals(required(binding, "rule_set_id")) || !RULE_VERSION.equals(required(binding, "rule_version"))) throw new ApiException(ApiErrorCode.RULE_VERSION_CONFLICT, 409, false, "Profile 或 Rule 版本不匹配"); }
     private ProfileRuleBinding binding(SemanticRevision revision) { return new ProfileRuleBinding(revision.profileBinding().profile().id(), revision.profileBinding().profile().version(), revision.profileBinding().ruleSet().id(), revision.profileBinding().ruleSet().version()); }
     private OplGrammar grammar(SemanticRevision revision) {
         var ref = revision.profileBinding().textGrammar();
@@ -841,8 +682,5 @@ public class LocalApiService {
         return RuntimeActiveBindingProvider.current();
     }
     private ApiException rejected(CommitFailureCode code) { return switch (code) { case REVISION_CONFLICT -> new ApiException(ApiErrorCode.REVISION_CONFLICT, 409, false, "基础修订不是当前草稿"); case READ_ONLY_REVISION -> new ApiException(ApiErrorCode.READ_ONLY_REVISION, 409, false, "当前修订为只读"); case IDEMPOTENCY_MISMATCH -> new ApiException(ApiErrorCode.IDEMPOTENCY_MISMATCH, 409, false, "command_id 已绑定不同请求"); case RULE_VERSION_CONFLICT -> new ApiException(ApiErrorCode.RULE_VERSION_CONFLICT, 409, false, "Profile 或 Rule 版本不匹配"); case VALIDATION_BLOCKED -> new ApiException(ApiErrorCode.VALIDATION_BLOCKED, 422, false, "候选修订未通过校验"); case MODIFIER_COMBINATION_INVALID -> new ApiException(ApiErrorCode.MODIFIER_COMBINATION_INVALID, 422, false, "Control 修饰组合无效"); case TEXT_GENERATION_BLOCKED -> new ApiException(ApiErrorCode.TEXT_GENERATION_BLOCKED, 422, false, "无法生成 OPL 文本"); default -> new ApiException(ApiErrorCode.PERSISTENCE_FAILED, 500, true, "修订提交失败"); }; }
-    private ApiException persistence(Exception exception) { return new ApiException(ApiErrorCode.PERSISTENCE_FAILED, 500, true, "本地持久化失败"); }
-    private String requestDigest(Map<String, Object> request) { try { return digest(objectMapper.writeValueAsString(request)); } catch (Exception exception) { throw new ApiException(ApiErrorCode.INVALID_ARGUMENT, 400, false, "请求无法序列化"); } }
-
     private record ModelRevision(Map<String, Object> model, SemanticRevision revision) { }
 }

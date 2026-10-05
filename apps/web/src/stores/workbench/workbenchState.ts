@@ -13,7 +13,7 @@ export function createWorkbenchState() {
     zoom: 100,
     bottomTab: "text" as BottomTab,
     bottomPanelExpanded: true,
-    validationState: "stale" as "current" | "running" | "stale" | "failed",
+    validationState: "unvalidated" as "unvalidated" | "current" | "running" | "stale" | "failed",
     validationProgress: 0,
     blockingFindings: 0,
     commandState: "idle" as "idle" | "submitting" | "blocked" | "failed",

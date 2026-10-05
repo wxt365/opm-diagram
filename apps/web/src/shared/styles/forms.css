@@ -52,19 +52,23 @@
 }
 
 .form-readonly {
-  display: flex;
-  gap: 12px;
-  align-items: baseline;
-  justify-content: space-between;
-  padding: 9px 0;
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  padding: 8px 0;
   border-bottom: 1px solid #edf0f3;
+}
+
+.form-readonly:last-child {
+  border-bottom: 0;
 }
 
 .form-readonly strong,
 .form-readonly code {
   color: #33414d;
   font-size: 12px;
-  text-align: right;
+  line-height: 1.45;
   overflow-wrap: anywhere;
 }
 
@@ -80,9 +84,10 @@
 
 .state-role-group {
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  padding: 8px;
+  gap: 6px;
+  padding: 0;
   margin: 0;
-  border: 1px solid #d9e0e7;
+  border: 0;
 }
 
 .state-role-group legend {
@@ -92,16 +97,40 @@
 }
 
 .state-role-group label {
-  display: inline-flex;
-  gap: 5px;
+  display: flex;
+  gap: 6px;
   align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 34px;
+  padding: 5px 4px;
   color: #44525f;
-  font-size: 12px;
+  font-size: 11px;
+  background: #ffffff;
+  border: 1px solid #ccd6de;
+  border-radius: 4px;
+}
+
+.state-role-group label:has(input:checked) {
+  color: #0b5fae;
+  background: #eaf3fc;
+  border-color: #8ebce4;
+}
+
+.state-role-group input {
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  margin: 0;
 }
 
 .state-editor__actions,
 .state-presentation-actions {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.state-presentation-actions .button:only-child {
+  grid-column: 1 / -1;
 }
 
 .relation-candidate__options {
@@ -113,11 +142,13 @@
   display: grid;
   gap: 4px;
   width: 100%;
-  padding: 9px;
+  min-height: 54px;
+  padding: 9px 10px;
   color: #24313b;
   text-align: left;
   background: #f8fafb;
   border: 1px solid #d9e0e7;
+  border-radius: 4px;
 }
 
 .relation-candidate__option:hover,

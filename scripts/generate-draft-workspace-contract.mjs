@@ -43,29 +43,82 @@ const v1 = name => importRule({ $ref: `#/components/schemas/${name}` }, source, 
 for (const name of ['DraftToken', 'SaveState', 'SaveResult', 'PinResult']) importRule(ref(name), save.$defs, '#/$defs/');
 const id = v1('StableId'), token = ref('DraftToken');
 const commands = {
-  CREATE_ELEMENT: 'CreateElementPayload', CREATE_FEATURE: 'CreateFeaturePayload', CREATE_FACT: 'CreateFactPayload',
+  APPLY_MODEL_PLAN: 'ModelPlanPayload',
+  CREATE_ARCHITECTURE_LINK: 'CreateArchitectureLinkPayload', DELETE_ARCHITECTURE_LINK: 'DeleteArchitectureLinkPayload', UPDATE_ARCHITECTURE_CLASSIFICATION: 'ArchitectureClassificationPayload', CREATE_ELEMENT: 'CreateElementPayload', CREATE_CONTEXT: 'CreateContextPayload', DELETE_CONTEXT: 'DeleteContextPayload', CREATE_FEATURE: 'CreateFeaturePayload', CREATE_FACT: 'CreateFactPayload',
   CREATE_STATE: 'CreateStatePayload', UPDATE_STATE: 'UpdateStatePayload', UPDATE_FACT: 'UpdateFactPayload',
-  UPDATE_PROPERTY: 'UpdatePropertyPayload', UPDATE_LAYOUT: 'UpdateLayoutPayload', DELETE_CONSTRUCT: 'DeleteConstructPayload',
+  UPDATE_PROPERTY: 'UpdatePropertyPayload', UPDATE_LAYOUT: 'UpdateLayoutPayload', UPDATE_LAYOUT_BATCH: 'UpdateLayoutBatchPayload', DELETE_CONSTRUCT: 'DeleteConstructPayload',
   STATE_EXPLICIT: 'StatePresentationPayload', STATE_SUPPRESS: 'StatePresentationPayload', UNFOLD: 'StatePresentationPayload', FOLD: 'StatePresentationPayload',
 };
 for (const name of new Set(Object.values(commands))) {
+  if (['ModelPlanPayload', 'CreateArchitectureLinkPayload', 'DeleteArchitectureLinkPayload', 'ArchitectureClassificationPayload', 'CreateContextPayload', 'DeleteContextPayload', 'UpdateLayoutBatchPayload'].includes(name)) continue;
   v1(name);
   for (const key of ['capability_query_id', 'selected_option_id']) {
     delete defs[name].properties[key]; defs[name].required = defs[name].required.filter(item => item !== key);
   }
 }
+defs.LayoutGeometry = obj({ x: { type: 'number' }, y: { type: 'number' }, width: { type: 'number', exclusiveMinimum: 0 }, height: { type: 'number', exclusiveMinimum: 0 } });
+defs.UpdateLayoutBatchPayload = obj({ layouts: { ...arr(obj({ occurrence_id: id, layout: ref('LayoutGeometry') })), minItems: 1, maxItems: 1000 } });
+defs.CreateContextPayload = obj({ context_id: id, refinee_element_id: id, name: { type: 'string', minLength: 1, maxLength: 256 } });
+defs.DeleteContextPayload = obj({ context_id: id, impact_token: str });
+defs.ArchitectureLinkKind = enumeration('INPUT', 'GENERATES', 'TRACE');
+defs.CreateArchitectureLinkPayload = obj({ context_id: id, target_context_id: id, kind: ref('ArchitectureLinkKind') });
+defs.DeleteArchitectureLinkPayload = obj({ context_id: id, link_id: id });
+defs.ArchitectureLink = obj({ link_id: id, source_context_id: id, target_context_id: id, kind: ref('ArchitectureLinkKind') });
+defs.ArchitectureLevel = enumeration('MISSION', 'FUNCTION', 'PRODUCT');
+defs.ArchitectureClassificationPayload = obj({ context_id: id, architecture_level: nil(ref('ArchitectureLevel')) });
+defs.CreateElementPayload.properties.context_id = id;
 defs.CreateFactPayload.properties.fact_family.enum = defs.CreateFactPayload.properties.fact_family.enum.filter(value => value !== 'CONTROL');
 // State 的持久化正文只有 name/roles，无 ordinal；不能接受后再静默丢弃。
 defs.CreateStatePayload.properties.name_or_value.maxLength = 256;
 defs.UpdateStatePayload.properties.changes.properties.name_or_value.maxLength = 256;
 delete defs.UpdateStatePayload.properties.changes.properties.ordinal;
+const planName = { type: 'string', minLength: 1, maxLength: 256 };
+const planCommon = { local_id: id };
+defs.ModelPlanStep = { oneOf: [
+  obj({ ...planCommon, command_type: { const: 'CREATE_ELEMENT' }, kind: enumeration('OBJECT', 'PROCESS'), name: planName, layout: ref('NodeLayoutInput') }),
+  obj({ ...planCommon, command_type: { const: 'CREATE_STATE' }, target: id, name: planName, state_roles: ref('StateRoles'), layout: ref('NodeLayoutInput') }, ['local_id', 'command_type', 'target', 'name']),
+  obj({ ...planCommon, command_type: { const: 'CREATE_FACT' }, endpoints: { ...arr(id), minItems: 2, maxItems: 3 }, capability_id: id }),
+  obj({ ...planCommon, command_type: { const: 'UPDATE_PROPERTY' }, target: id, name: planName }),
+  obj({ ...planCommon, command_type: { const: 'UPDATE_STATE' }, target: id, name: planName, state_roles: ref('StateRoles') }, ['local_id', 'command_type', 'target', 'name']),
+  obj({ ...planCommon, command_type: { const: 'UPDATE_LAYOUT' }, target: id, layout: ref('NodeLayoutInput') }),
+] };
+defs.ModelPlanPayload = obj({ context_id: id, steps: { ...arr(ref('ModelPlanStep')), minItems: 1, maxItems: 100 } });
+defs.MindmapNode = obj({ id, parent_id: nil(id), order: { type: 'integer', minimum: 0, maximum: 300 }, label: planName,
+  note: { type: 'string', maxLength: 4000 }, kind: enumeration('TOPIC', 'OBJECT', 'PROCESS', 'STATE', 'ATTRIBUTE', 'CONSTRAINT', 'UNCLASSIFIED'),
+  owner_id: nil(id), entity_ref: nil(id), target_id: nil(id), collapsed: { type: 'boolean' } });
+defs.MindmapRelation = obj({ id, label: planName, capability_id: nil(id), endpoints: { ...arr(id), minItems: 2, maxItems: 3 } });
+defs.MindmapDocument = obj({ format_version: { type: 'integer', minimum: 1, maximum: 1 }, id, revision: { type: 'integer', minimum: 0, maximum: Number.MAX_SAFE_INTEGER },
+  root_id: id, nodes: { ...arr(ref('MindmapNode')), minItems: 1, maxItems: 300 }, relations: { ...arr(ref('MindmapRelation')), maxItems: 100 } });
+defs.AnalysisSource = obj({ mindmap_id: id, revision: { type: 'integer', minimum: 0, maximum: Number.MAX_SAFE_INTEGER }, digest: str,
+  bindings: { ...arr(obj({ source_id: id, target_ref: id })), minItems: 1, maxItems: 400 }, excluded_ids: { ...arr(id), maxItems: 400 } });
+defs.MindmapMapping = obj({ source_id: id, target_id: id, source_json: str, target_name: str, target_kind: str });
+defs.MindmapConversion = obj({ command_id: id, context_id: id, revision: { type: 'integer' }, mappings: arr(ref('MindmapMapping')), excluded_ids: { ...arr(id), maxItems: 400 } });
+defs.MindmapRequest = obj({ request_id: id, action: enumeration('OPEN', 'SAVE'), draft_token: token,
+  document: ref('MindmapDocument'), expected_revision: { type: 'integer', minimum: 0, maximum: Number.MAX_SAFE_INTEGER } }, ['request_id', 'action', 'draft_token']);
+defs.MindmapResult = obj({ request_id: id, document: ref('MindmapDocument'), digest: str, conversions: arr(ref('MindmapConversion')) });
 defs.DraftCommandType = enumeration(...Object.keys(commands));
 defs.DraftCommand = { oneOf: Object.entries(commands).map(([command, payload]) => obj({ command_type: { const: command }, payload: ref(payload) })) };
 defs.DraftScope = obj({ context_id: id, selection_id: nil(id), intent: ref('DraftCommandType'), endpoints: arr(id) });
 defs.DraftAuthorization = obj({ capability_query_id: id, selected_option_id: id });
 defs.DraftEditRequest = obj({ request_id: id, command_id: id, expected_draft_token: token,
-  scope: ref('DraftScope'), authorization: ref('DraftAuthorization'), command: ref('DraftCommand') });
+  scope: ref('DraftScope'), authorization: ref('DraftAuthorization'), command: ref('DraftCommand'), analysis_source: ref('AnalysisSource') },
+  ['request_id', 'command_id', 'expected_draft_token', 'scope', 'authorization', 'command']);
 defs.DraftQueryRequest = obj({ request_id: id, draft_token: token, context_id: id });
+defs.MethodSource = { oneOf: [obj({ draft_token: token }), obj({ revision_id: id })] };
+defs.MethodSummaryRequest = obj({ request_id: id, context_id: id, source: ref('MethodSource') });
+defs.MethodEvidence = obj({ fact_id: id, capability_id: str, description: str, context_ids: arr(id), target_ids: arr(id) });
+defs.MethodRole = obj({ role: enumeration('SUBJECT', 'OBJECT', 'INSTRUMENT', 'RESOURCE', 'ENVIRONMENT', 'INFORMATION'),
+  status: enumeration('EVIDENCE', 'NO_EVIDENCE', 'MANUAL'), guidance: str, evidence: arr(ref('MethodEvidence')) });
+defs.MethodProcess = obj({ process_id: id, name: str, context_ids: arr(id), roles: { ...arr(ref('MethodRole')), minItems: 6, maxItems: 6 } });
+defs.MethodSummaryResult = obj({ meta: obj({ request_id: id, context_id: id, source: ref('MethodSource') }),
+  data: obj({ coverage: { const: 'RELATION_EVIDENCE_ONLY' }, processes: arr(ref('MethodProcess')),
+    contexts: arr(obj({ context_id: id, name: str, architecture_level: nil(ref('ArchitectureLevel')) })),
+    architecture_links: arr(ref('ArchitectureLink')), refinements: arr(obj({ refinement_id: id, parent_context_id: id, child_context_id: id, refinee_element_id: id, refinee_name: str, refinement_kind: enumeration('PROCESS', 'OBJECT') })) }) });
+defs.OperationHistoryRequest = obj({ request_id: id, revision: id, before: nil({ type: 'string', minLength: 1, maxLength: 2048 }) });
+defs.OperationHistoryItem = obj({ record_id: id, occurred_at: { type: 'string', format: 'date-time' }, operation: str,
+  title: { type: 'string', minLength: 1 }, context_id: nil(id), context_name: nil(str), status: str, revision_id: nil(id), detail_available: { type: 'boolean' } });
+defs.OperationHistoryResult = obj({ meta: obj({ request_id: id, project_id: id, model_id: id, revision: id }),
+  data: obj({ items: { ...arr(ref('OperationHistoryItem')), maxItems: 100 }, next_before: nil({ type: 'string', minLength: 1, maxLength: 2048 }) }) });
 defs.DraftRelationCatalogRequest = obj({ request_id: id, draft_token: token, context_id: id, selection_id: nil(id) });
 defs.DraftCapabilitiesRequest = obj({ request_id: id, draft_token: token, scope: ref('DraftScope') });
 defs.OpenDraftRequest = obj({ request_id: id, context_id: nil(id) });
@@ -91,10 +144,22 @@ const option = structuredClone(defs.CommandCapabilityOption);
 const deletion = ['impact_summary', 'impact_token', 'delete_mode', 'delete_target'];
 const ordinary = structuredClone(option);
 for (const key of deletion) delete ordinary.properties[key];
-ordinary.properties.command_type = enumeration(...Object.keys(commands).filter(command => command !== 'DELETE_CONSTRUCT'));
+ordinary.properties.command_type = enumeration(...Object.keys(commands).filter(command => !['DELETE_CONSTRUCT', 'DELETE_CONTEXT', 'CREATE_ARCHITECTURE_LINK', 'DELETE_ARCHITECTURE_LINK', 'UPDATE_ARCHITECTURE_CLASSIFICATION'].includes(command)));
 option.required.push(...deletion);
 option.properties.command_type = { const: 'DELETE_CONSTRUCT' };
-defs.CommandCapabilityOption = { oneOf: [ordinary, option] };
+defs.ContextDeleteImpact = obj({ input_token: token, context_id: id, parent_context_id: id, context_ids: arr(id),
+  counts: ref('DeleteImpactCounts'), blockers: arr(obj({ kind: enumeration('ELEMENT', 'FEATURE', 'STATE', 'FACT', 'OCCURRENCE', 'CONTEXT'), id, context_id: id }, ['kind', 'id'])) });
+const contextDeletion = structuredClone(ordinary);
+contextDeletion.properties.command_type = { const: 'DELETE_CONTEXT' };
+contextDeletion.properties.context_impact = ref('ContextDeleteImpact');
+contextDeletion.properties.impact_token = str;
+contextDeletion.required.push('context_impact', 'impact_token');
+// 方法元数据授权不使用语言 Profile 的 symbol/template/capability。
+const metadataOption = obj({ capability_query_id: id, option_id: id,
+  command_type: enumeration('UPDATE_ARCHITECTURE_CLASSIFICATION', 'CREATE_ARCHITECTURE_LINK', 'DELETE_ARCHITECTURE_LINK'), option_kind: { const: 'METHOD_METADATA' },
+  target_context_id: id, display_name: str, required_fields: structuredClone(ordinary.properties.required_fields),
+  enabled: { type: 'boolean' }, reason_codes: arr(ref('CapabilityReasonCode')), expires_with_token: token });
+defs.CommandCapabilityOption = { oneOf: [ordinary, option, contextDeletion, metadataOption] };
 defs.DraftCapabilitiesData = obj({ scope: ref('DraftScope'), allowed: arr(ref('DraftCommandType')),
   forbidden: arr(obj({ command_type: ref('DraftCommandType'), reason_code: ref('CapabilityReasonCode') })),
   capability_query_id: id, options: arr(ref('CommandCapabilityOption')) });
@@ -120,13 +185,19 @@ function projectionRefs(value) {
 defs.ProjectionConstruct = projectionRefs(construct);
 defs.ProjectionConstruct.additionalProperties = false;
 defs.DraftProjectionData = obj({ context_id: id, constructs: arr(ref('ProjectionConstruct')), suppressed_states: arr(v1('SuppressedState')) });
+defs.DraftModelPlanPreviewRequest = obj({ request_id: id, draft_token: token, context_id: id, plan_id: id,
+  steps: { ...arr(ref('ModelPlanStep')), maxItems: 100 }, next_scope: nil(ref('DraftScope')), finalize: { type: 'boolean' }, analysis_source: ref('AnalysisSource') },
+  ['request_id', 'draft_token', 'context_id', 'plan_id', 'steps', 'next_scope']);
+defs.DraftModelPlanPreviewResult = obj({ meta: ref('DraftQueryMeta'), data: ref('DraftProjectionData'), capabilities: nil(ref('DraftCapabilitiesData')), findings: nil(ref('DraftFindingsData')) });
 for (const [name, sourceName] of [['DraftTextData', 'TextProjectionResult'], ['DraftNavigationData', 'ContextNavigationResult'],
   ['DraftRelationCatalogData', 'RelationCatalogResult']]) {
   defs[name] = importRule(source[sourceName].properties.data, source, '#/components/schemas/');
 }
+defs.NavigationNode.properties.parent_context_id = id;
+defs.NavigationNode.properties.refinee_element_id = id;
 defs.DraftFinding = obj({ finding_id: id, rule_id: id, severity: { const: 'BLOCKING' },
   category: enumeration('DUPLICATE_ID', 'MISSING_REFERENCE', 'CAPABILITY_BINDING_MISMATCH', 'INVALID_ENDPOINT', 'STATE_OWNER_MISMATCH',
-    'INVALID_STATE_PRESENTATION', 'CONTEXT_CLOSURE_VIOLATION', 'INVALID_LAYOUT', 'INVALID_OWNERSHIP'),
+    'INVALID_STATE_PRESENTATION', 'CONTEXT_CLOSURE_VIOLATION', 'INVALID_LAYOUT', 'INVALID_OWNERSHIP', 'INVALID_REFINEMENT'),
   context_id: { type: 'null' }, entity_id: id, message: { type: 'string', minLength: 1 } });
 defs.DraftFindingsData = obj({ items: arr(ref('DraftFinding')), validation_scope: { const: 'MODEL' },
   validation_summary: obj({ blocking: { type: 'integer', minimum: 0, maximum: Number.MAX_SAFE_INTEGER }, warning: { type: 'integer', minimum: 0, maximum: 0 },
@@ -169,15 +240,19 @@ function tsType(rule) {
 }
 const ts = '// 由 scripts/generate-draft-workspace-contract.mjs 生成，请勿手改。\n\n' + Object.entries(defs).map(([name, rule]) => `export type ${name} = ${tsType(rule)};`).join('\n\n') + '\n';
 const operations = {
+  mindmap: ['ManageMindmap', 'MindmapRequest', 'MindmapResult'],
+  'plan-preview': ['PreviewModelPlan', 'DraftModelPlanPreviewRequest', 'DraftModelPlanPreviewResult'],
   open: ['OpenDraft', 'OpenDraftRequest', 'OpenDraftResult'], projection: ['QueryDraftProjection', 'DraftQueryRequest', 'DraftProjectionResult'],
   text: ['QueryDraftText', 'DraftQueryRequest', 'DraftTextResult'], navigation: ['QueryDraftNavigation', 'DraftQueryRequest', 'DraftNavigationResult'],
   findings: ['QueryDraftFindings', 'DraftQueryRequest', 'DraftFindingsResult'], 'relation-catalog': ['QueryDraftRelationCatalog', 'DraftRelationCatalogRequest', 'DraftRelationCatalogResult'],
   capabilities: ['QueryDraftCapabilities', 'DraftCapabilitiesRequest', 'DraftCapabilitiesResult'], commands: ['ExecuteDraftEdit', 'DraftEditRequest', 'DraftEditResult'],
   receipts: ['GetDraftReceipt', 'DraftReceiptRequest', 'DraftReceiptResult'],
+  'operation-history': ['QueryOperationHistory', 'OperationHistoryRequest', 'OperationHistoryResult'],
+  'method-summary': ['GetMethodSummary', 'MethodSummaryRequest', 'MethodSummaryResult'],
 };
 const apiRef = name => ({ $ref: `../schemas/opm-draft-workspace-v02.schema.json#/$defs/${name}` });
 const media = name => ({ 'application/json': { schema: apiRef(name) } });
-const api = { openapi: '3.1.0', info: { title: 'OPM 草稿编辑与查询 API（HS-02E 十三类命令及九条路径已接入，参数与查询边界见实施 Checklist）', version: '0.2.0-draft' },
+const api = { openapi: '3.1.0', info: { title: 'OPM 草稿编辑、查询与模型操作历史 API（参数与查询边界见实施 Checklist）', version: '0.2.0-draft' },
   servers: [{ url: 'http://127.0.0.1:17850/api/v2' }], security: [{ localSession: [] }],
   paths: Object.fromEntries(Object.entries(operations).map(([suffix, [operationId, request, result]]) => [`/projects/{project_id}/models/{model_id}/draft/${suffix}`, {
     parameters: ['project_id', 'model_id'].map(name => ({ name, in: 'path', required: true, schema: apiRef('StableId') })),

@@ -148,7 +148,7 @@ public final class DraftWorkspaceSchema {
         if (name.equals("DraftEditRequest")) {
             var scope = value.get("scope"); var command = value.get("command"); var payload = command.get("payload");
             require(scope.get("intent").equals(command.get("command_type")));
-            if (payload.has("context_id")) require(payload.get("context_id").equals(scope.get("context_id")));
+            if (payload.has("context_id")) require(payload.get("context_id").equals(scope.get(command.get("command_type").asText().equals("DELETE_CONTEXT") ? "selection_id" : "context_id")));
             if (command.get("command_type").asText().equals("DELETE_CONSTRUCT")) require(payload.get("selection_id").equals(scope.get("selection_id")));
         }
         if (name.equals("DraftEditResult")) {
@@ -185,6 +185,10 @@ public final class DraftWorkspaceSchema {
                 require(tokenEquals(option.get("expires_with_token"), meta.get("draft_token"))
                         && option.get("capability_query_id").equals(data.get("capability_query_id")) && ids.add(option.get("option_id").asText())
                         && option.get("command_type").equals(scope.get("intent")));
+                if (option.get("command_type").asText().equals("DELETE_CONTEXT")) {
+                    var impact = option.get("context_impact");
+                    require(impact.get("input_token").equals(meta.get("draft_token")) && impact.get("context_id").equals(scope.get("selection_id")));
+                }
                 if (option.get("command_type").asText().equals("DELETE_CONSTRUCT")) {
                     var impact = option.get("impact_summary");
                     require(tokenEquals(impact.get("input_token"), meta.get("draft_token")) && impact.get("selected_occurrence_id").equals(scope.get("selection_id"))

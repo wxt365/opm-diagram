@@ -1,6 +1,6 @@
 export type RelationToolGlyphKind =
   | "closed-target"
-  | "closed-both"
+  | "state-effect-pair"
   | "filled-circle"
   | "open-circle"
   | "invocation"
@@ -26,14 +26,14 @@ export interface RelationToolGlyph {
 const glyphs: Readonly<Record<string, RelationToolGlyph>> = {
   "symbol.link.consumption": { kind: "closed-target" },
   "symbol.link.result": { kind: "closed-target" },
-  "symbol.link.effect": { kind: "closed-both" },
+  "symbol.link.effect": { kind: "state-effect-pair" },
   "symbol.link.agent": { kind: "filled-circle" },
   "symbol.link.instrument": { kind: "open-circle" },
   "symbol.link.consumption.state": { kind: "closed-target", stateSource: true },
   "symbol.link.result.state": { kind: "closed-target", stateTarget: true },
-  "symbol.link.effect.state.input-output": { kind: "closed-both", stateSource: true, stateTarget: true },
-  "symbol.link.effect.state.input": { kind: "closed-both", stateSource: true },
-  "symbol.link.effect.state.output": { kind: "closed-both", stateTarget: true },
+  "symbol.link.effect.state.input-output": { kind: "state-effect-pair", stateSource: true, stateTarget: true },
+  "symbol.link.effect.state.input": { kind: "state-effect-pair", stateSource: true },
+  "symbol.link.effect.state.output": { kind: "state-effect-pair", stateTarget: true },
   "symbol.link.agent.state": { kind: "filled-circle", stateSource: true },
   "symbol.link.instrument.state": { kind: "open-circle", stateSource: true },
   "symbol.link.invocation": { kind: "invocation" },

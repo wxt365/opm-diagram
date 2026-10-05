@@ -9,6 +9,12 @@ const centerMap: Record<string, { x: number; y: number }> = {
 };
 const centers = (id: string) => centerMap[id];
 
+const closeCenters = (id: string) => ({
+  ...(id === "left" ? { x: 80, y: 212 } : { x: 80, y: 308 }),
+  width: 160,
+  height: 72,
+});
+
 describe("parallel relation layout", () => {
   it("单条关系保持直线，两条同向关系分居两侧", () => {
     const one = layoutParallelBinaryRelations([spec("fact.one")], centers);
@@ -29,6 +35,27 @@ describe("parallel relation layout", () => {
   it("正反向关系使用同一规范法向量，不会落到同一轨道", () => {
     const result = layoutParallelBinaryRelations([spec("fact.a"), spec("fact.b", "right", "left")], centers);
     expect(lanes(result)).toEqual({ "fact.a": -12, "fact.b": 12 });
+  });
+
+  it("紧邻节点的四条关系折点在节点轮廓外，排序和方向不改变对应轨道", () => {
+    const input = [spec("fact.a"), spec("fact.b", "right", "left"), spec("fact.c"), spec("fact.d")];
+    const result = layoutParallelBinaryRelations(input, closeCenters);
+    const shuffled = layoutParallelBinaryRelations([...input].reverse(), closeCenters);
+    const xById = Object.fromEntries(result.map((item) => [item.relationId, primary(item).vertices?.[0]?.x]));
+    expect(xById).toEqual(Object.fromEntries(shuffled.map((item) => [item.relationId, primary(item).vertices?.[0]?.x])));
+    expect(Object.values(xById).filter((x) => x !== undefined && x < 80 - 80 - 8)).toHaveLength(2);
+    expect(Object.values(xById).filter((x) => x !== undefined && x > 80 + 80 + 8)).toHaveLength(2);
+  });
+
+  it("节点拉开后恢复原分轨距离，节点移动会重算折点", () => {
+    const input = [spec("fact.a"), spec("fact.b")];
+    const near = layoutParallelBinaryRelations(input, closeCenters);
+    const far = layoutParallelBinaryRelations(input, (id) => ({
+      ...(id === "left" ? { x: 80, y: 212 } : { x: 80, y: 512 }), width: 160, height: 72,
+    }));
+    expect(primary(near[0]!).vertices?.[0]?.x).toBeGreaterThan(168);
+    expect(primary(far[0]!).vertices?.[0]?.x).toBe(80 + PARALLEL_RELATION_LANE_GAP / 2);
+    expect(primary(far[1]!).vertices?.[0]?.x).toBe(80 - PARALLEL_RELATION_LANE_GAP / 2);
   });
 
   it("保留 fan、已有 route、自调用和缺少端点中心的原始 RenderSpec", () => {

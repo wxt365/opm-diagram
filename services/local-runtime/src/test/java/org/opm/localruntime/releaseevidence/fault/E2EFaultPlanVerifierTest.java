@@ -20,6 +20,60 @@ class E2EFaultPlanVerifierTest {
     @TempDir Path temporaryDirectory;
 
     @Test
+    void bundledSchemaMatchesTheCurrentFrozenSourceBytes() throws Exception {
+        byte[] source = Files.readAllBytes(repositoryRoot().resolve("docs/contracts/schemas/opm-dev-canvas-06-e2e-attempt-artifact-v02.schema.json"));
+        try (var input = E2EFaultPlanVerifier.class.getResourceAsStream(E2EFaultPlanVerifier.SCHEMA_RESOURCE)) {
+            assertTrue(input != null, "JAR 必须包含受控 Schema");
+            assertEquals(E2EFaultPlanVerifier.EXPECTED_SCHEMA_SHA256, sha(input.readAllBytes()));
+        }
+        assertEquals(E2EFaultPlanVerifier.EXPECTED_SCHEMA_SHA256, sha(source));
+    }
+
+    @Test
+    void rejectsMissingOrTamperedBundledSchemaWithoutCheckoutFallback() throws Exception {
+        byte[] source = Files.readAllBytes(repositoryRoot().resolve("docs/contracts/schemas/opm-dev-canvas-06-e2e-attempt-artifact-v02.schema.json"));
+        byte[] tampered = java.util.Arrays.copyOf(source, source.length + 1);
+        tampered[source.length] = '\n';
+        Map<String, String> arguments = writePlan(FaultCase.PERSISTENCE_FAILED, Map.of());
+        // 独立加载真实 verifier：有效 checkout 仍存在，只替换其内嵌资源。
+        for (byte[] resource : new byte[][] {source, null, tampered}) {
+            try (var loader = new java.net.URLClassLoader(new java.net.URL[] {
+                    E2EFaultPlanVerifier.class.getProtectionDomain().getCodeSource().getLocation()
+            }, E2EFaultPlanVerifier.class.getClassLoader()) {
+                @Override
+                protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
+                    if (!name.startsWith("org.opm.localruntime.releaseevidence.fault.")) return super.loadClass(name, resolve);
+                    synchronized (getClassLoadingLock(name)) {
+                        Class<?> loaded = findLoadedClass(name);
+                        if (loaded == null) loaded = findClass(name);
+                        if (resolve) resolveClass(loaded);
+                        return loaded;
+                    }
+                }
+
+                @Override
+                public java.io.InputStream getResourceAsStream(String name) {
+                    if (name.equals(E2EFaultPlanVerifier.SCHEMA_RESOURCE.substring(1))) {
+                        return resource == null ? null : new java.io.ByteArrayInputStream(resource);
+                    }
+                    return super.getResourceAsStream(name);
+                }
+            }) {
+                Class<?> argumentType = loader.loadClass(E2EFaultLauncherArguments.class.getName());
+                Object input = argumentType.getConstructor(Map.class).newInstance(arguments);
+                var verify = loader.loadClass(E2EFaultPlanVerifier.class.getName()).getMethod("verify", argumentType);
+                if (resource == source) {
+                    assertTrue(verify.invoke(null, input) != null);
+                } else {
+                    var failure = assertThrows(java.lang.reflect.InvocationTargetException.class, () -> verify.invoke(null, input)).getCause();
+                    assertEquals("E2E_FAULT_PLAN_SCHEMA_INVALID", failure.getClass().getMethod("code").invoke(failure).toString());
+                    assertEquals("SCHEMA_0_2", failure.getClass().getMethod("stage").invoke(failure));
+                }
+            }
+        }
+    }
+
+    @Test
     void acceptsAllThreeFaultPlansWithNodeAjvAndTheJarValidator() throws Exception {
         for (FaultCase faultCase : FaultCase.values()) {
             Map<String, String> arguments = writePlan(faultCase, Map.of());

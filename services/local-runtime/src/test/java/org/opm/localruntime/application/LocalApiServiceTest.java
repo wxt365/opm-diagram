@@ -83,8 +83,9 @@ class LocalApiServiceTest {
     }
 
     @Test
-    void persistsTheP0ProjectToBaselinePathInSeparateProjectSqlite() {
-        LocalApiService service = new LocalApiService(new ProjectDatabaseFactory(temporaryDirectory));
+    void persistsTheP0ProjectToValidationPathAndRejectsIncompleteBaselineEvidence() throws Exception {
+        ProjectDatabaseFactory factory = new ProjectDatabaseFactory(temporaryDirectory);
+        LocalApiService service = new LocalApiService(factory);
 
         Map<String, Object> projectResult = service.createProject(projectRequest("request.project.001", "command.project.001"));
         Map<String, Object> project = data(projectResult);
@@ -125,10 +126,29 @@ class LocalApiServiceTest {
         Map<String, Object> queriedTask = data(service.task("request.task.001", string(task.get("task_id"))));
         assertEquals(revision, queriedTask.get("input_revision"));
 
-        String evidence = "evidence." + digest(string(task.get("task_id")) + revision).substring(0, 32);
-        Map<String, Object> baseline = data(service.baseline(projectId, modelId, baselineRequest("request.baseline.001", "command.baseline.001", revision, evidence)));
-        assertEquals(revision, baseline.get("revision_id"));
-        assertEquals(true, baseline.get("immutable"));
+        Map<?, ?> summary;
+        try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + factory.databasePath(projectId));
+             var query = connection.prepareStatement("SELECT result_json FROM background_task WHERE task_id = ?")) {
+            query.setString(1, string(task.get("task_id")));
+            try (var rows = query.executeQuery()) {
+                assertTrue(rows.next());
+                summary = new com.fasterxml.jackson.databind.ObjectMapper().readValue(rows.getString(1), Map.class);
+            }
+        }
+        assertEquals(0, summary.get("blocking"));
+        assertEquals("INCOMPLETE", summary.get("coverage_state"));
+        String evidence = string(summary.get("evidence_summary_token"));
+        String validatedRevision = revision;
+        assertEquals(ApiErrorCode.VALIDATION_BLOCKED, assertThrows(ApiException.class,
+                () -> service.baseline(projectId, modelId, baselineRequest("request.baseline.001", "command.baseline.001", validatedRevision, evidence))).code());
+        try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + factory.databasePath(projectId));
+             var query = connection.createStatement();
+             var rows = query.executeQuery("SELECT COUNT(*) FROM baseline")) {
+            assertTrue(rows.next());
+            assertEquals(0, rows.getInt(1));
+        }
+        assertFalse(((List<?>) service.revisions("request.revisions.blocked", projectId, modelId).get("data")).stream()
+                .map(Map.class::cast).anyMatch(item -> "BASELINE".equals(item.get("kind"))));
         assertFalse(((java.util.List<?>) service.revisions("request.revisions.001", projectId, modelId).get("data")).isEmpty());
     }
 
@@ -228,6 +248,7 @@ class LocalApiServiceTest {
         Map<?, ?> layoutAfter = (Map<?, ?>) attributeAfter.get("layout");
         assertEquals("FEATURE", attributeAfter.get("target_kind"));
         assertEquals("ATTRIBUTE_NODE", attributeAfter.get("construct_role"));
+        assertEquals("element.attribute-layout.owner", attributeAfter.get("owner_id"));
         assertEquals("CAP-FEAT-ATTRIBUTE-001", attributeAfter.get("capability_id"));
         assertEquals("Temperature", attributeAfter.get("label"));
         assertEquals(340.0d, ((Number) layoutAfter.get("x")).doubleValue());
@@ -239,6 +260,7 @@ class LocalApiServiceTest {
         assertEquals(textBefore.get("traces"), data(service.text("request.attribute-layout.trace.after", projectId, modelId, contextId, movedRevision)).get("traces"));
 
         Map<?, ?> operation = construct(service, projectId, modelId, contextId, movedRevision, "feature.operation-layout.calibrate");
+        assertEquals("element.attribute-layout.owner", operation.get("owner_id"));
         String operationRevision = committed(service.edit(projectId, modelId, contextId, editRequest(
                 "request.operation-layout.reject.001", "command.operation-layout.reject.001", movedRevision,
                 "UPDATE_LAYOUT", map("occurrence_id", operation.get("occurrence_id"), "layout", map("x", 12, "y", 24)))));
@@ -1288,14 +1310,4 @@ class LocalApiServiceTest {
         return value == null ? null : value.toString();
     }
 
-    private String digest(String value) {
-        try {
-            byte[] bytes = java.security.MessageDigest.getInstance("SHA-256").digest(value.getBytes(java.nio.charset.StandardCharsets.UTF_8));
-            StringBuilder result = new StringBuilder(bytes.length * 2);
-            for (byte item : bytes) result.append(String.format("%02x", item));
-            return result.toString();
-        } catch (Exception exception) {
-            throw new IllegalStateException(exception);
-        }
-    }
 }

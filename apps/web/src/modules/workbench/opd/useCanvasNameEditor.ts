@@ -51,7 +51,7 @@ export function useCanvasNameEditor(props: NameEditorProps, canvasHost: Ref<HTML
   }
 
   async function openNameEditor(node: OpdNode) {
-    if (!props.beginNameEdit || !props.submitNameEdit || (node.kind !== "object" && node.kind !== "process")) return;
+    if (!props.beginNameEdit || !props.submitNameEdit || node.kind === "state") return;
     if (nameEditor.active && !await finishNameEdit()) return;
     const request = ++nameEditRequest;
     if (!await props.beginNameEdit(node.id) || request !== nameEditRequest) return;

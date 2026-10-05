@@ -19,6 +19,7 @@
         <span class="header-context__state">Local Runtime · P03 设计确认</span>
       </div>
       <button
+        v-if="!isWorkbench"
         class="header-toggle"
         type="button"
         :aria-label="store.isSidebarCollapsed ? '展开导航' : '收起导航'"

@@ -12,7 +12,8 @@ public final class ProjectDatabaseFactory {
     /** 应用新建入口使用混合保存；历史发布工具仍显式使用旧构造器。 */
     public static ProjectDatabaseFactory journaledDrafts(Path storageRoot) {
         return new ProjectDatabaseFactory(storageRoot, new FlywayProjectSchemaMigrator(java.util.List.of(
-                "classpath:db/migration", "classpath:db/hybrid-save", "classpath:db/checkpoint", "classpath:db/pin")), true);
+                "classpath:db/migration", "classpath:db/hybrid-save", "classpath:db/checkpoint", "classpath:db/pin",
+                "classpath:db/digestv2", "classpath:db/mindmap")), true);
     }
 
     public ProjectDatabaseFactory(Path storageRoot) {
@@ -31,7 +32,13 @@ public final class ProjectDatabaseFactory {
 
     public ProjectDatabaseOpenResult open(String projectId) {
         validateProjectId(projectId);
-        return migrator.migrate(databasePath(projectId), journaledDrafts);
+        return migrator.migrate(databasePath(projectId), journaledDrafts, journaledDrafts);
+    }
+
+    /** 旧式库只在明确使用模型生命周期时升级删除守卫，避免影响固定版本发布工具。 */
+    public ProjectDatabaseOpenResult openForModelLifecycle(String projectId) {
+        validateProjectId(projectId);
+        return migrator.migrate(databasePath(projectId), journaledDrafts, true);
     }
 
     public boolean usesJournaledDrafts() { return journaledDrafts; }

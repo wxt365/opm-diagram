@@ -33,6 +33,26 @@ describe("relation preview renderer", () => {
     expect(preview.cells[0]?.kind === "edge" ? preview.cells[0].labels.map((label) => label.text) : []).toContain("e");
     expect(JSON.stringify(preview.cells)).not.toContain("fact.1");
   });
+
+  it("结构关系预览保留开放箭头、半箭头及分类交点", () => {
+    const structuralNodes = [...nodes, node("object.2", "occ.object.2", "object", 560)];
+    const structuralOption = (capabilityId: string, symbolId: string) => ({
+      ...option("CREATE_FACT", capabilityId, symbolId),
+      normalized_endpoints: [
+        { role: "STRUCTURAL_SOURCE", target_ref: { target_kind: "ELEMENT" as const, target_id: "object.1" }, ordinal: 0 },
+        { role: "STRUCTURAL_TARGET", target_ref: { target_kind: "ELEMENT" as const, target_id: "object.2" }, ordinal: 1 },
+      ],
+    });
+    const directed = buildCreateRelationPreview(structuralOption("CAP-ISO-STRUCT-001", "symbol.link.structural.tagged.unidirectional"), structuralNodes);
+    const bidirectional = buildCreateRelationPreview(structuralOption("CAP-ISO-STRUCT-003", "symbol.link.structural.tagged.bidirectional"), structuralNodes);
+    const classification = buildCreateRelationPreview(structuralOption("CAP-ISO-STRUCT-008", "symbol.link.structural.classification"), structuralNodes);
+    expect(directed.cells[0]).toMatchObject({ kind: "edge", line: { targetMarker: { name: "block", open: true } } });
+    expect(bidirectional.cells[0]).toMatchObject({ kind: "edge", line: {
+      sourceMarker: { name: "path", fill: "none" }, targetMarker: { name: "path", fill: "none" },
+    } });
+    expect(classification.cells.filter((cell) => cell.kind === "node").map((cell) => cell.shape)).toEqual(["polygon", "ellipse"]);
+    expect(classification.cells.filter((cell) => cell.kind === "edge" && cell.line.captureAnchor)).toHaveLength(0);
+  });
 });
 
 function node(id: string, occurrenceId: string, kind: "object" | "process", x: number): OpdNode {

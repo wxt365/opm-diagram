@@ -1,5 +1,5 @@
 // Generated from docs/contracts/openapi/opm-local-api-v1.yaml. DO NOT EDIT.
-// Contract digest: 887d4e09a62d47e06ec8584bce01635c35c78f9a007c1f528e828cd6325fef4c
+// Contract digest: de7907c5a06bcde65f9f3d0b12fb614b82e8f45fd1d2e587af3dc4b74c3f43a2
 
 export type ApiEdtCommandType =
   | "CREATE_ELEMENT"
@@ -150,7 +150,7 @@ export interface ApiEdtStatePresentationPayload {
 }
 
 export interface ApiEdtUpdatePropertyPayload {
-  target_ref: { target_kind: "ELEMENT"; target_id: string };
+  target_ref: { target_kind: "ELEMENT" | "FEATURE"; target_id: string };
   property_name: "name";
   value: string;
   capability_query_id: string;

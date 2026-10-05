@@ -43,8 +43,9 @@ class LocalApiController {
     }
 
     @GetMapping("/projects/{projectId}/models")
-    Map<String, Object> listModels(@PathVariable String projectId, @RequestParam("request_id") String requestId) {
-        return service.listModels(requestId, projectId);
+    Map<String, Object> listModels(@PathVariable String projectId, @RequestParam("request_id") String requestId,
+                                   @RequestParam(value = "archive_state", defaultValue = "ACTIVE") String archiveState) {
+        return service.listModels(requestId, projectId, archiveState);
     }
 
     @PostMapping("/projects/{projectId}/models")

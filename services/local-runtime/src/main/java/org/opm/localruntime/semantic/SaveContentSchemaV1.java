@@ -10,14 +10,35 @@ import java.util.regex.Pattern;
 /** 仅校验生成的保存内容 Schema；关键词集合由生成器封闭。 */
 final class SaveContentSchemaV1 {
     private static final JsonNode SCHEMA;
+    private static final JsonNode SCHEMA_V2;
+    private static final JsonNode SCHEMA_METHOD;
+    private static final JsonNode SCHEMA_TRACE;
     static {
         try (var input = SaveContentSchemaV1.class.getResourceAsStream("/draftsave/save-content-v1.schema.json")) {
             if (input == null) throw new IllegalStateException("保存内容 Schema 资源缺失");
             SCHEMA = new ObjectMapper().readTree(input);
         } catch (Exception exception) { throw new ExceptionInInitializerError(exception); }
+        try (var input = SaveContentSchemaV1.class.getResourceAsStream("/draftsave/save-content-v2.schema.json")) {
+            if (input == null) throw new IllegalStateException("新版保存内容 Schema 资源缺失");
+            SCHEMA_V2 = new ObjectMapper().readTree(input);
+        } catch (Exception exception) { throw new ExceptionInInitializerError(exception); }
+        try (var input = SaveContentSchemaV1.class.getResourceAsStream("/draftsave/save-content-v2-method.schema.json")) {
+            if (input == null) throw new IllegalStateException("方法分类保存内容 Schema 资源缺失");
+            SCHEMA_METHOD = new ObjectMapper().readTree(input);
+        } catch (Exception exception) { throw new ExceptionInInitializerError(exception); }
     }
 
+    static {
+        try (var input = SaveContentSchemaV1.class.getResourceAsStream("/draftsave/save-content-v2-trace.schema.json")) {
+            if (input == null) throw new IllegalStateException("架构关联保存内容 Schema 资源缺失");
+            SCHEMA_TRACE = new ObjectMapper().readTree(input);
+        } catch (Exception exception) { throw new ExceptionInInitializerError(exception); }
+    }
+    static void validateTrace(JsonNode value, String definition) { validate(value, SCHEMA_TRACE.required("$defs").required(definition), "", SCHEMA_TRACE.required("$defs")); }
+
     private SaveContentSchemaV1() { }
+
+    static void validateMethod(JsonNode value, String definition) { validate(value, SCHEMA_METHOD.required("$defs").required(definition), "", SCHEMA_METHOD.required("$defs")); }
 
     static JsonNode definition(String name) { return SCHEMA.required("$defs").required(name); }
     static List<String> keys(JsonNode value) {
@@ -27,10 +48,12 @@ final class SaveContentSchemaV1 {
         return keys;
     }
 
-    static void validate(JsonNode value, String definition) { validate(value, definition(definition), ""); }
+    static JsonNode definitionV2(String name) { return SCHEMA_V2.required("$defs").required(name); }
+    static void validate(JsonNode value, String definition) { validate(value, definition(definition), "", SCHEMA.required("$defs")); }
+    static void validateV2(JsonNode value, String definition) { validate(value, definitionV2(definition), "", SCHEMA_V2.required("$defs")); }
 
-    private static void validate(JsonNode value, JsonNode rule, String pointer) {
-        if (rule.has("$ref")) { validate(value, definition(rule.get("$ref").asText().substring("#/$defs/".length())), pointer); return; }
+    private static void validate(JsonNode value, JsonNode rule, String pointer, JsonNode definitions) {
+        if (rule.has("$ref")) { validate(value, definitions.required(rule.get("$ref").asText().substring("#/$defs/".length())), pointer, definitions); return; }
         if (rule.has("const") && !rule.get("const").equals(value)) invalid(pointer);
         if (rule.has("enum")) {
             boolean found = false;
@@ -44,12 +67,12 @@ final class SaveContentSchemaV1 {
                 for (var key : keys(value)) {
                     var property = rule.path("properties").get(key);
                     if (property == null) invalid(child(pointer, key));
-                    validate(value.get(key), property, child(pointer, key));
+                    validate(value.get(key), property, child(pointer, key), definitions);
                 }
             }
             case "array" -> {
                 if (!value.isArray() || value.size() < rule.path("minItems").asInt(0)) invalid(pointer);
-                for (int index = 0; index < value.size(); index++) validate(value.get(index), rule.required("items"), child(pointer, String.valueOf(index)));
+                for (int index = 0; index < value.size(); index++) validate(value.get(index), rule.required("items"), child(pointer, String.valueOf(index)), definitions);
                 if (rule.path("uniqueItems").asBoolean()) {
                     var seen = new HashSet<JsonNode>();
                     for (var item : value) if (!seen.add(item)) invalid(pointer);

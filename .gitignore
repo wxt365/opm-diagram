@@ -17,6 +17,7 @@ pids
 
 # 本地 Runtime 数据与临时文件
 /runtime-data/
+/services/local-runtime/runtime-data/
 /tmp/
 
 # Playwright 执行输出（测试源码和 fixture 仍需提交）

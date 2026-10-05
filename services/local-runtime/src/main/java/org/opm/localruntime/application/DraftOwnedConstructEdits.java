@@ -40,13 +40,14 @@ final class DraftOwnedConstructEdits {
         syncIdentities(document, serialized, "occurrences", "occurrence_id", affected);
         syncIdentities(document, serialized, "layouts", "layout_id", affected);
         syncLayoutGeometry(document, before, after, affected);
-        var context = find(document.get("contexts"), "context_id", before.rootContextId());
-        JsonNode occurrenceIds = find(serialized.get("contexts"), "context_id", before.rootContextId()).get("occurrence_ids");
+        String contextId = payload.hasNonNull("context_id") ? payload.get("context_id").asText() : before.rootContextId();
+        var context = find(document.get("contexts"), "context_id", contextId);
+        JsonNode occurrenceIds = find(serialized.get("contexts"), "context_id", contextId).get("occurrence_ids");
         if (!context.get("occurrence_ids").equals(occurrenceIds)) context.set("occurrence_ids", occurrenceIds);
         if (!type.equals("CREATE_FEATURE")) {
             String stateId = type.equals("CREATE_STATE") ? after.states().getLast().id() : payload.get("state_id").asText();
-            JsonNode next = presentation(serialized.path("state_presentations"), before.rootContextId(), stateId);
-            ObjectNode current = presentation(document.path("state_presentations"), before.rootContextId(), stateId);
+            JsonNode next = presentation(serialized.path("state_presentations"), contextId, stateId);
+            ObjectNode current = presentation(document.path("state_presentations"), contextId, stateId);
             if (current != null) {
                 current.set("explicitness", next.get("explicitness")); current.set("fold_state", next.get("fold_state"));
             } else if (type.equals("CREATE_STATE") || !next.path("explicitness").asText().equals("EXPLICIT") || !next.path("fold_state").asText().equals("UNFOLDED")) {

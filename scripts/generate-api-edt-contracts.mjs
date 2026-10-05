@@ -140,10 +140,10 @@ function assertUpdatePropertyContract() {
   const target = payload?.properties?.target_ref;
   if (payload?.additionalProperties !== false
       || target?.additionalProperties !== false
-      || target?.properties?.target_kind?.const !== "ELEMENT"
+      || target?.properties?.target_kind?.enum?.join(",") !== "ELEMENT,FEATURE"
       || payload?.properties?.property_name?.const !== "name"
       || payload?.properties?.value?.maxLength !== 256) {
-    throw new Error("UpdatePropertyPayload 必须保持封闭的 Object/Process name 契约");
+    throw new Error("UpdatePropertyPayload 必须保持封闭的 Element/Feature name 契约");
   }
   const variants = schemas.ExecuteEditCommandRequest?.allOf?.flatMap((item) => item.oneOf ?? []) ?? [];
   if (variants.filter((item) => item.properties?.command_type?.const === "UPDATE_PROPERTY").length !== 1) {
@@ -263,7 +263,7 @@ function enrichPropertyContract(content, language) {
     return content
       .replace(
         "export interface ApiEdtUpdateLayoutPayload {",
-        "export interface ApiEdtUpdatePropertyPayload {\n  target_ref: { target_kind: \"ELEMENT\"; target_id: string };\n  property_name: \"name\";\n  value: string;\n  capability_query_id: string;\n  selected_option_id: string;\n}\n\nexport interface ApiEdtUpdateLayoutPayload {",
+        "export interface ApiEdtUpdatePropertyPayload {\n  target_ref: { target_kind: \"ELEMENT\" | \"FEATURE\"; target_id: string };\n  property_name: \"name\";\n  value: string;\n  capability_query_id: string;\n  selected_option_id: string;\n}\n\nexport interface ApiEdtUpdateLayoutPayload {",
       )
       .replace(
         '  | { command_type: "UPDATE_LAYOUT"; payload: ApiEdtUpdateLayoutPayload }',

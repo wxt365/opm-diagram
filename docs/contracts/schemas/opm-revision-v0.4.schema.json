@@ -1,0 +1,1195 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://opm.local/schemas/revision/0.4",
+  "title": "OPM Revision 0.4 - OPD architecture classification",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_id",
+    "schema_version",
+    "revision_id",
+    "model_id",
+    "revision_sequence",
+    "schema_set_ref",
+    "profile_binding",
+    "model_header",
+    "elements",
+    "states",
+    "facts",
+    "contexts",
+    "occurrences",
+    "layouts",
+    "text_artifact",
+    "validation_summary",
+    "revision_digest",
+    "refinement_edges"
+  ],
+  "properties": {
+    "schema_id": {
+      "const": "MS-REV-001"
+    },
+    "schema_version": {
+      "const": "0.4"
+    },
+    "revision_id": {
+      "$ref": "#/$defs/stableId"
+    },
+    "model_id": {
+      "$ref": "#/$defs/stableId"
+    },
+    "parent_revision_id": {
+      "$ref": "#/$defs/stableId"
+    },
+    "revision_sequence": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "schema_set_ref": {
+      "$ref": "#/$defs/schemaSetRef"
+    },
+    "profile_binding": {
+      "$ref": "#/$defs/profileBinding"
+    },
+    "model_header": {
+      "$ref": "#/$defs/modelHeader"
+    },
+    "elements": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/element"
+      }
+    },
+    "features": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/feature"
+      }
+    },
+    "states": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/state"
+      }
+    },
+    "facts": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/fact"
+      }
+    },
+    "contexts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/context"
+      }
+    },
+    "occurrences": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/occurrence"
+      }
+    },
+    "layouts": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/layout"
+      }
+    },
+    "state_presentations": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/statePresentation"
+      }
+    },
+    "text_artifact": {
+      "$ref": "#/$defs/textArtifact"
+    },
+    "text_traces": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/textTrace"
+      }
+    },
+    "validation_summary": {
+      "$ref": "#/$defs/validationSummary"
+    },
+    "revision_digest": {
+      "$ref": "#/$defs/digest"
+    },
+    "refinement_edges": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/refinementEdge"
+      }
+    }
+  },
+  "$defs": {
+    "stableId": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z][A-Za-z0-9._:-]*$"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+(?:\\.[0-9]+)?$"
+    },
+    "digest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "algorithm",
+        "digest"
+      ],
+      "properties": {
+        "algorithm": {
+          "const": "sha256"
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "versionRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/stableId"
+        },
+        "version": {
+          "$ref": "#/$defs/version"
+        },
+        "digest": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "schemaSetRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "core_metamodel_version",
+        "profile_schema_version",
+        "rule_schema_version",
+        "storage_schema_version"
+      ],
+      "properties": {
+        "core_metamodel_version": {
+          "$ref": "#/$defs/version"
+        },
+        "profile_schema_version": {
+          "$ref": "#/$defs/version"
+        },
+        "rule_schema_version": {
+          "$ref": "#/$defs/version"
+        },
+        "storage_schema_version": {
+          "$ref": "#/$defs/version"
+        },
+        "extension_schemas": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/versionRef"
+          }
+        }
+      }
+    },
+    "profileBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "rule_set",
+        "text_grammar",
+        "symbol_catalog",
+        "normalization_adapter",
+        "binding_digest"
+      ],
+      "properties": {
+        "profile": {
+          "$ref": "#/$defs/versionRef"
+        },
+        "rule_set": {
+          "$ref": "#/$defs/versionRef"
+        },
+        "text_grammar": {
+          "$ref": "#/$defs/versionRef"
+        },
+        "symbol_catalog": {
+          "$ref": "#/$defs/versionRef"
+        },
+        "normalization_adapter": {
+          "$ref": "#/$defs/versionRef"
+        },
+        "binding_digest": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "qualifiedName": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "namespace",
+        "local_name"
+      ],
+      "properties": {
+        "namespace": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "local_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      }
+    },
+    "capabilityRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capability_id",
+        "profile_id",
+        "profile_version"
+      ],
+      "properties": {
+        "capability_id": {
+          "type": "string",
+          "pattern": "^CAP-[A-Z-]+-[0-9]{3}$"
+        },
+        "profile_id": {
+          "$ref": "#/$defs/stableId"
+        },
+        "profile_version": {
+          "$ref": "#/$defs/version"
+        }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_profile_id",
+        "source_profile_version",
+        "source_kind",
+        "source_entity_id"
+      ],
+      "properties": {
+        "source_profile_id": {
+          "$ref": "#/$defs/stableId"
+        },
+        "source_profile_version": {
+          "$ref": "#/$defs/version"
+        },
+        "source_kind": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_entity_id": {
+          "$ref": "#/$defs/stableId"
+        }
+      }
+    },
+    "normalization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "level"
+      ],
+      "properties": {
+        "level": {
+          "enum": [
+            "CORE",
+            "CONDITIONAL",
+            "DERIVED",
+            "PROFILE_ONLY",
+            "LOSSY",
+            "UNMAPPABLE"
+          ]
+        },
+        "condition_rule_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "modelHeader": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "model_id",
+        "identity_namespace",
+        "name",
+        "root_context_id"
+      ],
+      "properties": {
+        "model_id": {
+          "$ref": "#/$defs/stableId"
+        },
+        "identity_namespace": {
+          "$ref": "#/$defs/qualifiedName"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 4000
+        },
+        "root_context_id": {
+          "$ref": "#/$defs/stableId"
+        }
+      }
+    },
+    "element": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "element_id",
+        "core_kind",
+        "capability_ref",
+        "name",
+        "source",
+        "normalization"
+      ],
+      "properties": {
+        "element_id": {
+          "$ref": "#/$defs/stableId"
+        },
+        "core_kind": {
+          "enum": [
+            "OBJECT",
+            "PROCESS",
+            "PROFILE_ELEMENT"
+          ]
+        },
+        "capability_ref": {
+          "$ref": "#/$defs/capabilityRef"
+        },
+        "name": {
+          "$ref": "#/$defs/qualifiedName"
+        },
+        "essence": {
+          "enum": [
+            "PHYSICAL",
+            "INFORMATICAL"
+          ]
+        },
+        "affiliation": {
+          "enum": [
+            "SYSTEMIC",
+            "ENVIRONMENTAL"
+          ]
+        },
+        "perseverance": {
+          "enum": [
+            "STATIC",
+            "DYNAMIC",
+            "PERSISTENT"
+          ]
+        },
+        "feature_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/stableId"
+          }
+        },
+        "state_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/stableId"
+          }
+        },
+        "source": {
+          "$ref": "#/$defs/source"
+        },
+        "normalization": {
+          "$ref": "#/$defs/normalization"
+        }
+      }
+    },
+    "feature": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "feature_id",
+        "owner_element_id",
+        "feature_kind",
+        "capability_ref",
+        "name",
+        "source",
+        "normalization"
+      ],
+      "properties": {
+        "feature_id": {
+          "$ref": "#/$defs/stableId"
+        },
+        "owner_element_id": {
+          "$ref": "#/$defs/stableId"
+        },
+        "feature_kind": {
+          "enum": [
+            "ATTRIBUTE",
+            "OPERATION",
+            "PROFILE_FEATURE"
+          ]
+        },
+        "capability_ref": {
+          "$ref": "#/$defs/capabilityRef"
+        },
+        "name": {
+          "$ref": "#/$defs/qualifiedName"
+        },
+        "source": {
+          "$ref": "#/$defs/source"
+        },
+        "normalization": {
+          "$ref": "#/$defs/normalization"
+        }
+      }
+    },
+    "state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state_id",
+        "owner_element_id",
+        "capability_ref",
+        "name",
+        "source",
+        "normalization"
+      ],
+      "properties": {
+        "state_id": {
+          "$ref": "#/$defs/stableId"
+        },
+        "owner_target_kind": {
+          "enum": [
+            "ELEMENT",
+            "FEATURE"
+          ]
+        },
+        "owner_element_id": {
+          "$ref": "#/$defs/stableId"
+        },
+        "capability_ref": {
+          "$ref": "#/$defs/capabilityRef"
+        },
+        "name": {
+          "$ref": "#/$defs/qualifiedName"
+        },
+        "state_roles": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "INITIAL",
+              "DEFAULT",
+              "FINAL"
+            ]
+          }
+        },
+        "source": {
+          "$ref": "#/$defs/source"
+        },
+        "normalization": {
+          "$ref": "#/$defs/normalization"
+        }
+      }
+    },
+    "endpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "endpoint_id",
+        "role",
+        "target_kind",
+        "target_id",
+        "ordinal"
+      ],
+      "properties": {
+        "endpoint_id": {
+          "$ref": "#/$defs/stableId"
+        },
+        "role": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target_kind": {
+          "enum": [
+            "ELEMENT",
+            "STATE",
+            "FEATURE",
+            "FACT"
+          ]
+        },
+        "target_id": {
+          "$ref": "#/$defs/stableId"
+        },
+        "ordinal": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "state_qualification_id": {
+          "$ref": "#/$defs/stableId"
+        }
+      }
+    },
+    "fact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fact_id",
+        "fact_family",
+        "capability_ref",
+        "endpoints",
+        "direction",
+        "source",
+        "normalization"
+      ],
+      "properties": {
+        "fact_id": {
+          "$ref": "#/$defs/stableId"
+        },
+        "fact_family": {
+          "enum": [
+            "TRANSFORMATION",
+            "ENABLING",
+            "STRUCTURAL",
+            "CONTROL",
+            "LOGICAL",
+            "PROFILE_FACT"
+          ]
+        },
+        "capability_ref": {
+          "$ref": "#/$defs/capabilityRef"
+        },
+        "endpoints": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/endpoint"
+          }
+        },
+        "direction": {
+          "enum": [
+            "DIRECTED",
+            "BIDIRECTIONAL",
+            "UNDIRECTED",
+            "PROFILE_DEFINED"
+          ]
+        },
+        "modifiers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "modifier_id",
+              "value"
+            ],
+            "properties": {
+              "modifier_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "value": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "labels": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "slot_id",
+              "text"
+            ],
+            "properties": {
+              "slot_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "text": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              }
+            }
+          }
+        },
+        "collection_completeness": {
+          "enum": [
+            "COMPLETE",
+            "INCOMPLETE",
+            "NOT_APPLICABLE"
+          ]
+        },
+        "source": {
+          "$ref": "#/$defs/source"
+        },
+        "normalization": {
+          "$ref": "#/$defs/normalization"
+        }
+      }
+    },
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "context_id",
+        "context_kind",
+        "capability_ref",
+        "name",
+        "occurrence_ids",
+        "source"
+      ],
+      "properties": {
+        "context_id": {
+          "$ref": "#/$defs/stableId"
+        },
+        "context_kind": {
+          "enum": [
+            "SYSTEM_DIAGRAM",
+            "PROCESS_REFINEMENT",
+            "OBJECT_REFINEMENT",
+            "MODEL_VIEW",
+            "PROFILE_CONTEXT"
+          ]
+        },
+        "capability_ref": {
+          "$ref": "#/$defs/capabilityRef"
+        },
+        "name": {
+          "$ref": "#/$defs/qualifiedName"
+        },
+        "occurrence_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/stableId"
+          }
+        },
+        "source": {
+          "$ref": "#/$defs/source"
+        },
+        "architecture_level": {
+          "enum": [
+            "MISSION",
+            "FUNCTION",
+            "PRODUCT"
+          ]
+        }
+      }
+    },
+    "occurrence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "occurrence_id",
+        "context_id",
+        "target_kind",
+        "target_id",
+        "ownership",
+        "construct_role",
+        "layout_id"
+      ],
+      "properties": {
+        "occurrence_id": {
+          "$ref": "#/$defs/stableId"
+        },
+        "context_id": {
+          "$ref": "#/$defs/stableId"
+        },
+        "target_kind": {
+          "enum": [
+            "ELEMENT",
+            "FACT",
+            "STATE",
+            "FEATURE"
+          ]
+        },
+        "target_id": {
+          "$ref": "#/$defs/stableId"
+        },
+        "ownership": {
+          "enum": [
+            "OWNED",
+            "REFERENCED",
+            "VIEW_DERIVED"
+          ]
+        },
+        "construct_role": {
+          "type": "string",
+          "minLength": 1
+        },
+        "layout_id": {
+          "$ref": "#/$defs/stableId"
+        }
+      }
+    },
+    "statePresentation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "context_id",
+        "state_id",
+        "explicitness",
+        "fold_state"
+      ],
+      "properties": {
+        "context_id": {
+          "$ref": "#/$defs/stableId"
+        },
+        "state_id": {
+          "$ref": "#/$defs/stableId"
+        },
+        "explicitness": {
+          "enum": [
+            "EXPLICIT",
+            "SUPPRESSED"
+          ]
+        },
+        "fold_state": {
+          "enum": [
+            "UNFOLDED",
+            "FOLDED"
+          ]
+        }
+      }
+    },
+    "layout": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "layout_id",
+        "x",
+        "y",
+        "width",
+        "height",
+        "z_order"
+      ],
+      "properties": {
+        "layout_id": {
+          "$ref": "#/$defs/stableId"
+        },
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        },
+        "width": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "height": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "z_order": {
+          "type": "integer"
+        },
+        "route_points": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "x",
+              "y"
+            ],
+            "properties": {
+              "x": {
+                "type": "number"
+              },
+              "y": {
+                "type": "number"
+              }
+            }
+          }
+        }
+      }
+    },
+    "sentence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sentence_id",
+        "text",
+        "ordinal",
+        "generation_rule_ids",
+        "input_fact_ids"
+      ],
+      "properties": {
+        "sentence_id": {
+          "$ref": "#/$defs/stableId"
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ordinal": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "generation_rule_ids": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "input_fact_ids": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/stableId"
+          }
+        },
+        "tokens": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/sentenceToken"
+          }
+        }
+      }
+    },
+    "sourceRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_kind",
+        "stable_id"
+      ],
+      "properties": {
+        "source_kind": {
+          "enum": [
+            "FACT",
+            "CAPABILITY",
+            "ENDPOINT",
+            "ELEMENT",
+            "FEATURE",
+            "STATE",
+            "MODIFIER",
+            "OCCURRENCE",
+            "TEMPLATE",
+            "GRAMMAR",
+            "RULE",
+            "LEGACY"
+          ]
+        },
+        "stable_id": {
+          "$ref": "#/$defs/stableId"
+        },
+        "field_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "endpoint_ordinal": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sentence_slot": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "sentenceToken": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "token_id",
+        "sentence_id",
+        "ordinal",
+        "text",
+        "kind",
+        "start_utf8_byte",
+        "end_utf8_byte",
+        "source_refs"
+      ],
+      "properties": {
+        "token_id": {
+          "$ref": "#/$defs/stableId"
+        },
+        "sentence_id": {
+          "$ref": "#/$defs/stableId"
+        },
+        "ordinal": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "enum": [
+            "ENTITY",
+            "STATE",
+            "RELATION_VERB",
+            "CONTROL_KEYWORD",
+            "LIST_SEPARATOR",
+            "PUNCTUATION",
+            "WHITESPACE",
+            "KEYWORD",
+            "PROCESS",
+            "OBJECT"
+          ]
+        },
+        "start_utf8_byte": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "end_utf8_byte": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "source_refs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/sourceRef"
+          }
+        }
+      }
+    },
+    "textTrace": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "trace_id",
+        "context_id",
+        "fact_ids",
+        "input_element_ids",
+        "occurrence_ids",
+        "sentence_ids",
+        "rule_ids",
+        "binding_digest",
+        "token_ranges",
+        "source_refs"
+      ],
+      "properties": {
+        "trace_id": {
+          "$ref": "#/$defs/stableId"
+        },
+        "context_id": {
+          "$ref": "#/$defs/stableId"
+        },
+        "fact_ids": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/stableId"
+          }
+        },
+        "input_element_ids": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/stableId"
+          }
+        },
+        "occurrence_ids": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/stableId"
+          }
+        },
+        "sentence_ids": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/stableId"
+          }
+        },
+        "rule_ids": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "binding_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "token_ranges": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/tokenRange"
+          }
+        },
+        "source_refs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/sourceRef"
+          }
+        }
+      }
+    },
+    "tokenRange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "input_id",
+        "start_utf8_byte",
+        "end_utf8_byte"
+      ],
+      "properties": {
+        "input_id": {
+          "$ref": "#/$defs/stableId"
+        },
+        "start_utf8_byte": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "end_utf8_byte": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "textArtifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifact_id",
+        "modality",
+        "context_id",
+        "grammar_ref",
+        "sentences",
+        "artifact_digest"
+      ],
+      "properties": {
+        "artifact_id": {
+          "$ref": "#/$defs/stableId"
+        },
+        "modality": {
+          "enum": [
+            "OPL",
+            "OPT"
+          ]
+        },
+        "context_id": {
+          "$ref": "#/$defs/stableId"
+        },
+        "grammar_ref": {
+          "$ref": "#/$defs/versionRef"
+        },
+        "sentences": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/sentence"
+          }
+        },
+        "artifact_digest": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "validationSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scope",
+        "blocking",
+        "warning",
+        "suggestion",
+        "coverage_state",
+        "report_digest"
+      ],
+      "properties": {
+        "scope": {
+          "enum": [
+            "COMMAND_FILTER",
+            "PRE_COMMIT",
+            "POST_COMMIT",
+            "BASELINE_GATE",
+            "CONVERSION"
+          ]
+        },
+        "blocking": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "warning": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "suggestion": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "coverage_state": {
+          "enum": [
+            "COMPLETE",
+            "INCOMPLETE",
+            "EVIDENCE_MISSING"
+          ]
+        },
+        "report_digest": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "refinementEdge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "refinement_id",
+        "parent_context_id",
+        "child_context_id",
+        "refinee_element_id",
+        "refinement_kind"
+      ],
+      "properties": {
+        "refinement_id": {
+          "$ref": "#/$defs/stableId"
+        },
+        "parent_context_id": {
+          "$ref": "#/$defs/stableId"
+        },
+        "child_context_id": {
+          "$ref": "#/$defs/stableId"
+        },
+        "refinee_element_id": {
+          "$ref": "#/$defs/stableId"
+        },
+        "refinement_kind": {
+          "enum": [
+            "PROCESS",
+            "OBJECT"
+          ]
+        }
+      }
+    }
+  }
+}

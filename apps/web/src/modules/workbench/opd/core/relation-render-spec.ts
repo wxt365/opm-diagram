@@ -4,6 +4,7 @@ export type RelationFamily = "PROCEDURAL" | "STRUCTURAL";
 
 export interface RelationRenderContext {
   readonly nodes: readonly OpdNode[];
+  readonly nodeById?: ReadonlyMap<string, OpdNode>;
   readonly highlightedFindingTargetId?: string;
 }
 
@@ -28,6 +29,7 @@ export interface RelationEdgeSpec {
   readonly id: string;
   readonly source: string;
   readonly target: string;
+  readonly zIndex?: number;
   readonly role?: "PROCESS_INPUT";
   readonly data: Readonly<Record<string, string>>;
   readonly line: RelationLineSpec;
@@ -39,7 +41,7 @@ export interface RelationEdgeSpec {
 export interface RelationNodeSpec {
   readonly kind: "node";
   readonly id: string;
-  readonly shape: "polygon" | "rect";
+  readonly shape: "polygon" | "rect" | "ellipse";
   readonly x: number;
   readonly y: number;
   readonly width: number;
@@ -53,6 +55,7 @@ export interface RelationNodeSpec {
 export type RelationCellSpec = RelationEdgeSpec | RelationNodeSpec;
 
 export interface RelationRenderSpec {
+  readonly selected?: boolean;
   readonly relationId: string;
   readonly occurrenceId: string;
   readonly family: RelationFamily;

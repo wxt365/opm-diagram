@@ -1,6 +1,9 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { copyWorkbenchPermalink } from "./helpers/workbench-revision";
 
+const chromeExecutable = process.env.OPM_E2E_CHROME_EXECUTABLE;
+test.use(chromeExecutable ? { launchOptions: { executablePath: chromeExecutable } } : {});
+
 test("底部工作区折叠释放画布空间，只读提示不再占一行", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await openNewWorkbench(page, "Canvas space E2E");
@@ -220,18 +223,9 @@ test("真实 P01 到 P03 主路径提交并在三个视口重开", async ({ page
   await expect(page.locator(".x6-node")).toHaveCount(2);
   await page.locator(".x6-node").first().click({ position: { x: 10, y: 10 } });
   await expect(page.getByTestId("p03-tool-state")).toBeEnabled();
-  await page.getByTestId("p03-tool-state").click();
-  await page.locator(".x6-node").first().click();
-  await expect(page.getByTestId("p03-state-candidate")).toBeVisible();
-  await page.getByTestId("p03-state-name").fill("Ready");
-  const stateRevision = await commitAndRead(page, page.getByTestId("p03-state-candidate").getByRole("button", { name: "创建", exact: true }));
+  const stateRevision = await createState(page, canvasNode(page, "Object 1"), "Ready");
   await expect(page.locator(".x6-node")).toHaveCount(3);
-  await page.locator(".x6-node").first().click({ position: { x: 10, y: 10 } });
-  await page.getByTestId("p03-tool-state").click();
-  await page.locator(".x6-node").first().click({ position: { x: 10, y: 10 } });
-  await expect(page.getByTestId("p03-state-candidate")).toBeVisible();
-  await page.getByTestId("p03-state-name").fill("Finished");
-  await commitAndRead(page, page.getByTestId("p03-state-candidate").getByRole("button", { name: "创建", exact: true }));
+  await createState(page, canvasNode(page, "Object 1"), "Finished");
   await expect(page.locator(".x6-node")).toHaveCount(4);
   const committedRevision = await createProceduralRelation(page, canvasNode(page, "Ready"), [canvasNode(page, "Process 1")], "CAP-ISO-PROC-006");
   await expect(committedRelationAnchors(page)).toHaveCount(1);
@@ -384,6 +378,7 @@ test("Attribute 拖动布局并在刷新后保持位置", async ({ page }) => {
   const object = canvasNode(page, "Object 1");
   await object.click({ position: { x: 20, y: 20 } });
   await commitAndRead(page, page.getByTestId("p03-tool-attribute"));
+  await object.locator('[data-testid^="p03-feature-toggle-"]').click();
   const attribute = canvasNode(page, "Attribute 1");
   await expect(attribute).toBeVisible();
 
@@ -404,6 +399,7 @@ test("Attribute 拖动布局并在刷新后保持位置", async ({ page }) => {
   await page.reload();
   await expectWorkbenchReady(page);
   await expect(page.locator(".revision-tag")).toHaveText(revisionAfterMove);
+  await object.locator('[data-testid^="p03-feature-toggle-"]').click();
   const persisted = await canvasNode(page, "Attribute 1").boundingBox();
   if (!persisted) throw new Error("刷新后 Attribute 不可见");
   expect(Math.round(persisted.x)).toBe(Math.round(moved.x));
@@ -473,6 +469,10 @@ test("Effect 与剩余 State 指定变体从 Runtime 候选提交并重开", asy
   await createProceduralRelation(page, objectOne, [process, objectTwo], "CAP-ISO-PROC-003");
   await createProceduralRelation(page, ready, [process, objectOne], "CAP-ISO-PROC-009");
   const revision = await createProceduralRelation(page, objectOne, [process, finished], "CAP-ISO-PROC-010");
+  await page.screenshot({ path: test.info().outputPath("state-effect-tool-fidelity.png") });
+  const effectSegments = page.locator('.x6-edge[data-cell-id$=".input"], .x6-edge[data-cell-id$=".output"]');
+  await expect(effectSegments).toHaveCount(6);
+  expect((await edgeVisualSignaturesIn(effectSegments)).every((edge) => !edge.source && isClosedArrow(edge.target))).toBe(true);
   await expect(committedRelationAnchors(page)).toHaveCount(5);
   await expect(page.getByText("Process 1 consumes Ready Object 1.", { exact: true })).toBeVisible();
   await expect(page.getByText("Process 1 yields Finished Object 1.", { exact: true })).toBeVisible();
@@ -484,11 +484,48 @@ test("Effect 与剩余 State 指定变体从 Runtime 候选提交并重开", asy
   await expectWorkbenchReady(page);
   await expect(page.locator(".revision-tag")).toHaveText(revision);
   await expect(committedRelationAnchors(page)).toHaveCount(5);
+  await expect(effectSegments).toHaveCount(6);
+  expect((await edgeVisualSignaturesIn(effectSegments)).every((edge) => !edge.source && isClosedArrow(edge.target))).toBe(true);
   await expect(page.getByText("Process 1 consumes Ready Object 1.", { exact: true })).toBeVisible();
   await expect(page.getByText("Process 1 yields Finished Object 1.", { exact: true })).toBeVisible();
   await expect(page.getByText("Process 1 affects Object 2.", { exact: true })).toBeVisible();
   await expect(page.getByText("Process 1 changes Object 1 from Ready.", { exact: true })).toBeVisible();
   await expect(page.getByText("Process 1 changes Object 1 to Finished.", { exact: true })).toBeVisible();
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expectMobileCanvasReachable(page, process);
+  await expect(effectSegments).toHaveCount(6);
+});
+
+test("状态过程关系线在对象内可见且状态框位于连线之上", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await openNewWorkbench(page, "State link visibility E2E");
+  await commitAndRead(page, page.getByTestId("p03-tool-object"));
+  await commitAndRead(page, page.getByTestId("p03-tool-process"));
+  const owner = canvasNode(page, "Object 1");
+  const process = canvasNode(page, "Process 1");
+  await createState(page, owner, "Ready");
+  await createState(page, owner, "Finished");
+  const ready = canvasNode(page, "Ready");
+  const finished = canvasNode(page, "Finished");
+
+  await createProceduralRelation(page, ready, [process], "CAP-ISO-PROC-006");
+  await createProceduralRelation(page, process, [finished], "CAP-ISO-PROC-007");
+  await createProceduralRelation(page, ready, [process, finished], "CAP-ISO-PROC-008");
+  await expect(committedRelationAnchors(page)).toHaveCount(3);
+  await page.screenshot({ path: test.info().outputPath("state-procedural-link-visibility.png") });
+  const layering = await page.evaluate(() => {
+    const nodeCells = Array.from(document.querySelectorAll(".x6-node"));
+    const ownerCell = nodeCells.find((cell) => cell.textContent?.replace(/\s+/g, " ").trim() === "Object 1");
+    const stateCells = nodeCells.filter((cell) => ["Ready", "Finished"].includes(cell.textContent?.trim() ?? ""));
+    const relationCells = Array.from(document.querySelectorAll(".x6-edge"));
+    if (!ownerCell || stateCells.length !== 2 || relationCells.length !== 4) throw new Error("状态关系画布元素缺失");
+    return relationCells.map((edge) => ({
+      aboveOwner: Boolean(ownerCell.compareDocumentPosition(edge) & Node.DOCUMENT_POSITION_FOLLOWING),
+      belowStates: stateCells.every((state) => Boolean(edge.compareDocumentPosition(state) & Node.DOCUMENT_POSITION_FOLLOWING)),
+    }));
+  });
+  expect(layering).toEqual(Array.from({ length: 4 }, () => ({ aboveOwner: true, belowStates: true })));
 });
 
 test("生成消耗共用一个工具，双向拖线保持独立 Fact、OPL 和重开结果", async ({ page }) => {
@@ -567,7 +604,7 @@ test("16 类 Procedural Link 以冻结的 SVG marker、路径和时间注记呈�
   await expect(edges).toHaveCount(20);
   const visualSignatures = await edgeVisualSignatures(page);
   expect(visualSignatures.filter((edge) => isClosedArrow(edge.target))).toHaveLength(16);
-  expect(visualSignatures.filter((edge) => isClosedArrow(edge.source))).toHaveLength(8);
+  expect(visualSignatures.filter((edge) => isClosedArrow(edge.source))).toHaveLength(0);
   expect(visualSignatures.filter((edge) => isCircle(edge.target, "#20242a"))).toHaveLength(2);
   expect(visualSignatures.filter((edge) => isCircle(edge.target, "#ffffff"))).toHaveLength(2);
   expect(visualSignatures.filter((edge) => isLightningPath(edge.path))).toHaveLength(1);
@@ -659,10 +696,11 @@ test("Feature Value State 支持 Exhibition 与 State-specified Characterization
   await object.click({ position: { x: 20, y: 20 } });
   await expect(page.getByTestId("p03-tool-attribute")).toBeEnabled();
   await commitAndRead(page, page.getByTestId("p03-tool-attribute"));
+  await object.locator('[data-testid^="p03-feature-toggle-"]').click();
 
   const attribute = canvasNode(page, "Attribute 1");
   await expect(attribute).toBeVisible();
-  await createState(page, attribute, "High");
+  await createFeatureState(page, attribute, "High");
   const high = canvasNode(page, "High");
   await expect(high).toBeVisible();
 
@@ -678,6 +716,7 @@ test("Feature Value State 支持 Exhibition 与 State-specified Characterization
   await page.reload();
   await expectWorkbenchReady(page);
   await expect(page.locator(".revision-tag")).toHaveText(characterizationRevision);
+  await object.locator('[data-testid^="p03-feature-toggle-"]').click();
   await expect(committedRelationAnchors(page)).toHaveCount(2);
   await expect(page.locator(".x6-node").filter({ hasText: "Attribute 1" })).toHaveCount(1);
   await expect(page.locator(".x6-node").filter({ hasText: "High" })).toHaveCount(1);
@@ -737,32 +776,72 @@ test("十类 Structural Link 均通过 Runtime 候选生成 OPL、Trace 并在�
   await expect(objectOne).toBeVisible();
   await expect(objectTwo).toBeVisible();
   await expect(objectThree).toBeVisible();
+  const firstBox = await objectOne.boundingBox();
+  const secondBox = await objectTwo.boundingBox();
+  if (!firstBox || !secondBox) throw new Error("未找到 Structural Object 边界");
+  expect(secondBox.y - firstBox.y).toBeGreaterThanOrEqual(176);
 
   await objectOne.click({ position: { x: 20, y: 20 } });
   await commitAndRead(page, page.getByTestId("p03-tool-attribute"));
+  await objectOne.locator('[data-testid^="p03-feature-toggle-"]').click();
   const attribute = canvasNode(page, "Attribute 1");
   await createState(page, objectOne, "Ready");
   await createState(page, objectTwo, "Finished");
-  await createState(page, attribute, "High");
+  await createFeatureState(page, attribute, "High");
   const ready = canvasNode(page, "Ready");
   const finished = canvasNode(page, "Finished");
   const high = canvasNode(page, "High");
+  const preexistingEdgeIds = new Set(await page.locator(".x6-edge").evaluateAll((elements) => elements.map((element) => element.getAttribute("data-cell-id"))));
 
   await createStructuralRelation(page, objectOne, objectTwo, "CAP-ISO-STRUCT-001", undefined, { forward_tag: "owns" });
+  expect(isOpenArrow((await latestCommittedEdgeSignature(page)).target)).toBe(true);
   await createStructuralRelation(page, objectOne, objectTwo, "CAP-ISO-STRUCT-002");
+  expect(isOpenArrow((await latestCommittedEdgeSignature(page)).target)).toBe(true);
   await createStructuralRelation(page, objectOne, objectTwo, "CAP-ISO-STRUCT-003", undefined, { forward_tag: "includes", reverse_tag: "belongs to" });
+  expect(isOpenHarpoon((await latestCommittedEdgeSignature(page)).source) && isOpenHarpoon((await latestCommittedEdgeSignature(page)).target)).toBe(true);
   await createStructuralRelation(page, objectOne, objectTwo, "CAP-ISO-STRUCT-004");
+  expect(isOpenHarpoon((await latestCommittedEdgeSignature(page)).source) && isOpenHarpoon((await latestCommittedEdgeSignature(page)).target)).toBe(true);
+  const binaryIds = (await page.locator(".x6-edge").evaluateAll((elements) => elements.map((element) => element.getAttribute("data-cell-id") ?? "")))
+    .filter((id) => !preexistingEdgeIds.has(id));
+  expect(binaryIds).toHaveLength(4);
+  const binaryEdges = page.locator(binaryIds.map((id) => `.x6-edge[data-cell-id="${id}"]`).join(", "));
+  const binaryPaths = (await edgeVisualSignaturesIn(binaryEdges)).map((edge) => edge.path).sort();
+  const pathBounds = await binaryEdges.evaluateAll((elements) => elements.map((element) => {
+    const path = element.querySelector<SVGPathElement>('path[stroke="#20242a"]');
+    if (!path) throw new Error("未找到 Structural SVG 路径");
+    const box = path.getBoundingClientRect();
+    return { left: box.left, right: box.right };
+  }));
+  expect(pathBounds.filter((box) => box.left < firstBox.x - 8)).toHaveLength(2);
+  expect(pathBounds.filter((box) => box.right > firstBox.x + firstBox.width + 8)).toHaveLength(2);
+  await page.screenshot({ path: test.info().outputPath("structural-open-markers.png") });
   await createStructuralRelation(page, objectOne, [objectTwo, objectThree], "CAP-ISO-STRUCT-005", "COMPLETE");
   await createStructuralRelation(page, objectOne, attribute, "CAP-ISO-STRUCT-006", "COMPLETE");
   await createStructuralRelation(page, objectOne, [objectTwo, objectThree], "CAP-ISO-STRUCT-007", "COMPLETE");
   await createStructuralRelation(page, objectOne, objectTwo, "CAP-ISO-STRUCT-008");
+  await expect(page.locator('.x6-node[data-cell-id$=".junction.inner"] ellipse')).toHaveCount(1);
+  const exhibitionTriangleCount = await page.locator('.x6-node[data-cell-id$=".junction.inner"] polygon').count();
   await createStructuralRelation(page, objectOne, high, "CAP-ISO-STRUCT-009");
+  await expect(page.locator('.x6-node[data-cell-id$=".junction.inner"] polygon')).toHaveCount(exhibitionTriangleCount + 1);
+  await page.screenshot({ path: test.info().outputPath("structural-triangle-junctions.png") });
   const revision = await createStructuralRelation(page, ready, finished, "CAP-ISO-STRUCT-010", undefined, { forward_tag: "transfers" });
+  expect(isOpenArrow((await latestCommittedEdgeSignature(page)).target)).toBe(true);
 
   await page.reload();
   await expectWorkbenchReady(page);
   await expect(page.locator(".revision-tag")).toHaveText(revision);
   await expect(page.getByTestId("p03-opl-sentence")).toHaveCount(11);
+  await objectOne.locator('[data-testid^="p03-feature-toggle-"]').click();
+  await expect(page.locator('.x6-node[data-cell-id$=".junction.inner"] ellipse')).toHaveCount(1);
+  await expect(page.locator('.x6-node[data-cell-id$=".junction.inner"] polygon')).toHaveCount(exhibitionTriangleCount + 1);
+  const reopenedEdges = await edgeVisualSignatures(page);
+  expect(reopenedEdges.filter((edge) => isOpenArrow(edge.target))).toHaveLength(3);
+  expect(reopenedEdges.filter((edge) => isOpenHarpoon(edge.source) && isOpenHarpoon(edge.target))).toHaveLength(2);
+  const reopenedBinaryPaths = await page.locator(".x6-edge").evaluateAll((elements, ids) => elements
+    .filter((element) => ids.includes(element.getAttribute("data-cell-id") ?? ""))
+    .map((element) => element.querySelector('path[stroke="#20242a"]')?.getAttribute("d") ?? "").sort(), binaryIds);
+  expect(reopenedBinaryPaths).toEqual(binaryPaths);
+  await page.screenshot({ path: test.info().outputPath("structural-symbols-reopened.png") });
 
   const traceCases = [
     ["Object 1 owns Object 2.", "CAP-ISO-STRUCT-001"],
@@ -797,13 +876,82 @@ async function openNewWorkbench(page: Page, prefix: string) {
   await expectWorkbenchReady(page);
 }
 
-async function createState(page: Page, owner: Locator, name: string) {
+async function createState(page: Page, owner: Locator, name: string): Promise<string> {
+  const beforeIds = new Set(await page.locator(".x6-node").evaluateAll(nodes => nodes.map(node => node.getAttribute("data-cell-id"))));
   await owner.click({ position: { x: 20, y: 20 } });
-  await page.getByTestId("p03-tool-state").click();
-  await owner.click({ position: { x: 20, y: 20 } });
-  await expect(page.getByTestId("p03-state-candidate")).toBeVisible();
-  await page.getByTestId("p03-state-name").fill(name);
-  await commitAndRead(page, page.getByTestId("p03-state-candidate").getByRole("button", { name: "创建", exact: true }));
+  await expect(page.getByTestId("p03-tool-state")).toBeEnabled();
+  await commitAndRead(page, page.getByTestId("p03-tool-state"));
+  let createdId: string | null | undefined;
+  await expect.poll(async () => {
+    createdId = (await page.locator(".x6-node").evaluateAll(nodes => nodes.map(node => node.getAttribute("data-cell-id"))))
+      .find(id => id && !beforeIds.has(id));
+    return createdId ?? "";
+  }).not.toBe("");
+  if (!createdId) throw new Error("未找到直接创建的 State");
+  await page.locator(`.x6-node[data-cell-id="${createdId}"]`).click();
+  if (!await page.getByTestId("p03-state-inspector").count()) await page.getByTestId("p03-right-panel-open").click();
+  await page.getByTestId("p03-state-inspector-name").fill(name);
+  const revision = await commitAndRead(page, page.getByRole("button", { name: "保存 State", exact: true }));
+  await page.getByTestId("p03-right-panel-close").click();
+  return revision;
+}
+
+async function createFeatureState(page: Page, owner: Locator, name: string): Promise<string> {
+  const ownerId = await owner.getAttribute("data-cell-id");
+  if (!ownerId) throw new Error("Feature X6 cell ID 不存在");
+  const ownerElementId = await page.evaluate(async ({ ownerId, name }) => {
+    const match = window.location.pathname.match(/^\/projects\/([^/]+)\/models\/([^/]+)\/workbench$/);
+    const session = (window as Window & { __OPM_LOCAL_SESSION__?: string }).__OPM_LOCAL_SESSION__;
+    if (!match || !session) throw new Error("无法读取草稿工作台身份");
+    const [, projectId, modelId] = match;
+    const requestId = (prefix: string) => `${prefix}.e2e.${crypto.randomUUID().replaceAll("-", "")}`;
+    const post = async (operation: string, body: unknown) => {
+      const response = await fetch(`/api/v2/projects/${encodeURIComponent(projectId!)}/models/${encodeURIComponent(modelId!)}/draft/${operation}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-OPM-Session": session },
+        body: JSON.stringify(body),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(`草稿 ${operation} 失败：${JSON.stringify(payload)}`);
+      return payload;
+    };
+    const opened = await post("open", { request_id: requestId("open"), context_id: null });
+    const token = opened.draft_token;
+    const contextId = opened.context_id;
+    const scope = { context_id: contextId, selection_id: ownerId, intent: "CREATE_STATE", endpoints: [] };
+    const capabilities = await post("capabilities", { request_id: requestId("capabilities"), draft_token: token, scope });
+    const option = capabilities.data.options.find((item: { command_type: string; enabled: boolean }) => item.command_type === "CREATE_STATE" && item.enabled);
+    if (!option) throw new Error("Feature State 没有可用的 Runtime 候选");
+    const projection = await post("projection", { request_id: requestId("projection"), draft_token: token, context_id: contextId });
+    const feature = projection.data.constructs.find((item: { target_id: string }) => item.target_id === ownerId);
+    if (!feature?.owner_id) throw new Error("Feature owner 不存在");
+    await post("commands", {
+      request_id: requestId("edit"),
+      command_id: requestId("command"),
+      expected_draft_token: token,
+      scope,
+      authorization: { capability_query_id: option.capability_query_id, selected_option_id: option.option_id },
+      command: {
+        command_type: "CREATE_STATE",
+        payload: {
+          context_id: contextId,
+          owner_ref: { target_kind: "FEATURE", target_id: ownerId },
+          capability_ref: option.capability_ref,
+          name_or_value: name,
+          state_roles: [],
+          occurrence: { ownership: "OWNED", construct_role: "FEATURE_STATE_NODE" },
+          layout: { x: feature.layout.x + 36, y: feature.layout.y + 32 },
+        },
+      },
+    });
+    return feature.owner_id as string;
+  }, { ownerId, name });
+  await page.reload();
+  await expectWorkbenchReady(page);
+  const toggle = page.locator(`.x6-node[data-cell-id="${ownerElementId}"] [data-testid^="p03-feature-toggle-"]`);
+  if (await toggle.getAttribute("aria-label") === "展开所属特征 / Expand features") await toggle.click();
+  await expect(canvasNode(page, name)).toBeVisible();
+  return revisionTag(page);
 }
 
 async function createProceduralRelation(page: Page, source: Locator, targets: Locator[], capabilityId: string, duration?: string): Promise<string> {
@@ -837,7 +985,11 @@ type EdgeMarker = { shape: string; fill: string | null; path: string | null } | 
 type EdgeVisualSignature = { source: EdgeMarker; target: EdgeMarker; path: string };
 
 async function edgeVisualSignatures(page: Page): Promise<EdgeVisualSignature[]> {
-  return page.locator(".x6-edge").evaluateAll((elements) => elements.map((element) => {
+  return edgeVisualSignaturesIn(page.locator(".x6-edge"));
+}
+
+async function edgeVisualSignaturesIn(edges: Locator): Promise<EdgeVisualSignature[]> {
+  return edges.evaluateAll((elements) => elements.map((element) => {
     const line = Array.from(element.querySelectorAll<SVGPathElement>("path"))
       .find((path) => path.getAttribute("stroke") === "#20242a");
     if (!line) throw new Error("未找到关系线 SVG 路径");
@@ -850,8 +1002,23 @@ async function edgeVisualSignatures(page: Page): Promise<EdgeVisualSignature[]> 
   }));
 }
 
+async function latestCommittedEdgeSignature(page: Page): Promise<EdgeVisualSignature> {
+  const edge = committedRelationAnchors(page).last().locator("xpath=ancestor::*[contains(@class, 'x6-edge')][1]");
+  const signatures = await edgeVisualSignaturesIn(edge);
+  if (signatures.length !== 1) throw new Error("未找到最新提交的关系线");
+  return signatures[0]!;
+}
+
 function isClosedArrow(marker: EdgeMarker): boolean {
   return marker?.shape === "path" && marker.fill === "#ffffff" && Boolean(marker.path?.match(/[Ll]/));
+}
+
+function isOpenArrow(marker: EdgeMarker): boolean {
+  return marker?.shape === "path" && marker.fill === "none" && (marker.path?.match(/[Ll]/g) ?? []).length === 2;
+}
+
+function isOpenHarpoon(marker: EdgeMarker): boolean {
+  return marker?.shape === "path" && marker.fill === "none" && (marker.path?.match(/[Ll]/g) ?? []).length === 1;
 }
 
 function isCircle(marker: EdgeMarker, fill: "#20242a" | "#ffffff"): boolean {

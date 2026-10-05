@@ -24,7 +24,7 @@ describe("relation tool symbol", () => {
   });
 
   it("保留标准 marker、Control 注记和四类结构三角的区分", () => {
-    expect(resolveRelationToolGlyph("symbol.link.effect")?.kind).toBe("closed-both");
+    expect(resolveRelationToolGlyph("symbol.link.effect")?.kind).toBe("state-effect-pair");
     expect(resolveRelationToolGlyph("symbol.link.agent")?.kind).toBe("filled-circle");
     expect(resolveRelationToolGlyph("symbol.link.instrument")?.kind).toBe("open-circle");
     expect(resolveRelationToolGlyph("symbol.control.event.transforming")?.annotation).toBe("e");

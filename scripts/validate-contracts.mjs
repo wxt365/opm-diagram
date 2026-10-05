@@ -34,6 +34,15 @@ addFormats(commandAjv);
 const validateCommand = commandAjv.compile(openApi.components.schemas.ExecuteEditCommandRequest);
 const validateOption = commandAjv.compile(openApi.components.schemas.CommandCapabilityOption);
 const validateErrorEnvelope = commandAjv.compile(openApi.components.schemas.ErrorEnvelope);
+const validateLifecycle = commandAjv.compile(openApi.components.schemas.ModelLifecycleRequest);
+const lifecycleBase = { request_id: "request.lifecycle.001", command_id: "command.lifecycle.001" };
+assertValid(validateLifecycle, { ...lifecycleBase, action: "TRASH", expected_state: "ACTIVE" }, "模型移入回收站");
+assertValid(validateLifecycle, { ...lifecycleBase, action: "RESTORE", expected_state: "ARCHIVED" }, "恢复模型");
+assertValid(validateLifecycle, { ...lifecycleBase, action: "PURGE", expected_state: "ARCHIVED", confirmation_name: "测试模型" }, "模型永久删除确认");
+assertInvalid(validateLifecycle, { ...lifecycleBase, action: "PURGE", expected_state: "ARCHIVED" }, "永久删除缺少确认名称");
+assertInvalid(validateLifecycle, { ...lifecycleBase, action: "PURGE", expected_state: "ACTIVE", confirmation_name: "测试模型" }, "活动模型直接永久删除");
+assertInvalid(validateLifecycle, { ...lifecycleBase, action: "TRASH", expected_state: "ACTIVE", confirmation_name: "测试模型" }, "普通回收携带永久删除字段");
+assertInvalid(validateLifecycle, { ...lifecycleBase, action: "TRASH", expected_state: "ACTIVE", extra: true }, "模型操作额外字段");
 
 const writeGuard = {
   request_id: "request.contract.001",

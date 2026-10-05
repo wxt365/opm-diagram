@@ -1,6 +1,8 @@
 import { expect, test, type Page, type Locator } from "@playwright/test";
 
 test("中文节点改名支持Enter和点击画布提交，保持OPL、刷新与无边框样式一致", async ({ page }) => {
+  // 桌面改名路径需要节点中心位于可交互画布内，避免命中底部面板。
+  await page.setViewportSize({ width: 1600, height: 1000 });
   const pageErrors: string[] = [];
   page.on("pageerror", error => pageErrors.push(error.message));
   await page.goto("/projects");
@@ -79,9 +81,10 @@ test("中文节点改名支持Enter和点击画布提交，保持OPL、刷新与
   await expect(object).toContainText("阿拉比卡咖啡豆");
   await expect(page.getByTestId("p03-opl-sentence").filter({ hasText: "阿拉比卡咖啡豆" }).first()).toBeVisible();
   await property.fill("取消修改"); await property.press("Escape"); await expect(property).toHaveValue("阿拉比卡咖啡豆");
-  await property.fill("   "); await clickBlank(page);
+  // 在属性面板内失焦，避免空白画布点击取消节点选择后卸载属性输入。
+  await property.fill("   "); await property.press("Tab");
   await expect(property).toHaveValue("   "); await expect(property).toBeFocused();
-  await property.fill("精品咖啡豆"); await edit(page, () => clickBlank(page));
+  await property.fill("精品咖啡豆"); await edit(page, () => property.press("Tab"));
   await process.click(); await expect(property).toHaveValue("精细研磨");
   await property.fill("咖啡研磨"); await page.keyboard.press("Control+s");
   await expect(page.getByTestId("hs-save-state")).toHaveText("已手动保存");
@@ -101,8 +104,9 @@ async function edit(page: Page, action: () => Promise<unknown>) {
   await action(); await expect(page.getByTestId("hs-draft-identity")).not.toHaveText(before);
 }
 async function clickBlank(page: Page) {
-  const canvas = page.getByTestId("p03-canvas"); const box = await canvas.boundingBox();
-  await canvas.click({ position: { x: box!.width - 30, y: box!.height - 30 } });
+  const frame = (await page.locator(".canvas-frame").boundingBox())!;
+  // 可见画布左上角避开右下角的缩放控件和画布外的底部面板。
+  await page.mouse.click(frame.x + 18, frame.y + 18);
 }
 async function expectBorderless(input: Locator) {
   expect(await input.evaluate(element => {

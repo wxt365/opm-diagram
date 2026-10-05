@@ -1,4 +1,8 @@
 import { expect, test, type Page, type Locator } from "@playwright/test";
+import { chooseViewportAction } from "./viewport-controls";
+
+const chromeExecutable = process.env.OPM_E2E_CHROME_EXECUTABLE;
+test.use(chromeExecutable ? { launchOptions: { executablePath: chromeExecutable } } : {});
 
 test("状态容器联动、Operation 拖动和反向展示关系在保存重开后保持一致", async ({ page }) => {
   await page.setViewportSize({ width: 1512, height: 1000 });
@@ -16,22 +20,20 @@ test("状态容器联动、Operation 拖动和反向展示关系在保存重开�
   const owner = page.locator(".x6-node").filter({ hasText: "Object 1" });
   await owner.click();
   await edit(page, () => page.getByTestId("p03-tool-attribute").click());
+  await owner.locator('[data-testid^="p03-feature-toggle-"]').click();
   const attribute = page.locator(".x6-node").filter({ hasText: "Attribute 1" });
   await edit(page, () => drag(page, attribute, -200, 300));
   await owner.click();
   await edit(page, () => page.getByTestId("p03-tool-operation").click());
+  await owner.locator('[data-testid^="p03-feature-toggle-"]').click();
   const operation = page.locator(".x6-node").filter({ hasText: "Operation 1" });
   await expect(operation.locator("ellipse")).toBeVisible();
   await edit(page, () => drag(page, operation, 270, 120));
 
-  for (const name of ["待机", "运行中"]) {
-    await owner.click({ position: { x: 20, y: 14 } });
-    await page.getByTestId("p03-tool-state").click();
-    await owner.click({ position: { x: 20, y: 14 } });
-    await page.getByTestId("p03-state-name").fill(name);
-    if (name === "运行中") await page.getByTestId("p03-state-candidate").getByLabel("FINAL", { exact: true }).check();
-    await edit(page, () => page.getByTestId("p03-state-candidate").getByRole("button", { name: "创建", exact: true }).click());
-  }
+  await createState(page, owner, "待机");
+  await createState(page, owner, "运行中", "FINAL");
+  await page.getByTestId("p03-right-panel-close").click();
+  await page.getByRole("button", { name: "收起底部面板 / Collapse bottom panel", exact: true }).click();
   const states = [page.locator(".x6-node").filter({ hasText: "待机" }), page.locator(".x6-node").filter({ hasText: "运行中" })];
   for (const state of states) await contained(owner, state);
   const oldState = await states[0].boundingBox();
@@ -61,6 +63,7 @@ test("状态容器联动、Operation 拖动和反向展示关系在保存重开�
   expect(outlineBox!.x + outlineBox!.width / 2).toBeCloseTo(after[2]!.x + after[2]!.width / 2, 0);
   expect(outlineBox!.y + outlineBox!.height / 2).toBeCloseTo(after[2]!.y + after[2]!.height / 2, 0);
 
+  await chooseViewportAction(page, "fit");
   await page.getByTestId("p03-relation-menu-toggle-STRUCTURAL").click();
   await page.getByTestId("p03-relation-menu-option-CAP-ISO-STRUCT-006").click();
   await edit(page, async () => {
@@ -69,8 +72,9 @@ test("状态容器联动、Operation 拖动和反向展示关系在保存重开�
     await page.mouse.down(); await page.mouse.move(to.x + 20, to.y + 14, { steps: 12 }); await page.mouse.up();
   });
   await page.keyboard.press("Escape");
-  const outer = page.locator('.x6-node[data-cell-id$=".junction"]');
-  const inner = page.locator('.x6-node[data-cell-id$=".junction.inner"]');
+  // 只验证用户创建的结构关系，所属特征的装饰三角另有独立图形。
+  const outer = page.locator('.x6-node[data-cell-id$=".junction"]:not([data-cell-id^="feature."])');
+  const inner = page.locator('.x6-node[data-cell-id$=".junction.inner"]:not([data-cell-id^="feature."])');
   await expect(outer.locator("polygon")).toHaveAttribute("fill", "#ffffff");
   await expect(inner.locator("polygon")).toHaveAttribute("fill", "#20242a");
   await expect(page.locator('.x6-edge path[marker-end]')).toHaveCount(0);
@@ -80,6 +84,7 @@ test("状态容器联动、Operation 拖动和反向展示关系在保存重开�
   await page.screenshot({ path: test.info().outputPath("owned-layout.png") });
   await page.reload();
   await expect(page.getByTestId("hs-save")).toBeEnabled();
+  await owner.locator('[data-testid^="p03-feature-toggle-"]').click();
   for (const [index, node] of [owner, attribute, operation, ...states].entries()) await expect(node).toHaveAttribute("transform", positions[index]!);
   await expect(inner).toBeVisible();
   expect(errors).toEqual([]);
@@ -90,6 +95,24 @@ async function edit(page: Page, action: () => Promise<unknown>) {
   await action();
   await expect(page.getByTestId("hs-draft-identity")).not.toHaveText(before);
   await expect(page.getByTestId("hs-save")).toBeEnabled();
+}
+
+async function createState(page: Page, owner: Locator, name: string, role?: "INITIAL" | "DEFAULT" | "FINAL") {
+  const beforeIds = new Set(await page.locator(".x6-node").evaluateAll(nodes => nodes.map(node => node.getAttribute("data-cell-id"))));
+  await owner.click({ position: { x: 20, y: 14 } });
+  await edit(page, () => page.getByTestId("p03-tool-state").click());
+  let createdId: string | null | undefined;
+  await expect.poll(async () => {
+    createdId = (await page.locator(".x6-node").evaluateAll(nodes => nodes.map(node => node.getAttribute("data-cell-id"))))
+      .find(id => id && !beforeIds.has(id));
+    return createdId ?? "";
+  }).not.toBe("");
+  if (!createdId) throw new Error("未找到直接创建的 State");
+  await page.locator(`.x6-node[data-cell-id="${createdId}"]`).click();
+  if (!await page.getByTestId("p03-state-inspector").count()) await page.getByTestId("p03-right-panel-open").click();
+  await page.getByTestId("p03-state-inspector-name").fill(name);
+  if (role) await page.getByTestId("p03-state-inspector").getByLabel(role, { exact: true }).check();
+  await edit(page, () => page.getByRole("button", { name: "保存 State", exact: true }).click());
 }
 
 async function drag(page: Page, node: Locator, dx: number, dy: number, header = false) {

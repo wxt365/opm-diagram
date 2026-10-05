@@ -71,7 +71,7 @@ final class SemanticCommandEditor {
                 updateProceduralFact(projectId, modelId, base, payload, facts);
             }
         } else if ("UPDATE_PROPERTY".equals(type)) {
-            updateElementName(projectId, modelId, base, payload, elements);
+            updateName(projectId, modelId, base, payload, elements, features);
         } else if ("UPDATE_LAYOUT".equals(type)) {
             updateOccurrenceLayout(base, payload, elements, features, occurrences, layouts);
         } else if ("DELETE_CONSTRUCT".equals(type)) {
@@ -79,32 +79,40 @@ final class SemanticCommandEditor {
         } else if ("STATE_EXPLICIT".equals(type) || "STATE_SUPPRESS".equals(type) || "UNFOLD".equals(type) || "FOLD".equals(type)) {
             updateStatePresentation(base, type, payload, states, contexts, occurrences, layouts, presentations);
         } else throw profileForbidden();
-        return new SemanticRevision(revisionId, base.modelId(), base.revisionSequence() + 1, base.profileBinding(), base.rootContextId(), elements, features, states, facts, contexts, occurrences, layouts, presentations);
+        return new SemanticRevision(revisionId, base.modelId(), base.revisionSequence() + 1, base.profileBinding(), base.rootContextId(), elements, features, states, facts, contexts, occurrences, layouts, presentations, base.refinementEdges());
     }
 
-    private void updateElementName(String projectId, String modelId, SemanticRevision base, Map<String, Object> payload,
-                                   List<SemanticRevision.Element> elements) {
+    private void updateName(String projectId, String modelId, SemanticRevision base, Map<String, Object> payload,
+                            List<SemanticRevision.Element> elements, List<SemanticRevision.Feature> features) {
         if (!payload.keySet().equals(java.util.Set.of("target_ref", "property_name", "value", "capability_query_id", "selected_option_id"))) {
             throw new ApiException(ApiErrorCode.INVALID_ARGUMENT, 400, false, "UPDATE_PROPERTY payload 字段不合法");
         }
         Map<String, Object> targetRef = requiredMap(payload, "target_ref");
-        if (!targetRef.keySet().equals(java.util.Set.of("target_kind", "target_id")) || !"ELEMENT".equals(required(targetRef, "target_kind"))) {
+        String targetKind = required(targetRef, "target_kind");
+        if (!targetRef.keySet().equals(java.util.Set.of("target_kind", "target_id"))
+                || (!"ELEMENT".equals(targetKind) && !"FEATURE".equals(targetKind))) {
             throw new ApiException(ApiErrorCode.INVALID_ARGUMENT, 400, false, "UPDATE_PROPERTY target_ref 不合法");
         }
         if (!"name".equals(required(payload, "property_name"))) {
             throw new ApiException(ApiErrorCode.INVALID_ARGUMENT, 400, false, "UPDATE_PROPERTY 只允许修改 name");
         }
-        String elementId = required(targetRef, "target_id");
-        SemanticRevision.Element current = elements.stream().filter(element -> element.id().equals(elementId)).findFirst()
-                .orElseThrow(() -> domain("Element 不存在"));
-        if (current.coreKind() != SemanticRevision.CoreKind.OBJECT && current.coreKind() != SemanticRevision.CoreKind.PROCESS) {
-            throw domain("仅 Object/Process 支持名称编辑");
-        }
-        String queryId = capabilityQueryId(projectId, modelId, base.revisionId(), elementId, "UPDATE_PROPERTY", List.of());
+        String targetId = required(targetRef, "target_id");
+        String queryId = capabilityQueryId(projectId, modelId, base.revisionId(), targetId, "UPDATE_PROPERTY", List.of());
         if (!queryId.equals(required(payload, "capability_query_id")) || !propertyOptionId(queryId).equals(required(payload, "selected_option_id"))) {
             throw domain("名称编辑候选项已过期或不匹配");
         }
-        renameElement(elements, current, payload.get("value"), true);
+        if ("ELEMENT".equals(targetKind)) {
+            SemanticRevision.Element current = elements.stream().filter(element -> element.id().equals(targetId)).findFirst()
+                    .orElseThrow(() -> domain("Element 不存在"));
+            if (current.coreKind() != SemanticRevision.CoreKind.OBJECT && current.coreKind() != SemanticRevision.CoreKind.PROCESS) {
+                throw domain("仅 Object/Process 支持 Element 名称编辑");
+            }
+            renameElement(elements, current, payload.get("value"), true);
+        } else {
+            SemanticRevision.Feature current = features.stream().filter(feature -> feature.id().equals(targetId)).findFirst()
+                    .orElseThrow(() -> domain("Feature 不存在"));
+            renameFeature(features, current, payload.get("value"), true);
+        }
     }
 
     // 只处理已由草稿服务授权的节点命令；不产生新的 Revision 身份。
@@ -116,11 +124,18 @@ final class SemanticCommandEditor {
         switch (type) {
             case "CREATE_ELEMENT" -> createElement(base, payload, elements, contexts, occurrences, layouts);
             case "UPDATE_PROPERTY" -> {
-                String target = required(requiredMap(payload, "target_ref"), "target_id");
-                var element = elements.stream().filter(item -> item.id().equals(target)).findFirst().orElseThrow(() -> domain("Element 不存在"));
-                renameElement(elements, element, payload.get("value"), false);
+                Map<String, Object> targetRef = requiredMap(payload, "target_ref");
+                String target = required(targetRef, "target_id");
+                if ("ELEMENT".equals(required(targetRef, "target_kind"))) {
+                    var element = elements.stream().filter(item -> item.id().equals(target)).findFirst().orElseThrow(() -> domain("Element 不存在"));
+                    renameElement(elements, element, payload.get("value"), false);
+                } else {
+                    var feature = features.stream().filter(item -> item.id().equals(target)).findFirst().orElseThrow(() -> domain("Feature 不存在"));
+                    renameFeature(features, feature, payload.get("value"), false);
+                }
             }
             case "UPDATE_LAYOUT" -> updateOccurrenceLayout(base, payload, elements, base.features(), occurrences, layouts);
+            case "UPDATE_LAYOUT_BATCH" -> SemanticLayoutEditor.updateBatch(base, payload, layouts);
             case "CREATE_FEATURE" -> createFeatureConstruct(base, payload, elements, features, contexts, occurrences, layouts);
             case "CREATE_STATE" -> createStateConstruct(base, payload, elements, features, states, contexts, occurrences, layouts, presentations);
             case "UPDATE_STATE" -> updateStateConstruct(payload, states);
@@ -128,7 +143,32 @@ final class SemanticCommandEditor {
             default -> throw profileForbidden();
         }
         return new SemanticRevision(base.revisionId(), base.modelId(), base.revisionSequence(), base.profileBinding(), base.rootContextId(),
-                elements, features, states, base.facts(), contexts, occurrences, layouts, presentations);
+                elements, features, states, base.facts(), contexts, occurrences, layouts, presentations, base.refinementEdges());
+    }
+
+    SemanticRevision editDraftContext(SemanticRevision base, Map<String, Object> payload) {
+        String parentId = required(payload, "context_id");
+        String refineeId = required(payload, "refinee_element_id");
+        String name = elementName(payload.get("name"));
+        var element = base.elements().stream().filter(item -> item.id().equals(refineeId)).findFirst()
+                .orElseThrow(() -> domain("细化元素不存在"));
+        if (element.coreKind() != SemanticRevision.CoreKind.OBJECT && element.coreKind() != SemanticRevision.CoreKind.PROCESS
+                || base.occurrences().stream().noneMatch(item -> item.contextId().equals(parentId)
+                    && item.targetKind() == SemanticRevision.TargetKind.ELEMENT && item.targetId().equals(refineeId)
+                    && item.ownership() == SemanticRevision.OccurrenceOwnership.OWNED)
+                || base.refinementEdges().stream().anyMatch(item -> item.parentContextId().equals(parentId)
+                    && item.refineeElementId().equals(refineeId))) throw domain("当前图中的元素不可细化");
+        var contexts = new ArrayList<>(base.contexts());
+        var edges = new ArrayList<>(base.refinementEdges());
+        String childId = newId("context.refinement");
+        var kind = element.coreKind() == SemanticRevision.CoreKind.PROCESS
+                ? SemanticRevision.ContextKind.PROCESS_REFINEMENT : SemanticRevision.ContextKind.OBJECT_REFINEMENT;
+        contexts.add(new SemanticRevision.Context(childId, kind, capability("CAP-CONTEXT-001"),
+                qualifiedName(name), List.of(), source(kind.name())));
+        edges.add(new SemanticRevision.RefinementEdge(newId("refinement"), parentId, childId, refineeId, element.coreKind()));
+        return new SemanticRevision(base.revisionId(), base.modelId(), base.revisionSequence(), base.profileBinding(),
+                base.rootContextId(), base.elements(), base.features(), base.states(), base.facts(), contexts,
+                base.occurrences(), base.layouts(), base.statePresentations(), edges);
     }
 
     boolean draftLayoutAllowed(SemanticRevision base, String occurrenceId) {
@@ -165,10 +205,11 @@ final class SemanticCommandEditor {
         } else if (type.equals("DELETE_CONSTRUCT")) {
             var occurrence = occurrences.stream().filter(item -> item.id().equals(required(payload, "selection_id"))).findFirst().orElseThrow(() -> domain("Occurrence 不存在"));
             String mode = required(payload, "delete_mode"); var plan = deletePlan(base, occurrence, mode);
+            if (!remainsWithinContext(base, occurrence, plan)) throw domain("CONTEXT_NOT_ALLOWED");
             if (mode.equals("DELETE_TARGET") && plan.items().stream().anyMatch(item -> item.effect().equals("CASCADE"))) throw domain("DELETE_DEPENDENCY_EXISTS");
             applyDeletePlan(plan, mode, elements, features, states, facts, contexts, occurrences, layouts, presentations);
         } else throw profileForbidden();
-        return new SemanticRevision(base.revisionId(), base.modelId(), base.revisionSequence(), base.profileBinding(), base.rootContextId(), elements, features, states, facts, contexts, occurrences, layouts, presentations);
+        return new SemanticRevision(base.revisionId(), base.modelId(), base.revisionSequence(), base.profileBinding(), base.rootContextId(), elements, features, states, facts, contexts, occurrences, layouts, presentations, base.refinementEdges());
     }
 
     private void createProceduralFact(
@@ -278,6 +319,7 @@ final class SemanticCommandEditor {
                 .orElseThrow(() -> new ApiException(ApiErrorCode.INVALID_ARGUMENT, 400, false, "删除选择必须是当前 Projection occurrence"));
         String queryId = capabilityQueryId(projectId, modelId, base.revisionId(), selectionId, "DELETE_CONSTRUCT", List.of());
         DeletePlan plan = deletePlan(base, occurrence, mode);
+        if (!remainsWithinContext(base, occurrence, plan)) throw domain("CONTEXT_NOT_ALLOWED");
         if (!plan.targetKind().equals(required(payload, "construct_kind")) || !plan.targetId().equals(required(payload, "construct_id"))
                 || !deleteToken(base, queryId, selectionId, mode, plan).equals(required(payload, "impact_token"))) {
             throw new ApiException(ApiErrorCode.REVISION_CONFLICT, 409, false, "IMPACT_TOKEN_STALE");

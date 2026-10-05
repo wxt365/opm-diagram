@@ -6,6 +6,8 @@ const useExternalServers = process.env.OPM_E2E_EXTERNAL_SERVERS === "true";
 export default defineConfig({
   testDir: ".",
   testMatch: "**/*.spec.ts",
+  // 大图测试使用独立页面和 Vite 端口，由性能配置单独执行。
+  testIgnore: "**/workbench-performance.spec.ts",
   fullyParallel: false,
   workers: 1,
   timeout: 120_000,

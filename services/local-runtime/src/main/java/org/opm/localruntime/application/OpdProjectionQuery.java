@@ -13,7 +13,9 @@ final class OpdProjectionQuery {
         SemanticRevision.Context context = context(revision, contextId);
         Map<String, String> labels = labels(revision);
         Map<String, SemanticRevision.Layout> layouts = new LinkedHashMap<>();
+        Map<String, SemanticRevision.Feature> features = new LinkedHashMap<>();
         revision.layouts().forEach(layout -> layouts.put(layout.id(), layout));
+        revision.features().forEach(feature -> features.put(feature.id(), feature));
         Map<String, String> occurrenceIds = new LinkedHashMap<>();
         Map<String, SemanticRevision.StatePresentation> presentations = new LinkedHashMap<>();
         revision.occurrences().stream()
@@ -38,6 +40,11 @@ final class OpdProjectionQuery {
             construct.put("construct_role", occurrence.constructRole());
             construct.put("label", labels.getOrDefault(occurrence.targetId(), occurrence.targetId()));
             construct.put("layout", Map.of("x", layout.x(), "y", layout.y(), "width", layout.width(), "height", layout.height(), "z_order", layout.zOrder()));
+            if (occurrence.targetKind() == SemanticRevision.TargetKind.FEATURE) {
+                SemanticRevision.Feature feature = features.get(occurrence.targetId());
+                if (feature == null) throw domain("Context Feature 不存在");
+                construct.put("owner_id", feature.ownerElementId());
+            }
             if (occurrence.targetKind() == SemanticRevision.TargetKind.STATE) {
                 SemanticRevision.State state = revision.states().stream().filter(item -> item.id().equals(occurrence.targetId())).findFirst().orElseThrow(() -> domain("Context State 不存在"));
                 construct.put("owner_id", state.ownerElementId());

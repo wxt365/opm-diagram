@@ -12,14 +12,18 @@ public final class DraftWorkspaceController {
     private final DraftWorkspaceService service;
     public DraftWorkspaceController(DraftWorkspaceService service) { this.service = service; }
 
-    @PostMapping(value = "/{operation:open|projection|text|navigation|findings|relation-catalog|capabilities|commands|receipts}", consumes = "application/json", produces = "application/json")
+    @PostMapping(value = "/{operation:open|projection|text|navigation|findings|relation-catalog|capabilities|commands|receipts|operation-history|method-summary|plan-preview|mindmap}", consumes = "application/json", produces = "application/json")
     public JsonNode execute(@PathVariable String project, @PathVariable String model, @PathVariable String operation, @RequestBody String raw) {
         var type = switch (operation) {
+            case "mindmap" -> MindmapRequest;
+            case "plan-preview" -> DraftModelPlanPreviewRequest;
             case "open" -> OpenDraftRequest;
             case "capabilities" -> DraftCapabilitiesRequest;
             case "commands" -> DraftEditRequest;
             case "receipts" -> DraftReceiptRequest;
             case "relation-catalog" -> DraftRelationCatalogRequest;
+            case "operation-history" -> OperationHistoryRequest;
+            case "method-summary" -> MethodSummaryRequest;
             default -> DraftQueryRequest;
         };
         // 先保留原始词法执行严格解码，再进入领域层。

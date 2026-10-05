@@ -27,7 +27,13 @@ public final class DraftJournalRepository {
     private final Clock clock;
     private final Consumer<String> stage;
     @FunctionalInterface public interface Edit { Proposal apply(ObjectNode currentDocument); }
-    public record Proposal(String documentJson, List<String> affectedIds, List<String> textTraceIds, String validationSummaryJson) {
+    public record Proposal(String documentJson, List<String> affectedIds, List<String> textTraceIds, String validationSummaryJson, String historyDetailJson, String analysisMappingsJson) {
+        public Proposal(String documentJson, List<String> affectedIds, List<String> textTraceIds, String validationSummaryJson, String historyDetailJson) {
+            this(documentJson, affectedIds, textTraceIds, validationSummaryJson, historyDetailJson, null);
+        }
+        public Proposal(String documentJson, List<String> affectedIds, List<String> textTraceIds, String validationSummaryJson) {
+            this(documentJson, affectedIds, textTraceIds, validationSummaryJson, null, null);
+        }
         public Proposal { Objects.requireNonNull(documentJson); Objects.requireNonNull(validationSummaryJson); affectedIds = List.copyOf(affectedIds); textTraceIds = List.copyOf(textTraceIds); }
     }
     public record Snapshot(DraftToken token, String documentJson, String contentDigest, String dirtySince, String deadline,
@@ -57,6 +63,10 @@ public final class DraftJournalRepository {
                 return checked(stored, DraftWorkspaceContract.Type.DraftEditResult);
             }
             Snapshot current = load(connection, modelId);
+            if (input.has("analysis_source")) {
+                require(input.at("/command/command_type").asText().equals("APPLY_MODEL_PLAN"), "INPUT_INVALID");
+                MindmapRepository.checkSource(connection, modelId, input.get("analysis_source"));
+            }
             JsonNode expected = input.get("expected_draft_token");
             require(current.token().binding_digest().equals(expected.get("binding_digest").asText()), "RULE_VERSION_CONFLICT");
             require(current.token().draft_id().equals(expected.get("draft_id").asText()) && current.token().edit_seq() == expected.get("edit_seq").longValue(), "DRAFT_CONFLICT");
@@ -98,6 +108,12 @@ public final class DraftJournalRepository {
                 stage.accept("STREAM");
             }
             update(connection, "INSERT INTO draft_receipt VALUES (?,'EDIT',?,?,?,?)", modelId, commandId, requestDigest, result.toString(), now);
+            if (input.has("analysis_source")) {
+                require(proposal.analysisMappingsJson() != null, "INPUT_INVALID");
+                MindmapRepository.record(connection, modelId, commandId, context, input.get("analysis_source"), proposal.analysisMappingsJson());
+            }
+            if (proposal.historyDetailJson() != null) OperationHistoryRepository.append(connection, modelId, "EDIT." + commandId,
+                    requestDigest, resultToken, now, (ObjectNode) DraftJsonDelta.read(proposal.historyDetailJson()), result.path("status").asText());
             stage.accept("RECEIPT");
             Snapshot verified = load(connection, modelId);
             require(verified.token().equals(resultToken) && verified.contentDigest().equals(contentDigest), "DRAFT_RECOVERY_REQUIRED");
@@ -148,7 +164,7 @@ public final class DraftJournalRepository {
                 long replayTarget = target == null ? head : target;
                 DraftToken checkpointToken = new DraftToken(draft, covered, binding);
                 String dirty = rows.getString("dirty_since"), deadline = rows.getString("deadline");
-                require(covered <= head && "SaveContentDigest/1".equals(rows.getString("digest_version")), "DRAFT_RECOVERY_REQUIRED");
+                require(covered <= head && List.of("SaveContentDigest/1", "SaveContentDigest/2").contains(rows.getString("digest_version")), "DRAFT_RECOVERY_REQUIRED");
                 require((dirty == null) == (deadline == null), "DRAFT_RECOVERY_REQUIRED");
                 require(target != null || head == covered || dirty != null, "DRAFT_RECOVERY_REQUIRED");
                 if (dirty != null) require(TIME.format(java.time.Instant.parse(dirty)).equals(dirty) && TIME.format(java.time.Instant.parse(deadline)).equals(deadline)
@@ -157,8 +173,9 @@ public final class DraftJournalRepository {
                 require(HybridSavePreparation.hash(artifact).equals(rows.getString("artifact_digest")), "DRAFT_RECOVERY_REQUIRED");
                 ObjectNode content = (ObjectNode) DraftJsonDelta.read(rows.getString("model_json"));
                 ObjectNode metadata = (ObjectNode) DraftJsonDelta.read(artifact);
-                require(SaveContentDigestV1.sha256(SaveContentDigestV1.join(new SaveContentDigestV1.Parts(content, metadata)))
-                        .equals(rows.getString("content_digest")), "DRAFT_RECOVERY_REQUIRED");
+                var checkpointDocument = SaveContentDigestV1.join(new SaveContentDigestV1.Parts(content, metadata));
+                require(SaveContentDigestV1.version(checkpointDocument).equals(rows.getString("digest_version"))
+                        && SaveContentDigestV1.sha256(checkpointDocument).equals(rows.getString("content_digest")), "DRAFT_RECOVERY_REQUIRED");
                 if (hasOverlayTable(connection)) {
                     try (var overlay = connection.prepareStatement("SELECT * FROM draft_checkpoint_overlay WHERE checkpoint_id=?")) {
                         overlay.setString(1, rows.getString("selected_checkpoint"));
@@ -178,16 +195,16 @@ public final class DraftJournalRepository {
                         && rows.getString("base_revision_id").equals(document.path("revision_id").asText())
                         && binding.equals(document.at("/profile_binding/binding_digest/digest").asText())
                         && DraftJsonDelta.digest(document.get("profile_binding")).equals(DraftJsonDelta.digest(DraftJsonDelta.read(rows.getString("profile_binding_json")))), "DRAFT_RECOVERY_REQUIRED");
-                ObjectNode seed = document.deepCopy();
                 try (var journal = connection.prepareStatement("SELECT * FROM draft_journal WHERE model_id=? AND draft_id=? AND edit_seq>? AND (? IS NULL OR edit_seq<=?) ORDER BY edit_seq")) {
                     journal.setString(1, modelId); journal.setString(2, draft); journal.setLong(3, covered);
                     journal.setObject(4, target); journal.setObject(5, target);
                     try (var entries = journal.executeQuery()) {
                         while (entries.next()) {
                             require(entries.getLong("edit_seq") == covered + 1 && covered < replayTarget, "DRAFT_RECOVERY_REQUIRED");
+                            ObjectNode previous = document;
                             content = DraftJsonDelta.apply(content, DraftJsonDelta.read(entries.getString("delta_json")));
                             metadata = DraftJsonDelta.apply(metadata, DraftJsonDelta.read(entries.getString("artifact_delta_json")));
-                            document = SaveContentDigestV1.join(new SaveContentDigestV1.Parts(content, metadata)); immutable(seed, document);
+                            document = SaveContentDigestV1.join(new SaveContentDigestV1.Parts(content, metadata)); immutable(previous, document);
                             digest = SaveContentDigestV1.sha256(document); require(digest.equals(entries.getString("result_digest")), "DRAFT_RECOVERY_REQUIRED");
                             ObjectNode receipt = storedReceipt(connection, modelId, "EDIT", entries.getString("command_id"), entries.getString("request_digest"));
                             require(receipt != null && receipt.path("status").asText().equals("DURABLE") && receipt.path("content_digest").asText().equals(digest)
@@ -208,10 +225,18 @@ public final class DraftJournalRepository {
     }
 
     private static void immutable(JsonNode before, JsonNode after) {
-        for (String pointer : List.of("/schema_id", "/schema_version", "/model_id", "/profile_binding", "/schema_set_ref", "/revision_id", "/revision_sequence", "/parent_revision_id", "/model_header/model_id", "/model_header/root_context_id")) {
+        for (String pointer : List.of("/schema_id", "/model_id", "/profile_binding", "/schema_set_ref", "/revision_id", "/revision_sequence", "/parent_revision_id", "/model_header/model_id", "/model_header/root_context_id")) {
             JsonNode left = before.at(pointer), right = after.at(pointer);
             require(left.isMissingNode() ? right.isMissingNode() : !right.isMissingNode() && DraftJsonDelta.digest(left).equals(DraftJsonDelta.digest(right)), "INPUT_INVALID");
         }
+        String oldVersion = before.path("schema_version").asText(), nextVersion = after.path("schema_version").asText();
+        require(oldVersion.equals(nextVersion) || List.of("0.2", "0.3", "0.4").contains(oldVersion) && nextVersion.equals("0.5")
+                && after.path("contexts").findValues("architecture_links").stream().anyMatch(links -> links.isArray() && !links.isEmpty())
+                || List.of("0.2", "0.3").contains(oldVersion) && nextVersion.equals("0.4")
+                && after.path("contexts").findValues("architecture_level").size() > 0
+                || oldVersion.equals("0.2") && nextVersion.equals("0.3")
+                && !before.has("refinement_edges") && after.path("refinement_edges").isArray()
+                && !after.get("refinement_edges").isEmpty(), "INPUT_INVALID");
     }
     private static ObjectNode storedReceipt(Connection connection, String model, String operation, String id, String expectedDigest) throws Exception {
         try (var statement = connection.prepareStatement("SELECT request_digest,result_json FROM draft_receipt WHERE model_id=? AND operation=? AND idempotency_id=?")) {

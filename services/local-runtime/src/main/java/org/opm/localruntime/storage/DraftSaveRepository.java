@@ -156,6 +156,10 @@ public final class DraftSaveRepository {
             scope(connection, project, model); require(hasOverlayTable(connection), "DRAFT_RECOVERY_REQUIRED");
             var head = load(connection, model); var document = SaveContentDigestV1.read(head.documentJson()); validate.accept(document.deepCopy());
             String checkpoint = storeCheckpoint(connection, model, head, document);
+            if (head.dirtySince() != null) {
+                var detail = JSON.createObjectNode().put("operation", "AUTO_SAVE").put("title", "自动保存草稿").putNull("context_id").putNull("context_name");
+                OperationHistoryRepository.append(connection, model, "AUTO." + checkpoint, head.contentDigest(), head.token(), TIME.format(clock.instant()), detail, "SAVED");
+            }
             advance(connection, model, head, head, checkpoint); stage.accept("STREAM");
             verifyUnchangedHead(connection, model, head); stage.accept("VERIFIED"); return new Checkpoint(checkpoint, head.token());
         });
@@ -167,7 +171,7 @@ public final class DraftSaveRepository {
             statement.setString(1, model); statement.setString(2, captured.contentDigest());
             try (var rows = statement.executeQuery()) {
                 if (rows.next()) {
-                    require("SaveContentDigest/1".equals(rows.getString("digest_version")) && HybridSavePreparation.hash(rows.getString("artifact_json")).equals(rows.getString("artifact_digest")), "DRAFT_RECOVERY_REQUIRED");
+                    require(SaveContentDigestV1.version(document).equals(rows.getString("digest_version")) && HybridSavePreparation.hash(rows.getString("artifact_json")).equals(rows.getString("artifact_digest")), "DRAFT_RECOVERY_REQUIRED");
                     stored = new SaveContentDigestV1.Parts((ObjectNode) DraftJsonDelta.read(rows.getString("model_json")), (ObjectNode) DraftJsonDelta.read(rows.getString("artifact_json")));
                     require(SaveContentDigestV1.sha256(SaveContentDigestV1.join(stored)).equals(captured.contentDigest()), "DRAFT_RECOVERY_REQUIRED");
                 }
@@ -175,7 +179,8 @@ public final class DraftSaveRepository {
         }
         if (stored == null) {
             stored = parts; String metadata = parts.metadata().toString();
-            update(connection, "INSERT INTO draft_content VALUES (?,?,'SaveContentDigest/1',?,?,?)", model, captured.contentDigest(), parts.content().toString(), metadata, HybridSavePreparation.hash(metadata));
+            update(connection, "INSERT INTO draft_content VALUES (?,?,?,?,?,?)", model, captured.contentDigest(),
+                    SaveContentDigestV1.version(document), parts.content().toString(), metadata, HybridSavePreparation.hash(metadata));
         }
         stage.accept("CONTENT");
         String checkpoint = null;

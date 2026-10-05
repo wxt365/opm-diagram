@@ -23,13 +23,39 @@ final class ConstructDeletionPolicy {
         if (occurrence.targetKind() != SemanticRevision.TargetKind.FACT
                 && (occurrence.ownership() == SemanticRevision.OccurrenceOwnership.REFERENCED
                 || revision.occurrences().stream().filter(item -> item.targetKind() == occurrence.targetKind() && item.targetId().equals(occurrence.targetId()) && item.ownership() == SemanticRevision.OccurrenceOwnership.OWNED).count() > 1)) {
-            options.add(deleteOption(queryId, revision, occurrence, "REMOVE_OCCURRENCE", "移除此视图", true, List.of(), deletePlan(revision, occurrence, "REMOVE_OCCURRENCE")));
+            DeletePlan removePlan = deletePlan(revision, occurrence, "REMOVE_OCCURRENCE");
+            boolean local = remainsWithinContext(revision, occurrence, removePlan);
+            options.add(deleteOption(queryId, revision, occurrence, "REMOVE_OCCURRENCE", "移除此视图", local,
+                    local ? List.of() : List.of("CONTEXT_NOT_ALLOWED"), removePlan));
         }
         boolean blocked = targetPlan.items().stream().anyMatch(item -> "CASCADE".equals(item.effect()));
-        options.add(deleteOption(queryId, revision, occurrence, "DELETE_TARGET", display, !blocked,
-                blocked ? List.of("DELETE_DEPENDENCY_EXISTS") : List.of(), blocked ? targetPlan.withBlockers() : targetPlan));
-        if (blocked) options.add(deleteOption(queryId, revision, occurrence, "CASCADE", "级联" + display, true, List.of(), deletePlan(revision, occurrence, "CASCADE")));
+        boolean local = remainsWithinContext(revision, occurrence, targetPlan);
+        options.add(deleteOption(queryId, revision, occurrence, "DELETE_TARGET", display, !blocked && local,
+                !local ? List.of("CONTEXT_NOT_ALLOWED") : blocked ? List.of("DELETE_DEPENDENCY_EXISTS") : List.of(),
+                blocked ? targetPlan.withBlockers() : targetPlan));
+        if (blocked) options.add(deleteOption(queryId, revision, occurrence, "CASCADE", "级联" + display, local,
+                local ? List.of() : List.of("CONTEXT_NOT_ALLOWED"), deletePlan(revision, occurrence, "CASCADE")));
         return List.copyOf(options);
+    }
+
+    static boolean remainsWithinContext(SemanticRevision revision, SemanticRevision.Occurrence occurrence, DeletePlan plan) {
+        Set<String> removedOccurrences = new HashSet<>();
+        Set<String> removedElements = new HashSet<>();
+        for (var item : plan.items()) {
+            if ("OCCURRENCE".equals(item.kind())) {
+                if (!occurrence.contextId().equals(item.contextId())) return false;
+                removedOccurrences.add(item.id());
+            } else if ("ELEMENT".equals(item.kind())) removedElements.add(item.id());
+        }
+        for (var edge : revision.refinementEdges()) {
+            if (removedElements.contains(edge.refineeElementId())) return false;
+            if (revision.occurrences().stream().anyMatch(item -> removedOccurrences.contains(item.id())
+                    && item.contextId().equals(edge.parentContextId())
+                    && item.targetKind() == SemanticRevision.TargetKind.ELEMENT
+                    && item.targetId().equals(edge.refineeElementId())
+                    && item.ownership() == SemanticRevision.OccurrenceOwnership.OWNED)) return false;
+        }
+        return true;
     }
 
     static ApiEdtContract.CommandCapabilityOption deleteOption(String queryId, SemanticRevision revision, SemanticRevision.Occurrence occurrence,
@@ -114,7 +140,7 @@ final class ConstructDeletionPolicy {
         for (int index = 0; index < contexts.size(); index++) {
             SemanticRevision.Context context = contexts.get(index);
             contexts.set(index, new SemanticRevision.Context(context.id(), context.kind(), context.capability(), context.name(),
-                    context.occurrenceIds().stream().filter(id -> !removedOccurrenceIds.contains(id)).toList(), context.source()));
+                    context.occurrenceIds().stream().filter(id -> !removedOccurrenceIds.contains(id)).toList(), context.source(), context.architectureLevel(), context.architectureLinks()));
         }
     }
 

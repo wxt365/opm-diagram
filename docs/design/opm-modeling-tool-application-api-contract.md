@@ -1,3 +1,5 @@
+2026-10-01：草稿 V2 增加 `UPDATE_LAYOUT_BATCH`，完整几何快照按 scope endpoints 精确授权并在一次 journal 事务中提交；用于多选移动及布局撤销/重做。V1 的 `UPDATE_LAYOUT` 不变。见[规格](../../specs/opm-layout-selection-history-feature-task-spec.md)。
+
 # OPM 单机建模工具应用 API 契约
 
 2026-09-15：UPDATE_LAYOUT 的 owned role 集合扩展至 Operation、State、Feature State，payload 不变；状态容纳与父移动联动由 Runtime 原子执行，草稿只产生一条 journal edit，继续按混合保存策略形成检查点。角色/owner/Context 校验、夹取算法、失败与回滚见[状态布局修正规格](../../specs/opm-p03-owned-state-layout-and-exhibition-bugfix-task-spec.md)，替代旧三类移动限制。
@@ -22,7 +24,7 @@
 
 `UPDATE_LAYOUT` 仅携带 `occurrence_id` 和二维有限数 `x/y`，不得携带目标、Context、尺寸或级联集合。允许当前根 Context 的 owned Object/Process/Attribute/Operation/State，Runtime 复核 role/kind/owner 后执行；State 在 owner 内容区夹取位置，父节点移动原子更新其可见 owned 状态布局。尺寸扩展由 Runtime 的容纳规则计算。Fact、非 owned 和跨 Context occurrence 继续拒绝；语义及 OPL/Trace 不变，活动草稿沿混合保存策略持久化。完整边界由 `specs/opm-p03-owned-state-layout-and-exhibition-bugfix-task-spec.md` 冻结。
 
-`UPDATE_PROPERTY` 的首个受控切片只允许修改 Object/Process 的 `name`。payload 固定为 `target_ref={target_kind=ELEMENT,target_id}`、`property_name=name`、`value`、`capability_query_id` 和 `selected_option_id`，禁止扩展字段。名称保留原字符串，按 Unicode code point 限制为最多 256，空白值非法，不执行唯一性校验；成功只替换 Element `QualifiedName.local_name`。旧 Revision、Baseline、同值和重复命令的精确语义由 `specs/opm-p03-element-name-editing-task-spec.md` 第 6、7 节冻结。
+`UPDATE_PROPERTY` 的受控名称切片允许修改 Object/Process/Attribute/Operation 的 `name`。payload 固定为 `target_ref={target_kind=ELEMENT|FEATURE,target_id}`、`property_name=name`、`value`、`capability_query_id` 和 `selected_option_id`，禁止扩展字段；Object/Process 使用 `ELEMENT`，Attribute/Operation 使用 `FEATURE`。名称保留原字符串，按 Unicode code point 限制为最多 256，空白值非法，不执行唯一性校验；成功只替换目标的 `QualifiedName.local_name`，Feature 的 owner/kind/capability 不变。旧 Revision、Baseline、同值和重复命令继续遵守既有语义，Feature 扩展由 `specs/opm-p03-feature-owner-and-name-editing-feature-task-spec.md` 冻结。
 
 `DELETE_CONSTRUCT` 的完整 P03 生命周期由 `specs/opm-p03-unified-construct-lifecycle-design-task-spec.md` 冻结：删除从 selected occurrence 取得 Runtime impact option，而不是由画布 Cell 推断 target 或 cascade；当前 0.2 OpenAPI、生成 DTO 与 Runtime 仍待后继原子实现规格同步。
 
@@ -168,6 +170,11 @@
 | API-PRJ-010 | SearchWorkspace | Query | M02/M05 | P01/P03 | 稳定定位结果 |
 | API-PRJ-011 | AnalyseProfileConversion | Task | M06-M08/M10 | OV04/P05 | Conversion Report |
 | API-PRJ-012 | ApplyProfileConversion | Command | M03-M10/M12 | OV04 | 新目标 Draft Revision |
+| API-PRJ-013 | ChangeModelLifecycle | Command | M02/M12 | P02 | 模型移入回收站、恢复或永久删除的原子收据 |
+
+`ListModels` 可传 `archive_state=ACTIVE|ARCHIVED`，默认 ACTIVE。`ChangeModelLifecycle` 采用 `TRASH|RESTORE|PURGE` action 与 expected_state；只有 ARCHIVED 模型可 PURGE，且必须提供与模型当前名称精确一致的 confirmation_name。移入回收站保留全部内容，活动工作台与 Draft 操作不再访问该模型；恢复保留原模型 ID 与内容。永久删除仅清理该模型在项目库中的内部数据，保留项目级生命周期审计/收据和外部备份/导出物。所有写请求仍经过本地会话保护。
+
+SQLite V7 迁移增加事务内的 model_purge_authorization 表并收紧删除授权范围：仅 ARCHIVED 模型在完整清理事务中可删除不可变历史，普通直接 DELETE 仍被拒绝。禁止修改旧 SQL 迁移；迁移及单模型回滚证据见 `specs/opm-p02-model-trash-lifecycle-feature-task-spec.md`。
 
 ### 7.2 Context、编辑与投影
 
@@ -413,6 +420,10 @@ Wire payload 不重复传递 MS-MOD-001 的 `target_ref/capability_ref`：target
 | API-MTH-003 | SaveDecisionRecord | Command | M11/M09/M12 | P03 | 新 committed_revision 和 Decision Record |
 | API-MTH-004 | ResolveMethodFinding | Command | M11/M09/M12 | P03 | 新 committed_revision 和处置结果 |
 
+当前本地实现的 API-MTH-001 为 6×1 关系证据切片：`POST /api/v2/projects/{project}/models/{model}/draft/method-summary`，使用本地 session 守卫。`MethodSummaryRequest` 的 `request_id/context_id` 必填，`source` 必须仅含精确 `draft_token` 或 `revision_id`。草稿冲突返回 DRAFT_CONFLICT，未知图或版本返回 NOT_FOUND；历史版本从保存文档独立读取。`MethodSummaryResult.meta` 回显请求、图与输入来源，`data.coverage=RELATION_EVIDENCE_ONLY`，包含模型所有过程的六类卡片、候选关系证据、OPD/目标 ID 和人工确认提示。
+
+Agent/State Agent、Effect/状态 Effect、Instrument/State Instrument、Consumption/State Consumption 分别提供主体、客体、手段、资源的候选证据。环境与信息无法从当前语言关系唯一识别，返回 MANUAL；不按名称或 affiliation/essence 自动认定角色。不产生方法通过或 ISO 符合性结论，不写入模型/校验结果。OPD 三层分类与已有父子细化导航见下文；同模型显式架构输入/生成/追溯见下文；独立模型分类、跨模型关联、功能信息模式、决策与处置命令尚未实现。详见 `specs/opm-method-six-one-feature-task-spec.md`。
+
 ### 7.4 版本与基线
 
 | 编号 | 操作 | 类型 | 处理模块 | 页面/弹层 | 主要结果 |
@@ -441,6 +452,14 @@ Wire payload 不重复传递 MS-MOD-001 的 `target_ref/capability_ref`：target
 | API-TSK-002 | ListTasks | Query | M12 端口 | 全局任务中心/P06 | 任务分页列表 |
 | API-TSK-003 | CancelTask | Command | M12 端口 | P05/P06/弹层 | cancelling/cancelled 或不可取消错误 |
 | API-TSK-004 | SubscribeTaskEvents | Stream | M12 端口 | P03/P05/P06/弹层 | 单 Task SSE 提示；最终状态仍以 GetTask 为准 |
+
+### 7.5.1 OPD JSON 可编辑迁移增量
+
+- `API-OPD-001`：`POST /api/v1/projects/{projectId}/models/{modelId}/opd-json/export`。请求包含 `request_id/context_id` 及二选一的当前 `draft_token` 或固定 `revision_id`；返回 JSON 文件内容，读取不修改草稿或版本。草稿 token 变化返回 `REVISION_CONFLICT`。
+- `API-OPD-002`：`POST /api/v1/projects/{projectId}/opd-json/import`。请求包含 `request_id/command_id/name/binding/opd_package`；HTTP 201 返回标准 CommandEnvelope，`data` 为新 Model 并附 `context_id`。相同命令与内容重试只创建一次，变更请求ID不影响幂等。
+- 格式为 `OPM-OPD-JSON/1.0`，契约见 [JSON Schema](../contracts/schemas/opm-opd-json-v1.schema.json) 和 [OpenAPI](../contracts/openapi/opm-local-api-v1.yaml)。保留选中 OPD、后代、必要父级及关系依赖，包含完整语义、共享内部身份、状态展示和各图布局；剔除无关兄弟图。不是只包含节点与连线的画布投影，也不是完整历史备份。
+- 导入创建独立模型，生成新 model/revision/draft 身份，内部语义ID位于新模型命名空间内；不合并或覆盖已有模型。文件最多10 MiB；支持语义 schema 0.2/0.3/0.4/0.5，0.1明确拒绝。目标环境活动 Profile/Rule/Grammar/Symbol/Normalization 全绑定必须一致，冲突返回 `RULE_VERSION_CONFLICT`。版本、引用、入口、来源和模型身份校验失败零模型写入；持久化失败整事务回滚。
+- 两个 POST 入口复用本地会话请求防护。导入前校验所有图的 OPL 可生成，导入后重新生成派生文本，清除旧修订摘要与校验证据；迁移成功不代表模型通过符合性校验。本增量不实现既有 API-XFR 的完整模型原生交换包或 OpCloud 文件兼容。
 
 ## 8. 关键操作明细
 
@@ -612,3 +631,46 @@ Inspect 返回 Restore Plan、备份完整性、格式迁移、目标项目、�
 3. 完整画布逻辑和 0.2 目标机器契约由第 7.2 节及全量冻结基线第 6 章冻结；DEV-CANVAS-00 必须形成版本化 OpenAPI、generated client 和正反 contract test，不得手写分叉 DTO；
 4. 机器扩展必须保留 P0 客户端兼容或发布明确的新 schema/API 版本；字段已进入草案不等于兼容性和生成结果已验证；
 5. 查询聚合可以在真实浏览器和大图性能测试后优化，但不得改变 revision/binding/freshness、分页和错误语义；需要改变 payload 时必须重新关闭设计门并升版。
+
+
+### 草稿 V2 子树删除
+
+仅 Journaled Draft V2 的命令增加 `DELETE_CONTEXT`，旧 Revision 删除命令保持原范围。`scope.context_id` 为当前活动图，`scope.selection_id` 为待删除子图；封闭 payload 仅含 `context_id`（必须等于 selection）及 `impact_token`。
+
+`capabilities` 返回该命令的独立候选分支，包含 `context_impact`（当前 input_token、目标图、幸存 parent_context_id、完整 context_ids、counts 与 blockers）和绑定 query/option/impact 的 token。根图没有删除候选；任何外部 occurrence、关系、所属引用、状态呈现或细化边依赖都会使候选 disabled。提交在同一 Journal 事务中重新计算计划及授权，伪造、过期和阻断请求零写入，重复 command_id 沿用既有幂等收据。
+
+删除子树全部出现位置和布局及 OWNED 语义目标、所属特征/状态/关系，保留父图细化元素及历史修订；不自动重写跨图引用。成功后客户端使用候选 parent_context_id 回读，避免读取已删除的当前图。删除所有细化图后正文保留原有 0.3/0.4；Journal 回放逐条验证相邻编辑的 schema_version 转换，0.2→0.3 首次升级必须包含细化边；方法分类允许 0.2/0.3→0.4，不允许降级。详见[规格](../../specs/opm-delete-context-feature-task-spec.md)。
+
+### 2026-10-03 固定版本校验任务兼容混合保存
+
+`API-VAL-001` 对已有固定版本执行当前支持的模型检查，任务、幂等收据和操作记录同事务登记。旧版本保留 `revision_document` 外键；混合保存版本先验证 `draft_savepoint` 及内容完整性，旧外键列使用允许的 NULL，完整输入版本和服务端项目/模型身份存于既有任务 `request_json`。TaskDescriptor.input_revision 和查询 meta.read_revision 始终恢复实际输入，不能使用初始版本代替。永久删除模型时按服务端记录的模型身份清理对应任务，保留其他模型任务。
+
+新任务以忽略 request_id 后的命令内容作为幂等身份，同命令重试返回同任务；旧收据仍支持原请求内容重放。任务 COMPLETED 表示检查执行完成，不等于完整规则覆盖。检查复用活动草稿的基础结构、状态归属和受支持关系的 OPL/Trace 规则，问题明细及 coverage_state=INCOMPLETE 持久化在现有 result_json 内；本轮不新增任务结果接口。
+
+创建基线要求零阻断、COMPLETE 和可核对的问题明细。旧任务仅有汇总数且曾将零结构问题标成 COMPLETE，不能继续作为完整证据；当前有限覆盖任务同样不能放行基线。已存在的历史及基线不作回写。该修复没有 API/schema 或数据库迁移，重启耐久性和实际浏览器证据见[校验任务修复规格](../../specs/opm-validation-task-persistence-bugfix-task-spec.md)。
+
+
+## 2026-10-03 操作历史只读契约
+
+新增 `POST /api/v2/projects/{project}/models/{model}/draft/operation-history`，请求 `OperationHistoryRequest`：`request_id`、`revision`（`HEAD` 或精确保存版本）、`before`（首屏 null，后续使用不透明游标）。响应 `OperationHistoryResult` 包含项目/模型/请求/版本身份及 `data.items`、`data.next_before`；每页最多 100 条，按时间与记录 ID 倒序。错误沿用 V2 错误体和本地会话守卫，跨模型或未知版本返回 NOT_FOUND，非法/跨作用域游标返回 INPUT_INVALID。
+
+新编辑详情由应用层捕获，存储层与 Journal/收据在同一事务内写入既有 `idempotency_record` 的 `DRAFT_OPERATION_HISTORY_V1` 内部命名空间，`result_revision_id` 留空，避免新保存版本触发旧 Revision 外键。详情包含 draft/seq、当时说明与 OPD 名；同 ID 重放复用收据，不重复历史。自动保存仅在保护脏草稿时追加历史，与检查点事务原子提交。手动保存及固定版本直接读取不可变收据，不改写收据格式。
+
+版本截止同时使用 captured_seq、保存时点与产生版本的第一条收据顺序，排除同毫秒/同 seq 的后续无变化操作。历史不依赖会被压缩的 Journal。旧编辑以真实收据降级显示并标记缺少详情；旧 Operation Record 只显示可证实的状态，不补造名称。无 schema、迁移、配置或依赖变化。
+
+### OPD 架构层分类及细化追溯（2026-10-03）
+
+`API-MTH-002` 的当前切片是 OPD 分类，使用 V2 `commands` 的 `UPDATE_ARCHITECTURE_CLASSIFICATION`，不新增独立写入通道。payload 为 `{context_id, architecture_level}`，level 为 `MISSION/FUNCTION/PRODUCT/null`；null 清除字段。scope.context_id 等于 payload.context_id，selection_id 为 null，endpoints 为空。capabilities 返回封闭的 `METHOD_METADATA` 候选，只含当前图及 token 授权，不带语言 capability、symbol、template。继续执行本地会话检查、exact token、幂等收据、Journal 和操作历史原子事务，失败零写入，无变化不推进编辑序号。历史界面只读。
+
+语义文件 0.4 在 Context 增加可选 `architecture_level`，继承 0.3 的 refinement_edges（即使为空）。旧 0.2/0.3 schema 不改，首次设置升级到 0.4，清除或删除子图不会降级。使用独立 `opm-save-content-v2-method.schema.json` 校验，摘要仍为 SaveContentDigest/2（同一内容集合、几何编码和 JCS 算法，Context 的新增字段属于内容）；旧文档摘要不变，无数据库迁移。OPD JSON 1.0 可迁移 0.4，旧客户端必须明确拒绝不支持版本，不能有损回写。
+
+`method-summary` 在原 processes 外返回全模型 contexts（context_id/name/architecture_level，未分类为 null）及 refinements（父图、子图、展开元素、名称和种类）。架构方法面板设置当前图分类，并提供模型清单、父子细化导航及父图元素定位；分类不按名字推断、不自动继承、不限制父子分类顺序。细化追溯不能代表 FR-METHOD-002 的全部架构输入/生成关系。规格：`specs/opm-method-classification-feature-task-spec.md`。
+
+
+### 同模型 OPD 架构关联（2026-10-03）
+
+FR-METHOD-002 的本切片使用 V2 `commands` 新增 `CREATE_ARCHITECTURE_LINK` 与 `DELETE_ARCHITECTURE_LINK`，复用 `METHOD_METADATA` 授权、草稿 token、幂等收据和历史事务。新增 payload 为 `{context_id,target_context_id,kind}`，当前图为源；种类 `INPUT/GENERATES/TRACE` 分别表示提供输入给、生成、追溯到。删除 payload 为 `{context_id,link_id}`，当前图必须为任一端。scope.context_id 等于 payload.context_id，selection_id 为 null，endpoints 为空。拒绝自连、缺失目标、未知种类或关联、错误作用域/授权和过期 token；重复源/目标/种类无变化，允许反向关联及回环。不强制架构层或类别顺序。
+
+语义 0.5 的 Context 可选 `architecture_links` 数组，单条 `{link_id,target_context_id,kind}`，源为所属 Context。0.2–0.4 冻结，独立 `opm-save-content-v2-trace.schema.json` 校验，摘要仍为 SaveContentDigest/2，无数据库迁移。首次新增升级；删除、分类修改和后续普通编辑保留正文 0.5。方法记录不生成 Fact、画布连线或 OPL。
+
+`method-summary.data.architecture_links` 必填，空为 []，返回全模型关联及 source_context_id，支持双向查看和导航。历史源使用该固定版本的关联，不读取后续草稿。删除子树时，幸存 OPD 指向子树的关联作为外部依赖阻止删除；解除关联后可删，子树内部关联随子树删除。OPD JSON 1.0 支持 0.5，双向关联和语义依赖闭包迭代到固定点，回环可终止；迁移保留关联身份、方向与种类。旧客户端拒绝未知版本，禁止丢弃字段回写。本切片只支持同模型，不含自动推断、跨模型关联或 ISO 符合性结论。规格：`specs/opm-method-trace-feature-task-spec.md`。

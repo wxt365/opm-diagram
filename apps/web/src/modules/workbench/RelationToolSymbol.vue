@@ -33,11 +33,18 @@
       <template v-else-if="glyph.kind === 'tagged-bidirectional'">
         <path d="M4 14H52M4 14L11 8M52 14L45 20" />
       </template>
+      <template v-else-if="glyph.kind === 'state-effect-pair'">
+        <path d="M10 14H21M34 14H46" />
+        <polygon points="21,14 16,10 16,18" fill="#fff" />
+        <polygon points="46,14 41,10 41,18" fill="#fff" />
+        <ellipse cx="27.5" cy="14" rx="6.5" ry="5" fill="#fff" stroke-width="1.2" />
+        <rect v-if="!glyph.stateSource" x="1" y="8" width="9" height="12" fill="#fff" stroke-width="1.2" />
+        <rect v-if="!glyph.stateTarget" x="46" y="8" width="9" height="12" fill="#fff" stroke-width="1.2" />
+      </template>
       <template v-else>
         <path :d="binaryLine" />
         <path v-if="glyph.kind === 'tagged-directed'" :d="`M${targetX} 14L${targetX - 8} 8M${targetX} 14L${targetX - 8} 20`" />
         <polygon v-if="usesClosedTarget" :points="`${targetX},14 ${targetX - 8},8 ${targetX - 8},20`" fill="#fff" />
-        <polygon v-if="glyph.kind === 'closed-both'" :points="`${sourceX},14 ${sourceX + 8},8 ${sourceX + 8},20`" fill="#fff" />
         <circle v-if="usesFilledCircle" cx="48" cy="14" r="4" fill="currentColor" />
         <circle v-if="glyph.kind === 'open-circle'" cx="48" cy="14" r="4" fill="#fff" />
       </template>
@@ -62,6 +69,6 @@ const glyph = computed(() => resolveRelationToolGlyph(props.symbolId));
 const sourceX = computed(() => glyph.value?.stateSource ? 10 : 6);
 const targetX = computed(() => glyph.value?.stateTarget ? 46 : 50);
 const binaryLine = computed(() => `M${glyph.value?.stateSource ? sourceX.value : 4} 14H${targetX.value}`);
-const usesClosedTarget = computed(() => glyph.value?.kind === "closed-target" || glyph.value?.kind === "closed-both" || glyph.value?.kind === "control-closed");
+const usesClosedTarget = computed(() => glyph.value?.kind === "closed-target" || glyph.value?.kind === "control-closed");
 const usesFilledCircle = computed(() => glyph.value?.kind === "filled-circle" || glyph.value?.kind === "control-filled-circle");
 </script>

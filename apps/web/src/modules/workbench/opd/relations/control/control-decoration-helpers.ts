@@ -15,7 +15,8 @@ export function createControlDecorator(controlCapabilityId: string, definitionId
       const cells = base.cells.map((cell) => {
         if (cell.kind !== "edge" || cell.role !== "PROCESS_INPUT") return cell;
         decorated = true;
-        return { ...cell, labels: [...cell.labels, { position: 0.88, text: annotation, fontSize: 13, fontWeight: 700 }] };
+        // 从目标端回退固定距离，为端点标记和字母背景留白，避免短线上的文字遮住标记。
+        return { ...cell, labels: [...cell.labels, { position: -24, text: annotation, fontSize: 13, fontWeight: 700 }] };
       });
       if (!decorated) throw new OpdRelationRenderError("OPD_CONTROL_DECORATION_INVALID", `Control ${controlCapabilityId} 没有 PROCESS_INPUT segment`);
       return { ...base, cells };
