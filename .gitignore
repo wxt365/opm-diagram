@@ -167,5 +167,5 @@ vite.config.ts.timestamp-*
 .harness
 reference
 
-# 保证前端依赖锁文件不受用户级忽略规则影响
-!package-lock.json
+# 用户指定：根 npm 锁文件仅在本地生成
+/package-lock.json
