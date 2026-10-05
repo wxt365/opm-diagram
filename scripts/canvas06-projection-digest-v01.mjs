@@ -285,7 +285,8 @@ function unicode(value, pointer, violations) {
   }
 }
 
-function binary64Hex(value) {
+export function binary64Hex(value) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) throw new TypeError('binary64 编码只接受有限数字。');
   const bytes = new Uint8Array(8);
   new DataView(bytes.buffer).setFloat64(0, value, false);
   const hex = [...bytes].map(byte => byte.toString(16).padStart(2, '0')).join('');

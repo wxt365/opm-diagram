@@ -2,7 +2,7 @@
 
 文档版本：`v1.0`
 
-文档状态：`FROZEN_INCLUDED`；逻辑数据、Revision 0.2 目标和事务契约冻结，SQLite V1 保持不变
+文档状态：`FROZEN_INCLUDED`；既有 Revision 0.2 与 SQLite V1/V2 原文保持不变；新增混合保存模式的逻辑契约见下述修正，迁移尚未实现
 
 全局设计状态、延期边界和开发准入以 `opm-design-freeze-baseline.md` 为唯一事实源。
 
@@ -13,6 +13,8 @@
 - `feature`
 
 ## 1. 文档范围
+
+2026-09-11 保存策略修正：[混合保存与草稿恢复设计](opm-hybrid-save-and-draft-recovery-design.md) 对 `JOURNALED_DRAFT_V2` 取代本文第 3、4、5、6、7、10 节中“编辑必增 Revision、Checkpoint 只指向 Revision、历史保留待定”的相关要求。新模式编辑写耐久增量与 token，检查点保留两个及恢复/Undo 必需增量，手动保存与固定引用才物化历史；旧模式和已有不可变 Revision 仍按本文原契约。新增迁移不移除旧触发器，不将增量冒充完整 document_json；具体机器 DDL 与恢复测试由 HS-01/04 实施，尚未交付。
 
 本文档冻结 OPM 单机建模工具的逻辑持久化对象、唯一所有者、稳定身份、可变性、修订提交包、原子事务、并发幂等、索引缓存、迁移和故障恢复边界。
 

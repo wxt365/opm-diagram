@@ -1,5 +1,5 @@
 // Generated from docs/contracts/openapi/opm-local-api-v1.yaml. DO NOT EDIT.
-// Contract digest: 8418a08e4d557870b685d7a669e68b6452a9af3a0b63299c335c051e5d69c2ef
+// Contract digest: 887d4e09a62d47e06ec8584bce01635c35c78f9a007c1f528e828cd6325fef4c
 
 export type ApiEdtCommandType =
   | "CREATE_ELEMENT"
@@ -53,12 +53,40 @@ export interface ApiEdtNormalizedEndpoint {
   state_qualification?: string;
 }
 
-export interface ApiEdtImpactSummary {
-  affected_construct_count: number;
-  affected_context_count: number;
-  affected_sentence_count: number;
-  affected_finding_count: number;
+export type ApiEdtRelationInteractionMode = "CREATE_FACT" | "UPDATE_SELECTED_FACT";
+
+export interface ApiEdtRelationEndpointRoleSummary {
+  role: string;
+  target_kinds: Array<"ELEMENT" | "STATE" | "FEATURE" | "FACT">;
+  min_occurs: number;
+  max_occurs?: number;
+  state_qualification_allowed: boolean;
 }
+
+export interface ApiEdtRelationEndpointSummary {
+  min_endpoints: number;
+  max_endpoints?: number;
+  roles: ApiEdtRelationEndpointRoleSummary[];
+}
+
+export interface ApiEdtRelationCatalogItem {
+  family: "PROCEDURAL" | "CONTROL" | "STRUCTURAL";
+  capability_id: string;
+  display_name: string;
+  symbol_id: string;
+  interaction_mode: ApiEdtRelationInteractionMode;
+  symbol_descriptor: ApiEdtAssetReference;
+  endpoint_summary: ApiEdtRelationEndpointSummary;
+  enabled: boolean;
+  reason_codes: string[];
+}
+
+export type ApiEdtDeleteMode = "REMOVE_OCCURRENCE" | "DELETE_TARGET" | "CASCADE";
+export type ApiEdtDeleteTargetKind = "OCCURRENCE" | "ELEMENT" | "FEATURE" | "STATE" | "FACT";
+export interface ApiEdtDeleteTarget { kind: ApiEdtDeleteTargetKind; id: string; }
+export interface ApiEdtDeleteImpactItem { kind: string; id: string; context_id?: string; effect: "DIRECT" | "CASCADE" | "BLOCKER"; }
+export interface ApiEdtDeleteImpactCounts { contexts: number; occurrences: number; elements: number; features: number; states: number; facts: number; opl_sentences: number; traces: number; findings: number; }
+export interface ApiEdtImpactSummary { input_revision: string; selected_occurrence_id: string; delete_mode: ApiEdtDeleteMode; target: ApiEdtDeleteTarget; items: ApiEdtDeleteImpactItem[]; counts: ApiEdtDeleteImpactCounts; }
 
 export interface ApiEdtCommandCapabilityOption {
   capability_query_id: string;
@@ -79,6 +107,8 @@ export interface ApiEdtCommandCapabilityOption {
   expires_with_revision: string;
   impact_summary?: ApiEdtImpactSummary;
   impact_token?: string;
+  delete_mode?: ApiEdtDeleteMode;
+  delete_target?: ApiEdtDeleteTarget;
 }
 
 export interface ApiEdtCommandCapabilitiesData {
@@ -119,6 +149,19 @@ export interface ApiEdtStatePresentationPayload {
   layout?: { x: number; y: number; width?: number; height?: number };
 }
 
+export interface ApiEdtUpdatePropertyPayload {
+  target_ref: { target_kind: "ELEMENT"; target_id: string };
+  property_name: "name";
+  value: string;
+  capability_query_id: string;
+  selected_option_id: string;
+}
+
+export interface ApiEdtUpdateLayoutPayload {
+  occurrence_id: string;
+  layout: { x: number; y: number };
+}
+
 export interface ApiEdtCreateFactPayload {
   context_id: string;
   capability_ref: { capability_id: string; version?: string };
@@ -145,8 +188,10 @@ export interface ApiEdtUpdateFactPayload {
 }
 
 export interface ApiEdtDeleteConstructPayload {
-  construct_kind: ApiEdtTargetKind;
+  selection_id: string;
+  construct_kind: ApiEdtDeleteTargetKind;
   construct_id: string;
+  delete_mode: ApiEdtDeleteMode;
   impact_token: string;
 }
 
@@ -156,5 +201,7 @@ export type ApiEdtCommandPayload =
   | { command_type: "CREATE_STATE"; payload: ApiEdtCreateStatePayload }
   | { command_type: "UPDATE_STATE"; payload: ApiEdtUpdateStatePayload }
   | { command_type: "UPDATE_FACT"; payload: ApiEdtUpdateFactPayload }
+  | { command_type: "UPDATE_PROPERTY"; payload: ApiEdtUpdatePropertyPayload }
+  | { command_type: "UPDATE_LAYOUT"; payload: ApiEdtUpdateLayoutPayload }
   | { command_type: "DELETE_CONSTRUCT"; payload: ApiEdtDeleteConstructPayload }
   | { command_type: "STATE_EXPLICIT" | "STATE_SUPPRESS" | "UNFOLD" | "FOLD"; payload: ApiEdtStatePresentationPayload };

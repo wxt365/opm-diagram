@@ -22,6 +22,10 @@ final class LocalWriteRequestGuard implements HandlerInterceptor {
         if (!HttpMethod.POST.matches(request.getMethod())) {
             return true;
         }
+        return validate(request);
+    }
+
+    boolean validate(HttpServletRequest request) {
         String host = request.getServerName();
         String origin = request.getHeader("Origin");
         if (!ALLOWED_HOSTS.contains(host) || !sameLoopbackOrigin(origin, host) || !sessionToken.matches(request.getHeader("X-OPM-Session"))) {

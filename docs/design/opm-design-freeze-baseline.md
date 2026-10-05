@@ -1,16 +1,22 @@
 # OPM 单机建模工具全量设计冻结基线
 
-文档版本：`1.76`
+2026-09-15 局部修正冻结：[P03 状态布局、Operation 与展示—特征符号](../../specs/opm-p03-owned-state-layout-and-exhibition-bugfix-task-spec.md)。替代 Attribute 布局规格的旧移动白名单；不变更发布、Capability enablement 或 ISO 符合性证据状态。执行证据见[checklist](../checklists/opm-p03-owned-state-layout-and-exhibition-bugfix-checklist.md)。
+
+文档版本：`1.93`
 
 初始冻结日期：`2026-07-30`
 
-最近复核日期：`2026-09-01`
+最近复核日期：`2026-09-11`
 
 设计冻结状态：`FROZEN`
 
 开发准入状态：`READY_FOR_DEVELOPMENT`
 
 ## 1. 文档定位
+
+2026-09-11：新增 [混合保存与草稿恢复策略](opm-hybrid-save-and-draft-recovery-design.md)，冻结用户交互、逻辑身份、调度/事务、保留与兼容边界。该模式为 M09/M12 的后继 L3 变更：策略 FROZEN，机器 Schema/DDL、实现与迁移证据尚未交付；只能依 [HS-01~04 实施任务](../../specs/opm-hybrid-save-strategy-implementation-task-spec.md) 逐片进入开发，不得依据本文件的既有全局 READY 声明直接启用新保存模式。既有 32 项责任计数不据此重算，新增变更单独追踪于 [设计 Checklist](../checklists/opm-hybrid-save-strategy-design-checklist.md)。
+
+2026-09-11：冻结 [P03 生成/消耗组合工具](../../specs/opm-p03-combined-transformation-tool-task-spec.md)。仅合并基础 001/002 的 UI 入口，按 Runtime 规范端点与手势方向选择，保留独立 Capability、Fact、Symbol、OPL/Trace；Catalog 16/8/10 不变，UI 常驻 4/4/5、展开 15/8/10。该冻结不改变发布或 ISO 证据结论，实施验证见 [Checklist](../checklists/opm-p03-combined-transformation-tool-checklist.md)。
 
 本文档是 OPM 单机建模工具设计状态和开发准入的唯一事实源。需求、架构、页面、交互、语义、API、数据、测试、发布、任务规格和 checklist 继续承载各自的详细设计；它们不得单独改变全局设计冻结状态。
 
@@ -99,18 +105,18 @@ Launcher 仍只启动 loopback 服务并打开系统默认浏览器。前端在�
 | --- | --- | --- | --- | --- | --- |
 | `DFR-001` | 单机、本地、单用户、loopback 产品边界 | 需求 `v1.0` 第 8、13 章；ARC-007 | Product + M01 | FR-LOCAL、NFR-SEC-001~006 | 新 task spec + 本基线升版 |
 | `DFR-002` | 当前开发范围和 P01-P03/完整画布交付顺序 | 开发执行包 `v1.47` | Architecture | DEV-00~09、DEV-CANVAS-00~06 单包 DoD | 禁止跨包静默扩围 |
-| `DFR-003` | P01-P06 页面、IA、状态、字段和组件职责 | 页面四文档 + handoff | Frontend Architecture | 原型报告、P01-P06 状态与字段映射 | 页面变更同时更新四文档与 handoff |
-| `DFR-004` | State、图标工具链、关系目录和 16/8/10 完整画布 UX | 完整画布设计 `v1.0` | M01/M05/M06 | `ACC-CANVAS-*`、DEV-CANVAS-01~04 | Capability/事件/字段变更必须升版 |
+| `DFR-003` | P01-P06 页面、IA、状态、字段、组件职责、HEAD/EXACT URL 定位和 OPD 节点渲染注册架构 | 页面设计 `v1.0` + 状态/字段 `v1.1` + 组件交互 `v1.13` + OPD 节点渲染架构 `v1.6` + handoff `v1.13` | Frontend Architecture | 原型报告、P01-P06 状态与字段映射、canonical HEAD URL、只读 EXACT 深链、实际 Revision Header、Node/Capability Definition、committed/preview RenderSpec、Control Decorator、Registry、X6 adapter/gesture/context-menu intent contract | 页面、URL 或节点/关系渲染架构变更同时更新责任文档与 handoff |
+| `DFR-004` | State、图标工具链、关系目录和 16/8/10 完整画布 UX | 完整画布设计 `v1.10` | M01/M05/M06 | `ACC-CANVAS-*`、主工具栏单排纯图标分组、`5/4/5`高频直达、完整纯图标`16/8/10`目录、双语tooltip、34项标准缩略符号、七阶段 gesture、26基础preview、右键/键盘统一构造生命周期、DEV-CANVAS-01~04 | Capability/事件/字段变更必须升版 |
 | `DFR-005` | 浏览器、视口、缩放和可访问性矩阵 | 本文第 3 章 | Frontend + QA | NFR-UX-001~006、visual/cross-browser E2E | 浏览器或阈值变化必须升版本基线 |
 | `DFR-006` | Thing/State/Fact/Modifier/Context/Occurrence/Revision 核心语义 | 公共语义内核 + 核心元模型字段 | M04/M05/M09 | MS-INV、CORE、roundtrip 正反例 | 语义身份或不变量不得由 UI/API 单边修改 |
 | `DFR-007` | 两配置档 96 Capability 宇宙、Profile binding 和隔离 | 能力矩阵 + Profile 字段 Schema | M10 | 96 项唯一登记、未知能力封闭 | 来源或能力变化生成新 Profile version |
 | `DFR-008` | ISO Clause 1~14、Annex A/B-D 边界和 103 规则组追踪 | ISO 矩阵 `v1.0` | Standards + M07 | 103 个 ISOR 唯一、证据缺失返回无法判断 | 标准解释变化需证据定位和矩阵升版 |
-| `DFR-009` | 16 Procedural、8 Control、10 Structural 的语义、候选和提交 | 能力矩阵 + 完整画布设计 | M04/M06 | 34 Capability 正反例、端点与候选过滤 | 禁止前端硬编码替代 Profile/Rule |
+| `DFR-009` | 16 Procedural、8 Control、10 Structural 的语义、候选、提交和前端独立 Definition/Decorator | 能力矩阵 + 完整画布设计 + OPD 节点渲染架构 + P03关系手势/分组工具栏规格 | M04/M05/M06 | 34 Capability 正反例、exact Symbol glyph、端点与候选过滤、26基础preview/confirm、8 Control selected Fact路径、34项Registry隔离 | 禁止前端硬编码替代 Profile/Rule、未知Symbol fallback、option直接提交或按family聚合production renderer |
 | `DFR-010` | Control 的 Fact/Modifier 唯一表示 | API/持久化/物理设计 | M04/M06/M12 | `control.capability` + `control.segment=PROCESS_INPUT` 成对、各唯一 | 不新增第二 Fact/edge/SQLite 表 |
 | `DFR-011` | Structural 双向/互惠、fan/list/completeness 和稳定 Fact 身份 | 符号文本契约第 7 章 | M04/M05/M08 | Structural 合法变体、fan 身份和完整性正反例 | 句式、fan 或方向变化需 Grammar/Rule 同版变更 |
 | `DFR-012` | concrete OPL、precedence、SentencePlan、UTF-8 Token/Trace 和 golden | 符号文本契约 + DEV-CANVAS-05 | M08 | GATE-05-01~06、replay/digest/零部分提交 | 模板、顺序或 range 变化生成新资产版本 |
-| `DFR-013` | 应用命令/查询、Revision guard、幂等、错误和事务 | 应用 API 契约 `v1.0` | M02/M03/M06/M09/M12 | API operation、error、atomic commit 映射 | 应用语义先变更，再映射传输 DTO |
-| `DFR-014` | 完整画布 OpenAPI 目标契约 | `opm-local-api-v1.yaml` 目标 `0.2.0` + API 第 7.2 节 | M06 + API owner | option/base Fact/allowed modifier、State/Fact union、正反 contract test | DEV-CANVAS-00 只能实现冻结目标，不得改语义 |
+| `DFR-013` | 应用命令/查询、Revision guard、幂等、错误和事务 | 应用 API 契约 `v1.3` | M02/M03/M06/M09/M12 | API operation、Catalog/option、impact/token、error、atomic commit 映射 | 应用语义先变更，再映射传输 DTO |
+| `DFR-014` | 完整画布 OpenAPI 目标契约 | `opm-local-api-v1.yaml` 后继目标 + API 第 7.2 节 | M06 + API owner | selection-aware Catalog interaction/symbol/endpoint summary、option/base Fact/allowed modifier、State/Fact union、完整 delete impact/token/mode payload、正反 contract test | DEV-CANVAS-00及P03实现只能实现冻结目标，不得改语义 |
 | `DFR-015` | Revision 0.2 目标机器表示和 0.1 兼容读取 | 核心字段 + 持久化 +物理设计 | M09/M12 | Fact `modifiers[]`、旧 reader、roundtrip、immutable | 发布独立 `/0.2` Schema；不得改写 0.1 历史 Revision |
 | `DFR-016` | SQLite V1、不可变 Revision、Draft Head、原子提交和恢复 | 持久化 +物理设计 + V1 DDL | M09/M12 | migration、FK、immutable trigger、故障注入 | 当前语义扩展不修改 SQLite V1 |
 | `DFR-017` | `.opmp` 1.0 原生交换、版本兼容和资产 exact binding | 原生交换契约 | M02/M10/M12 | ZIP/Canonical JSON/SHA-256、1.0 reader/writer、staging、digest、未知版本阻断、回滚 | 不得宣称为 ISO 或第三方标准交换格式 |
@@ -355,14 +361,46 @@ development_gate=READY_FOR_DEVELOPMENT
 
 2026-09-01 复核记录七十三：`DFR-017` 的物理格式虽已冻结，但仍缺 Manifest machine Schema、摘要预像、Decimal canonical JSON 与 ZIP 安全限额，不能安全实现。新增 EXCHANGE-01 机器契约、L3 实现规格和检查清单后，实现 `.opmp` ZIP Writer/Reader、JCS Manifest digest、Decimal entry canonicalizer、路径/重复/symlink/压缩限制、required extension/版本/依赖拒绝及 `MODEL_REVISION` 只读内存适配。定向 Java `7/7`、Schema `2/2`、全局 contract validate 与 diff check 均通过；`PROJECT_FULL`/`BASELINE_ASSET` 仍仅 inspection，SQLite 写入、导入提交、静态 golden 文件、生产发布和 ISO 证据均未实现或运行。设计责任仍为`32=22+10`，`blocked/unresolved/cross_document_conflict=0`。
 
+2026-09-02 复核记录七十四：沿当前集中式 `OpdCanvas.vue` 的节点 kind 分支、全量 Cell 重建和名称编辑路径复核后，确认既有设计只冻结了逻辑组件树、Symbol Descriptor 和 X6 非事实源边界，未冻结节点类型的独立代码责任、注册完整性、共享 adapter、编辑器隔离及修改影响范围。本次新增 OPD 节点定义与渲染注册架构 `v1.0`，明确 Node 仅是表现层图元且不改变领域 Element/State/Feature 分类，并将 DFR-003 细化为五种节点各一 Definition、三族关系定义、类型安全 Registry、纯 RenderSpec、共享 X6 adapter 和独立 Editor；正常更新目标改为 occurrence-keyed 增量调和，禁止 Vue 类继承、每实例文件、目录扫描、未知 kind 通用矩形 fallback 和 Profile 代码执行。技术基线、页面组件、完整画布 `v1.1`、符号契约 `v1.1`、前端 handoff `v1.1`及索引已同步。责任仍为`32=22+10`，`blocked/unresolved/cross_document_conflict=0`和`READY_FOR_DEVELOPMENT`；本轮没有修改或验证 Vue/TypeScript 实现，集中式 renderer 迁移、前端回归、visual/E2E、性能、Candidate、Activation、生产发布和 ISO 证据均未形成。
+
+2026-09-02 复核记录七十五：继续复核关系组件的代码责任后，确认记录七十四初始采用的三个 family production renderer 会把 16 Procedural、8 Control、10 Structural 的不同端点、分段、fan、marker、label 和注记重新集中到大型条件分支，不能满足 Capability 级修改隔离。本次将 OPD 节点定义与渲染注册架构升为`v1.1`，以后继修正规格唯一冻结`16 Procedural Definition + 8 Control Decorator + 10 Structural Definition`及34项ID/文件一一映射；基础 Registry按Fact `capability_id`查找26项，Control Registry按`control.capability`查找8项，family只用于目录、共享helper和测试分组。Control Decorator必须保持基础`relationId/occurrenceId/family/symbolId/primaryCellId/capture anchor`，不得创建第二Fact、Occurrence或Relation Group；旧三个family renderer仅保留为被取代的历史决定，禁止双实现和fallback。技术基线、组件交互、完整画布、符号契约、前端handoff、索引及历史规格/checklist已同步。责任仍为`32=22+10`，`blocked/unresolved/cross_document_conflict=0`和`READY_FOR_DEVELOPMENT`；本轮仅冻结设计，未重构`OpdCanvas.vue`，也未形成前端代码回归、visual/E2E、性能、Candidate、Activation、生产发布或ISO符合性证据。
+
+2026-09-03 复核记录七十六：确认既有`UPDATE_LAYOUT`仅授权根Context内owned Object/Process occurrence，Attribute虽有独立Layout和X6节点但被Runtime与前端白名单拒绝。本次新增P03 Attribute布局编辑L3规格/checklist，将应用API、完整画布、前端handoff和OPD渲染架构分别升为`v1.1/v1.3/v1.3/v1.2`，唯一扩展目标为`FEATURE + ATTRIBUTE_NODE + feature_kind=ATTRIBUTE`。wire继续只含`occurrence_id + layout{x,y}`，OpenAPI以机器扩展固定`OBJECT_NODE/PROCESS_NODE/ATTRIBUTE_NODE`；Runtime必须复核根Context、OWNED、occurrence role/target kind和目标Element/Feature，前端白名单不得替代授权。Operation、State、Fact、Referenced和跨Context继续拒绝；提交只改变Layout坐标并保持Feature owner、语义、OPL/Trace。责任仍为`32=22+10`，冻结后`blocked/unresolved/cross_document_conflict=0`和`READY_FOR_DEVELOPMENT`；代码、E2E和构建证据须以本规格checklist实际执行结果为准，不提升DEV-CANVAS-06、Candidate、Activation、production或ISO状态。
+
+2026-09-03 复核记录七十七：沿当前P03关系入口、目录、Store候选和X6 preview复核后，确认两个“过程/结构关系”按钮都调用无族意图的`armRelationCreation()`，Runtime目录项不能进入创建，且除Consumption和Structural外的Procedural option会直接提交；通用虚线preview也没有按Capability复用标准Symbol。新增P03关系手势与统一候选L3设计修正规格/checklist及独立实现规格/checklist，将组件交互、完整画布、OPD渲染架构、符号文本、应用API和前端handoff分别升为`v1.3/v1.4/v1.3/v1.3/v1.2/v1.4`。唯一活动设计固定单一关系入口、selection-aware 16/8/10 Catalog、`idle -> relation-armed -> dragging -> endpoint-selected -> candidate-filtering -> candidate-preview -> confirmed|cancelled`、四类X6意图、26个基础Capability统一preview/confirm和8个Control selected Fact `UPDATE_FACT`路径；preview无Fact/Occurrence/capture anchor和正式OPL/Trace。责任仍为`32=22+10`，`blocked/unresolved/cross_document_conflict=0`并恢复`READY_FOR_DEVELOPMENT`；当前产品代码仍为`NONCONFORMANT_IMPLEMENTATION`，须按后继实现规格验收后才能声称该交互已实现，不提升DEV-CANVAS-06、Candidate、Activation、production或ISO状态。
+
+2026-09-03 复核记录七十八：P03关系手势实现验证发现三端点Procedural在首次拖线取得两个端点后尚未达到Catalog `min_endpoints`，原七阶段状态机缺少继续选择转换。以最小L3修正冻结`endpoint-selected -> relation-armed`分支：仅在已选端点数小于Runtime Catalog `min_endpoints`时使用，只决定候选查询时机，不在前端判定端点合法性；达到最小数后仍必须进入`candidate-filtering`并接受Runtime normalization。责任计数、开发准入和发布/ISO边界不变。
+
+2026-09-03 复核记录七十九：P03关系手势后继实现已按独立L3规格完成本地功能范围验证。OpenAPI/生成DTO/Runtime闭合selection-aware `16 Procedural + 8 Control + 10 Structural`目录；Vue/X6实现单一关系入口、七阶段状态机、四类意图、26基础Capability统一preview/confirm及8 Control selected Fact同Fact更新。契约、Java定向`27/27`、Vue`76/76`、lint/typecheck/build、Workbench Playwright `12/12`和diff检查通过；`local-runtime`全量`345`项仍有既有Fault Plan/JAR Schema与数据库version/recovery marker相关`4`项失败、`1`项错误，详见实现checklist。结论仅为`IMPLEMENTED/VERIFIED_LOCAL_FEATURE_SCOPE`，不构成DEV-CANVAS-06、Candidate、Activation、production或ISO证据。
+
+2026-09-03 复核记录八十：P03画布删除此前只有 `DELETE_CONSTRUCT` 名称、计数型 impact/token 和局部 State 表述，未区分 occurrence 与语义目标，亦未冻结依赖闭包、前端确认、Control 移除或后继 OpenAPI 原子同步边界。新增统一构造生命周期 L3 设计规格/checklist：Object/Process、Attribute/Operation、State、基础 Fact 的创建/删除矩阵，`REMOVE_OCCURRENCE/DELETE_TARGET/CASCADE` 三模式，完整且规范排序 impact 项、opaque token binding、零部分删除、Fact 删除与 Control `UPDATE_FACT` 移除，以及检查器/快捷键/X6 intent 边界均已冻结。应用 API、完整画布、组件交互、渲染架构、handoff 和索引同步至`v1.3/v1.5/v1.4/v1.4/v1.5`；现有 OpenAPI 0.2、生成 DTO、Runtime、Vue 与 E2E 不在本设计包内，后继 L3 原子实现规格才可修改。责任仍为`32=22+10`，`blocked/unresolved/cross_document_conflict=0`、`READY_FOR_DEVELOPMENT`；本轮不构成任何 Runtime、浏览器、DEV-CANVAS-06、Candidate、Activation、production 或 ISO 证据。
+
+2026-09-03 复核记录八十一：统一构造生命周期原先要求检查器危险态删除图标，操作密度与画布选择流不匹配，且未冻结右键入口，可能诱发前端直接删 Cell 或旁路 impact/token。冻结修正为不提供独立删除图标：画布右键和 `Delete/Backspace` 统一打开 Runtime 驱动的构造操作菜单，选择 mode 后才打开 impact 确认；右键未选中构造先同步 selection，空白/未知/装饰 Cell 不劫持浏览器原生菜单，Control annotation 只提供基础 Fact 的“移除 Control”确认。完整画布、组件交互、渲染架构、handoff 与索引同步至`v1.6/v1.5/v1.5/v1.6`；OpenAPI、Runtime、Vue、X6和E2E仍为`DESIGN_FROZEN/NOT_IMPLEMENTED`。责任仍为`32=22+10`，`blocked/unresolved/cross_document_conflict=0`、`READY_FOR_DEVELOPMENT`；本轮不构成 Runtime、浏览器、发布或 ISO 证据。
+
+2026-09-04 复核记录八十二：P03统一构造生命周期后继 L3 实现已完成本地功能范围验证。OpenAPI/生成 DTO 闭合 `REMOVE_OCCURRENCE`、`DELETE_TARGET`、`CASCADE` 与 exact impact payload；Runtime 按 committed occurrence 计算规范 impact/token，覆盖 Element、Feature、State、Fact、依赖阻断、级联、token stale 与 Control Modifier 移除；Vue/X6 仅经右键或 `Delete/Backspace` 打开 Runtime action menu 和 impact 确认。契约校验、Java Service/MVC `30/30`、Vue `77/77`、lint、typecheck、build、P03 Workbench Playwright `13/13` 与 diff 检查通过；独立 bootstrap 用例亦通过。全量 Playwright 的 DEV-CANVAS-06 三个受控发布 spec 因缺少 Runner 注入而按其自身契约拒绝，未计入本轮。结论仅为`IMPLEMENTED/VERIFIED_LOCAL_FEATURE_SCOPE`，不构成DEV-CANVAS-06、Candidate、Activation、production或ISO证据。
+
+2026-09-05 复核记录八十三：用户将 P03 删除交互由“菜单后确认”修正为直接执行，并要求同端点多关系不可重合。新增直接删除与平行关系分轨 L3 规格/checklist；统一生命周期设计和实现规格同步为右键菜单项一次点击提交、`Delete/Backspace` 查询后按 `DELETE_TARGET -> CASCADE -> REMOVE_OCCURRENCE` 直接提交且不显示菜单，Runtime option/impact token/事务与 X6 非事实源边界保持不变。关系几何新增 Definition 后纯布局步骤：仅对无既有 route 的普通二元关系按无向端点对和稳定 identity 排序，以 `24px` lane 间距生成对称 midpoint；fan、Effect、自调用和复杂 route 不覆盖。组件交互、完整画布、渲染架构与前端 handoff 分别升为`v1.6/v1.7/v1.6/v1.7`。设计冲突为零并允许 Build；实现与验证状态以本轮 checklist 的实际结果为准，不提升 DEV-CANVAS-06、Candidate、Activation、production 或 ISO 状态。
+
+2026-09-05 复核记录八十四：P03 关系能力原先仍隐藏在单一“关系”入口和目录中，查找成本高；当前实现也没有 Fact route/vertices 的 `UPDATE_LAYOUT` 持久化契约，不能把自动分轨误称为可手动调线。本次新增分组关系工具栏与标准符号 L3 规格/checklist，将旧单一入口取代为三组常驻 `16 Procedural / 8 Control / 10 Structural` 工具带；Catalog 仍由 Runtime 原序和 selection-aware 结果驱动，26 个基础关系直接进入既有拖线候选，8 个 Control 只对已选 committed Procedural Fact 启用。34 个工具项按 exact `symbol_descriptor.id` 映射 ISO 基线所需 marker/shaft/state/control/fan 缩略 glyph，未知 ID 禁用且无通用箭头 fallback。较矮视口的 X6 内容最小高度固定为 `360px` 并由画布容器滚动，避免节点落入 OPL 面板后方。普通二元关系只提供稳定自动分轨；手动 vertex 编辑继续禁止，直到独立 L3 route layout 契约实现。完整画布、组件交互、符号契约和前端 handoff 分别升为`v1.8/v1.7/v1.4/v1.8`；本地实现和验证只按对应 checklist 记载，不提升 DEV-CANVAS-06、Candidate、Activation、production 或 ISO 状态。
+
+2026-09-05 复核记录八十五：三行全量常驻关系工具带仍占用过多画布高度且不符合高频工具操作习惯。本次将唯一活动交互修正为开发工具式单行工具栏：`Procedural / Control / Structural` 以两条竖线分隔，按稳定 Capability ID 常驻 `5/4/5` 个高频标准图标，每族组尾箭头按 Runtime 原序展开完整 `16/8/10` 目录；一次只开一组，外部点击、Escape 或选择项关闭，禁用组仍可展开查看原因。窄屏由单行内部横向滚动承载，目录浮层不参与画布高度，Runtime候选、selection-aware Control、34项exact Symbol、零提交边界和手动vertex延期均不变。完整画布、组件交互、符号契约和前端handoff分别升为`v1.9/v1.8/v1.5/v1.9`；Vue `85/85`、P03 Playwright `14/14`、lint、typecheck、build、桌面浏览器视觉与窄屏布局断言均通过。本结论仅为本地功能范围验证，不提升DEV-CANVAS-06、Candidate、Activation、production或ISO状态。
+
+2026-09-05 复核记录八十六：独立第二排关系工具仍浪费主工具栏右侧空间，展开目录中的关系名称和数量也不符合高密度开发工具交互。本次将唯一活动布局冻结并实现为一排：`选择/平移 | 五类构造 | Procedural | Control | Structural | 缩放/适配`，整条工具栏在窄视口横向滚动。常驻与完整目录的关系项全部为纯标准图标，34项以稳定Capability ID显式映射中文名，并以“中文 / Runtime display_name”的`title/aria-label`提供双语提示；目录改为视口固定浮层，随主工具栏滚动重锚且不得被overflow裁剪。完整画布、组件交互、符号契约和前端handoff分别升为`v1.10/v1.9/v1.6/v1.10`；Runtime候选、Control selection-aware、Revision、标准符号与手动vertex延期边界不变。Node 22 根级测试`85/85`、P03 Playwright`14/14`、lint、typecheck、contract validate、build、桌面Chrome与390x844 Chromium视觉检查及diff检查均通过；本结论仅为本地功能范围验证，不提升DEV-CANVAS-06、Candidate、Activation、production或ISO状态。
+
+2026-09-05 复核记录八十七：浏览器复核发现关系常驻按钮为`42px`、下拉符号为`52px`，明显宽于普通`32px`工具；tooltip同时使用Runtime缩写并暴露endpoint role、target kind和reason code，出现“施事 / Agent；AGENT_OBJECT”等非标准用户文案。本次冻结并实现34项Capability级中英文显示表，英文逐字节采用活动Profile名称，中文将Agent/Instrument等统一为“主体关系/手段关系”；tooltip只显示标准双语名称，禁用时第二行追加可读原因，禁止暴露机器字段。关系常驻按钮/符号固定为`34 x 32px / 32 x 18px`，下拉符号为`42 x 20px`，四列浮层最大`256px`。完整画布、组件交互、符号契约和前端handoff分别升为`v1.11/v1.10/v1.7/v1.11`。Node 22下34项组件回归、Vue`85/85`、P03 Playwright`14/14`、lint、typecheck、contract validate、build、桌面Chrome无障碍树与390x844 Chromium视觉/尺寸检查均通过；本结论仅为本地功能范围验证，不提升DEV-CANVAS-06、Candidate、Activation、production或ISO状态。
+
+2026-09-07 复核记录八十八：P03 属性检查器原先即使关闭内容仍固定占用桌面右侧 `270px`，且属性访问只存在于该空栏内部。本次新增按需属性检查器 L2 规格/checklist：仅选择不打开 Dock，右键菜单首项与主工具栏图标显式打开，关闭保留 selection；State editing、关系/Control 候选及结构关系编辑可独立强制显示右侧任务区。关闭时 Grid 移除第三列，X6 使用容器 auto resize，打开/关闭均不产生 Revision；Delete/Backspace 直接删除和 Runtime impact/token 边界不变。组件交互和前端 handoff 分别升为`v1.11/v1.12`。Node 22 下 Vue `86/86`、P03 Playwright `14/14`、lint、typecheck、build、diff 检查和当前 `5173` Chrome 视觉复核通过；本结论仅为本地功能范围验证，不提升 DEV-CANVAS-06、Candidate、Activation、production 或 ISO 状态。
+
+2026-09-11 复核记录八十九：P03 既有 URL 设计把活动 Draft 的实际 committed Revision 持续写入 query，混淆“跟随活动 Head”与“固定历史 Revision”，并使语义/布局提交改变地址。本次新增活动 HEAD 稳定 URL 与精确 Revision 深链 L3 设计规格/checklist，唯一冻结 HEAD canonical query 为 `?context=<context_id>`；`revision=head` 仅兼容输入并以 replace 规范化。Header 始终显示实际 committed Revision，提交只更新 Header、编辑基线和 Projection；历史 Revision、Named Snapshot、Baseline 和显式永久链接才使用只读 `?revision=<revision_id>&context=<context_id>`。精确 Revision 非法或跨 Model 时 fail-closed，Context 在目标 Revision 内规范化；viewport、选择、候选、工具和面板状态禁止进入 URL/history state。布局是否产生 Revision 保持独立。状态/字段、组件交互、模块设计和前端 handoff 分别升为 `v1.1/v1.1/v1.13/v1.1/v1.13`；旧 P0/P04 URL 条款标记为历史且被取代。责任仍为 `32=22+10`，`blocked/unresolved/cross_document_conflict=0`、`READY_FOR_DEVELOPMENT`；当前代码仍会写回精确 Revision，故本轮仅为 `DESIGN_FROZEN/IMPLEMENTATION_NOT_STARTED`，不构成前端、浏览器、DEV-CANVAS-06、Candidate、Activation、production 或 ISO 证据。
+
 ## 9. 实现与证据状态
 
 设计状态与实现状态必须分栏。当前设计冻结结论不修改以下事实：
 
 | 证据面 | 本任务结论 |
 | --- | --- |
-| Java/Vue/SQLite 代码 | 未在本任务实现或复核 |
-| OpenAPI 0.2 generated client/handler | 待 DEV-CANVAS-00 验收 |
+| Java/Vue/SQLite 代码 | P03关系gesture、统一构造生命周期、直接删除、平行关系分轨、主工具栏同排纯图标关系工具及按需属性检查器均为`IMPLEMENTED/VERIFIED_LOCAL_FEATURE_SCOPE`；Runtime impact/token/事务不变，Vue右键属性首项、Dock释放/恢复、右键一次点击和键盘无菜单直接删除、X6容器auto resize和普通二元关系稳定分轨、`5/4/5`高频直达、完整纯图标`16/8/10`下拉目录、34项标准双语tooltip、可读禁用原因及34项标准缩略glyph已通过本地自动化与浏览器视觉验证；关系手动vertex编辑仍未实现；HEAD/EXACT URL 新设计为`IMPLEMENTATION_NOT_STARTED`，当前前端仍会把 committed Revision 写回 URL；本任务不修改 SQLite |
+| OpenAPI 0.2 generated client/handler | selection-aware Catalog、interaction mode、exact symbol和endpoint summary，以及完整 delete impact/mode/token payload均已生成并通过契约、Service与MVC定向验证 |
 | Revision 0.2 reader/writer/roundtrip | 待 DEV-CANVAS-00/03 验收 |
 | DEV-CANVAS-05 golden/Trace 机器证据 | 以对应 checklist 当前执行记录为准，本任务不重跑 |
 | DEV-CANVAS-06 visual/E2E/performance/recovery/release | `9048bb3...`为origin，唯一活动链为`O -> C -> S -> A -> R`；O..A=`25=15 M+10 A`，R=`33=31 M+2 A`，O..R=`52=40 M+12 A`。A=`db854055...`保持Fault lifecycle和Browser proof；R先完成API/Runtime `5 M`与source guard，再实现Context `0.1`、194/388调度、Driver/CaseExecution、RUN_SETUP identity、DIRECT/REQUEST_MUTATION一次性同源client、API Exchange/Artifact Index和production bridge。Source Set目标为`0.2/24`且相对A为`11/13`，Service及Source Set外测试不进入Source Set，Runtime JAR从R重建。Common precondition设计已闭合，代码实现与完整调度仍在进行；C/S/A source已形成并验证，R/最终Manifest/Report与真实controlled/`194/388`均为`NOT_CREATED/NOT_RUN`。 |
@@ -396,3 +434,9 @@ development_gate=READY_FOR_DEVELOPMENT
 ### 11.2 假设/解释
 
 “所有设计冻结”的目标解释为：当前开发基线的必需设计全部`FROZEN_INCLUDED`，未来范围全部以可审计边界`FROZEN_DEFERRED`；不要求在设计任务中提前完成延期能力的详细实现设计或生成运行证据。当前已达到该设计目标；实现和证据仍按各开发包与Gate独立判定。
+2026-09-07 复核记录：用户验证表明统一候选确认门不符合常用画图工具的直接连线操作。新增 `opm-p03-direct-relation-commit-interaction-task-spec.md`，取代“唯一 option 也不得自动提交”的活动交互语义：普通关系最终端点松开后由 Runtime exact option refresh 直接创建；仅必填 duration、标签、多值方向、多个候选或失败恢复保留参数编辑；fan 默认 COMPLETE，并以 Shift 松开继续收集端点。Runtime、OpenAPI、Schema、SQLite、Profile、OPL/Trace 和 Control 路径不变。
+2026-09-07 复核记录：实机复现 Tagged Structural 参数候选会阻断其他关系工具、向顶部插入反馈并强制展开右侧“创建关系”任务区。新增 `opm-p03-inline-relation-parameter-and-tool-switch-bugfix-task-spec.md`，冻结为未提交候选在工具切换时静默取消、零 Revision；必填参数使用画布内联浮层，Enter 提交、Escape/关闭取消且无创建确认按钮。组件交互与完整画布版本升为 `v1.12`；Runtime exact refresh、公共契约、SQLite、Profile、OPL/Trace 和 Control 路径不变。
+
+2026-09-11 复核记录：新增 [P03 连线上关系名称编辑规格](../../specs/opm-p03-on-edge-relation-label-editing-task-spec.md)，将关系名称输入定位到实际 X6 路径，并冻结双击带标签结构关系后复用 Runtime UPDATE_FACT option 的 labels-only 更新。Enter 保存、Escape 取消、失焦保留、同名零提交、失败保留及过期授权拒绝；不强制展开属性栏。设计与实现已完成，本地验收见 [Checklist](../checklists/opm-p03-on-edge-relation-label-editing-checklist.md)。该记录不改变公共 API、模型持久化、URL 策略、Control 语义或发布证据状态。
+
+2026-09-11 画布空间修正：按 [可折叠底部工作区规格](../../specs/opm-p03-collapsible-bottom-workspace-task-spec.md) 冻结底部面板展开位，原固定 240px 面板可收起为 38px 标签栏，校验状态并入同栏；只读提示改为 Header 锁形标签。首次保留展开 OPL，用户收起后同一会话的提交及版本切换保留该偏好；只替代现有导航流程对底部标签的 UI 重置，不改变 HEAD/EXACT 定位、模型写入守卫或 URL 契约。实现及本地验证见 [Checklist](../checklists/opm-p03-collapsible-bottom-workspace-checklist.md)。发布、Profile 与 ISO 证据状态不变。

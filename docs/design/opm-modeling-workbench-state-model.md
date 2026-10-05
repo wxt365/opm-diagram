@@ -1,12 +1,12 @@
 # OPM 单机建模工具页面状态模型
 
-文档版本：`v1.0`
+文档版本：`v1.1`
 
 文档状态：`FROZEN_INCLUDED`；P01-P06 与完整画布状态模型冻结，实施证据按开发包记录
 
 全局设计状态、延期边界和开发准入以 `opm-design-freeze-baseline.md` 为唯一事实源。
 
-更新时间：2026-07-28
+更新时间：2026-09-11
 
 ## Task Type
 
@@ -34,11 +34,11 @@
 
 | 分层 | 含义 | 是否进入逻辑 URL | 耐久来源 |
 | --- | --- | --- | --- |
-| `route_context` | project、model、revision、context 和页面身份 | 是，稳定标识进入 | M02/M09 查询后校验 |
+| `route_context` | project、model、HEAD/EXACT Revision 模式、context 和页面身份 | 是，稳定标识进入 | M02/M09 查询后校验 |
 | `query_state` | 搜索、筛选、排序、标签和差异选择 | 仅可分享、可恢复部分 | URL 或本地偏好 |
 | `local_view_state` | 面板尺寸、折叠、viewport、临时选择和焦点 | 否 | 会话内或本地偏好 |
 | `resource_state` | 页面查询的 loading/ready/empty/error | 否 | 应用查询结果 |
-| `editor_state` | 当前修订、候选输入、提交、撤销重做和只读模式 | 仅 revision 模式进入 | M03/M09 + 会话状态 |
+| `editor_state` | 实际 committed Revision、候选输入、提交、撤销重做和只读模式 | 仅 EXACT 定位模式进入 Revision ID；HEAD 的实际 Revision 只显示于 Header | M03/M09 + 会话状态 |
 | `projection_state` | OPD、文本、校验和方法投影的新鲜度 | 否 | M05/M07/M08/M11 |
 | `overlay_state` | 弹层打开、预览、提交和失败状态 | 否 | 页面会话 |
 | `background_task_state` | 校验、转换、导入、导出、备份和恢复任务 | 任务 ID 可选进入查询 | M10/M12 任务查询 |
@@ -77,27 +77,43 @@
 ### 4.1 进入 URL 的状态
 
 1. `page_id` 对应的逻辑 route；
-2. `project_id`、`model_id`、可选 `revision_id` 和 `context_id`；
-3. P04 的左右比较版本；
-4. P05 可复现的严重级别、规则类别和状态筛选；
-5. 需要从外部入口定位时的 `element_id/finding_id/sentence_id`，消费后转为选择状态。
+2. `project_id`、`model_id` 和 `context_id`；P03 活动草稿的 canonical query 为 `?context=<context_id>`，省略 `revision`；
+3. 仅打开历史 Revision、Named Snapshot、Baseline 或复制永久链接时进入精确 `revision_id`，canonical query 为 `?revision=<revision_id>&context=<context_id>`；
+4. `revision=head` 仅作为兼容输入，解析后必须 replace 为省略 `revision` 的 canonical HEAD URL，不新增浏览器历史；
+5. P04 的左右比较版本；
+6. P05 可复现的严重级别、规则类别和状态筛选；
+7. 需要从外部入口定位时的 `element_id/finding_id/sentence_id`，消费后转为选择状态。
 
 ### 4.2 不进入 URL 的状态
 
 1. viewport 比例、平移位置、框选范围和鼠标模式；
-2. 属性表单未提交值、拖拽中间态和关系创建预览；
+2. selection、hover、焦点、Finding/OPL 临时高亮、属性表单未提交值、拖拽中间态和 State/关系候选；
 3. 撤销/重做栈和自动保存定时状态；
 4. 弹层表单、二次确认和本地文件选择结果；
-5. 面板拖动中的临时尺寸和当前键盘焦点。
+5. 激活工具、菜单、属性检查器开关、底部标签、面板尺寸和提交中状态；
+6. 上述状态同样不得写入 browser history state 形成隐式恢复旁路。
 
 ### 4.3 刷新与非法入口
 
-1. 刷新后先解析 route，再由 M02/M09 验证项目、模型、修订和 Context 是否存在；
-2. revision 未指定时打开最新可恢复 Draft Revision；不存在草稿时打开最新 Baseline 的只读视图；
-3. Context 不存在或不属于指定模型时，回退到该模型默认根 Context，并显示非阻断说明；
-4. revision 是 Snapshot/Baseline 时强制只读，不因 URL 参数进入编辑模式；
-5. 项目归档仍可显式打开，但显示归档状态；恢复或基于其中模型创建草稿必须走明确动作；
-6. 格式或恢复检查失败时进入 `recovery-required`，不打开部分可编辑模型。
+1. 刷新后先解析 route，再由 M02/M09 验证项目、模型、Revision 模式和 Context；
+2. `revision` 未指定或等于 `head` 时解析活动 Draft Head；Header 显示 M09 返回的实际 committed Revision，提交新 Revision 后只更新 Header 和投影，不改变 URL；
+3. Model 不存在活动 Draft 时，保留既有最近 Baseline 恢复策略，但必须立即 replace 为该 Baseline 固定 Revision 的 EXACT URL 并进入只读模式；没有可用 Baseline 时显示无可打开版本，不得伪造 HEAD；
+4. 精确 Revision 格式非法、不存在或不属于指定 Model 时拒绝入口，不得回退到 HEAD；
+5. Context 缺失、不存在或不属于目标 Model/Revision 时，在该目标 Revision 内解析默认根 Context、显示非阻断说明并 replace 为 canonical URL；
+6. Snapshot/Baseline 入口由 M09 解析其固定 Revision 和 access mode，进入携带精确 Revision ID 的只读 URL；
+7. EXACT URL 不跟随 Draft Head；“返回活动草稿”或“基于固定版本创建草稿”成功后切换为 canonical HEAD URL；
+8. 浏览器前进、后退和刷新只恢复 Context 及 HEAD/EXACT 资源定位，不重复命令或恢复临时画布状态；
+9. 项目归档仍可显式打开，但显示归档状态；恢复或基于其中模型创建草稿必须走明确动作；
+10. 格式或恢复检查失败时进入 `recovery-required`，不打开部分可编辑模型。
+
+### 4.4 Header 与永久链接
+
+`JOURNALED_DRAFT_V2` 按 [混合保存设计第 3/8 节](opm-hybrid-save-and-draft-recovery-design.md) 覆盖以下第 1/3 条：Header 显示活动草稿编辑序号，复制永久链接先 Pin 点击时 token，再复制真实 EXACT Revision。第 6.2/6.3 节的“每次编辑 committed_revision”“新修订触发自动保存”仅适用 V1；V2 使用 DURABLE 草稿回执，Runtime 从首笔未覆盖编辑开始计算 10 秒期限。保存成功只覆盖 captured_seq，不清除后续 dirty。当前实现仍为 V1。
+
+1. Header 始终显示当前投影实际读取或命令成功返回的 committed Revision，不显示 URL 字面量 `head` 或空值；
+2. HEAD 模式下语义命令、布局命令、撤销、重做和自动保存即使产生新 Revision，也不得 push/replace 精确 Revision ID；
+3. “复制永久链接”必须使用 Header 当前实际 committed Revision 生成 EXACT URL；省略 Revision 的 HEAD URL 不得冒充永久链接；
+4. `UPDATE_LAYOUT` 是否产生 Revision 由布局/持久化契约独立决定，不与 URL 展示策略绑定。
 
 ## 5. 全局回流约定
 
@@ -292,6 +308,7 @@ stateDiagram-v2
 3. `bottom_panel: text / findings / history / method`；
 4. `viewport_state: scale / translation / mode / fit_target`；
 5. `panel_state: left/right/bottom open + size`；
+   底部展开位与选中标签独立：用户折叠不清除标签或查询结果，同一挂载会话的提交及 Context/Revision 切换保留该偏好；显式选择底部标签时展开，刷新重新初始化为展开 OPL。该状态仅存在于前端，不写入 URL、Revision 或浏览器 history state。具体交互与既有 capture 字段边界见 [可折叠底部工作区规格](../../specs/opm-p03-collapsible-bottom-workspace-task-spec.md)。
 6. `OV03/OV05/OV06/OV08/OV11 overlay_submit`。
 7. `state_candidate` 和 `relation_candidate`，均绑定当前 Context/base revision；
 8. `capability_option_resource: idle/loading/current/stale/error`，只保存 API-EDT-001 查询结果。
@@ -404,5 +421,5 @@ stateDiagram-v2
 1. P0 状态切片已映射现有 OpenAPI；完整画布 State/关系候选已映射应用 API 逻辑契约，TypeScript DTO 必须由 DEV-CANVAS-00 的机器契约生成；
 2. 面板默认尺寸和移动降级已经原型验证，本地偏好与 viewport bookmark 保存周期由生产实现确定；
 3. 任务固定为查询 + SSE，取消点和进度阶段由每类任务实现定义；
-4. 浏览器 route 承载 revision/context 稳定定位，viewport 和未提交状态不进入 URL。
+4. 浏览器 route 以省略 `revision` 的 canonical HEAD URL 承载活动草稿，以精确 Revision URL 承载历史/Snapshot/Baseline/永久链接；Header 始终显示实际 committed Revision，viewport 和未提交状态不进入 URL。
 5. 现有 P0 设计确认前端只实现 Object/Process/Consumption 工具状态，不能作为 State/完整关系 candidate 已实现证据。

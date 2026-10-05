@@ -1,0 +1,146 @@
+.app-layout {
+  min-height: 100vh;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  height: 56px;
+  padding: 0 20px;
+  color: #f8fafc;
+  background: #17212b;
+  border-bottom: 1px solid #0f171e;
+}
+
+.brand-button,
+.header-toggle,
+.back-link,
+.app-breadcrumb button,
+.sidebar-item,
+.panel-tabs button,
+.bottom-tabs button,
+.context-tree__item,
+.tool-button,
+.text-action,
+.opl-line,
+.finding-row {
+  color: inherit;
+  background: transparent;
+  border: 0;
+}
+
+.brand-button {
+  display: inline-flex;
+  gap: 10px;
+  align-items: center;
+  padding: 0;
+  font-weight: 700;
+}
+
+.brand-mark,
+.resource-symbol,
+.model-card__marker {
+  display: inline-grid;
+  place-items: center;
+  color: #ffffff;
+  background: #0b6bcb;
+  border-radius: 4px;
+}
+
+.brand-mark {
+  width: 31px;
+  height: 27px;
+  font-size: 10px;
+  letter-spacing: 0;
+}
+
+.header-context {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  margin-left: auto;
+  font-size: 12px;
+}
+
+.header-context__label {
+  color: #cbd5df;
+}
+
+.header-context__state {
+  padding: 3px 7px;
+  color: #b6e5cb;
+  background: #1d4e3d;
+  border: 1px solid #32735a;
+  border-radius: 3px;
+}
+
+.header-toggle {
+  width: 30px;
+  height: 30px;
+  margin-left: 16px;
+  color: #cbd5df;
+  border: 1px solid #4a5968;
+  border-radius: 4px;
+}
+
+.app-layout__body {
+  display: flex;
+  min-height: calc(100vh - 56px);
+}
+
+.app-sidebar {
+  flex: 0 0 190px;
+  padding: 14px 10px;
+  background: #ffffff;
+  border-right: 1px solid #d9e0e7;
+  transition: flex-basis 160ms ease;
+}
+
+.app-sidebar--collapsed {
+  flex-basis: 54px;
+}
+
+.sidebar-item {
+  display: flex;
+  width: 100%;
+  gap: 10px;
+  align-items: center;
+  min-height: 36px;
+  padding: 7px 9px;
+  color: #4b5763;
+  text-align: left;
+  border-radius: 4px;
+}
+
+.sidebar-item:hover,
+.sidebar-item--active {
+  color: #0b5fae;
+  background: #eaf3fc;
+}
+
+.app-main {
+  min-width: 0;
+  flex: 1;
+}
+
+.app-breadcrumb {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  height: 42px;
+  padding: 0 28px;
+  color: #687582;
+  font-size: 13px;
+  background: #ffffff;
+  border-bottom: 1px solid #e0e6eb;
+}
+
+.app-breadcrumb button {
+  padding: 0;
+  color: #0b6bcb;
+}
+
+.app-breadcrumb strong {
+  color: #384550;
+  font-weight: 600;
+}

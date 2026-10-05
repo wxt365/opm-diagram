@@ -1,8 +1,59 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { localRuntimeApi } from "./localRuntimeApi";
+import type { DraftQueryContracts } from "./localRuntimeApi";
 
 describe("localRuntimeApi", () => {
+  it("V2 查询使用固定路径和会话，旧 V1 envelope 不混入新错误", async () => {
+    window.__OPM_LOCAL_SESSION__ = "session.v2";
+    const fetchMock = vi.fn(async () => response(200, { request_id: "request.1" }));
+    vi.stubGlobal("fetch", fetchMock);
+    for (const operation of ["open", "projection", "text", "navigation", "findings", "relation-catalog", "capabilities", "receipts"] as const) {
+      await localRuntimeApi.draftQuery("project.1", "model.1", operation, { request_id: "request.1", context_id: null } as DraftQueryContracts[typeof operation][0]);
+      expect(fetchMock.mock.calls.at(-1)?.[0]).toBe(`/api/v2/projects/project.1/models/model.1/draft/${operation}`);
+      expect(fetchMock.mock.calls.at(-1)?.[1]).toMatchObject({ method: "POST", headers: { "X-OPM-Session": "session.v2" } });
+    }
+  });
+
+  it("V2 EDIT/SAVE/PIN 保留 exact raw，包括负零", async () => {
+    window.__OPM_LOCAL_SESSION__ = "session.v2";
+    const fetchMock = vi.fn(async () => response(200, { status: "test" })); vi.stubGlobal("fetch", fetchMock);
+    const raw = '{"layout":{"x":-0,"y":0.1}}';
+    for (const [operation, path] of [["EDIT", "commands"], ["SAVE", "save"], ["PIN", "pin"]] as const) {
+      await localRuntimeApi.draftMutation("project.1", "model.1", operation, raw);
+      expect(fetchMock.mock.calls.at(-1)?.[0]).toBe(`/api/v2/projects/project.1/models/model.1/draft/${path}`);
+      expect(fetchMock.mock.calls.at(-1)?.[1]).toMatchObject({ body: raw });
+    }
+  });
+
+  it("V2 顶层错误保留 code/reason/retryable，缺会话零发送", async () => {
+    const fetchMock = vi.fn(async () => response(422, { code: "DRAFT_EDIT_REJECTED", message: "输入被阻断", retryable: false, reason_code: "COMMAND_NOT_IMPLEMENTED" }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(localRuntimeApi.draftMutation("project.1", "model.1", "EDIT", "{}")).rejects.toMatchObject({ code: "LOCAL_SESSION_INVALID" });
+    expect(fetchMock).not.toHaveBeenCalled();
+    window.__OPM_LOCAL_SESSION__ = "session.v2";
+    await expect(localRuntimeApi.draftMutation("project.1", "model.1", "EDIT", "{}")).rejects.toMatchObject({ code: "DRAFT_EDIT_REJECTED", reasonCode: "COMMAND_NOT_IMPLEMENTED", retryable: false });
+  });
+
+  it.each(["", "<html>错误</html>", "null", "[]", "{}"])("V2 不能将无效 2xx 当成确认：%s", async text => {
+    window.__OPM_LOCAL_SESSION__ = "session.v2";
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, text: async () => text })));
+    await expect(localRuntimeApi.draftMutation("project.1", "model.1", "SAVE", "{}")).rejects.toMatchObject({ code: "DRAFT_RESPONSE_INVALID" });
+  });
+
+  it("会话分别发送 HEAD 和精确定位参数，空 Revision 不被转换为 HEAD", async () => {
+    const fetchMock = vi.fn(async () => response(200, { meta: {}, data: {} }));
+    vi.stubGlobal("fetch", fetchMock);
+    await localRuntimeApi.workspaceSession("project.test", "model.test");
+    await localRuntimeApi.workspaceSession("project.test", "model.test", "revision.1", "context.root");
+    await localRuntimeApi.workspaceSession("project.test", "model.test", "");
+    const urls = fetchMock.mock.calls.map(([path]) => new URL(path as string, "http://localhost"));
+    expect(urls[0].searchParams.has("revision")).toBe(false);
+    expect(urls[1].searchParams.get("revision")).toBe("revision.1");
+    expect(urls[1].searchParams.get("context")).toBe("context.root");
+    expect(urls[2].searchParams.has("revision")).toBe(true);
+    expect(urls[2].searchParams.get("revision")).toBe("");
+  });
   afterEach(() => {
     vi.unstubAllGlobals();
     delete window.__OPM_LOCAL_SESSION__;

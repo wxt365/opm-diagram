@@ -170,7 +170,7 @@ function toModelItem(value: ModelWire): ModelListItem {
     projectId: value.project_id,
     name: value.name,
     profile: `${value.profile_id} ${value.profile_version}`,
-    headRevision: value.head_revision,
+    headRevision: value.head_revision ?? "无活动草稿",
     accessMode: value.access_mode,
   };
 }

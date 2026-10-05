@@ -1,0 +1,218 @@
+.overlay-backdrop {
+  position: fixed;
+  z-index: 20;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgb(21 31 40 / 44%);
+}
+
+.dialog-panel {
+  width: min(100%, 520px);
+  max-height: calc(100vh - 40px);
+  padding: 20px;
+  overflow: auto;
+  background: #ffffff;
+  border: 1px solid #aebbc6;
+  border-radius: 6px;
+  box-shadow: 0 14px 36px rgb(17 31 43 / 24%);
+}
+
+.dialog-panel__header {
+  align-items: flex-start;
+  padding-bottom: 14px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid #e1e7ec;
+}
+
+.dialog-panel__header h2 {
+  margin-bottom: 0;
+}
+
+.icon-control {
+  width: 28px;
+  height: 28px;
+  color: #55626e;
+  background: #ffffff;
+  border: 1px solid #c7d0d8;
+  border-radius: 3px;
+}
+
+.form-field {
+  display: grid;
+  gap: 6px;
+  margin: 14px 0;
+}
+
+.form-field > span {
+  color: #44525f;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.form-readonly {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 9px 0;
+  border-bottom: 1px solid #edf0f3;
+}
+
+.form-readonly strong,
+.form-readonly code {
+  color: #33414d;
+  font-size: 12px;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.state-editor,
+.state-role-group,
+.state-editor__actions,
+.state-presentation-actions,
+.relation-candidate,
+.relation-candidate__options {
+  display: grid;
+  gap: 10px;
+}
+
+.state-role-group {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding: 8px;
+  margin: 0;
+  border: 1px solid #d9e0e7;
+}
+
+.state-role-group legend {
+  padding: 0 4px;
+  color: #44525f;
+  font-size: 12px;
+}
+
+.state-role-group label {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+  color: #44525f;
+  font-size: 12px;
+}
+
+.state-editor__actions,
+.state-presentation-actions {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.relation-candidate__options {
+  max-height: 280px;
+  overflow: auto;
+}
+
+.relation-candidate__option {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  padding: 9px;
+  color: #24313b;
+  text-align: left;
+  background: #f8fafb;
+  border: 1px solid #d9e0e7;
+}
+
+.relation-candidate__option:hover,
+.relation-candidate__option:focus-visible {
+  border-color: #0b6bcb;
+  outline: none;
+}
+
+.relation-candidate__option span {
+  color: #5f6c77;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.relation-catalog-item {
+  grid-template-columns: 42px minmax(0, 1fr);
+  align-items: center;
+}
+
+.relation-catalog-item > :not(.relation-symbol-preview) {
+  grid-column: 2;
+}
+
+.relation-symbol-preview {
+  position: relative;
+  grid-column: 1;
+  grid-row: 1 / span 3;
+  width: 36px;
+  height: 20px;
+}
+
+.relation-symbol-preview::before {
+  position: absolute;
+  top: 9px;
+  left: 2px;
+  width: 30px;
+  border-top: 2px solid #20242a;
+  content: "";
+}
+
+.relation-symbol-preview::after {
+  position: absolute;
+  top: 5px;
+  right: 2px;
+  width: 7px;
+  height: 7px;
+  border-top: 2px solid #20242a;
+  border-right: 2px solid #20242a;
+  content: "";
+  transform: rotate(45deg);
+}
+
+.relation-symbol-preview[data-symbol-id*="agent"]::after {
+  border: 2px solid #20242a;
+  border-radius: 50%;
+  background: #20242a;
+  transform: none;
+}
+
+.relation-symbol-preview[data-symbol-id*="instrument"]::after {
+  border: 2px solid #20242a;
+  border-radius: 50%;
+  background: #fff;
+  transform: none;
+}
+
+.relation-symbol-preview[data-symbol-id*="structural"]::before {
+  border-top-style: double;
+}
+
+.dialog-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  margin: 16px 0;
+  background: #dce4ea;
+  border: 1px solid #dce4ea;
+}
+
+.dialog-summary-grid > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 10px;
+  background: #f8fafb;
+}
+
+.dialog-summary-grid strong {
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.dialog-panel__footer {
+  justify-content: flex-end;
+  padding-top: 16px;
+  margin-top: 18px;
+  border-top: 1px solid #e1e7ec;
+}

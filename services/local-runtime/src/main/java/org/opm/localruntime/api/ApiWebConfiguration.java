@@ -16,5 +16,6 @@ class ApiWebConfiguration implements WebMvcConfigurer {
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(new LocalWriteRequestGuard(sessionToken)).addPathPatterns("/api/v1/**");
+        registry.addInterceptor(new DraftWriteRequestGuard(sessionToken)).addPathPatterns("/api/v2/**");
     }
 }

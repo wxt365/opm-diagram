@@ -1,5 +1,5 @@
 <template>
-  <section class="workbench" data-testid="p03-workbench">
+  <section class="workbench" :class="{ 'workbench--bottom-collapsed': !store.workbench.bottomPanelExpanded }" data-testid="p03-workbench">
     <header class="workbench-header">
       <div class="workbench-header__context">
         <button class="back-link" type="button" @click="router.push(`/projects/${projectId}`)">项目 / {{ store.projectName }}</button>
@@ -7,8 +7,16 @@
         <span class="profile-tag">{{ store.profileLabel }}</span>
       </div>
       <div class="workbench-header__status">
-        <span class="revision-tag">草稿 {{ store.workbench.revision || "-" }}</span>
-        <span class="save-tag">{{ store.workbench.autosaveState === "saved" ? "已保存" : "保存失败" }}</span>
+        <span class="revision-tag" :title="`最近版本 / Latest revision: ${store.workbench.revision || '-'}`" data-testid="hs-draft-identity">{{ store.draftToken && store.workbench.locationMode === 'HEAD' ? `活动草稿 · 编辑 ${store.draftToken.edit_seq}` : `${store.workbench.locationMode === 'HEAD' ? '草稿' : '固定版本'} ${store.workbench.revision || '-'}` }}</span>
+        <span v-if="store.workbench.resourceState === 'ready' && store.isReadonly" class="readonly-tag" role="status" title="当前修订只读，语义和布局编辑已禁用。 / Read-only revision; model and layout editing disabled." aria-label="当前修订只读，语义和布局编辑已禁用。 / Read-only revision; model and layout editing disabled." data-testid="p03-readonly-banner"><Lock :size="12" aria-hidden="true" />只读</span>
+        <select aria-label="打开版本" data-testid="p03-version-select" :value="store.workbench.locationMode === 'HEAD' ? 'head' : store.workbench.revision" :disabled="store.workbench.resourceState !== 'ready' || store.workbench.commandState === 'submitting'" @change="openVersion(($event.target as HTMLSelectElement).value)">
+          <option value="head">活动草稿</option>
+          <option v-for="revision in store.revisions" :key="revision.id" :value="revision.id">{{ revision.kind === 'BASELINE' ? 'Baseline' : 'Revision' }} {{ revision.sequence }}</option>
+        </select>
+        <button v-if="store.workbench.locationMode === 'EXACT'" class="button button--secondary" type="button" data-testid="p03-return-head" @click="openVersion('head')">返回活动草稿</button>
+        <button class="button button--secondary" type="button" data-testid="p03-copy-permalink" :disabled="store.workbench.resourceState !== 'ready' || store.saving" @mousedown.prevent @click="copyPermalink">复制永久链接</button>
+        <span class="save-tag" role="status" data-testid="hs-save-state">{{ store.saveLabel }}</span>
+        <button v-if="store.draftToken && (store.pendingDelivery || store.saveError)" class="button button--secondary" type="button" data-testid="hs-retry-delivery" @click="store.retryDraftDelivery">重新加载 / 恢复待确认</button>
         <button class="button button--secondary" type="button" data-testid="p03-run-validation" :disabled="store.workbench.resourceState !== 'ready'" @click="store.runValidation">运行校验</button>
       </div>
     </header>
@@ -16,182 +24,121 @@
     <div class="workbench-main">
       <div class="workbench-notices">
         <p v-if="store.workbench.resourceState === 'loading'" class="command-feedback" role="status">正在读取 Local Runtime 工作台会话。</p>
-        <p v-if="store.workbench.resourceState === 'error' || store.workbench.commandFeedback" class="command-feedback" role="status" data-testid="p03-command-feedback">{{ store.workbench.commandFeedback }}<code v-if="store.workbench.feedbackCode" data-testid="p03-command-feedback-code">{{ store.workbench.feedbackCode }}</code></p>
-        <div v-if="store.isReadonly" class="readonly-banner" data-testid="p03-readonly-banner">当前修订只读，语义写入已禁用。</div>
+        <p v-if="store.workbench.resourceState === 'error'" class="command-feedback" role="status" data-testid="p03-command-feedback">{{ store.workbench.commandFeedback }}<code v-if="store.workbench.feedbackCode" data-testid="p03-command-feedback-code">{{ store.workbench.feedbackCode }}</code></p>
       </div>
 
-      <div class="workbench-grid">
+      <div class="workbench-grid" :class="{ 'workbench-grid--inspector-open': inspectorDockVisible }">
         <aside class="workbench-panel navigator-panel">
           <div class="panel-tabs"><span>Context</span><strong>{{ store.contexts.length }}</strong></div>
           <div class="context-tree">
-            <button v-for="context in store.contexts" :key="context.id" class="context-tree__item" :class="{ 'is-current': context.id === store.workbench.activeContextId }" type="button" :data-testid="`p03-context-${context.id}`" @click="store.selectContext(context.id)">
+            <button v-for="context in store.contexts" :key="context.id" class="context-tree__item" :class="{ 'is-current': context.id === store.workbench.activeContextId }" type="button" :data-testid="`p03-context-${context.id}`" @click="openContext(context.id)">
               {{ context.label }}
             </button>
           </div>
-          <p class="disabled-reason">P0 仅支持根系统图；细化和视图由后续包实现。</p>
+          <p class="disabled-reason">{{ store.draftToken ? '已有 Context 可切换；暂不支持创建或删除 Context。' : 'P0 仅支持根系统图；细化和视图由后续包实现。' }}</p>
         </aside>
 
         <section class="editor-panel">
-          <div class="editor-toolbar" data-testid="p03-canvas-toolchain">
+          <div class="editor-toolbar" role="toolbar" aria-label="OPM 画布工具 / OPM canvas tools" data-testid="p03-canvas-toolchain">
             <div class="tool-group" aria-label="画布工具">
-              <button class="tool-button tool-button--icon is-active" type="button" title="选择" aria-label="选择" data-testid="p03-tool-select"><MousePointer2 :size="18" aria-hidden="true" /></button>
-              <button class="tool-button tool-button--icon" type="button" title="平移画布" aria-label="平移画布" data-testid="p03-tool-pan"><Hand :size="18" aria-hidden="true" /></button>
+              <button v-if="store.draftToken" class="tool-button tool-button--icon" type="button" title="保存 / Save (Ctrl/Cmd+S)" aria-label="保存 / Save (Ctrl/Cmd+S)" :disabled="store.isReadonly || store.saving" data-testid="hs-save" @mousedown.prevent @click="requestSave"><Save :size="18" aria-hidden="true" /></button>
+              <button class="tool-button tool-button--icon" :class="{ 'is-active': canvasInteractionTool === 'select' }" type="button" title="选择 / Select" aria-label="选择 / Select" :aria-pressed="canvasInteractionTool === 'select'" data-testid="p03-tool-select" @click="setCanvasInteractionTool('select')"><MousePointer2 :size="18" aria-hidden="true" /></button>
+              <button class="tool-button tool-button--icon" :class="{ 'is-active': canvasInteractionTool === 'pan' }" type="button" title="平移画布 / Pan canvas" aria-label="平移画布 / Pan canvas" :aria-pressed="canvasInteractionTool === 'pan'" data-testid="p03-tool-pan" @click="setCanvasInteractionTool('pan')"><Hand :size="18" aria-hidden="true" /></button>
             </div>
+            <span class="editor-toolbar__separator" aria-hidden="true" />
             <div class="tool-group" aria-label="P0 建模命令">
-              <button class="tool-button tool-button--icon" type="button" title="创建 Object" aria-label="创建 Object" :disabled="store.isReadonly" data-testid="p03-tool-object" @click="store.addElement('OBJECT')"><Box :size="18" aria-hidden="true" /></button>
-              <button class="tool-button tool-button--icon" type="button" title="创建 Process" aria-label="创建 Process" :disabled="store.isReadonly" data-testid="p03-tool-process" @click="store.addElement('PROCESS')"><CircleDashed :size="18" aria-hidden="true" /></button>
-              <button class="tool-button tool-button--icon" type="button" title="创建 Attribute" aria-label="创建 Attribute" :disabled="store.isReadonly || !store.selectedNode || (store.selectedNode.kind !== 'object' && store.selectedNode.kind !== 'process')" data-testid="p03-tool-attribute" @click="store.addFeature('ATTRIBUTE')"><ListTree :size="18" aria-hidden="true" /></button>
-              <button class="tool-button tool-button--icon" type="button" title="创建 Operation" aria-label="创建 Operation" :disabled="store.isReadonly || !store.selectedNode || (store.selectedNode.kind !== 'object' && store.selectedNode.kind !== 'process')" data-testid="p03-tool-operation" @click="store.addFeature('OPERATION')"><Cog :size="18" aria-hidden="true" /></button>
-              <button class="tool-button tool-button--icon" type="button" title="创建 Consumption" aria-label="创建 Consumption" :disabled="store.isReadonly" data-testid="p03-tool-consumption" @click="store.addConsumption"><Workflow :size="18" aria-hidden="true" /></button>
-              <button class="tool-button tool-button--icon" :class="{ 'is-active': store.relationCandidate.phase !== 'idle' }" type="button" title="创建过程关系" aria-label="创建过程关系" :disabled="store.isReadonly" data-testid="p03-tool-procedural-relation" @click="store.armRelationCreation"><GitFork :size="18" aria-hidden="true" /></button>
-              <button class="tool-button tool-button--icon" :class="{ 'is-active': store.relationCandidate.phase !== 'idle' }" type="button" title="创建结构关系" aria-label="创建结构关系" :disabled="store.isReadonly" data-testid="p03-tool-structural-relation" @click="store.armRelationCreation"><Network :size="18" aria-hidden="true" /></button>
-              <button class="tool-button tool-button--icon" :class="{ 'is-active': store.stateCandidate.phase === 'placing' }" type="button" title="创建 State" aria-label="创建 State" :disabled="store.isReadonly || !store.selectedNode || (store.selectedNode.kind !== 'object' && store.selectedNode.kind !== 'attribute' && store.selectedNode.kind !== 'operation') || !store.stateCreateOption?.enabled" data-testid="p03-tool-state" @click="store.armStateCreation"><CircleDotDashed :size="18" aria-hidden="true" /></button>
+              <button class="tool-button tool-button--icon" type="button" title="创建对象 / Create Object" aria-label="创建对象 / Create Object" :disabled="store.isReadonly" data-testid="p03-tool-object" @click="store.addElement('OBJECT')"><ElementToolSymbol kind="object" /></button>
+              <button class="tool-button tool-button--icon" type="button" title="创建过程 / Create Process" aria-label="创建过程 / Create Process" :disabled="store.isReadonly" data-testid="p03-tool-process" @click="store.addElement('PROCESS')"><ElementToolSymbol kind="process" /></button>
+              <button class="tool-button tool-button--icon" type="button" title="创建属性 / Create Attribute" aria-label="创建属性 / Create Attribute" :disabled="store.isReadonly || !store.selectedNode || (store.selectedNode.kind !== 'object' && store.selectedNode.kind !== 'process')" data-testid="p03-tool-attribute" @click="store.addFeature('ATTRIBUTE')"><ElementToolSymbol kind="attribute" /></button>
+              <button class="tool-button tool-button--icon" type="button" title="创建操作 / Create Operation" aria-label="创建操作 / Create Operation" :disabled="store.isReadonly || !store.selectedNode || (store.selectedNode.kind !== 'object' && store.selectedNode.kind !== 'process')" data-testid="p03-tool-operation" @click="store.addFeature('OPERATION')"><ElementToolSymbol kind="operation" /></button>
+              <button class="tool-button tool-button--icon" :class="{ 'is-active': store.stateCandidate.phase === 'placing' }" type="button" title="创建状态 / Create State" aria-label="创建状态 / Create State" :disabled="store.isReadonly || !store.selectedNode || (store.selectedNode.kind !== 'object' && store.selectedNode.kind !== 'attribute' && store.selectedNode.kind !== 'operation') || !store.stateCreateOption?.enabled" data-testid="p03-tool-state" @click="armStateCreation"><ElementToolSymbol kind="state" /></button>
             </div>
-            <div class="tool-group" aria-label="关系目录">
-              <button class="tool-button tool-button--icon" :class="{ 'is-active': store.relationCatalog.open }" type="button" title="关系目录" aria-label="关系目录" data-testid="p03-tool-relation-menu" @click="store.openRelationCatalog"><ListTree :size="18" aria-hidden="true" /></button>
-            </div>
+            <span class="editor-toolbar__separator" aria-hidden="true" />
+            <RelationToolPalette
+              :families="store.relationCatalogFamilies"
+              :items="store.relationCatalog.items"
+              :readonly="store.isReadonly"
+              :active-capability-id="activeRelationCapabilityId"
+              @activate="activateRelationCatalogItem"
+            />
+            <span class="editor-toolbar__separator" aria-hidden="true" />
             <div class="tool-group tool-group--end" aria-label="视口控制">
-              <button class="tool-button tool-button--icon" type="button" title="缩小视图" aria-label="缩小视图" data-testid="p03-zoom-out" @click="store.setViewportZoom(store.workbench.zoom - 10)"><ZoomOut :size="18" aria-hidden="true" /></button>
+              <button class="tool-button tool-button--icon" type="button" title="缩小视图 / Zoom out" aria-label="缩小视图 / Zoom out" data-testid="p03-zoom-out" @click="store.setViewportZoom(store.workbench.zoom - 10)"><ZoomOut :size="18" aria-hidden="true" /></button>
               <output data-testid="p03-zoom-output">{{ store.workbench.zoom }}%</output>
-              <button class="tool-button tool-button--icon" type="button" title="放大视图" aria-label="放大视图" data-testid="p03-zoom-in" @click="store.setViewportZoom(store.workbench.zoom + 10)"><ZoomIn :size="18" aria-hidden="true" /></button>
-              <button class="tool-button tool-button--icon" type="button" title="适配画布" aria-label="适配画布" data-testid="p03-zoom-fit" @click="store.setViewportZoom(100)"><Maximize :size="18" aria-hidden="true" /></button>
+              <button class="tool-button tool-button--icon" type="button" title="放大视图 / Zoom in" aria-label="放大视图 / Zoom in" data-testid="p03-zoom-in" @click="store.setViewportZoom(store.workbench.zoom + 10)"><ZoomIn :size="18" aria-hidden="true" /></button>
+              <button class="tool-button tool-button--icon" type="button" title="恢复 100% / Reset zoom to 100%" aria-label="恢复 100% / Reset zoom to 100%" data-testid="p03-zoom-fit" @click="store.setViewportZoom(100)"><Maximize :size="18" aria-hidden="true" /></button>
+              <button class="tool-button tool-button--icon" :class="{ 'is-active': store.rightPanel.open }" type="button" :title="store.rightPanel.open ? '关闭属性 / Close properties' : '打开属性 / Open properties'" :aria-label="store.rightPanel.open ? '关闭属性 / Close properties' : '打开属性 / Open properties'" :disabled="!store.workbench.selectedId" data-testid="p03-right-panel-open" @click="toggleProperties"><PanelRightOpen :size="18" aria-hidden="true" /></button>
             </div>
           </div>
-          <section v-if="store.relationCatalog.open" class="relation-candidate" data-testid="p03-relation-catalog-menu">
-            <div class="form-readonly"><span>Runtime 关系目录</span><button class="button button--secondary" type="button" data-testid="p03-relation-catalog-close" @click="store.closeRelationCatalog">关闭</button></div>
-            <label class="form-field"><span>搜索</span><input v-model="store.relationCatalog.search" data-testid="p03-relation-catalog-search" maxlength="256"></label>
-            <p v-if="store.relationCatalog.loading" class="disabled-reason">正在读取 Runtime 关系目录。</p>
-            <section v-for="family in store.relationCatalogFamilies" :key="family" class="relation-candidate" :data-testid="`p03-relation-catalog-${family}`">
-              <button class="button button--secondary" type="button" :data-testid="`p03-relation-catalog-toggle-${family}`" @click="store.toggleRelationCatalogFamily(family)">{{ family }} {{ store.relationCatalogItems(family).length }}</button>
-              <div v-if="store.isRelationCatalogExpanded(family)" class="relation-candidate__options">
-                <button v-for="item in store.relationCatalogItems(family)" :key="item.capability_id" class="relation-candidate__option" type="button" :disabled="!item.enabled" :data-testid="`p03-relation-catalog-option-${item.capability_id}`">
-                  <strong>{{ item.display_name }}</strong><span>{{ item.capability_id }}</span><span>{{ item.symbol_id }}</span><span v-if="item.reason_codes.length" class="disabled-reason">{{ item.reason_codes.join(", ") }}</span>
+          <div ref="canvasSurface" class="canvas-surface">
+            <div class="canvas-frame">
+              <OpdCanvas ref="canvasEditor" :key="canvasLocationKey" :readonly="store.isReadonly" :nodes="store.workbench.nodes" :relations="store.workbench.relations" :selected-id="store.workbench.selectedId" :zoom="store.workbench.zoom" :interaction-tool="canvasInteractionTool" :state-placement-owner-id="store.stateCandidate.phase === 'placing' ? store.stateCandidate.ownerId : undefined" :relation-gesture-phase="store.relationCandidate.phase" :relation-preview="relationPreview" :relation-editor-target="relationEditorTarget" :highlighted-finding-target-id="store.highlightedFindingTargetId || undefined" :begin-name-edit="store.beginElementNameEdit" :submit-name-edit="store.renameElement" @select="store.selectConstruct" @move="store.moveElement" @place-state="store.placeState" @relation-intent="store.handleRelationGesture" @construct-actions-menu-requested="requestConstructActions" @relation-editor-anchor="relationEditorAnchor = $event" @relation-label-edit-requested="openRelationLabelEditor" />
+              <div class="canvas-state">{{ store.workbench.lastAction }}</div>
+            </div>
+            <p
+              v-if="store.workbench.resourceState !== 'error' && store.workbench.commandFeedback"
+              class="editor-command-feedback"
+              role="status"
+              aria-live="polite"
+              aria-atomic="true"
+              data-testid="p03-command-feedback"
+            >
+              <span>{{ store.workbench.commandFeedback }}</span>
+              <code v-if="store.workbench.feedbackCode" data-testid="p03-command-feedback-code">{{ store.workbench.feedbackCode }}</code>
+            </p>
+            <template v-if="store.constructActions.open">
+              <button class="construct-context-menu__dismiss" type="button" aria-label="关闭构造操作菜单" @click="store.cancelConstructDelete" />
+              <section class="construct-context-menu" role="menu" aria-label="构造操作" :style="constructMenuStyle" data-testid="p03-construct-actions-menu">
+                <button class="construct-context-menu__item construct-context-menu__item--neutral" role="menuitem" type="button" data-testid="p03-construct-open-properties" @click="openConstructProperties">
+                  <PanelRightOpen :size="15" aria-hidden="true" />
+                  <span>打开属性</span>
                 </button>
-              </div>
+                <span v-if="store.constructActions.options.length" class="construct-context-menu__separator" aria-hidden="true" />
+                <template v-for="option in store.constructActions.options" :key="option.option_id">
+                  <button class="construct-context-menu__item" role="menuitem" type="button" :disabled="!option.enabled" data-testid="p03-construct-delete-action" @click="store.chooseConstructDelete(option)">
+                    <Trash2 :size="15" aria-hidden="true" />
+                    <span>{{ deleteActionLabel(option) }}</span>
+                  </button>
+                  <span v-if="option.enabled && option.impact_summary" class="construct-context-menu__reason">影响 {{ option.impact_summary.items?.length ?? 0 }} 项</span>
+                  <span v-if="!option.enabled && option.reason_codes.length" class="construct-context-menu__reason">{{ option.reason_codes.join(", ") }}</span>
+                </template>
+              </section>
+            </template>
+            <section
+              v-if="store.relationCandidate.phase === 'candidate-preview' && store.relationCandidate.selectedOption && !store.relationCandidate.autoCommitting"
+              class="relation-parameter-popover"
+              :class="{ 'relation-parameter-popover--label': Object.keys(store.relationCandidate.labels).length > 0 }"
+              :style="relationEditorStyle"
+              data-testid="p03-relation-preview"
+            >
+              <form ref="relationParameterEditor" data-testid="p03-relation-candidate" @submit.prevent="submitRelationParameterEditor" @keydown.enter.exact.stop.prevent="submitRelationParameterEditor" @keydown.esc.stop.prevent="cancelRelationEditor" @compositionstart="relationComposing = true" @compositionend="relationComposing = false">
+                <header class="relation-parameter-popover__header">
+                  <strong v-if="!Object.keys(store.relationCandidate.labels).length">关系参数</strong>
+                  <button class="relation-parameter-popover__close" type="button" :disabled="relationSubmitting" title="取消关系 / Cancel relation" aria-label="取消关系 / Cancel relation" data-testid="p03-relation-preview-cancel" @click="cancelRelationEditor"><X :size="15" aria-hidden="true" /></button>
+                </header>
+                <label v-if="store.relationCandidate.selectedOption.required_fields.some((field) => field.field_id === 'duration')" class="form-field"><span>duration</span><input v-model="store.relationCandidate.duration" data-testid="p03-relation-duration" placeholder="PT5M" required @input="store.rebuildRelationPreview"></label>
+                <label v-for="(_, slot) in store.relationCandidate.labels" :key="slot" class="form-field"><span>{{ relationLabelTitle(slot, store.relationCandidate.direction) }}</span><input v-model="store.relationCandidate.labels[slot]" :data-testid="`p03-structural-label-${slot}`" :disabled="relationSubmitting" :aria-label="relationLabelTitle(slot, store.relationCandidate.direction)" :title="relationLabelTitle(slot, store.relationCandidate.direction) + ' · Enter 保存 / Save · Escape 取消 / Cancel'" :placeholder="slot === 'reverse_tag' ? '反向关系名称' : '关系名称'" maxlength="256" :required="slot !== 'reverse_tag' || store.relationCandidate.direction === 'BIDIRECTIONAL'" pattern=".*\S.*" @input="store.rebuildRelationPreview"></label>
+                <label v-if="(store.relationCandidate.selectedOption.required_fields.find((field) => field.field_id === 'direction')?.allowed_values?.length ?? 0) > 1" class="form-field"><span>direction</span><select v-model="store.relationCandidate.direction" required @change="updateRelationSelectParameter"><option v-for="direction in store.relationCandidate.selectedOption.required_fields.find((field) => field.field_id === 'direction')?.allowed_values ?? []" :key="direction" :value="direction">{{ direction }}</option></select></label>
+                <label v-if="store.relationCandidate.selectedOption.required_fields.some((field) => field.field_id === 'collection_completeness')" class="form-field"><span>完整性</span><select v-model="store.relationCandidate.collectionCompleteness" data-testid="p03-structural-completeness" required @change="updateRelationSelectParameter"><option disabled value="">请选择</option><option value="COMPLETE">完整</option><option value="INCOMPLETE">不完整</option></select></label>
+              </form>
             </section>
-          </section>
-          <div class="canvas-frame">
-            <OpdCanvas :nodes="store.workbench.nodes" :relations="store.workbench.relations" :selected-id="store.workbench.selectedId" :zoom="store.workbench.zoom" :state-placement-owner-id="store.stateCandidate.phase === 'placing' ? store.stateCandidate.ownerId : undefined" :relation-preview="relationPreview" :highlighted-finding-target-id="store.highlightedFindingTargetId || undefined" @select="store.selectConstruct" @place-state="store.placeState" />
-            <div class="canvas-state">{{ store.workbench.lastAction }}</div>
+            <section v-if="inlineRelationEditing" class="relation-parameter-popover relation-parameter-popover--label" :style="relationEditorStyle" data-testid="p03-relation-label-editor">
+              <form ref="relationLabelEditor" @submit.prevent="submitRelationLabelEditor" @keydown.enter.exact.stop.prevent="submitRelationLabelEditor" @keydown.esc.stop.prevent="cancelRelationEditor" @compositionstart="relationComposing = true" @compositionend="relationComposing = false">
+                <header class="relation-parameter-popover__header"><button class="relation-parameter-popover__close" type="button" :disabled="relationSubmitting" title="取消编辑 / Cancel editing" aria-label="取消编辑 / Cancel editing" @click="cancelRelationEditor"><X :size="15" aria-hidden="true" /></button></header>
+                <label v-for="(_, slot) in store.structuralUpdateCandidate.labels" :key="slot" class="form-field"><span>{{ relationLabelTitle(slot, store.structuralUpdateCandidate.direction) }}</span><input v-model="store.structuralUpdateCandidate.labels[slot]" :data-testid="`p03-relation-rename-${slot}`" :aria-label="relationLabelTitle(slot, store.structuralUpdateCandidate.direction)" :title="relationLabelTitle(slot, store.structuralUpdateCandidate.direction) + ' · Enter 保存 / Save · Escape 取消 / Cancel'" :placeholder="slot === 'reverse_tag' ? '反向关系名称' : '关系名称'" :disabled="relationSubmitting" maxlength="256" :required="slot !== 'reverse_tag' || store.structuralUpdateCandidate.direction === 'BIDIRECTIONAL'" pattern=".*\S.*"></label>
+              </form>
+            </section>
           </div>
         </section>
 
-        <aside class="workbench-panel inspector-panel" data-testid="p03-right-panel">
-          <div class="panel-heading"><div><span>选择与属性</span><strong>{{ selectionKind }}</strong></div><span class="profile-tag">{{ store.workbench.revision }}</span></div>
-          <button v-if="!store.rightPanel.open && store.workbench.selectedId && store.relationCandidate.phase === 'idle' && store.stateCandidate.phase === 'idle'" class="button button--secondary" type="button" data-testid="p03-right-panel-open" @click="store.openRightPanel">打开属性</button>
-          <section v-if="store.relationCandidate.phase === 'selecting-target'" class="relation-candidate" data-testid="p03-relation-target">
-            <div class="form-readonly"><span>已选端点</span><code>{{ store.relationCandidate.endpointIds.join(' -> ') }}</code></div>
-            <p class="disabled-reason">可继续在画布选择端点；Self-invocation 可重复选择同一 Process。</p>
-            <button class="button" type="button" :disabled="store.relationCandidate.endpointIds.length < 2" data-testid="p03-relation-resolve" @click="store.resolveRelationCandidates">查看可用关系</button>
-            <button class="button button--secondary" type="button" @click="store.cancelRelationCandidate">取消</button>
-          </section>
-          <section v-else-if="store.relationCandidate.phase === 'choosing'" class="relation-candidate" data-testid="p03-relation-catalog">
-            <div class="form-readonly"><span>端点</span><code>{{ store.relationCandidate.sourceId }} -> {{ store.relationCandidate.targetId }}</code></div>
-            <template v-if="!store.relationCandidate.selectedOption">
-              <label v-if="store.relationCandidate.options.some((option) => option.required_fields.some((field) => field.field_id === 'duration' && field.required))" class="form-field"><span>duration</span><input v-model="store.relationCandidate.duration" data-testid="p03-relation-duration" placeholder="PT5M"></label>
-              <div class="relation-candidate__options">
-                <button v-for="option in store.relationCandidate.options" :key="option.option_id" class="relation-candidate__option" type="button" :data-testid="`p03-relation-option-${option.capability_ref.capability_id}`" @click="store.chooseRelationCandidate(option)">
-                  <strong>{{ option.display_name }}</strong><span>{{ option.normalized_endpoints.map((endpoint) => endpoint.role).join(' -> ') }}</span>
-                </button>
-              </div>
-            </template>
-            <form v-else class="state-editor" data-testid="p03-structural-candidate" @submit.prevent="store.submitRelationCandidate(store.relationCandidate.selectedOption)">
-              <div class="form-readonly"><span>关系</span><strong>{{ store.relationCandidate.selectedOption.display_name }}</strong></div>
-              <label v-for="(_, slot) in store.relationCandidate.labels" :key="slot" class="form-field"><span>{{ slot }}</span><input v-model="store.relationCandidate.labels[slot]" :data-testid="`p03-structural-label-${slot}`" maxlength="256"></label>
-              <label v-if="(store.relationCandidate.selectedOption.required_fields.find((field) => field.field_id === 'direction')?.allowed_values?.length ?? 0) !== 1" class="form-field"><span>direction</span><select v-model="store.relationCandidate.direction"><option v-for="direction in store.relationCandidate.selectedOption.required_fields.find((field) => field.field_id === 'direction')?.allowed_values ?? []" :key="direction" :value="direction">{{ direction }}</option></select></label>
-              <label v-if="store.relationCandidate.selectedOption.required_fields.some((field) => field.field_id === 'collection_completeness')" class="form-field"><span>完整性</span><select v-model="store.relationCandidate.collectionCompleteness" data-testid="p03-structural-completeness"><option disabled value="">请选择</option><option value="COMPLETE">完整</option><option value="INCOMPLETE">不完整</option></select></label>
-              <div class="state-editor__actions"><button class="button button--secondary" type="button" @click="store.cancelRelationCandidate">取消</button><button class="button" type="submit" :disabled="store.workbench.commandState === 'submitting'">创建</button></div>
-            </form>
-            <button class="button button--secondary" type="button" @click="store.cancelRelationCandidate">取消</button>
-          </section>
-          <section v-else-if="store.relationCandidate.phase === 'previewing'" class="relation-candidate" data-testid="p03-relation-preview">
-            <div class="form-readonly"><span>候选</span><code data-testid="p03-relation-preview-id">{{ store.relationCandidate.candidateId }}</code></div>
-            <p class="disabled-reason">候选尚未写入修订或投影，确认后才创建关系。</p>
-            <div class="state-editor__actions"><button class="button button--secondary" type="button" data-testid="p03-relation-preview-cancel" @click="store.cancelRelationCandidate">取消</button><button class="button" type="button" data-testid="p03-relation-preview-confirm" @click="store.confirmRelationCandidate">确认创建</button></div>
-          </section>
-          <form v-else-if="store.stateCandidate.phase === 'editing'" class="state-editor" data-testid="p03-state-candidate" @submit.prevent="store.submitStateCandidate">
-            <div class="form-readonly"><span>Owner</span><code>{{ store.stateCandidate.ownerId }}</code></div>
-            <label class="form-field"><span>State 名称</span><input v-model="store.stateCandidate.name" data-testid="p03-state-name" maxlength="256" autofocus></label>
-            <fieldset class="state-role-group"><legend>角色</legend><label v-for="role in stateRoles" :key="role"><input v-model="store.stateCandidate.roles" type="checkbox" :value="role">{{ role }}</label></fieldset>
-            <div class="state-editor__actions"><button class="button button--secondary" type="button" @click="store.cancelStateCandidate">取消</button><button class="button" type="submit" :disabled="store.workbench.commandState === 'submitting'">创建</button></div>
-          </form>
-          <section v-else-if="store.rightPanel.open && store.selectedNode?.kind === 'state'" data-testid="p03-state-inspector">
-            <div class="form-readonly"><span>State ID</span><code>{{ store.selectedNode.id }}</code></div>
-            <div class="form-readonly"><span>Owner</span><code>{{ store.selectedNode.ownerId }}</code></div>
-            <label class="form-field"><span>名称</span><input v-model="store.stateEditor.name" data-testid="p03-state-inspector-name" maxlength="256"></label>
-            <fieldset class="state-role-group"><legend>角色</legend><label v-for="role in stateRoles" :key="role"><input v-model="store.stateEditor.roles" type="checkbox" :value="role">{{ role }}</label></fieldset>
-            <div class="state-editor__actions"><button class="button" type="button" @click="store.saveSelectedState">保存 State</button></div>
-            <div class="state-presentation-actions"><button class="button button--secondary" type="button" @click="store.changeStatePresentation(store.selectedNode.explicitness === 'SUPPRESSED' ? 'STATE_EXPLICIT' : 'STATE_SUPPRESS')">{{ store.selectedNode.explicitness === 'SUPPRESSED' ? '显式' : '抑制' }}</button><button class="button button--secondary" type="button" @click="store.changeStatePresentation(store.selectedNode.foldState === 'FOLDED' ? 'UNFOLD' : 'FOLD')">{{ store.selectedNode.foldState === 'FOLDED' ? '展开' : '折叠' }}</button></div>
-            <div v-if="store.stateDeleteOption" class="impact-callout" data-testid="p03-state-delete-impact"><strong>删除影响</strong><span>构造 {{ store.stateDeleteOption.impact_summary?.affected_construct_count ?? 0 }} · Context {{ store.stateDeleteOption.impact_summary?.affected_context_count ?? 0 }} · 文本 {{ store.stateDeleteOption.impact_summary?.affected_sentence_count ?? 0 }}</span><button class="button button--danger" type="button" :disabled="!store.stateDeleteOption.enabled" @click="store.deleteSelectedState">{{ store.stateDeleteOption.enabled ? '删除 State' : 'State 被 Fact 引用，不能删除' }}</button></div>
-          </section>
-          <template v-else-if="store.rightPanel.open && store.selectedNode">
-            <div class="form-readonly"><span>名称</span><strong>{{ store.selectedNode.label }}</strong></div>
-            <div class="form-readonly"><span>稳定标识</span><code>{{ store.selectedNode.id }}</code></div>
-            <div class="form-readonly"><span>Occurrence</span><code>{{ store.selectedNode.occurrenceId }}</code></div>
-            <section v-if="store.selectedObjectSuppressedStates.length" class="state-presentation-actions" data-testid="p03-suppressed-states">
-              <button v-for="state in store.selectedObjectSuppressedStates" :key="state.state_id" class="button button--secondary" type="button" :data-testid="`p03-suppressed-state-${state.state_id}`" @click="store.makeSuppressedStateExplicit(state.state_id)">显式 {{ state.name_or_value }}</button>
-            </section>
-            <p class="disabled-reason">属性更新命令不在 P0 范围。</p>
-          </template>
-          <template v-else-if="store.rightPanel.open && store.selectedRelation">
-            <div class="form-readonly"><span>关系</span><strong>{{ store.selectedRelation.capabilityId ?? 'Consumption' }}</strong></div>
-            <div class="form-readonly"><span>稳定标识</span><code>{{ store.selectedRelation.id }}</code></div>
-            <div v-for="endpoint in store.selectedRelation.endpoints ?? []" :key="`${endpoint.ordinal}-${endpoint.role}`" class="form-readonly"><span>{{ endpoint.role }}</span><code>{{ endpoint.targetId }}</code></div>
-            <div v-if="store.selectedRelation.duration" class="form-readonly"><span>duration</span><code>{{ store.selectedRelation.duration }}</code></div>
-            <div v-if="store.selectedRelation.controlCapability" class="form-readonly"><span>Control</span><code>{{ store.selectedRelation.controlCapability }}</code></div>
-            <div v-if="store.factDeleteOption" class="impact-callout" data-testid="p03-fact-delete-impact"><strong>删除影响</strong><span>构造 {{ store.factDeleteOption.impact_summary?.affected_construct_count ?? 0 }} · Context {{ store.factDeleteOption.impact_summary?.affected_context_count ?? 0 }} · 文本 {{ store.factDeleteOption.impact_summary?.affected_sentence_count ?? 0 }}</span><button class="button button--danger" type="button" :disabled="!store.factDeleteOption.enabled || !store.factDeleteOption.impact_token" @click="store.deleteSelectedFact">删除关系</button></div>
-            <form v-if="store.structuralUpdateCandidate.phase === 'editing'" class="state-editor" data-testid="p03-structural-update" @submit.prevent="store.submitStructuralUpdate">
-              <div class="form-readonly"><span>关系</span><strong>{{ store.structuralUpdateCandidate.option?.display_name }}</strong></div>
-              <label v-for="(_, slot) in store.structuralUpdateCandidate.labels" :key="slot" class="form-field"><span>{{ slot }}</span><input v-model="store.structuralUpdateCandidate.labels[slot]" :data-testid="`p03-structural-update-label-${slot}`" maxlength="256"></label>
-              <label v-if="(store.structuralUpdateCandidate.option?.required_fields.find((field) => field.field_id === 'direction')?.allowed_values?.length ?? 0) !== 1" class="form-field"><span>direction</span><select v-model="store.structuralUpdateCandidate.direction"><option v-for="direction in store.structuralUpdateCandidate.option?.required_fields.find((field) => field.field_id === 'direction')?.allowed_values ?? []" :key="direction" :value="direction">{{ direction }}</option></select></label>
-              <label v-if="store.structuralUpdateCandidate.option?.required_fields.some((field) => field.field_id === 'collection_completeness')" class="form-field"><span>完整性</span><select v-model="store.structuralUpdateCandidate.collectionCompleteness" data-testid="p03-structural-update-completeness"><option disabled value="">请选择</option><option value="COMPLETE">完整</option><option value="INCOMPLETE">不完整</option></select></label>
-              <div class="state-editor__actions"><button class="button button--secondary" type="button" @click="store.cancelStructuralUpdate">取消</button><button class="button" type="submit" :disabled="store.workbench.commandState === 'submitting'">保存</button></div>
-            </form>
-            <template v-else-if="store.selectedRelation.capabilityId?.startsWith('CAP-ISO-STRUCT-')">
-              <div v-for="label in store.selectedRelation.labels ?? []" :key="label.slotId" class="form-readonly"><span>{{ label.slotId }}</span><strong>{{ label.text }}</strong></div>
-              <div v-if="store.selectedRelation.collectionCompleteness && store.selectedRelation.collectionCompleteness !== 'NOT_APPLICABLE'" class="form-readonly"><span>完整性</span><strong>{{ store.selectedRelation.collectionCompleteness === 'COMPLETE' ? '完整' : '不完整' }}</strong></div>
-              <button class="button" type="button" :disabled="store.isReadonly" data-testid="p03-structural-update-open" @click="store.armStructuralUpdate">编辑结构关系</button>
-            </template>
-            <template v-else>
-              <section v-if="store.controlCandidate.phase === 'choosing'" class="relation-candidate" data-testid="p03-control-catalog">
-                <div class="relation-candidate__options">
-                  <button v-for="option in store.controlCandidate.options" :key="option.option_id" class="relation-candidate__option" type="button" :data-testid="`p03-control-option-${option.capability_ref.capability_id}`" @click="store.submitControlCandidate(option)">
-                    <strong>{{ option.display_name }}</strong><span>{{ option.capability_ref.capability_id }}</span>
-                  </button>
-                </div>
-                <button class="button button--secondary" type="button" @click="store.cancelControlCandidate">取消</button>
-              </section>
-              <button v-else class="button" type="button" :disabled="store.isReadonly" data-testid="p03-control-open" @click="store.armControlUpdate">添加 Control</button>
-            </template>
-          </template>
-          <p v-else class="empty-inspector">从画布选择元素或关系。</p>
-        </aside>
+        <WorkbenchInspector v-if="inspectorDockVisible" ref="propertyNameEditor" :store="store" :canvas-location-key="canvasLocationKey" @state-candidate="Object.assign(store.stateCandidate, $event)" @state-editor="Object.assign(store.stateEditor, $event)" @structural-update-candidate="Object.assign(store.structuralUpdateCandidate, $event)" />
       </div>
     </div>
 
-    <section class="bottom-panel">
-      <div class="bottom-tabs" role="tablist">
-        <button v-for="tab in bottomTabs" :key="tab.value" :class="{ 'is-active': store.workbench.bottomTab === tab.value }" type="button" role="tab" :data-testid="`p03-tab-${tab.value}`" @click="store.setBottomTab(tab.value)">{{ tab.label }}</button>
-      </div>
-      <div v-if="store.workbench.bottomTab === 'text'" class="bottom-content" data-testid="p03-text-panel">
-        <div class="projection-meta"><span>OPL</span><span>input {{ store.workbench.revision }}</span></div>
-        <button v-for="line in store.textLines" :key="line.id" class="opl-line" type="button" data-testid="p03-opl-sentence" @click="store.locateText(line)">{{ line.text }}</button>
-        <p v-if="!store.textLines.length" class="projection-message">当前 Context 尚无可生成 OPL 的 Procedural Fact。</p>
-      </div>
-      <div v-else-if="store.workbench.bottomTab === 'findings'" class="bottom-content" data-testid="p03-findings-panel">
-        <p v-if="!store.findings.length" class="projection-message">当前修订没有 Finding。</p>
-        <button v-for="finding in store.findings" :key="finding.finding_id" class="opl-line" type="button" :class="{ 'is-active': finding.finding_id === store.selectedFindingId }" :data-testid="`p03-finding-${finding.finding_id}`" @click="store.selectFinding(finding.finding_id)">{{ finding.severity }} · {{ finding.rule_id }}</button>
-        <button class="button button--secondary" type="button" :disabled="!store.selectedFindingId" data-testid="p03-finding-locate" @click="store.locateFinding">定位 Finding</button>
-      </div>
-      <div v-else-if="store.workbench.bottomTab === 'history'" class="bottom-content" data-testid="p03-history-panel">
-        <p v-if="!store.operationRecords.length" class="projection-message">当前修订没有 Operation Record。</p>
-        <p v-for="record in store.operationRecords" :key="record.operation_record_id" :data-testid="`p03-operation-${record.operation_record_id}`">{{ record.result_status }} · {{ record.diagnostic_id ?? record.operation_id }} · {{ record.command_id }}</p>
-        <button v-if="store.releaseVisualCommonFaultCommand" class="button button--secondary" type="button" data-testid="p03-release-visual-common-fault-command" @click="store.submitReleaseVisualCommonFaultCommand">提交受控故障命令</button>
-      </div>
-      <div v-else class="bottom-content"><p>架构方法检查待连接 Method Query；当前不形成语言符合性结论。</p></div>
-    </section>
+    <WorkbenchBottomPanel :store="store" @toggle="store.workbench.bottomPanelExpanded = !store.workbench.bottomPanelExpanded" @activate-tab="activateBottomTab" />
 
     <div
+      v-if="!store.draftToken"
       class="capture-view-state"
       data-testid="p03-capture-view-state"
       :data-read-revision="store.captureViewState.readRevision"
@@ -215,48 +162,214 @@
       :data-finding-highlighted-target-id="store.captureViewState.findingHighlightedTargetId"
       :data-feedback-current-code="store.captureViewState.feedbackCurrentCode"
       aria-hidden="true"
-    ><span v-for="code in store.captureViewState.historyCodes" :key="code" :data-opm-history-code="code"></span></div>
-
-    <div class="validation-status"><div><span>校验</span><strong>{{ validationLabel }}</strong></div><progress :value="store.workbench.validationProgress" max="100" /><span>阻断 {{ store.workbench.blockingFindings }}</span></div>
+    >
+      <span v-for="code in store.captureViewState.historyCodes" :key="code" :data-opm-history-code="code" />
+    </div>
   </section>
 </template>
 
 <script setup lang="ts">
-import { Box, CircleDashed, CircleDotDashed, Cog, GitFork, Hand, ListTree, Maximize, MousePointer2, Network, Workflow, ZoomIn, ZoomOut } from "@lucide/vue";
-import { computed, watch } from "vue";
+import { Hand, Lock, Maximize, MousePointer2, PanelRightOpen, Save, Trash2, X, ZoomIn, ZoomOut } from "@lucide/vue";
+import { computed, nextTick, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
+import { useWorkbenchNavigation } from "./useWorkbenchNavigation";
 import OpdCanvas from "@/modules/workbench/OpdCanvas.vue";
+import WorkbenchBottomPanel from "./WorkbenchBottomPanel.vue";
+import WorkbenchInspector from "./WorkbenchInspector.vue";
+import ElementToolSymbol from "@/modules/workbench/ElementToolSymbol.vue";
+import RelationToolPalette from "@/modules/workbench/RelationToolPalette.vue";
+import type { WorkbenchCapabilityOption } from "@/shared/types/workbenchCapability";
 import { useWorkbenchRuntimeStore } from "@/stores/workbenchRuntime";
 
 const route = useRoute();
 const router = useRouter();
 const store = useWorkbenchRuntimeStore();
+const canvasSurface = ref<HTMLDivElement>();
+const canvasEditor = ref<InstanceType<typeof OpdCanvas>>();
+const propertyNameEditor = ref<InstanceType<typeof WorkbenchInspector>>();
+async function finishInputs(): Promise<boolean> {
+  if (relationComposing.value || relationSubmitting.value) return false;
+  if (canvasEditor.value && !await canvasEditor.value.finishNameEdit()) return false;
+  if (propertyNameEditor.value && !await propertyNameEditor.value.finishNameEdit()) return false;
+  if (inlineRelationEditing.value) {
+    await submitRelationLabelEditor();
+    if (inlineRelationEditing.value) return false;
+  }
+  if (store.relationCandidate.phase === "candidate-preview") {
+    await submitRelationParameterEditor();
+    if (store.relationCandidate.phase === "candidate-preview") return false;
+  }
+  return true;
+}
+const canvasLocationKey = ref(0);
+const relationParameterEditor = ref<HTMLFormElement>();
+const relationLabelEditor = ref<HTMLFormElement>();
+const relationEditorAnchor = ref<{ clientX: number; clientY: number } | null>(null);
+const relationComposing = ref(false);
+const relationSubmitting = ref(false);
+const inlineRelationEditing = computed(() => store.structuralUpdateCandidate.phase === "editing" && store.structuralUpdateCandidate.inline);
+const relationEditorTarget = computed(() => {
+  if (inlineRelationEditing.value) return { cellId: store.structuralUpdateCandidate.factId, ratio: 0.35 };
+  const preview = store.relationCandidate.previewSpec;
+  return preview ? { cellId: preview.primaryCellId, ratio: Object.keys(store.relationCandidate.labels).length ? 0.35 : 0.5 } : undefined;
+});
+const relationEditorStyle = computed(() => {
+  const anchor = relationEditorAnchor.value;
+  const bounds = canvasSurface.value?.getBoundingClientRect();
+  if (!anchor || !bounds) return { visibility: "hidden" as const };
+  const labelOnly = inlineRelationEditing.value || Object.keys(store.relationCandidate.labels).length > 0;
+  const width = Math.max(0, Math.min(labelOnly ? 120 : 224, bounds.width - 32));
+  const editor = inlineRelationEditing.value ? relationLabelEditor.value : relationParameterEditor.value;
+  const height = editor?.parentElement?.getBoundingClientRect().height ?? 76;
+  return {
+    left: `${Math.max(8, Math.min(anchor.clientX - bounds.left - width / 2, bounds.width - width - 8))}px`,
+    top: `${Math.max(8, Math.min(anchor.clientY - bounds.top - (labelOnly ? 12 : 48), bounds.height - height - 8))}px`,
+    width: `${width}px`, right: "auto",
+  };
+});
+const canvasInteractionTool = ref<"select" | "pan">("select");
 const projectId = computed(() => typeof route.params.projectId === "string" ? route.params.projectId : "");
 const modelId = computed(() => typeof route.params.modelId === "string" ? route.params.modelId : "");
-const bottomTabs = [
-  { value: "text", label: "OPL / OPT" },
-  { value: "findings", label: "问题" },
-  { value: "history", label: "操作历史" },
-  { value: "method", label: "架构方法" },
-] as const;
-const stateRoles = ["INITIAL", "DEFAULT", "FINAL"] as const;
-const selectionKind = computed(() => store.selectedRelation ? "关系" : store.selectedNode?.kind === "process" ? "过程" : store.selectedNode?.kind === "state" ? "状态" : store.selectedNode ? "对象" : "未选择");
-const relationPreview = computed(() => store.relationCandidate.phase === "previewing" && store.relationCandidate.candidateId
-  ? { candidateId: store.relationCandidate.candidateId, sourceId: store.relationCandidate.sourceId, targetId: store.relationCandidate.targetId }
-  : undefined);
-const validationLabel = computed(() => store.workbench.validationState === "running" ? "运行中" : store.workbench.validationState === "failed" ? "校验失败，可重试" : store.workbench.validationState === "current" ? "结果当前" : "结果过期");
+const relationPreview = computed(() => store.relationCandidate.previewSpec ?? store.controlCandidate.previewSpec ?? undefined);
+const activeRelationCapabilityId = computed(() => store.relationCandidate.catalogItem?.capability_id ?? store.controlCandidate.selectedOption?.capability_ref.capability_id);
+const inspectorDockVisible = computed(() => store.rightPanel.open
+  || store.stateCandidate.phase === "editing"
+  || store.controlCandidate.phase !== "idle"
+  || (store.structuralUpdateCandidate.phase === "editing" && !store.structuralUpdateCandidate.inline));
+const constructMenuStyle = computed(() => ({ left: `${store.constructActions.anchor.x}px`, top: `${store.constructActions.anchor.y}px` }));
 
-watch([projectId, modelId, () => route.query.context, () => route.query.revision], ([nextProject, nextModel, context, revision]) => {
-  if (!nextProject || !nextModel) return;
-  const wantedContext = typeof context === "string" ? context : undefined;
-  const wantedRevision = typeof revision === "string" ? revision : undefined;
-  if (nextProject === store.projectId && nextModel === store.modelId && wantedContext === store.workbench.activeContextId && wantedRevision === store.workbench.revision) return;
-  void store.load(nextProject, nextModel, wantedContext, wantedRevision);
-}, { immediate: true });
+function activateBottomTab(tab: typeof store.workbench.bottomTab) {
+  if (store.workbench.bottomPanelExpanded && store.workbench.bottomTab === tab) store.workbench.bottomPanelExpanded = false;
+  else store.setBottomTab(tab);
+}
 
-watch(() => [store.workbench.revision, store.workbench.activeContextId], ([revision, context]) => {
-  if (!revision || !context || (route.query.revision === revision && route.query.context === context)) return;
-  void router.replace({ query: { ...route.query, revision, context } });
+function requestConstructActions(selectionId: string, anchor?: { clientX: number; clientY: number }, activation: "menu" | "direct" = "menu") {
+  const bounds = canvasSurface.value?.getBoundingClientRect();
+  const menuWidth = 208;
+  const menuHeight = 184;
+  const gutter = 8;
+  const localX = anchor && bounds ? anchor.clientX - bounds.left : gutter;
+  const localY = anchor && bounds ? anchor.clientY - bounds.top : gutter;
+  const x = Math.max(gutter, Math.min(localX, Math.max(gutter, (bounds?.width ?? menuWidth + gutter * 2) - menuWidth - gutter)));
+  const y = Math.max(gutter, Math.min(localY, Math.max(gutter, (bounds?.height ?? menuHeight + gutter * 2) - menuHeight - gutter)));
+  void store.requestConstructActions(selectionId, { x, y }, activation);
+}
+
+function openConstructProperties() {
+  store.cancelConstructDelete();
+  store.openRightPanel();
+}
+
+function toggleProperties() {
+  if (store.rightPanel.open) store.closeRightPanel();
+  else store.openRightPanel();
+}
+
+function setCanvasInteractionTool(tool: "select" | "pan") {
+  if (relationSubmitting.value) return;
+  if (inlineRelationEditing.value) store.cancelStructuralUpdate();
+  if (tool === "pan") {
+    store.cancelRelationCandidate();
+    store.cancelStateCandidate();
+  }
+  canvasInteractionTool.value = tool;
+}
+
+function activateRelationCatalogItem(item: Parameters<typeof store.activateRelationCatalogItem>[0], intent: Parameters<typeof store.activateRelationCatalogItem>[1]) {
+  if (relationSubmitting.value) return;
+  store.cancelStructuralUpdate();
+  canvasInteractionTool.value = "select";
+  store.activateRelationCatalogItem(item, intent);
+}
+
+function armStateCreation() {
+  canvasInteractionTool.value = "select";
+  store.armStateCreation();
+}
+
+function deleteActionLabel(option: WorkbenchCapabilityOption) {
+  if (option.command_type === "UPDATE_FACT") return "移除 Control";
+  if (option.delete_mode === "REMOVE_OCCURRENCE") return "从当前 OPD 移除";
+  if (option.delete_mode === "CASCADE") return "删除全部受影响内容";
+  const target = option.delete_target?.kind;
+  if (target === "STATE") return "删除状态";
+  if (target === "FACT") return "删除关系";
+  if (target === "FEATURE") return store.selectedNode?.kind === "operation" ? "删除操作" : "删除属性";
+  if (target === "ELEMENT") return store.selectedNode?.kind === "process" ? "删除过程" : "删除对象";
+  return "删除构造";
+}
+
+function updateRelationSelectParameter() {
+  store.rebuildRelationPreview();
+  const option = store.relationCandidate.selectedOption;
+  if (!option) return;
+  const hasTextParameter = option.required_fields.some((field) => field.field_id === "duration" || field.field_id === "labels");
+  if (!hasTextParameter) void store.confirmRelationCandidate();
+}
+
+async function submitRelationParameterEditor(event?: Event) {
+  if (relationComposing.value || (event instanceof KeyboardEvent && event.isComposing) || relationSubmitting.value || !relationParameterEditor.value?.reportValidity()) return;
+  relationSubmitting.value = true;
+  try { await store.confirmRelationCandidate(); } finally { relationSubmitting.value = false; }
+}
+
+function relationLabelTitle(slot: string, direction: string) {
+  return slot === "reverse_tag" ? "反向名称 / Reverse name" : direction === "BIDIRECTIONAL" ? "正向名称 / Forward name" : "关系名称 / Relation name";
+}
+
+async function openRelationLabelEditor(relationId: string) {
+  if (relationSubmitting.value || store.workbench.commandState === "submitting") return;
+  store.cancelRelationCandidate();
+  await store.selectConstruct(relationId);
+  if (store.workbench.selectedId !== relationId) return;
+  await store.armStructuralUpdate(true);
+}
+
+function cancelRelationEditor() {
+  if (relationSubmitting.value) return;
+  store.cancelRelationCandidate();
+  store.cancelStructuralUpdate();
+}
+
+async function submitRelationLabelEditor(event?: Event) {
+  if (relationComposing.value || (event instanceof KeyboardEvent && event.isComposing) || relationSubmitting.value || !relationLabelEditor.value?.reportValidity()) return;
+  relationSubmitting.value = true;
+  try { await store.submitStructuralUpdate(); } finally { relationSubmitting.value = false; }
+}
+
+watch(inlineRelationEditing, async (editing) => {
+  relationComposing.value = false;
+  if (!editing) return;
+  await nextTick();
+  const input = relationLabelEditor.value?.querySelector("input");
+  input?.focus();
+  input?.select();
 });
+
+// 等待 X6 的路径首次可观测后再聚焦，避免输入框仍隐藏时丢失焦点。
+watch(() => Boolean(relationEditorAnchor.value), async (visible) => {
+  if (!visible) return;
+  await nextTick();
+  const input = (inlineRelationEditing.value ? relationLabelEditor.value : relationParameterEditor.value)?.querySelector<HTMLInputElement>("input");
+  input?.focus();
+  if (inlineRelationEditing.value) input?.select();
+});
+
+watch(() => [projectId.value, modelId.value, store.workbench.selectedId, store.workbench.activeContextId], () => {
+  store.cancelStructuralUpdate();
+});
+watch(() => store.editingIdentity, () => {
+  if (!relationSubmitting.value) store.cancelStructuralUpdate();
+});
+
+const { requestSave, openVersion, openContext, copyPermalink } = useWorkbenchNavigation({ store, route, router, finishInputs, projectId, modelId, canvasLocationKey, canvasInteractionTool });
+
+watch(() => store.relationCandidate.phase, async (phase) => {
+  if (phase !== "candidate-preview" || store.relationCandidate.autoCommitting) return;
+  relationComposing.value = false;
+  await nextTick();
+  relationParameterEditor.value?.querySelector<HTMLElement>("input, select")?.focus();
+});
+
 </script>

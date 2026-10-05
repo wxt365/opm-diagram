@@ -1,0 +1,819 @@
+{
+  "schema_version": "0.2",
+  "project_id": "project.1",
+  "model_id": "model.1",
+  "token": {
+    "draft_id": "draft.1",
+    "edit_seq": 0,
+    "binding_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "messages": [
+    {
+      "type": "OpenDraftRequest",
+      "raw": "{\"request_id\":\"request.1\",\"context_id\":null}"
+    },
+    {
+      "type": "DraftQueryRequest",
+      "raw": "{\"request_id\":\"request.1\",\"draft_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"context_id\":\"context.1\"}"
+    },
+    {
+      "type": "DraftCapabilitiesRequest",
+      "raw": "{\"request_id\":\"request.1\",\"draft_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"scope\":{\"context_id\":\"context.1\",\"selection_id\":\"occurrence.1\",\"intent\":\"DELETE_CONSTRUCT\",\"endpoints\":[]}}"
+    },
+    {
+      "type": "OpenDraftResult",
+      "raw": "{\"request_id\":\"request.1\",\"project_id\":\"project.1\",\"model_id\":\"model.1\",\"root_context_id\":\"context.1\",\"context_id\":\"context.1\",\"mode\":\"JOURNALED_DRAFT_V2\",\"draft_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"save_state\":{\"durable_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"checkpoint_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"last_manual_revision\":null,\"dirty_since\":null,\"deadline\":null,\"in_flight\":\"NONE\",\"pending_manual_target\":null,\"last_error\":null}}"
+    },
+    {
+      "type": "DraftEditResult",
+      "raw": "{\"request_id\":\"request.1\",\"command_id\":\"command.1\",\"status\":\"DURABLE\",\"base_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"result_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":1,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"content_digest\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"affected_ids\":[],\"text_trace_ids\":[],\"validation_summary\":{\"blocking\":0,\"warning\":0,\"suggestion\":0,\"coverage_state\":\"COMPLETE\"}}"
+    },
+    {
+      "type": "DraftEditResult",
+      "raw": "{\"request_id\":\"request.1\",\"command_id\":\"command.1\",\"status\":\"UNCHANGED\",\"base_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"result_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"content_digest\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"affected_ids\":[],\"text_trace_ids\":[],\"validation_summary\":{\"blocking\":0,\"warning\":0,\"suggestion\":0,\"coverage_state\":\"COMPLETE\"}}"
+    },
+    {
+      "type": "DraftProjectionResult",
+      "raw": "{\"meta\":{\"request_id\":\"request.1\",\"draft_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"context_id\":\"context.1\"},\"data\":{\"context_id\":\"context.1\",\"constructs\":[{\"occurrence_id\":\"occurrence.1\",\"target_id\":\"element.1\",\"target_kind\":\"ELEMENT\",\"construct_role\":\"OBJECT_NODE\",\"capability_id\":\"CAP-OBJECT-001\",\"label\":\"订单\",\"layout\":{\"x\":0.1,\"y\":2,\"width\":100,\"height\":60,\"z_order\":0,\"route_points\":[{\"x\":3.3,\"y\":4.4}]}}],\"suppressed_states\":[]}}"
+    },
+    {
+      "type": "DraftCapabilitiesResult",
+      "raw": "{\"meta\":{\"request_id\":\"request.1\",\"draft_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"context_id\":\"context.1\"},\"data\":{\"scope\":{\"context_id\":\"context.1\",\"selection_id\":\"occurrence.1\",\"intent\":\"DELETE_CONSTRUCT\",\"endpoints\":[]},\"allowed\":[\"DELETE_CONSTRUCT\"],\"forbidden\":[],\"capability_query_id\":\"query.1\",\"options\":[{\"capability_query_id\":\"query.1\",\"option_id\":\"option.1\",\"command_type\":\"DELETE_CONSTRUCT\",\"capability_ref\":{\"capability_id\":\"CAP-DELETE-001\"},\"display_name\":\"删除\",\"group_path\":[],\"normalized_endpoints\":[],\"required_fields\":[],\"allowed_modifiers\":[],\"symbol_descriptor\":{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"template_family\":{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"rule_refs\":[{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}],\"enabled\":true,\"reason_codes\":[],\"expires_with_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"impact_summary\":{\"input_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"selected_occurrence_id\":\"occurrence.1\",\"delete_mode\":\"DELETE_TARGET\",\"target\":{\"kind\":\"ELEMENT\",\"id\":\"element.1\"},\"items\":[],\"counts\":{\"contexts\":0,\"occurrences\":0,\"elements\":0,\"features\":0,\"states\":0,\"facts\":0,\"opl_sentences\":0,\"traces\":0,\"findings\":0}},\"impact_token\":\"impact.1234567890123456789\",\"delete_mode\":\"DELETE_TARGET\",\"delete_target\":{\"kind\":\"ELEMENT\",\"id\":\"element.1\"}}]}}"
+    },
+    {
+      "type": "DraftTextResult",
+      "raw": "{\"meta\":{\"request_id\":\"request.1\",\"draft_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"context_id\":\"context.1\"},\"data\":{\"artifact_id\":\"artifact.1\",\"modality\":\"OPL\",\"sentences\":[{\"sentence_id\":\"sentence.1\",\"text\":\"订单存在。\",\"ordinal\":0}],\"traces\":[]}}"
+    },
+    {
+      "type": "DraftNavigationResult",
+      "raw": "{\"meta\":{\"request_id\":\"request.1\",\"draft_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"context_id\":\"context.1\"},\"data\":{\"current_path\":[\"context.1\"],\"process_tree\":[],\"object_forest\":[],\"views\":[{\"context_id\":\"context.1\",\"label\":\"系统图\",\"context_kind\":\"ROOT\",\"has_children\":false}]}}"
+    },
+    {
+      "type": "DraftFindingsResult",
+      "raw": "{\"meta\":{\"request_id\":\"request.1\",\"draft_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"context_id\":\"context.1\"},\"data\":{\"items\":[],\"validation_scope\":\"MODEL\",\"validation_summary\":{\"blocking\":0,\"warning\":0,\"suggestion\":0,\"coverage_state\":\"INCOMPLETE\"}}}"
+    },
+    {
+      "type": "DraftRelationCatalogRequest",
+      "raw": "{\"request_id\":\"request.1\",\"draft_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"context_id\":\"context.1\",\"selection_id\":null}"
+    },
+    {
+      "type": "DraftRelationCatalogResult",
+      "raw": "{\"meta\":{\"request_id\":\"request.1\",\"draft_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"context_id\":\"context.1\"},\"data\":{\"items\":[{\"family\":\"PROCEDURAL\",\"capability_id\":\"capability.0\",\"display_name\":\"关系\",\"symbol_id\":\"symbol.0\",\"interaction_mode\":\"CREATE_FACT\",\"symbol_descriptor\":{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"endpoint_summary\":{\"min_endpoints\":2,\"roles\":[]},\"enabled\":true,\"reason_codes\":[]},{\"family\":\"PROCEDURAL\",\"capability_id\":\"capability.1\",\"display_name\":\"关系\",\"symbol_id\":\"symbol.1\",\"interaction_mode\":\"CREATE_FACT\",\"symbol_descriptor\":{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"endpoint_summary\":{\"min_endpoints\":2,\"roles\":[]},\"enabled\":true,\"reason_codes\":[]},{\"family\":\"PROCEDURAL\",\"capability_id\":\"capability.2\",\"display_name\":\"关系\",\"symbol_id\":\"symbol.2\",\"interaction_mode\":\"CREATE_FACT\",\"symbol_descriptor\":{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"endpoint_summary\":{\"min_endpoints\":2,\"roles\":[]},\"enabled\":true,\"reason_codes\":[]},{\"family\":\"PROCEDURAL\",\"capability_id\":\"capability.3\",\"display_name\":\"关系\",\"symbol_id\":\"symbol.3\",\"interaction_mode\":\"CREATE_FACT\",\"symbol_descriptor\":{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"endpoint_summary\":{\"min_endpoints\":2,\"roles\":[]},\"enabled\":true,\"reason_codes\":[]},{\"family\":\"PROCEDURAL\",\"capability_id\":\"capability.4\",\"display_name\":\"关系\",\"symbol_id\":\"symbol.4\",\"interaction_mode\":\"CREATE_FACT\",\"symbol_descriptor\":{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"endpoint_summary\":{\"min_endpoints\":2,\"roles\":[]},\"enabled\":true,\"reason_codes\":[]},{\"family\":\"PROCEDURAL\",\"capability_id\":\"capability.5\",\"display_name\":\"关系\",\"symbol_id\":\"symbol.5\",\"interaction_mode\":\"CREATE_FACT\",\"symbol_descriptor\":{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"endpoint_summary\":{\"min_endpoints\":2,\"roles\":[]},\"enabled\":true,\"reason_codes\":[]},{\"family\":\"PROCEDURAL\",\"capability_id\":\"capability.6\",\"display_name\":\"关系\",\"symbol_id\":\"symbol.6\",\"interaction_mode\":\"CREATE_FACT\",\"symbol_descriptor\":{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"endpoint_summary\":{\"min_endpoints\":2,\"roles\":[]},\"enabled\":true,\"reason_codes\":[]},{\"family\":\"PROCEDURAL\",\"capability_id\":\"capability.7\",\"display_name\":\"关系\",\"symbol_id\":\"symbol.7\",\"interaction_mode\":\"CREATE_FACT\",\"symbol_descriptor\":{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"endpoint_summary\":{\"min_endpoints\":2,\"roles\":[]},\"enabled\":true,\"reason_codes\":[]},{\"family\":\"PROCEDURAL\",\"capability_id\":\"capability.8\",\"display_name\":\"关系\",\"symbol_id\":\"symbol.8\",\"interaction_mode\":\"CREATE_FACT\",\"symbol_descriptor\":{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"endpoint_summary\":{\"min_endpoints\":2,\"roles\":[]},\"enabled\":true,\"reason_codes\":[]},{\"family\":\"PROCEDURAL\",\"capability_id\":\"capability.9\",\"display_name\":\"关系\",\"symbol_id\":\"symbol.9\",\"interaction_mode\":\"CREATE_FACT\",\"symbol_descriptor\":{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"endpoint_summary\":{\"min_endpoints\":2,\"roles\":[]},\"enabled\":true,\"reason_codes\":[]},{\"family\":\"PROCEDURAL\",\"capability_id\":\"capability.10\",\"display_name\":\"关系\",\"symbol_id\":\"symbol.10\",\"interaction_mode\":\"CREATE_FACT\",\"symbol_descriptor\":{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"endpoint_summary\":{\"min_endpoints\":2,\"roles\":[]},\"enabled\":true,\"reason_codes\":[]},{\"family\":\"PROCEDURAL\",\"capability_id\":\"capability.11\",\"display_name\":\"关系\",\"symbol_id\":\"symbol.11\",\"interaction_mode\":\"CREATE_FACT\",\"symbol_descriptor\":{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"endpoint_summary\":{\"min_endpoints\":2,\"roles\":[]},\"enabled\":true,\"reason_codes\":[]},{\"family\":\"PROCEDURAL\",\"capability_id\":\"capability.12\",\"display_name\":\"关系\",\"symbol_id\":\"symbol.12\",\"interaction_mode\":\"CREATE_FACT\",\"symbol_descriptor\":{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"endpoint_summary\":{\"min_endpoints\":2,\"roles\":[]},\"enabled\":true,\"reason_codes\":[]},{\"family\":\"PROCEDURAL\",\"capability_id\":\"capability.13\",\"display_name\":\"关系\",\"symbol_id\":\"symbol.13\",\"interaction_mode\":\"CREATE_FACT\",\"symbol_descriptor\":{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"endpoint_summary\":{\"min_endpoints\":2,\"roles\":[]},\"enabled\":true,\"reason_codes\":[]},{\"family\":\"PROCEDURAL\",\"capability_id\":\"capability.14\",\"display_name\":\"关系\",\"symbol_id\":\"symbol.14\",\"interaction_mode\":\"CREATE_FACT\",\"symbol_descriptor\":{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"endpoint_summary\":{\"min_endpoints\":2,\"roles\":[]},\"enabled\":true,\"reason_codes\":[]},{\"family\":\"PROCEDURAL\",\"capability_id\":\"capability.15\",\"display_name\":\"关系\",\"symbol_id\":\"symbol.15\",\"interaction_mode\":\"CREATE_FACT\",\"symbol_descriptor\":{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"endpoint_summary\":{\"min_endpoints\":2,\"roles\":[]},\"enabled\":true,\"reason_codes\":[]},{\"family\":\"CONTROL\",\"capability_id\":\"capability.16\",\"display_name\":\"关系\",\"symbol_id\":\"symbol.16\",\"interaction_mode\":\"UPDATE_SELECTED_FACT\",\"symbol_descriptor\":{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"endpoint_summary\":{\"min_endpoints\":2,\"roles\":[]},\"enabled\":true,\"reason_codes\":[]},{\"family\":\"CONTROL\",\"capability_id\":\"capability.17\",\"display_name\":\"关系\",\"symbol_id\":\"symbol.17\",\"interaction_mode\":\"UPDATE_SELECTED_FACT\",\"symbol_descriptor\":{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"endpoint_summary\":{\"min_endpoints\":2,\"roles\":[]},\"enabled\":true,\"reason_codes\":[]},{\"family\":\"CONTROL\",\"capability_id\":\"capability.18\",\"display_name\":\"关系\",\"symbol_id\":\"symbol.18\",\"interaction_mode\":\"UPDATE_SELECTED_FACT\",\"symbol_descriptor\":{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"endpoint_summary\":{\"min_endpoints\":2,\"roles\":[]},\"enabled\":true,\"reason_codes\":[]},{\"family\":\"CONTROL\",\"capability_id\":\"capability.19\",\"display_name\":\"关系\",\"symbol_id\":\"symbol.19\",\"interaction_mode\":\"UPDATE_SELECTED_FACT\",\"symbol_descriptor\":{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"endpoint_summary\":{\"min_endpoints\":2,\"roles\":[]},\"enabled\":true,\"reason_codes\":[]},{\"family\":\"CONTROL\",\"capability_id\":\"capability.20\",\"display_name\":\"关系\",\"symbol_id\":\"symbol.20\",\"interaction_mode\":\"UPDATE_SELECTED_FACT\",\"symbol_descriptor\":{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"endpoint_summary\":{\"min_endpoints\":2,\"roles\":[]},\"enabled\":true,\"reason_codes\":[]},{\"family\":\"CONTROL\",\"capability_id\":\"capability.21\",\"display_name\":\"关系\",\"symbol_id\":\"symbol.21\",\"interaction_mode\":\"UPDATE_SELECTED_FACT\",\"symbol_descriptor\":{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"endpoint_summary\":{\"min_endpoints\":2,\"roles\":[]},\"enabled\":true,\"reason_codes\":[]},{\"family\":\"CONTROL\",\"capability_id\":\"capability.22\",\"display_name\":\"关系\",\"symbol_id\":\"symbol.22\",\"interaction_mode\":\"UPDATE_SELECTED_FACT\",\"symbol_descriptor\":{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"endpoint_summary\":{\"min_endpoints\":2,\"roles\":[]},\"enabled\":true,\"reason_codes\":[]},{\"family\":\"CONTROL\",\"capability_id\":\"capability.23\",\"display_name\":\"关系\",\"symbol_id\":\"symbol.23\",\"interaction_mode\":\"UPDATE_SELECTED_FACT\",\"symbol_descriptor\":{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"endpoint_summary\":{\"min_endpoints\":2,\"roles\":[]},\"enabled\":true,\"reason_codes\":[]},{\"family\":\"STRUCTURAL\",\"capability_id\":\"capability.24\",\"display_name\":\"关系\",\"symbol_id\":\"symbol.24\",\"interaction_mode\":\"CREATE_FACT\",\"symbol_descriptor\":{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"endpoint_summary\":{\"min_endpoints\":2,\"roles\":[]},\"enabled\":true,\"reason_codes\":[]},{\"family\":\"STRUCTURAL\",\"capability_id\":\"capability.25\",\"display_name\":\"关系\",\"symbol_id\":\"symbol.25\",\"interaction_mode\":\"CREATE_FACT\",\"symbol_descriptor\":{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"endpoint_summary\":{\"min_endpoints\":2,\"roles\":[]},\"enabled\":true,\"reason_codes\":[]},{\"family\":\"STRUCTURAL\",\"capability_id\":\"capability.26\",\"display_name\":\"关系\",\"symbol_id\":\"symbol.26\",\"interaction_mode\":\"CREATE_FACT\",\"symbol_descriptor\":{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"endpoint_summary\":{\"min_endpoints\":2,\"roles\":[]},\"enabled\":true,\"reason_codes\":[]},{\"family\":\"STRUCTURAL\",\"capability_id\":\"capability.27\",\"display_name\":\"关系\",\"symbol_id\":\"symbol.27\",\"interaction_mode\":\"CREATE_FACT\",\"symbol_descriptor\":{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"endpoint_summary\":{\"min_endpoints\":2,\"roles\":[]},\"enabled\":true,\"reason_codes\":[]},{\"family\":\"STRUCTURAL\",\"capability_id\":\"capability.28\",\"display_name\":\"关系\",\"symbol_id\":\"symbol.28\",\"interaction_mode\":\"CREATE_FACT\",\"symbol_descriptor\":{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"endpoint_summary\":{\"min_endpoints\":2,\"roles\":[]},\"enabled\":true,\"reason_codes\":[]},{\"family\":\"STRUCTURAL\",\"capability_id\":\"capability.29\",\"display_name\":\"关系\",\"symbol_id\":\"symbol.29\",\"interaction_mode\":\"CREATE_FACT\",\"symbol_descriptor\":{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"endpoint_summary\":{\"min_endpoints\":2,\"roles\":[]},\"enabled\":true,\"reason_codes\":[]},{\"family\":\"STRUCTURAL\",\"capability_id\":\"capability.30\",\"display_name\":\"关系\",\"symbol_id\":\"symbol.30\",\"interaction_mode\":\"CREATE_FACT\",\"symbol_descriptor\":{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"endpoint_summary\":{\"min_endpoints\":2,\"roles\":[]},\"enabled\":true,\"reason_codes\":[]},{\"family\":\"STRUCTURAL\",\"capability_id\":\"capability.31\",\"display_name\":\"关系\",\"symbol_id\":\"symbol.31\",\"interaction_mode\":\"CREATE_FACT\",\"symbol_descriptor\":{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"endpoint_summary\":{\"min_endpoints\":2,\"roles\":[]},\"enabled\":true,\"reason_codes\":[]},{\"family\":\"STRUCTURAL\",\"capability_id\":\"capability.32\",\"display_name\":\"关系\",\"symbol_id\":\"symbol.32\",\"interaction_mode\":\"CREATE_FACT\",\"symbol_descriptor\":{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"endpoint_summary\":{\"min_endpoints\":2,\"roles\":[]},\"enabled\":true,\"reason_codes\":[]},{\"family\":\"STRUCTURAL\",\"capability_id\":\"capability.33\",\"display_name\":\"关系\",\"symbol_id\":\"symbol.33\",\"interaction_mode\":\"CREATE_FACT\",\"symbol_descriptor\":{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"endpoint_summary\":{\"min_endpoints\":2,\"roles\":[]},\"enabled\":true,\"reason_codes\":[]}]}}"
+    },
+    {
+      "type": "DraftReceiptRequest",
+      "raw": "{\"request_id\":\"request.1\",\"operation\":\"EDIT\",\"idempotency_id\":\"command.1\"}"
+    },
+    {
+      "type": "DraftReceiptResult",
+      "raw": "{\"request_id\":\"request.1\",\"operation\":\"EDIT\",\"idempotency_id\":\"command.1\",\"status\":\"NOT_FOUND\",\"request_digest\":null,\"result\":null}"
+    },
+    {
+      "type": "DraftReceiptResult",
+      "raw": "{\"request_id\":\"request.1\",\"operation\":\"EDIT\",\"idempotency_id\":\"command.1\",\"status\":\"FOUND\",\"request_digest\":\"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\",\"result\":{\"request_id\":\"request.1\",\"command_id\":\"command.1\",\"status\":\"DURABLE\",\"base_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"result_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":1,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"content_digest\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"affected_ids\":[],\"text_trace_ids\":[],\"validation_summary\":{\"blocking\":0,\"warning\":0,\"suggestion\":0,\"coverage_state\":\"COMPLETE\"}}}"
+    },
+    {
+      "type": "DraftReceiptRequest",
+      "raw": "{\"request_id\":\"request.1\",\"operation\":\"SAVE\",\"idempotency_id\":\"save.1\"}"
+    },
+    {
+      "type": "DraftReceiptResult",
+      "raw": "{\"request_id\":\"request.1\",\"operation\":\"SAVE\",\"idempotency_id\":\"save.1\",\"status\":\"NOT_FOUND\",\"request_digest\":null,\"result\":null}"
+    },
+    {
+      "type": "DraftReceiptResult",
+      "raw": "{\"request_id\":\"request.1\",\"operation\":\"SAVE\",\"idempotency_id\":\"save.1\",\"status\":\"FOUND\",\"request_digest\":\"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\",\"result\":{\"save_id\":\"save.1\",\"status\":\"SAVED\",\"captured_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"checkpoint_id\":\"checkpoint.1\",\"revision_id\":\"revision.1\",\"head_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}}}"
+    },
+    {
+      "type": "DraftReceiptRequest",
+      "raw": "{\"request_id\":\"request.1\",\"operation\":\"PIN\",\"idempotency_id\":\"pin.1\"}"
+    },
+    {
+      "type": "DraftReceiptResult",
+      "raw": "{\"request_id\":\"request.1\",\"operation\":\"PIN\",\"idempotency_id\":\"pin.1\",\"status\":\"NOT_FOUND\",\"request_digest\":null,\"result\":null}"
+    },
+    {
+      "type": "DraftReceiptResult",
+      "raw": "{\"request_id\":\"request.1\",\"operation\":\"PIN\",\"idempotency_id\":\"pin.1\",\"status\":\"FOUND\",\"request_digest\":\"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\",\"result\":{\"pin_id\":\"pin.1\",\"revision_id\":\"revision.1\",\"captured_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}}}"
+    },
+    {
+      "type": "DraftError",
+      "raw": "{\"code\":\"DRAFT_EDIT_REJECTED\",\"message\":\"删除依赖阻断\",\"retryable\":false,\"reason_code\":\"DELETE_DEPENDENCY_EXISTS\"}"
+    }
+  ],
+  "rejections": [
+    {
+      "type": "DraftReceiptResult",
+      "raw": "{\"request_id\":\"request.1\",\"operation\":\"EDIT\",\"idempotency_id\":\"bad.id\",\"status\":\"FOUND\",\"request_digest\":\"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\",\"result\":{\"request_id\":\"request.1\",\"command_id\":\"command.1\",\"status\":\"DURABLE\",\"base_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"result_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":1,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"content_digest\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"affected_ids\":[],\"text_trace_ids\":[],\"validation_summary\":{\"blocking\":0,\"warning\":0,\"suggestion\":0,\"coverage_state\":\"COMPLETE\"}}}"
+    },
+    {
+      "type": "DraftReceiptResult",
+      "raw": "{\"request_id\":\"request.1\",\"operation\":\"EDIT\",\"idempotency_id\":\"command.1\",\"status\":\"FOUND\",\"request_digest\":\"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\",\"result\":{}}"
+    },
+    {
+      "type": "DraftReceiptResult",
+      "raw": "{\"request_id\":\"request.1\",\"operation\":\"SAVE\",\"idempotency_id\":\"bad.id\",\"status\":\"FOUND\",\"request_digest\":\"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\",\"result\":{\"save_id\":\"save.1\",\"status\":\"SAVED\",\"captured_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"checkpoint_id\":\"checkpoint.1\",\"revision_id\":\"revision.1\",\"head_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}}}"
+    },
+    {
+      "type": "DraftReceiptResult",
+      "raw": "{\"request_id\":\"request.1\",\"operation\":\"SAVE\",\"idempotency_id\":\"save.1\",\"status\":\"FOUND\",\"request_digest\":\"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\",\"result\":{}}"
+    },
+    {
+      "type": "DraftReceiptResult",
+      "raw": "{\"request_id\":\"request.1\",\"operation\":\"PIN\",\"idempotency_id\":\"bad.id\",\"status\":\"FOUND\",\"request_digest\":\"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\",\"result\":{\"pin_id\":\"pin.1\",\"revision_id\":\"revision.1\",\"captured_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}}}"
+    },
+    {
+      "type": "DraftReceiptResult",
+      "raw": "{\"request_id\":\"request.1\",\"operation\":\"PIN\",\"idempotency_id\":\"pin.1\",\"status\":\"FOUND\",\"request_digest\":\"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\",\"result\":{}}"
+    },
+    {
+      "type": "DraftEditRequest",
+      "raw": "{\"request_id\":\"request.1\",\"command_id\":\"command.1\",\"expected_draft_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"scope\":{\"context_id\":\"context.1\",\"selection_id\":\"occurrence.1\",\"intent\":\"CREATE_ELEMENT\",\"endpoints\":[]},\"authorization\":{\"capability_query_id\":\"query.1\",\"selected_option_id\":\"option.1\"},\"command\":{\"command_type\":\"CREATE_ELEMENT\",\"payload\":{\"kind\":\"OBJECT\",\"name\":\"订单\",\"layout\":{\"x\":0,\"y\":2.5},\"extra\":true}}}"
+    },
+    {
+      "type": "DraftEditRequest",
+      "raw": "{\"request_id\":\"request.1\",\"command_id\":\"command.1\",\"expected_draft_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"scope\":{\"context_id\":\"context.1\",\"selection_id\":\"occurrence.1\",\"intent\":\"CREATE_FEATURE\",\"endpoints\":[]},\"authorization\":{\"capability_query_id\":\"query.1\",\"selected_option_id\":\"option.1\"},\"command\":{\"command_type\":\"CREATE_FEATURE\",\"payload\":{\"context_id\":\"context.1\",\"owner_element_id\":\"element.1\",\"feature_kind\":\"ATTRIBUTE\",\"capability_ref\":{\"capability_id\":\"CAP-FEAT-ATTRIBUTE-001\"},\"name\":\"颜色\",\"occurrence\":{\"ownership\":\"OWNED\",\"construct_role\":\"ATTRIBUTE_NODE\"},\"layout\":{\"x\":0,\"y\":0},\"extra\":true}}}"
+    },
+    {
+      "type": "DraftEditRequest",
+      "raw": "{\"request_id\":\"request.1\",\"command_id\":\"command.1\",\"expected_draft_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"scope\":{\"context_id\":\"context.1\",\"selection_id\":\"occurrence.1\",\"intent\":\"CREATE_FACT\",\"endpoints\":[]},\"authorization\":{\"capability_query_id\":\"query.1\",\"selected_option_id\":\"option.1\"},\"command\":{\"command_type\":\"CREATE_FACT\",\"payload\":{\"context_id\":\"context.1\",\"capability_ref\":{\"capability_id\":\"CAP-ISO-PROC-001\"},\"fact_family\":\"PROCEDURAL\",\"normalized_endpoints\":[{\"role\":\"CONSUMED_OBJECT\",\"target_ref\":{\"target_kind\":\"ELEMENT\",\"target_id\":\"element.1\"},\"ordinal\":0},{\"role\":\"CONSUMING_PROCESS\",\"target_ref\":{\"target_kind\":\"ELEMENT\",\"target_id\":\"element.2\"},\"ordinal\":1}],\"direction\":\"DIRECTED\",\"labels\":[],\"modifiers\":[],\"logical_groups\":[],\"occurrence\":{\"ownership\":\"OWNED\",\"construct_role\":\"CONSUMPTION_LINK\"},\"layout\":{\"route_points\":[{\"x\":0.1,\"y\":-2.5}]},\"extra\":true}}}"
+    },
+    {
+      "type": "DraftEditRequest",
+      "raw": "{\"request_id\":\"request.1\",\"command_id\":\"command.1\",\"expected_draft_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"scope\":{\"context_id\":\"context.1\",\"selection_id\":\"occurrence.1\",\"intent\":\"CREATE_STATE\",\"endpoints\":[]},\"authorization\":{\"capability_query_id\":\"query.1\",\"selected_option_id\":\"option.1\"},\"command\":{\"command_type\":\"CREATE_STATE\",\"payload\":{\"context_id\":\"context.1\",\"owner_ref\":{\"target_kind\":\"ELEMENT\",\"target_id\":\"element.1\"},\"capability_ref\":{\"capability_id\":\"CAP-STATE-001\"},\"name_or_value\":\"就绪\",\"state_roles\":[\"INITIAL\"],\"occurrence\":{\"ownership\":\"OWNED\",\"construct_role\":\"STATE_NODE\"},\"layout\":{\"x\":1,\"y\":2},\"extra\":true}}}"
+    },
+    {
+      "type": "DraftEditRequest",
+      "raw": "{\"request_id\":\"request.1\",\"command_id\":\"command.1\",\"expected_draft_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"scope\":{\"context_id\":\"context.1\",\"selection_id\":\"occurrence.1\",\"intent\":\"UPDATE_STATE\",\"endpoints\":[]},\"authorization\":{\"capability_query_id\":\"query.1\",\"selected_option_id\":\"option.1\"},\"command\":{\"command_type\":\"UPDATE_STATE\",\"payload\":{\"state_id\":\"state.1\",\"expected_owner_ref\":{\"target_kind\":\"ELEMENT\",\"target_id\":\"element.1\"},\"changes\":{\"name_or_value\":\"完成\"},\"extra\":true}}}"
+    },
+    {
+      "type": "DraftEditRequest",
+      "raw": "{\"request_id\":\"request.1\",\"command_id\":\"command.1\",\"expected_draft_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"scope\":{\"context_id\":\"context.1\",\"selection_id\":\"occurrence.1\",\"intent\":\"UPDATE_FACT\",\"endpoints\":[]},\"authorization\":{\"capability_query_id\":\"query.1\",\"selected_option_id\":\"option.1\"},\"command\":{\"command_type\":\"UPDATE_FACT\",\"payload\":{\"fact_id\":\"fact.1\",\"expected_capability_ref\":{\"capability_id\":\"CAP-ISO-PROC-001\"},\"replacement\":{\"modifiers\":[]},\"extra\":true}}}"
+    },
+    {
+      "type": "DraftEditRequest",
+      "raw": "{\"request_id\":\"request.1\",\"command_id\":\"command.1\",\"expected_draft_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"scope\":{\"context_id\":\"context.1\",\"selection_id\":\"occurrence.1\",\"intent\":\"UPDATE_PROPERTY\",\"endpoints\":[]},\"authorization\":{\"capability_query_id\":\"query.1\",\"selected_option_id\":\"option.1\"},\"command\":{\"command_type\":\"UPDATE_PROPERTY\",\"payload\":{\"target_ref\":{\"target_kind\":\"ELEMENT\",\"target_id\":\"element.1\"},\"property_name\":\"name\",\"value\":\"订单😀\",\"extra\":true}}}"
+    },
+    {
+      "type": "DraftEditRequest",
+      "raw": "{\"request_id\":\"request.1\",\"command_id\":\"command.1\",\"expected_draft_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"scope\":{\"context_id\":\"context.1\",\"selection_id\":\"occurrence.1\",\"intent\":\"UPDATE_LAYOUT\",\"endpoints\":[]},\"authorization\":{\"capability_query_id\":\"query.1\",\"selected_option_id\":\"option.1\"},\"command\":{\"command_type\":\"UPDATE_LAYOUT\",\"payload\":{\"occurrence_id\":\"occurrence.1\",\"layout\":{\"x\":0,\"y\":0.1},\"extra\":true}}}"
+    },
+    {
+      "type": "DraftEditRequest",
+      "raw": "{\"request_id\":\"request.1\",\"command_id\":\"command.1\",\"expected_draft_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"scope\":{\"context_id\":\"context.1\",\"selection_id\":\"occurrence.1\",\"intent\":\"DELETE_CONSTRUCT\",\"endpoints\":[]},\"authorization\":{\"capability_query_id\":\"query.1\",\"selected_option_id\":\"option.1\"},\"command\":{\"command_type\":\"DELETE_CONSTRUCT\",\"payload\":{\"selection_id\":\"occurrence.1\",\"construct_kind\":\"ELEMENT\",\"construct_id\":\"element.1\",\"delete_mode\":\"DELETE_TARGET\",\"impact_token\":\"impact.1234567890123456789\",\"extra\":true}}}"
+    },
+    {
+      "type": "DraftEditRequest",
+      "raw": "{\"request_id\":\"request.1\",\"command_id\":\"command.1\",\"expected_draft_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"scope\":{\"context_id\":\"context.1\",\"selection_id\":\"occurrence.1\",\"intent\":\"STATE_EXPLICIT\",\"endpoints\":[]},\"authorization\":{\"capability_query_id\":\"query.1\",\"selected_option_id\":\"option.1\"},\"command\":{\"command_type\":\"STATE_EXPLICIT\",\"payload\":{\"context_id\":\"context.1\",\"state_id\":\"state.1\",\"extra\":true}}}"
+    },
+    {
+      "type": "DraftEditRequest",
+      "raw": "{\"request_id\":\"request.1\",\"command_id\":\"command.1\",\"expected_draft_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"scope\":{\"context_id\":\"context.1\",\"selection_id\":\"occurrence.1\",\"intent\":\"STATE_SUPPRESS\",\"endpoints\":[]},\"authorization\":{\"capability_query_id\":\"query.1\",\"selected_option_id\":\"option.1\"},\"command\":{\"command_type\":\"STATE_SUPPRESS\",\"payload\":{\"context_id\":\"context.1\",\"state_id\":\"state.1\",\"extra\":true}}}"
+    },
+    {
+      "type": "DraftEditRequest",
+      "raw": "{\"request_id\":\"request.1\",\"command_id\":\"command.1\",\"expected_draft_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"scope\":{\"context_id\":\"context.1\",\"selection_id\":\"occurrence.1\",\"intent\":\"UNFOLD\",\"endpoints\":[]},\"authorization\":{\"capability_query_id\":\"query.1\",\"selected_option_id\":\"option.1\"},\"command\":{\"command_type\":\"UNFOLD\",\"payload\":{\"context_id\":\"context.1\",\"state_id\":\"state.1\",\"extra\":true}}}"
+    },
+    {
+      "type": "DraftEditRequest",
+      "raw": "{\"request_id\":\"request.1\",\"command_id\":\"command.1\",\"expected_draft_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"scope\":{\"context_id\":\"context.1\",\"selection_id\":\"occurrence.1\",\"intent\":\"FOLD\",\"endpoints\":[]},\"authorization\":{\"capability_query_id\":\"query.1\",\"selected_option_id\":\"option.1\"},\"command\":{\"command_type\":\"FOLD\",\"payload\":{\"context_id\":\"context.1\",\"state_id\":\"state.1\",\"extra\":true}}}"
+    },
+    {
+      "type": "DraftEditRequest",
+      "raw": "null"
+    },
+    {
+      "type": "DraftEditRequest",
+      "raw": "{\"request_id\":\"request.1\",\"command_id\":\"command.1\",\"expected_draft_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"scope\":{\"context_id\":\"context.1\",\"selection_id\":\"occurrence.1\",\"intent\":\"UPDATE_LAYOUT\",\"endpoints\":[]},\"authorization\":{\"capability_query_id\":\"query.1\",\"selected_option_id\":\"option.1\"},\"command\":{\"command_type\":\"UPDATE_LAYOUT\",\"payload\":{\"occurrence_id\":\"occurrence.1\",\"layout\":{\"x\":0,\"y\":0.1}}}}{}"
+    },
+    {
+      "type": "DraftEditRequest",
+      "raw": "{\"unknown\":true,\"request_id\":\"request.1\",\"command_id\":\"command.1\",\"expected_draft_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"scope\":{\"context_id\":\"context.1\",\"selection_id\":\"occurrence.1\",\"intent\":\"UPDATE_LAYOUT\",\"endpoints\":[]},\"authorization\":{\"capability_query_id\":\"query.1\",\"selected_option_id\":\"option.1\"},\"command\":{\"command_type\":\"UPDATE_LAYOUT\",\"payload\":{\"occurrence_id\":\"occurrence.1\",\"layout\":{\"x\":0,\"y\":0.1}}}}"
+    },
+    {
+      "type": "DraftEditRequest",
+      "raw": "{\"request_id\":\"request.1\",\"command_id\":\"command.1\",\"expected_draft_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"edit_seq\":1,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"scope\":{\"context_id\":\"context.1\",\"selection_id\":\"occurrence.1\",\"intent\":\"UPDATE_LAYOUT\",\"endpoints\":[]},\"authorization\":{\"capability_query_id\":\"query.1\",\"selected_option_id\":\"option.1\"},\"command\":{\"command_type\":\"UPDATE_LAYOUT\",\"payload\":{\"occurrence_id\":\"occurrence.1\",\"layout\":{\"x\":0,\"y\":0.1}}}}"
+    },
+    {
+      "type": "DraftEditRequest",
+      "raw": "{\"request_id\":\"request.1\",\"command_id\":\"command.1\",\"expected_draft_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":9007199254740992,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"scope\":{\"context_id\":\"context.1\",\"selection_id\":\"occurrence.1\",\"intent\":\"UPDATE_LAYOUT\",\"endpoints\":[]},\"authorization\":{\"capability_query_id\":\"query.1\",\"selected_option_id\":\"option.1\"},\"command\":{\"command_type\":\"UPDATE_LAYOUT\",\"payload\":{\"occurrence_id\":\"occurrence.1\",\"layout\":{\"x\":0,\"y\":0.1}}}}"
+    },
+    {
+      "type": "DraftEditRequest",
+      "raw": "{\"request_id\":\"request.1\",\"command_id\":\"command.1\",\"expected_draft_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":\"0\",\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"scope\":{\"context_id\":\"context.1\",\"selection_id\":\"occurrence.1\",\"intent\":\"UPDATE_LAYOUT\",\"endpoints\":[]},\"authorization\":{\"capability_query_id\":\"query.1\",\"selected_option_id\":\"option.1\"},\"command\":{\"command_type\":\"UPDATE_LAYOUT\",\"payload\":{\"occurrence_id\":\"occurrence.1\",\"layout\":{\"x\":0,\"y\":0.1}}}}"
+    },
+    {
+      "type": "DraftEditRequest",
+      "raw": "{\"request_id\":\"request.1\",\"command_id\":\"command.1\",\"expected_draft_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0.5,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"scope\":{\"context_id\":\"context.1\",\"selection_id\":\"occurrence.1\",\"intent\":\"UPDATE_LAYOUT\",\"endpoints\":[]},\"authorization\":{\"capability_query_id\":\"query.1\",\"selected_option_id\":\"option.1\"},\"command\":{\"command_type\":\"UPDATE_LAYOUT\",\"payload\":{\"occurrence_id\":\"occurrence.1\",\"layout\":{\"x\":0,\"y\":0.1}}}}"
+    },
+    {
+      "type": "DraftEditRequest",
+      "raw": "{\"request_id\":\"request.1\",\"command_id\":\"command.1\",\"expected_draft_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"scope\":{\"context_id\":\"context.1\",\"selection_id\":\"occurrence.1\",\"intent\":\"UPDATE_LAYOUT\",\"endpoints\":[]},\"authorization\":{\"capability_query_id\":\"query.1\",\"selected_option_id\":\"option.1\"},\"command\":{\"command_type\":\"UPDATE_LAYOUT\",\"payload\":{\"occurrence_id\":\"occurrence.1\",\"layout\":{\"x\":1e400,\"y\":0.1}}}}"
+    },
+    {
+      "type": "DraftEditRequest",
+      "raw": "{\"request_id\":\"request.1\",\"command_id\":\"command.1\",\"expected_draft_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"scope\":{\"context_id\":\"context.1\",\"selection_id\":\"occurrence.1\",\"intent\":\"UPDATE_LAYOUT\",\"endpoints\":[]},\"authorization\":{\"capability_query_id\":\"query.1\",\"selected_option_id\":\"option.1\"},\"command\":{\"command_type\":\"UPDATE_LAYOUT\",\"payload\":{\"occurrence_id\":\"occurrence.1\",\"layout\":{\"x\":null,\"y\":0.1}}}}"
+    },
+    {
+      "type": "DraftEditRequest",
+      "raw": "{\"request_id\":\"request.1\",\"command_id\":\"command.1\",\"expected_draft_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"scope\":{\"context_id\":\"context.1\",\"selection_id\":\"occurrence.1\",\"intent\":\"UPDATE_LAYOUT\",\"endpoints\":[]},\"authorization\":{\"capability_query_id\":\"query.1\",\"selected_option_id\":\"option.1\"},\"command\":{\"command_type\":\"UPDATE_LAYOUT\",\"payload\":{\"occurrence_id\":\"occurrence.1\",\"layout\":{\"x\":\"0\",\"y\":0.1}}}}"
+    },
+    {
+      "type": "DraftEditRequest",
+      "raw": "{\"request_id\":\"request.1\",\"command_id\":\"command.1\",\"expected_draft_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"scope\":{\"context_id\":\"context.1\",\"selection_id\":\"occurrence.1\",\"intent\":\"UPDATE_LAYOUT\",\"endpoints\":[]},\"authorization\":{\"capability_query_id\":\"query.1\",\"selected_option_id\":\"option.1\"},\"command\":{\"command_type\":\"UPDATE_LAYOUT\",\"payload\":{\"occurrence_id\":\"occurrence.1\",\"layout\":{\"x\":{\"binary64\":\"0000000000000000\"},\"y\":0.1}}}}"
+    },
+    {
+      "type": "DraftEditRequest",
+      "raw": "{\"request_id\":\"request.1\",\"command_id\":\"command.1\",\"expected_draft_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"scope\":{\"context_id\":\"context.1\",\"selection_id\":\"occurrence.1\",\"intent\":\"UPDATE_LAYOUT\",\"endpoints\":[]},\"authorization\":{\"capability_query_id\":\"query.1\",\"selected_option_id\":\"option.1\"},\"command\":{\"command_type\":\"UPDATE_LAYOUT\",\"payload\":{\"occurrence_id\":\"occurrence.1\",\"layout\":{\"x\":0,\"\\u0078\":2,\"y\":0.1}}}}"
+    },
+    {
+      "type": "DraftEditRequest",
+      "raw": "{\"request_id\":\"request.1\",\"command_id\":\"command.1\",\"base_revision\":\"revision.1\",\"expected_draft_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"scope\":{\"context_id\":\"context.1\",\"selection_id\":\"occurrence.1\",\"intent\":\"UPDATE_LAYOUT\",\"endpoints\":[]},\"authorization\":{\"capability_query_id\":\"query.1\",\"selected_option_id\":\"option.1\"},\"command\":{\"command_type\":\"UPDATE_LAYOUT\",\"payload\":{\"occurrence_id\":\"occurrence.1\",\"layout\":{\"x\":0,\"y\":0.1}}}}"
+    },
+    {
+      "type": "DraftEditRequest",
+      "raw": "{\"request_id\":\"request.1\",\"command_id\":\"command.1\",\"expected_draft_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"scope\":{\"context_id\":\"context.1\",\"selection_id\":\"occurrence.1\",\"intent\":\"UPDATE_LAYOUT\",\"endpoints\":[]},\"authorization\":{\"selected_option_id\":\"option.1\"},\"command\":{\"command_type\":\"UPDATE_LAYOUT\",\"payload\":{\"occurrence_id\":\"occurrence.1\",\"layout\":{\"x\":0,\"y\":0.1}}}}"
+    },
+    {
+      "type": "DraftEditRequest",
+      "raw": "{\"request_id\":\"request.1\",\"command_id\":\"command.1\",\"expected_draft_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"scope\":{\"context_id\":\"context.1\",\"selection_id\":\"occurrence.1\",\"intent\":\"CREATE_FACT\",\"endpoints\":[]},\"authorization\":{\"capability_query_id\":\"query.1\",\"selected_option_id\":\"option.1\"},\"command\":{\"command_type\":\"UPDATE_LAYOUT\",\"payload\":{\"occurrence_id\":\"occurrence.1\",\"layout\":{\"x\":0,\"y\":0.1}}}}"
+    },
+    {
+      "type": "DraftEditRequest",
+      "raw": "{\"request_id\":\"request.1\",\"command_id\":\"command.1\",\"expected_draft_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"scope\":{\"context_id\":\"context.1\",\"selection_id\":\"occurrence.1\",\"intent\":\"CREATE_FACT\",\"endpoints\":[]},\"authorization\":{\"capability_query_id\":\"query.1\",\"selected_option_id\":\"option.1\"},\"command\":{\"command_type\":\"CREATE_FACT\",\"payload\":{\"kind\":\"CONSUMPTION\",\"object_id\":\"element.1\",\"process_id\":\"element.2\"}}}"
+    },
+    {
+      "type": "DraftEditRequest",
+      "raw": "{\"request_id\":\"request.1\",\"command_id\":\"command.1\",\"expected_draft_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"scope\":{\"context_id\":\"context.1\",\"selection_id\":\"occurrence.1\",\"intent\":\"CREATE_FACT\",\"endpoints\":[]},\"authorization\":{\"capability_query_id\":\"query.1\",\"selected_option_id\":\"option.1\"},\"command\":{\"command_type\":\"CREATE_FACT\",\"payload\":{\"context_id\":\"context.1\",\"capability_ref\":{\"capability_id\":\"CAP-ISO-PROC-001\"},\"fact_family\":\"CONTROL\",\"normalized_endpoints\":[{\"role\":\"CONSUMED_OBJECT\",\"target_ref\":{\"target_kind\":\"ELEMENT\",\"target_id\":\"element.1\"},\"ordinal\":0},{\"role\":\"CONSUMING_PROCESS\",\"target_ref\":{\"target_kind\":\"ELEMENT\",\"target_id\":\"element.2\"},\"ordinal\":1}],\"direction\":\"DIRECTED\",\"labels\":[],\"modifiers\":[],\"logical_groups\":[],\"occurrence\":{\"ownership\":\"OWNED\",\"construct_role\":\"CONSUMPTION_LINK\"},\"layout\":{\"route_points\":[{\"x\":0.1,\"y\":-2.5}]}}}}"
+    },
+    {
+      "type": "DraftEditRequest",
+      "raw": "{\"request_id\":\"request.1\",\"command_id\":\"command.1\",\"expected_draft_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"scope\":{\"context_id\":\"context.1\",\"selection_id\":\"occurrence.1\",\"intent\":\"CREATE_FEATURE\",\"endpoints\":[]},\"authorization\":{\"capability_query_id\":\"query.1\",\"selected_option_id\":\"option.1\"},\"command\":{\"command_type\":\"CREATE_FEATURE\",\"payload\":{\"context_id\":\"context.2\",\"owner_element_id\":\"element.1\",\"feature_kind\":\"ATTRIBUTE\",\"capability_ref\":{\"capability_id\":\"CAP-FEAT-ATTRIBUTE-001\"},\"name\":\"颜色\",\"occurrence\":{\"ownership\":\"OWNED\",\"construct_role\":\"ATTRIBUTE_NODE\"},\"layout\":{\"x\":0,\"y\":0}}}}"
+    },
+    {
+      "type": "DraftEditRequest",
+      "raw": "{\"request_id\":\"request.1\",\"command_id\":\"command.1\",\"expected_draft_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"scope\":{\"context_id\":\"context.1\",\"selection_id\":\"occurrence.1\",\"intent\":\"DELETE_CONSTRUCT\",\"endpoints\":[]},\"authorization\":{\"capability_query_id\":\"query.1\",\"selected_option_id\":\"option.1\"},\"command\":{\"command_type\":\"DELETE_CONSTRUCT\",\"payload\":{\"selection_id\":\"occurrence.2\",\"construct_kind\":\"ELEMENT\",\"construct_id\":\"element.1\",\"delete_mode\":\"DELETE_TARGET\",\"impact_token\":\"impact.1234567890123456789\"}}}"
+    },
+    {
+      "type": "DraftCapabilitiesResult",
+      "raw": "{\"meta\":{\"request_id\":\"request.1\",\"draft_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"context_id\":\"context.1\"},\"data\":{\"scope\":{\"context_id\":\"context.1\",\"selection_id\":\"occurrence.1\",\"intent\":\"DELETE_CONSTRUCT\",\"endpoints\":[]},\"allowed\":[\"DELETE_CONSTRUCT\"],\"forbidden\":[],\"capability_query_id\":\"query.1\",\"options\":[{\"capability_query_id\":\"query.1\",\"option_id\":\"option.1\",\"command_type\":\"DELETE_CONSTRUCT\",\"capability_ref\":{\"capability_id\":\"CAP-DELETE-001\"},\"display_name\":\"删除\",\"group_path\":[],\"normalized_endpoints\":[],\"required_fields\":[],\"allowed_modifiers\":[],\"symbol_descriptor\":{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"template_family\":{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"rule_refs\":[{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}],\"enabled\":true,\"reason_codes\":[],\"expires_with_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"impact_token\":\"impact.1234567890123456789\",\"delete_mode\":\"DELETE_TARGET\",\"delete_target\":{\"kind\":\"ELEMENT\",\"id\":\"element.1\"}}]}}"
+    },
+    {
+      "type": "DraftCapabilitiesResult",
+      "raw": "{\"meta\":{\"request_id\":\"request.1\",\"draft_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"context_id\":\"context.1\"},\"data\":{\"scope\":{\"context_id\":\"context.1\",\"selection_id\":\"occurrence.1\",\"intent\":\"DELETE_CONSTRUCT\",\"endpoints\":[]},\"allowed\":[\"DELETE_CONSTRUCT\"],\"forbidden\":[],\"capability_query_id\":\"query.1\",\"options\":[{\"capability_query_id\":\"query.1\",\"option_id\":\"option.1\",\"command_type\":\"DELETE_CONSTRUCT\",\"capability_ref\":{\"capability_id\":\"CAP-DELETE-001\"},\"display_name\":\"删除\",\"group_path\":[],\"normalized_endpoints\":[],\"required_fields\":[],\"allowed_modifiers\":[],\"symbol_descriptor\":{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"template_family\":{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"rule_refs\":[{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}],\"enabled\":true,\"reason_codes\":[],\"expires_with_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"impact_summary\":{\"input_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"selected_occurrence_id\":\"occurrence.1\",\"delete_mode\":\"DELETE_TARGET\",\"target\":{\"kind\":\"ELEMENT\",\"id\":\"element.1\"},\"items\":[],\"counts\":{\"contexts\":0,\"occurrences\":0,\"elements\":0,\"features\":0,\"states\":0,\"facts\":0,\"opl_sentences\":0,\"traces\":0,\"findings\":0}},\"delete_mode\":\"DELETE_TARGET\",\"delete_target\":{\"kind\":\"ELEMENT\",\"id\":\"element.1\"}}]}}"
+    },
+    {
+      "type": "DraftCapabilitiesResult",
+      "raw": "{\"meta\":{\"request_id\":\"request.1\",\"draft_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"context_id\":\"context.1\"},\"data\":{\"scope\":{\"context_id\":\"context.1\",\"selection_id\":\"occurrence.1\",\"intent\":\"DELETE_CONSTRUCT\",\"endpoints\":[]},\"allowed\":[\"DELETE_CONSTRUCT\"],\"forbidden\":[],\"capability_query_id\":\"query.1\",\"options\":[{\"capability_query_id\":\"query.1\",\"option_id\":\"option.1\",\"command_type\":\"DELETE_CONSTRUCT\",\"capability_ref\":{\"capability_id\":\"CAP-DELETE-001\"},\"display_name\":\"删除\",\"group_path\":[],\"normalized_endpoints\":[],\"required_fields\":[],\"allowed_modifiers\":[],\"symbol_descriptor\":{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"template_family\":{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"rule_refs\":[{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}],\"enabled\":true,\"reason_codes\":[],\"expires_with_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"impact_summary\":{\"input_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"selected_occurrence_id\":\"occurrence.1\",\"delete_mode\":\"DELETE_TARGET\",\"target\":{\"kind\":\"ELEMENT\",\"id\":\"element.1\"},\"items\":[],\"counts\":{\"contexts\":0,\"occurrences\":0,\"elements\":0,\"features\":0,\"states\":0,\"facts\":0,\"opl_sentences\":0,\"traces\":0,\"findings\":0}},\"impact_token\":\"impact.1234567890123456789\",\"delete_target\":{\"kind\":\"ELEMENT\",\"id\":\"element.1\"}}]}}"
+    },
+    {
+      "type": "DraftCapabilitiesResult",
+      "raw": "{\"meta\":{\"request_id\":\"request.1\",\"draft_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"context_id\":\"context.1\"},\"data\":{\"scope\":{\"context_id\":\"context.1\",\"selection_id\":\"occurrence.1\",\"intent\":\"DELETE_CONSTRUCT\",\"endpoints\":[]},\"allowed\":[\"DELETE_CONSTRUCT\"],\"forbidden\":[],\"capability_query_id\":\"query.1\",\"options\":[{\"capability_query_id\":\"query.1\",\"option_id\":\"option.1\",\"command_type\":\"DELETE_CONSTRUCT\",\"capability_ref\":{\"capability_id\":\"CAP-DELETE-001\"},\"display_name\":\"删除\",\"group_path\":[],\"normalized_endpoints\":[],\"required_fields\":[],\"allowed_modifiers\":[],\"symbol_descriptor\":{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"template_family\":{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"rule_refs\":[{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}],\"enabled\":true,\"reason_codes\":[],\"expires_with_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"impact_summary\":{\"input_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"selected_occurrence_id\":\"occurrence.1\",\"delete_mode\":\"DELETE_TARGET\",\"target\":{\"kind\":\"ELEMENT\",\"id\":\"element.1\"},\"items\":[],\"counts\":{\"contexts\":0,\"occurrences\":0,\"elements\":0,\"features\":0,\"states\":0,\"facts\":0,\"opl_sentences\":0,\"traces\":0,\"findings\":0}},\"impact_token\":\"impact.1234567890123456789\",\"delete_mode\":\"DELETE_TARGET\"}]}}"
+    },
+    {
+      "type": "DraftCapabilitiesResult",
+      "raw": "{\"meta\":{\"request_id\":\"request.1\",\"draft_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"context_id\":\"context.1\"},\"data\":{\"scope\":{\"context_id\":\"context.1\",\"selection_id\":\"occurrence.1\",\"intent\":\"DELETE_CONSTRUCT\",\"endpoints\":[]},\"allowed\":[\"DELETE_CONSTRUCT\"],\"forbidden\":[],\"capability_query_id\":\"query.1\",\"options\":[{\"capability_query_id\":\"query.1\",\"option_id\":\"option.1\",\"command_type\":\"DELETE_CONSTRUCT\",\"capability_ref\":{\"capability_id\":\"CAP-DELETE-001\"},\"display_name\":\"删除\",\"group_path\":[],\"normalized_endpoints\":[],\"required_fields\":[],\"allowed_modifiers\":[],\"symbol_descriptor\":{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"template_family\":{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"rule_refs\":[{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}],\"enabled\":true,\"reason_codes\":[],\"expires_with_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":1,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"impact_summary\":{\"input_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"selected_occurrence_id\":\"occurrence.1\",\"delete_mode\":\"DELETE_TARGET\",\"target\":{\"kind\":\"ELEMENT\",\"id\":\"element.1\"},\"items\":[],\"counts\":{\"contexts\":0,\"occurrences\":0,\"elements\":0,\"features\":0,\"states\":0,\"facts\":0,\"opl_sentences\":0,\"traces\":0,\"findings\":0}},\"impact_token\":\"impact.1234567890123456789\",\"delete_mode\":\"DELETE_TARGET\",\"delete_target\":{\"kind\":\"ELEMENT\",\"id\":\"element.1\"}}]}}"
+    },
+    {
+      "type": "DraftCapabilitiesResult",
+      "raw": "{\"meta\":{\"request_id\":\"request.1\",\"draft_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"context_id\":\"context.1\"},\"data\":{\"scope\":{\"context_id\":\"context.1\",\"selection_id\":\"occurrence.1\",\"intent\":\"DELETE_CONSTRUCT\",\"endpoints\":[]},\"allowed\":[\"DELETE_CONSTRUCT\"],\"forbidden\":[],\"capability_query_id\":\"query.1\",\"options\":[{\"capability_query_id\":\"query.2\",\"option_id\":\"option.1\",\"command_type\":\"DELETE_CONSTRUCT\",\"capability_ref\":{\"capability_id\":\"CAP-DELETE-001\"},\"display_name\":\"删除\",\"group_path\":[],\"normalized_endpoints\":[],\"required_fields\":[],\"allowed_modifiers\":[],\"symbol_descriptor\":{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"template_family\":{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"rule_refs\":[{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}],\"enabled\":true,\"reason_codes\":[],\"expires_with_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"impact_summary\":{\"input_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"selected_occurrence_id\":\"occurrence.1\",\"delete_mode\":\"DELETE_TARGET\",\"target\":{\"kind\":\"ELEMENT\",\"id\":\"element.1\"},\"items\":[],\"counts\":{\"contexts\":0,\"occurrences\":0,\"elements\":0,\"features\":0,\"states\":0,\"facts\":0,\"opl_sentences\":0,\"traces\":0,\"findings\":0}},\"impact_token\":\"impact.1234567890123456789\",\"delete_mode\":\"DELETE_TARGET\",\"delete_target\":{\"kind\":\"ELEMENT\",\"id\":\"element.1\"}}]}}"
+    },
+    {
+      "type": "DraftCapabilitiesResult",
+      "raw": "{\"meta\":{\"request_id\":\"request.1\",\"draft_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"context_id\":\"context.1\"},\"data\":{\"scope\":{\"context_id\":\"context.1\",\"selection_id\":\"occurrence.1\",\"intent\":\"DELETE_CONSTRUCT\",\"endpoints\":[]},\"allowed\":[\"DELETE_CONSTRUCT\"],\"forbidden\":[],\"capability_query_id\":\"query.1\",\"options\":[{\"capability_query_id\":\"query.1\",\"option_id\":\"option.1\",\"command_type\":\"DELETE_CONSTRUCT\",\"capability_ref\":{\"capability_id\":\"CAP-DELETE-001\"},\"display_name\":\"删除\",\"group_path\":[],\"normalized_endpoints\":[],\"required_fields\":[],\"allowed_modifiers\":[],\"symbol_descriptor\":{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"template_family\":{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"rule_refs\":[{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}],\"enabled\":true,\"reason_codes\":[],\"expires_with_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"impact_summary\":{\"input_token\":{\"draft_id\":\"draft.2\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"selected_occurrence_id\":\"occurrence.1\",\"delete_mode\":\"DELETE_TARGET\",\"target\":{\"kind\":\"ELEMENT\",\"id\":\"element.1\"},\"items\":[],\"counts\":{\"contexts\":0,\"occurrences\":0,\"elements\":0,\"features\":0,\"states\":0,\"facts\":0,\"opl_sentences\":0,\"traces\":0,\"findings\":0}},\"impact_token\":\"impact.1234567890123456789\",\"delete_mode\":\"DELETE_TARGET\",\"delete_target\":{\"kind\":\"ELEMENT\",\"id\":\"element.1\"}}]}}"
+    },
+    {
+      "type": "DraftCapabilitiesResult",
+      "raw": "{\"meta\":{\"request_id\":\"request.1\",\"draft_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"context_id\":\"context.1\"},\"data\":{\"scope\":{\"context_id\":\"context.1\",\"selection_id\":\"occurrence.1\",\"intent\":\"DELETE_CONSTRUCT\",\"endpoints\":[]},\"allowed\":[\"DELETE_CONSTRUCT\"],\"forbidden\":[],\"capability_query_id\":\"query.1\",\"options\":[{\"capability_query_id\":\"query.1\",\"option_id\":\"option.1\",\"command_type\":\"DELETE_CONSTRUCT\",\"capability_ref\":{\"capability_id\":\"CAP-DELETE-001\"},\"display_name\":\"删除\",\"group_path\":[],\"normalized_endpoints\":[],\"required_fields\":[],\"allowed_modifiers\":[],\"symbol_descriptor\":{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"template_family\":{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"rule_refs\":[{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}],\"enabled\":true,\"reason_codes\":[],\"expires_with_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"impact_summary\":{\"input_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"selected_occurrence_id\":\"occurrence.2\",\"delete_mode\":\"DELETE_TARGET\",\"target\":{\"kind\":\"ELEMENT\",\"id\":\"element.1\"},\"items\":[],\"counts\":{\"contexts\":0,\"occurrences\":0,\"elements\":0,\"features\":0,\"states\":0,\"facts\":0,\"opl_sentences\":0,\"traces\":0,\"findings\":0}},\"impact_token\":\"impact.1234567890123456789\",\"delete_mode\":\"DELETE_TARGET\",\"delete_target\":{\"kind\":\"ELEMENT\",\"id\":\"element.1\"}}]}}"
+    },
+    {
+      "type": "DraftCapabilitiesResult",
+      "raw": "{\"meta\":{\"request_id\":\"request.1\",\"draft_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"context_id\":\"context.1\"},\"data\":{\"scope\":{\"context_id\":\"context.1\",\"selection_id\":\"occurrence.1\",\"intent\":\"DELETE_CONSTRUCT\",\"endpoints\":[]},\"allowed\":[\"DELETE_CONSTRUCT\"],\"forbidden\":[],\"capability_query_id\":\"query.1\",\"options\":[{\"capability_query_id\":\"query.1\",\"option_id\":\"option.1\",\"command_type\":\"DELETE_CONSTRUCT\",\"capability_ref\":{\"capability_id\":\"CAP-DELETE-001\"},\"display_name\":\"删除\",\"group_path\":[],\"normalized_endpoints\":[],\"required_fields\":[],\"allowed_modifiers\":[],\"symbol_descriptor\":{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"template_family\":{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"rule_refs\":[{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}],\"enabled\":true,\"reason_codes\":[],\"expires_with_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"impact_summary\":{\"input_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"selected_occurrence_id\":\"occurrence.1\",\"delete_mode\":\"DELETE_TARGET\",\"target\":{\"kind\":\"ELEMENT\",\"id\":\"element.2\"},\"items\":[],\"counts\":{\"contexts\":0,\"occurrences\":0,\"elements\":0,\"features\":0,\"states\":0,\"facts\":0,\"opl_sentences\":0,\"traces\":0,\"findings\":0}},\"impact_token\":\"impact.1234567890123456789\",\"delete_mode\":\"DELETE_TARGET\",\"delete_target\":{\"kind\":\"ELEMENT\",\"id\":\"element.1\"}}]}}"
+    },
+    {
+      "type": "DraftCapabilitiesResult",
+      "raw": "{\"meta\":{\"request_id\":\"request.1\",\"draft_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"context_id\":\"context.1\"},\"data\":{\"scope\":{\"context_id\":\"context.1\",\"selection_id\":\"occurrence.1\",\"intent\":\"DELETE_CONSTRUCT\",\"endpoints\":[]},\"allowed\":[\"DELETE_CONSTRUCT\"],\"forbidden\":[],\"capability_query_id\":\"query.1\",\"options\":[{\"capability_query_id\":\"query.1\",\"option_id\":\"option.1\",\"command_type\":\"DELETE_CONSTRUCT\",\"capability_ref\":{\"capability_id\":\"CAP-DELETE-001\"},\"display_name\":\"删除\",\"group_path\":[],\"normalized_endpoints\":[],\"required_fields\":[],\"allowed_modifiers\":[],\"symbol_descriptor\":{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"template_family\":{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"rule_refs\":[{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}],\"enabled\":true,\"reason_codes\":[],\"expires_with_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"impact_summary\":{\"input_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"selected_occurrence_id\":\"occurrence.1\",\"delete_mode\":\"CASCADE\",\"target\":{\"kind\":\"ELEMENT\",\"id\":\"element.1\"},\"items\":[],\"counts\":{\"contexts\":0,\"occurrences\":0,\"elements\":0,\"features\":0,\"states\":0,\"facts\":0,\"opl_sentences\":0,\"traces\":0,\"findings\":0}},\"impact_token\":\"impact.1234567890123456789\",\"delete_mode\":\"DELETE_TARGET\",\"delete_target\":{\"kind\":\"ELEMENT\",\"id\":\"element.1\"}}]}}"
+    },
+    {
+      "type": "DraftCapabilitiesResult",
+      "raw": "{\"meta\":{\"request_id\":\"request.1\",\"draft_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"context_id\":\"context.2\"},\"data\":{\"scope\":{\"context_id\":\"context.1\",\"selection_id\":\"occurrence.1\",\"intent\":\"DELETE_CONSTRUCT\",\"endpoints\":[]},\"allowed\":[\"DELETE_CONSTRUCT\"],\"forbidden\":[],\"capability_query_id\":\"query.1\",\"options\":[{\"capability_query_id\":\"query.1\",\"option_id\":\"option.1\",\"command_type\":\"DELETE_CONSTRUCT\",\"capability_ref\":{\"capability_id\":\"CAP-DELETE-001\"},\"display_name\":\"删除\",\"group_path\":[],\"normalized_endpoints\":[],\"required_fields\":[],\"allowed_modifiers\":[],\"symbol_descriptor\":{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"template_family\":{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"rule_refs\":[{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}],\"enabled\":true,\"reason_codes\":[],\"expires_with_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"impact_summary\":{\"input_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"selected_occurrence_id\":\"occurrence.1\",\"delete_mode\":\"DELETE_TARGET\",\"target\":{\"kind\":\"ELEMENT\",\"id\":\"element.1\"},\"items\":[],\"counts\":{\"contexts\":0,\"occurrences\":0,\"elements\":0,\"features\":0,\"states\":0,\"facts\":0,\"opl_sentences\":0,\"traces\":0,\"findings\":0}},\"impact_token\":\"impact.1234567890123456789\",\"delete_mode\":\"DELETE_TARGET\",\"delete_target\":{\"kind\":\"ELEMENT\",\"id\":\"element.1\"}}]}}"
+    },
+    {
+      "type": "DraftCapabilitiesResult",
+      "raw": "{\"meta\":{\"request_id\":\"request.1\",\"draft_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"context_id\":\"context.1\"},\"data\":{\"scope\":{\"context_id\":\"context.1\",\"selection_id\":\"occurrence.1\",\"intent\":\"DELETE_CONSTRUCT\",\"endpoints\":[]},\"allowed\":[\"DELETE_CONSTRUCT\"],\"forbidden\":[],\"capability_query_id\":\"query.1\",\"options\":[{\"capability_query_id\":\"query.1\",\"option_id\":\"option.1\",\"command_type\":\"DELETE_CONSTRUCT\",\"capability_ref\":{\"capability_id\":\"CAP-DELETE-001\"},\"display_name\":\"删除\",\"group_path\":[],\"normalized_endpoints\":[],\"required_fields\":[],\"allowed_modifiers\":[],\"symbol_descriptor\":{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"template_family\":{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"rule_refs\":[{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}],\"enabled\":true,\"reason_codes\":[],\"expires_with_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"impact_summary\":{\"input_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"selected_occurrence_id\":\"occurrence.1\",\"delete_mode\":\"DELETE_TARGET\",\"target\":{\"kind\":\"ELEMENT\",\"id\":\"element.1\"},\"items\":[],\"counts\":{\"contexts\":0,\"occurrences\":0,\"elements\":0,\"features\":0,\"states\":0,\"facts\":0,\"opl_sentences\":0,\"traces\":0,\"findings\":0}},\"impact_token\":\"impact.1234567890123456789\",\"delete_mode\":\"DELETE_TARGET\",\"delete_target\":{\"kind\":\"ELEMENT\",\"id\":\"element.1\"}},{\"capability_query_id\":\"query.1\",\"option_id\":\"option.1\",\"command_type\":\"DELETE_CONSTRUCT\",\"capability_ref\":{\"capability_id\":\"CAP-DELETE-001\"},\"display_name\":\"删除\",\"group_path\":[],\"normalized_endpoints\":[],\"required_fields\":[],\"allowed_modifiers\":[],\"symbol_descriptor\":{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"template_family\":{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"rule_refs\":[{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}],\"enabled\":true,\"reason_codes\":[],\"expires_with_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"impact_summary\":{\"input_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"selected_occurrence_id\":\"occurrence.1\",\"delete_mode\":\"DELETE_TARGET\",\"target\":{\"kind\":\"ELEMENT\",\"id\":\"element.1\"},\"items\":[],\"counts\":{\"contexts\":0,\"occurrences\":0,\"elements\":0,\"features\":0,\"states\":0,\"facts\":0,\"opl_sentences\":0,\"traces\":0,\"findings\":0}},\"impact_token\":\"impact.1234567890123456789\",\"delete_mode\":\"DELETE_TARGET\",\"delete_target\":{\"kind\":\"ELEMENT\",\"id\":\"element.1\"}}]}}"
+    },
+    {
+      "type": "DraftCapabilitiesResult",
+      "raw": "{\"meta\":{\"request_id\":\"request.1\",\"draft_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"context_id\":\"context.1\"},\"data\":{\"scope\":{\"context_id\":\"context.1\",\"selection_id\":\"occurrence.1\",\"intent\":\"DELETE_CONSTRUCT\",\"endpoints\":[]},\"allowed\":[\"DELETE_CONSTRUCT\"],\"forbidden\":[],\"capability_query_id\":\"query.1\",\"options\":[{\"capability_query_id\":\"query.1\",\"option_id\":\"option.1\",\"command_type\":\"DELETE_CONSTRUCT\",\"capability_ref\":{\"capability_id\":\"CAP-DELETE-001\"},\"display_name\":\"删除\",\"group_path\":[],\"normalized_endpoints\":[],\"required_fields\":[],\"allowed_modifiers\":[],\"symbol_descriptor\":{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"template_family\":{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"rule_refs\":[{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}],\"enabled\":true,\"reason_codes\":[],\"expires_with_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"impact_summary\":{\"input_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"selected_occurrence_id\":\"occurrence.1\",\"delete_mode\":\"DELETE_TARGET\",\"target\":{\"kind\":\"ELEMENT\",\"id\":\"element.1\"},\"items\":[],\"counts\":{\"contexts\":0,\"occurrences\":0,\"elements\":0,\"features\":0,\"states\":0,\"facts\":0,\"opl_sentences\":0,\"traces\":0,\"findings\":0}},\"impact_token\":\"impact.1234567890123456789\",\"delete_mode\":\"DELETE_TARGET\",\"delete_target\":{\"kind\":\"ELEMENT\",\"id\":\"element.1\"},\"expires_with_revision\":\"revision.1\"}]}}"
+    },
+    {
+      "type": "DraftCapabilitiesResult",
+      "raw": "{\"meta\":{\"request_id\":\"request.1\",\"draft_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"context_id\":\"context.1\"},\"data\":{\"scope\":{\"context_id\":\"context.1\",\"selection_id\":\"occurrence.1\",\"intent\":\"DELETE_CONSTRUCT\",\"endpoints\":[]},\"allowed\":[\"DELETE_CONSTRUCT\"],\"forbidden\":[],\"capability_query_id\":\"query.1\",\"options\":[{\"capability_query_id\":\"query.1\",\"option_id\":\"option.1\",\"command_type\":\"UPDATE_LAYOUT\",\"capability_ref\":{\"capability_id\":\"CAP-DELETE-001\"},\"display_name\":\"删除\",\"group_path\":[],\"normalized_endpoints\":[],\"required_fields\":[],\"allowed_modifiers\":[],\"symbol_descriptor\":{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"template_family\":{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"rule_refs\":[{\"id\":\"asset.1\",\"version\":\"0.2.0\",\"digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}],\"enabled\":true,\"reason_codes\":[],\"expires_with_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"impact_summary\":{\"input_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"selected_occurrence_id\":\"occurrence.1\",\"delete_mode\":\"DELETE_TARGET\",\"target\":{\"kind\":\"ELEMENT\",\"id\":\"element.1\"},\"items\":[],\"counts\":{\"contexts\":0,\"occurrences\":0,\"elements\":0,\"features\":0,\"states\":0,\"facts\":0,\"opl_sentences\":0,\"traces\":0,\"findings\":0}},\"impact_token\":\"impact.1234567890123456789\",\"delete_mode\":\"DELETE_TARGET\",\"delete_target\":{\"kind\":\"ELEMENT\",\"id\":\"element.1\"}}]}}"
+    },
+    {
+      "type": "DraftEditResult",
+      "raw": "{\"request_id\":\"request.1\",\"command_id\":\"command.1\",\"status\":\"DURABLE\",\"base_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"result_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"content_digest\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"affected_ids\":[],\"text_trace_ids\":[],\"validation_summary\":{\"blocking\":0,\"warning\":0,\"suggestion\":0,\"coverage_state\":\"COMPLETE\"}}"
+    },
+    {
+      "type": "DraftEditResult",
+      "raw": "{\"request_id\":\"request.1\",\"command_id\":\"command.1\",\"status\":\"DURABLE\",\"base_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"result_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":2,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"content_digest\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"affected_ids\":[],\"text_trace_ids\":[],\"validation_summary\":{\"blocking\":0,\"warning\":0,\"suggestion\":0,\"coverage_state\":\"COMPLETE\"}}"
+    },
+    {
+      "type": "DraftEditResult",
+      "raw": "{\"request_id\":\"request.1\",\"command_id\":\"command.1\",\"status\":\"DURABLE\",\"base_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"result_token\":{\"draft_id\":\"draft.2\",\"edit_seq\":1,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"content_digest\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"affected_ids\":[],\"text_trace_ids\":[],\"validation_summary\":{\"blocking\":0,\"warning\":0,\"suggestion\":0,\"coverage_state\":\"COMPLETE\"}}"
+    },
+    {
+      "type": "DraftEditResult",
+      "raw": "{\"request_id\":\"request.1\",\"command_id\":\"command.1\",\"status\":\"UNCHANGED\",\"base_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"result_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":1,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"content_digest\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"affected_ids\":[],\"text_trace_ids\":[],\"validation_summary\":{\"blocking\":0,\"warning\":0,\"suggestion\":0,\"coverage_state\":\"COMPLETE\"}}"
+    },
+    {
+      "type": "DraftEditResult",
+      "raw": "{\"request_id\":\"request.1\",\"command_id\":\"command.1\",\"status\":\"DURABLE\",\"base_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"result_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":1,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"content_digest\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"affected_ids\":[],\"text_trace_ids\":[],\"validation_summary\":{\"blocking\":0,\"warning\":0,\"suggestion\":0,\"coverage_state\":\"COMPLETE\"},\"committed_revision\":\"revision.1\"}"
+    },
+    {
+      "type": "DraftProjectionResult",
+      "raw": "{\"meta\":{\"request_id\":\"request.1\",\"draft_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"context_id\":\"context.1\"},\"data\":{\"context_id\":\"context.1\",\"constructs\":[{\"occurrence_id\":\"occurrence.1\",\"target_id\":\"element.1\",\"target_kind\":\"ELEMENT\",\"construct_role\":\"OBJECT_NODE\",\"capability_id\":\"CAP-OBJECT-001\",\"label\":\"订单\",\"layout\":{\"x\":0.1,\"y\":2,\"width\":100,\"height\":60,\"z_order\":0,\"route_points\":[{\"x\":3.3,\"y\":4.4}],\"hidden\":true}}],\"suppressed_states\":[]}}"
+    },
+    {
+      "type": "OpenDraftResult",
+      "raw": "{\"request_id\":\"request.1\",\"project_id\":\"project.1\",\"model_id\":\"model.1\",\"root_context_id\":\"context.1\",\"context_id\":\"context.1\",\"mode\":\"JOURNALED_DRAFT_V2\",\"draft_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"save_state\":{\"durable_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":1,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"checkpoint_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"last_manual_revision\":null,\"dirty_since\":null,\"deadline\":null,\"in_flight\":\"NONE\",\"pending_manual_target\":null,\"last_error\":null}}"
+    },
+    {
+      "type": "OpenDraftResult",
+      "raw": "{\"request_id\":\"request.1\",\"project_id\":\"project.1\",\"model_id\":\"model.1\",\"root_context_id\":\"context.1\",\"context_id\":\"context.1\",\"mode\":\"JOURNALED_DRAFT_V2\",\"draft_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"save_state\":{\"durable_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"checkpoint_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"last_manual_revision\":null,\"dirty_since\":\"2026-02-30T00:00:00.000Z\",\"deadline\":\"2026-09-11T00:00:10.000Z\",\"in_flight\":\"NONE\",\"pending_manual_target\":null,\"last_error\":null}}"
+    },
+    {
+      "type": "OpenDraftResult",
+      "raw": "{\"request_id\":\"request.1\",\"project_id\":\"project.1\",\"model_id\":\"model.1\",\"root_context_id\":\"context.1\",\"context_id\":\"context.1\",\"mode\":\"JOURNALED_DRAFT_V2\",\"draft_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"save_state\":{\"durable_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"checkpoint_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"last_manual_revision\":null,\"dirty_since\":\"2026-09-11T00:00:00Z\",\"deadline\":\"2026-09-11T00:00:10.000Z\",\"in_flight\":\"NONE\",\"pending_manual_target\":null,\"last_error\":null}}"
+    },
+    {
+      "type": "OpenDraftResult",
+      "raw": "{\"request_id\":\"request.1\",\"project_id\":\"project.1\",\"model_id\":\"model.1\",\"root_context_id\":\"context.1\",\"context_id\":\"context.1\",\"mode\":\"JOURNALED_DRAFT_V2\",\"draft_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"save_state\":{\"durable_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"checkpoint_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"last_manual_revision\":null,\"dirty_since\":\"2026-09-11T00:00:00.000+08:00\",\"deadline\":\"2026-09-11T00:00:10.000Z\",\"in_flight\":\"NONE\",\"pending_manual_target\":null,\"last_error\":null}}"
+    }
+  ],
+  "digests": [
+    {
+      "raw": "{\"request_id\":\"request.1\",\"command_id\":\"command.1\",\"expected_draft_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"scope\":{\"context_id\":\"context.1\",\"selection_id\":\"occurrence.1\",\"intent\":\"UPDATE_LAYOUT\",\"endpoints\":[]},\"authorization\":{\"capability_query_id\":\"query.1\",\"selected_option_id\":\"option.1\"},\"command\":{\"command_type\":\"UPDATE_LAYOUT\",\"payload\":{\"occurrence_id\":\"occurrence.1\",\"layout\":{\"x\":-0,\"y\":0.1}}}}",
+      "canonical": "{\"authorization\":{\"capability_query_id\":\"query.1\",\"selected_option_id\":\"option.1\"},\"command\":{\"command_type\":\"UPDATE_LAYOUT\",\"payload\":{\"layout\":{\"x\":{\"binary64\":\"8000000000000000\"},\"y\":{\"binary64\":\"3fb999999999999a\"}},\"occurrence_id\":\"occurrence.1\"}},\"command_id\":\"command.1\",\"expected_draft_token\":{\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"draft_id\":\"draft.1\",\"edit_seq\":{\"binary64\":\"0000000000000000\"}},\"identity_version\":\"DraftEditRequest/1\",\"model_id\":\"model.1\",\"project_id\":\"project.1\",\"scope\":{\"context_id\":\"context.1\",\"endpoints\":[],\"intent\":\"UPDATE_LAYOUT\",\"selection_id\":\"occurrence.1\"}}",
+      "digest": "c65c16fc6bcb33c4e77fcc91071e10b92ab79ad3eec9b493c6a00b4a544eaf48"
+    },
+    {
+      "raw": "{\"request_id\":\"request.2\",\"command_id\":\"command.1\",\"expected_draft_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"scope\":{\"context_id\":\"context.1\",\"selection_id\":\"occurrence.1\",\"intent\":\"UPDATE_LAYOUT\",\"endpoints\":[]},\"authorization\":{\"capability_query_id\":\"query.1\",\"selected_option_id\":\"option.1\"},\"command\":{\"command_type\":\"UPDATE_LAYOUT\",\"payload\":{\"occurrence_id\":\"occurrence.1\",\"layout\":{\"x\":-0,\"y\":0.1}}}}",
+      "canonical": "{\"authorization\":{\"capability_query_id\":\"query.1\",\"selected_option_id\":\"option.1\"},\"command\":{\"command_type\":\"UPDATE_LAYOUT\",\"payload\":{\"layout\":{\"x\":{\"binary64\":\"8000000000000000\"},\"y\":{\"binary64\":\"3fb999999999999a\"}},\"occurrence_id\":\"occurrence.1\"}},\"command_id\":\"command.1\",\"expected_draft_token\":{\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"draft_id\":\"draft.1\",\"edit_seq\":{\"binary64\":\"0000000000000000\"}},\"identity_version\":\"DraftEditRequest/1\",\"model_id\":\"model.1\",\"project_id\":\"project.1\",\"scope\":{\"context_id\":\"context.1\",\"endpoints\":[],\"intent\":\"UPDATE_LAYOUT\",\"selection_id\":\"occurrence.1\"}}",
+      "digest": "c65c16fc6bcb33c4e77fcc91071e10b92ab79ad3eec9b493c6a00b4a544eaf48"
+    },
+    {
+      "raw": "{\"request_id\":\"request.1\",\"command_id\":\"command.1\",\"expected_draft_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"scope\":{\"context_id\":\"context.1\",\"selection_id\":\"occurrence.1\",\"intent\":\"UPDATE_LAYOUT\",\"endpoints\":[]},\"authorization\":{\"capability_query_id\":\"query.1\",\"selected_option_id\":\"option.1\"},\"command\":{\"command_type\":\"UPDATE_LAYOUT\",\"payload\":{\"occurrence_id\":\"occurrence.1\",\"layout\":{\"x\":0,\"y\":0.1}}}}",
+      "canonical": "{\"authorization\":{\"capability_query_id\":\"query.1\",\"selected_option_id\":\"option.1\"},\"command\":{\"command_type\":\"UPDATE_LAYOUT\",\"payload\":{\"layout\":{\"x\":{\"binary64\":\"0000000000000000\"},\"y\":{\"binary64\":\"3fb999999999999a\"}},\"occurrence_id\":\"occurrence.1\"}},\"command_id\":\"command.1\",\"expected_draft_token\":{\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"draft_id\":\"draft.1\",\"edit_seq\":{\"binary64\":\"0000000000000000\"}},\"identity_version\":\"DraftEditRequest/1\",\"model_id\":\"model.1\",\"project_id\":\"project.1\",\"scope\":{\"context_id\":\"context.1\",\"endpoints\":[],\"intent\":\"UPDATE_LAYOUT\",\"selection_id\":\"occurrence.1\"}}",
+      "digest": "30a593bc7125488d2e51dbd29bf46bbad1d17da4cb74c201e8cb3d41e13f2ab6"
+    },
+    {
+      "raw": "{\"request_id\":\"request.1\",\"command_id\":\"command.1\",\"expected_draft_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"scope\":{\"context_id\":\"context.1\",\"selection_id\":\"occurrence.1\",\"intent\":\"UPDATE_PROPERTY\",\"endpoints\":[]},\"authorization\":{\"capability_query_id\":\"query.1\",\"selected_option_id\":\"option.1\"},\"command\":{\"command_type\":\"UPDATE_PROPERTY\",\"payload\":{\"target_ref\":{\"target_kind\":\"ELEMENT\",\"target_id\":\"element.1\"},\"property_name\":\"name\",\"value\":\"订单😀\"}}}",
+      "canonical": "{\"authorization\":{\"capability_query_id\":\"query.1\",\"selected_option_id\":\"option.1\"},\"command\":{\"command_type\":\"UPDATE_PROPERTY\",\"payload\":{\"property_name\":\"name\",\"target_ref\":{\"target_id\":\"element.1\",\"target_kind\":\"ELEMENT\"},\"value\":\"订单😀\"}},\"command_id\":\"command.1\",\"expected_draft_token\":{\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"draft_id\":\"draft.1\",\"edit_seq\":{\"binary64\":\"0000000000000000\"}},\"identity_version\":\"DraftEditRequest/1\",\"model_id\":\"model.1\",\"project_id\":\"project.1\",\"scope\":{\"context_id\":\"context.1\",\"endpoints\":[],\"intent\":\"UPDATE_PROPERTY\",\"selection_id\":\"occurrence.1\"}}",
+      "digest": "c37d00c68eaf1e21f7e46770479177b434153847cbe03c6e22c6ba41b56015a9"
+    },
+    {
+      "raw": "{\"request_id\":\"request.1\",\"command_id\":\"command.1\",\"expected_draft_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"scope\":{\"context_id\":\"context.1\",\"selection_id\":\"occurrence.1\",\"intent\":\"CREATE_FACT\",\"endpoints\":[]},\"authorization\":{\"capability_query_id\":\"query.1\",\"selected_option_id\":\"option.1\"},\"command\":{\"command_type\":\"CREATE_FACT\",\"payload\":{\"context_id\":\"context.1\",\"capability_ref\":{\"capability_id\":\"CAP-ISO-PROC-001\"},\"fact_family\":\"PROCEDURAL\",\"normalized_endpoints\":[{\"role\":\"CONSUMED_OBJECT\",\"target_ref\":{\"target_kind\":\"ELEMENT\",\"target_id\":\"element.1\"},\"ordinal\":0},{\"role\":\"CONSUMING_PROCESS\",\"target_ref\":{\"target_kind\":\"ELEMENT\",\"target_id\":\"element.2\"},\"ordinal\":1}],\"direction\":\"DIRECTED\",\"labels\":[],\"modifiers\":[],\"logical_groups\":[],\"occurrence\":{\"ownership\":\"OWNED\",\"construct_role\":\"CONSUMPTION_LINK\"},\"layout\":{\"route_points\":[{\"x\":0.1,\"y\":-2.5}]}}}}",
+      "canonical": "{\"authorization\":{\"capability_query_id\":\"query.1\",\"selected_option_id\":\"option.1\"},\"command\":{\"command_type\":\"CREATE_FACT\",\"payload\":{\"capability_ref\":{\"capability_id\":\"CAP-ISO-PROC-001\"},\"context_id\":\"context.1\",\"direction\":\"DIRECTED\",\"fact_family\":\"PROCEDURAL\",\"labels\":[],\"layout\":{\"route_points\":[{\"x\":{\"binary64\":\"3fb999999999999a\"},\"y\":{\"binary64\":\"c004000000000000\"}}]},\"logical_groups\":[],\"modifiers\":[],\"normalized_endpoints\":[{\"ordinal\":{\"binary64\":\"0000000000000000\"},\"role\":\"CONSUMED_OBJECT\",\"target_ref\":{\"target_id\":\"element.1\",\"target_kind\":\"ELEMENT\"}},{\"ordinal\":{\"binary64\":\"3ff0000000000000\"},\"role\":\"CONSUMING_PROCESS\",\"target_ref\":{\"target_id\":\"element.2\",\"target_kind\":\"ELEMENT\"}}],\"occurrence\":{\"construct_role\":\"CONSUMPTION_LINK\",\"ownership\":\"OWNED\"}}},\"command_id\":\"command.1\",\"expected_draft_token\":{\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"draft_id\":\"draft.1\",\"edit_seq\":{\"binary64\":\"0000000000000000\"}},\"identity_version\":\"DraftEditRequest/1\",\"model_id\":\"model.1\",\"project_id\":\"project.1\",\"scope\":{\"context_id\":\"context.1\",\"endpoints\":[],\"intent\":\"CREATE_FACT\",\"selection_id\":\"occurrence.1\"}}",
+      "digest": "3b53865f4aa77c3a1bd689b7b2fd8a6257855ecd92d021a5d3074a7572f4ca04"
+    },
+    {
+      "raw": "{\"request_id\":\"request.1\",\"command_id\":\"command.1\",\"expected_draft_token\":{\"draft_id\":\"draft.1\",\"edit_seq\":0,\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"scope\":{\"context_id\":\"context.1\",\"selection_id\":\"occurrence.1\",\"intent\":\"UPDATE_LAYOUT\",\"endpoints\":[\"element.2\",\"element.1\",\"element.1\"]},\"authorization\":{\"capability_query_id\":\"query.1\",\"selected_option_id\":\"option.1\"},\"command\":{\"command_type\":\"UPDATE_LAYOUT\",\"payload\":{\"occurrence_id\":\"occurrence.1\",\"layout\":{\"x\":0,\"y\":0.1}}}}",
+      "canonical": "{\"authorization\":{\"capability_query_id\":\"query.1\",\"selected_option_id\":\"option.1\"},\"command\":{\"command_type\":\"UPDATE_LAYOUT\",\"payload\":{\"layout\":{\"x\":{\"binary64\":\"0000000000000000\"},\"y\":{\"binary64\":\"3fb999999999999a\"}},\"occurrence_id\":\"occurrence.1\"}},\"command_id\":\"command.1\",\"expected_draft_token\":{\"binding_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"draft_id\":\"draft.1\",\"edit_seq\":{\"binary64\":\"0000000000000000\"}},\"identity_version\":\"DraftEditRequest/1\",\"model_id\":\"model.1\",\"project_id\":\"project.1\",\"scope\":{\"context_id\":\"context.1\",\"endpoints\":[\"element.2\",\"element.1\",\"element.1\"],\"intent\":\"UPDATE_LAYOUT\",\"selection_id\":\"occurrence.1\"}}",
+      "digest": "17540d77a9278c434b927a75a16116438e08672431e2d54633ab58141c6d8ad5"
+    }
+  ],
+  "commands": [
+    {
+      "request_id": "request.1",
+      "command_id": "command.1",
+      "expected_draft_token": {
+        "draft_id": "draft.1",
+        "edit_seq": 0,
+        "binding_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "scope": {
+        "context_id": "context.1",
+        "selection_id": "occurrence.1",
+        "intent": "CREATE_ELEMENT",
+        "endpoints": []
+      },
+      "authorization": {
+        "capability_query_id": "query.1",
+        "selected_option_id": "option.1"
+      },
+      "command": {
+        "command_type": "CREATE_ELEMENT",
+        "payload": {
+          "kind": "OBJECT",
+          "name": "订单",
+          "layout": {
+            "x": 0,
+            "y": 2.5
+          }
+        }
+      }
+    },
+    {
+      "request_id": "request.1",
+      "command_id": "command.1",
+      "expected_draft_token": {
+        "draft_id": "draft.1",
+        "edit_seq": 0,
+        "binding_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "scope": {
+        "context_id": "context.1",
+        "selection_id": "occurrence.1",
+        "intent": "CREATE_FEATURE",
+        "endpoints": []
+      },
+      "authorization": {
+        "capability_query_id": "query.1",
+        "selected_option_id": "option.1"
+      },
+      "command": {
+        "command_type": "CREATE_FEATURE",
+        "payload": {
+          "context_id": "context.1",
+          "owner_element_id": "element.1",
+          "feature_kind": "ATTRIBUTE",
+          "capability_ref": {
+            "capability_id": "CAP-FEAT-ATTRIBUTE-001"
+          },
+          "name": "颜色",
+          "occurrence": {
+            "ownership": "OWNED",
+            "construct_role": "ATTRIBUTE_NODE"
+          },
+          "layout": {
+            "x": 0,
+            "y": 0
+          }
+        }
+      }
+    },
+    {
+      "request_id": "request.1",
+      "command_id": "command.1",
+      "expected_draft_token": {
+        "draft_id": "draft.1",
+        "edit_seq": 0,
+        "binding_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "scope": {
+        "context_id": "context.1",
+        "selection_id": "occurrence.1",
+        "intent": "CREATE_FACT",
+        "endpoints": []
+      },
+      "authorization": {
+        "capability_query_id": "query.1",
+        "selected_option_id": "option.1"
+      },
+      "command": {
+        "command_type": "CREATE_FACT",
+        "payload": {
+          "context_id": "context.1",
+          "capability_ref": {
+            "capability_id": "CAP-ISO-PROC-001"
+          },
+          "fact_family": "PROCEDURAL",
+          "normalized_endpoints": [
+            {
+              "role": "CONSUMED_OBJECT",
+              "target_ref": {
+                "target_kind": "ELEMENT",
+                "target_id": "element.1"
+              },
+              "ordinal": 0
+            },
+            {
+              "role": "CONSUMING_PROCESS",
+              "target_ref": {
+                "target_kind": "ELEMENT",
+                "target_id": "element.2"
+              },
+              "ordinal": 1
+            }
+          ],
+          "direction": "DIRECTED",
+          "labels": [],
+          "modifiers": [],
+          "logical_groups": [],
+          "occurrence": {
+            "ownership": "OWNED",
+            "construct_role": "CONSUMPTION_LINK"
+          },
+          "layout": {
+            "route_points": [
+              {
+                "x": 0.1,
+                "y": -2.5
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "request_id": "request.1",
+      "command_id": "command.1",
+      "expected_draft_token": {
+        "draft_id": "draft.1",
+        "edit_seq": 0,
+        "binding_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "scope": {
+        "context_id": "context.1",
+        "selection_id": "occurrence.1",
+        "intent": "CREATE_STATE",
+        "endpoints": []
+      },
+      "authorization": {
+        "capability_query_id": "query.1",
+        "selected_option_id": "option.1"
+      },
+      "command": {
+        "command_type": "CREATE_STATE",
+        "payload": {
+          "context_id": "context.1",
+          "owner_ref": {
+            "target_kind": "ELEMENT",
+            "target_id": "element.1"
+          },
+          "capability_ref": {
+            "capability_id": "CAP-STATE-001"
+          },
+          "name_or_value": "就绪",
+          "state_roles": [
+            "INITIAL"
+          ],
+          "occurrence": {
+            "ownership": "OWNED",
+            "construct_role": "STATE_NODE"
+          },
+          "layout": {
+            "x": 1,
+            "y": 2
+          }
+        }
+      }
+    },
+    {
+      "request_id": "request.1",
+      "command_id": "command.1",
+      "expected_draft_token": {
+        "draft_id": "draft.1",
+        "edit_seq": 0,
+        "binding_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "scope": {
+        "context_id": "context.1",
+        "selection_id": "occurrence.1",
+        "intent": "UPDATE_STATE",
+        "endpoints": []
+      },
+      "authorization": {
+        "capability_query_id": "query.1",
+        "selected_option_id": "option.1"
+      },
+      "command": {
+        "command_type": "UPDATE_STATE",
+        "payload": {
+          "state_id": "state.1",
+          "expected_owner_ref": {
+            "target_kind": "ELEMENT",
+            "target_id": "element.1"
+          },
+          "changes": {
+            "name_or_value": "完成"
+          }
+        }
+      }
+    },
+    {
+      "request_id": "request.1",
+      "command_id": "command.1",
+      "expected_draft_token": {
+        "draft_id": "draft.1",
+        "edit_seq": 0,
+        "binding_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "scope": {
+        "context_id": "context.1",
+        "selection_id": "occurrence.1",
+        "intent": "UPDATE_FACT",
+        "endpoints": []
+      },
+      "authorization": {
+        "capability_query_id": "query.1",
+        "selected_option_id": "option.1"
+      },
+      "command": {
+        "command_type": "UPDATE_FACT",
+        "payload": {
+          "fact_id": "fact.1",
+          "expected_capability_ref": {
+            "capability_id": "CAP-ISO-PROC-001"
+          },
+          "replacement": {
+            "modifiers": []
+          }
+        }
+      }
+    },
+    {
+      "request_id": "request.1",
+      "command_id": "command.1",
+      "expected_draft_token": {
+        "draft_id": "draft.1",
+        "edit_seq": 0,
+        "binding_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "scope": {
+        "context_id": "context.1",
+        "selection_id": "occurrence.1",
+        "intent": "UPDATE_PROPERTY",
+        "endpoints": []
+      },
+      "authorization": {
+        "capability_query_id": "query.1",
+        "selected_option_id": "option.1"
+      },
+      "command": {
+        "command_type": "UPDATE_PROPERTY",
+        "payload": {
+          "target_ref": {
+            "target_kind": "ELEMENT",
+            "target_id": "element.1"
+          },
+          "property_name": "name",
+          "value": "订单😀"
+        }
+      }
+    },
+    {
+      "request_id": "request.1",
+      "command_id": "command.1",
+      "expected_draft_token": {
+        "draft_id": "draft.1",
+        "edit_seq": 0,
+        "binding_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "scope": {
+        "context_id": "context.1",
+        "selection_id": "occurrence.1",
+        "intent": "UPDATE_LAYOUT",
+        "endpoints": []
+      },
+      "authorization": {
+        "capability_query_id": "query.1",
+        "selected_option_id": "option.1"
+      },
+      "command": {
+        "command_type": "UPDATE_LAYOUT",
+        "payload": {
+          "occurrence_id": "occurrence.1",
+          "layout": {
+            "x": 0,
+            "y": 0.1
+          }
+        }
+      }
+    },
+    {
+      "request_id": "request.1",
+      "command_id": "command.1",
+      "expected_draft_token": {
+        "draft_id": "draft.1",
+        "edit_seq": 0,
+        "binding_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "scope": {
+        "context_id": "context.1",
+        "selection_id": "occurrence.1",
+        "intent": "DELETE_CONSTRUCT",
+        "endpoints": []
+      },
+      "authorization": {
+        "capability_query_id": "query.1",
+        "selected_option_id": "option.1"
+      },
+      "command": {
+        "command_type": "DELETE_CONSTRUCT",
+        "payload": {
+          "selection_id": "occurrence.1",
+          "construct_kind": "ELEMENT",
+          "construct_id": "element.1",
+          "delete_mode": "DELETE_TARGET",
+          "impact_token": "impact.1234567890123456789"
+        }
+      }
+    },
+    {
+      "request_id": "request.1",
+      "command_id": "command.1",
+      "expected_draft_token": {
+        "draft_id": "draft.1",
+        "edit_seq": 0,
+        "binding_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "scope": {
+        "context_id": "context.1",
+        "selection_id": "occurrence.1",
+        "intent": "STATE_EXPLICIT",
+        "endpoints": []
+      },
+      "authorization": {
+        "capability_query_id": "query.1",
+        "selected_option_id": "option.1"
+      },
+      "command": {
+        "command_type": "STATE_EXPLICIT",
+        "payload": {
+          "context_id": "context.1",
+          "state_id": "state.1"
+        }
+      }
+    },
+    {
+      "request_id": "request.1",
+      "command_id": "command.1",
+      "expected_draft_token": {
+        "draft_id": "draft.1",
+        "edit_seq": 0,
+        "binding_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "scope": {
+        "context_id": "context.1",
+        "selection_id": "occurrence.1",
+        "intent": "STATE_SUPPRESS",
+        "endpoints": []
+      },
+      "authorization": {
+        "capability_query_id": "query.1",
+        "selected_option_id": "option.1"
+      },
+      "command": {
+        "command_type": "STATE_SUPPRESS",
+        "payload": {
+          "context_id": "context.1",
+          "state_id": "state.1"
+        }
+      }
+    },
+    {
+      "request_id": "request.1",
+      "command_id": "command.1",
+      "expected_draft_token": {
+        "draft_id": "draft.1",
+        "edit_seq": 0,
+        "binding_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "scope": {
+        "context_id": "context.1",
+        "selection_id": "occurrence.1",
+        "intent": "UNFOLD",
+        "endpoints": []
+      },
+      "authorization": {
+        "capability_query_id": "query.1",
+        "selected_option_id": "option.1"
+      },
+      "command": {
+        "command_type": "UNFOLD",
+        "payload": {
+          "context_id": "context.1",
+          "state_id": "state.1"
+        }
+      }
+    },
+    {
+      "request_id": "request.1",
+      "command_id": "command.1",
+      "expected_draft_token": {
+        "draft_id": "draft.1",
+        "edit_seq": 0,
+        "binding_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "scope": {
+        "context_id": "context.1",
+        "selection_id": "occurrence.1",
+        "intent": "FOLD",
+        "endpoints": []
+      },
+      "authorization": {
+        "capability_query_id": "query.1",
+        "selected_option_id": "option.1"
+      },
+      "command": {
+        "command_type": "FOLD",
+        "payload": {
+          "context_id": "context.1",
+          "state_id": "state.1"
+        }
+      }
+    }
+  ]
+}

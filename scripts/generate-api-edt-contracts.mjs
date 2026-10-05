@@ -13,22 +13,39 @@ const schemas = contract.components?.schemas;
 if (!schemas) throw new Error("OpenAPI 缺少 components.schemas");
 
 const commandTypes = enumValues("EditCommandType");
-const requiredCommands = ["CREATE_ELEMENT", "CREATE_FEATURE", "CREATE_FACT", "CREATE_STATE", "UPDATE_STATE", "UPDATE_FACT", "DELETE_CONSTRUCT", "STATE_EXPLICIT", "STATE_SUPPRESS", "UNFOLD", "FOLD"];
+const requiredCommands = ["CREATE_ELEMENT", "CREATE_FEATURE", "CREATE_FACT", "CREATE_STATE", "UPDATE_STATE", "UPDATE_FACT", "UPDATE_PROPERTY", "UPDATE_LAYOUT", "DELETE_CONSTRUCT", "STATE_EXPLICIT", "STATE_SUPPRESS", "UNFOLD", "FOLD"];
 for (const command of requiredCommands) {
   if (!commandTypes.includes(command)) throw new Error(`EditCommandType 缺少 ${command}`);
 }
-for (const name of ["CommandCapabilityOption", "CreateFeaturePayload", "CreateStatePayload", "UpdateStatePayload", "CreateFactPayload", "UpdateFactPayload", "DeleteConstructPayload", "StatePresentationPayload"]) {
+for (const name of ["CommandCapabilityOption", "RelationCatalogItem", "RelationEndpointSummary", "RelationEndpointRoleSummary", "CreateFeaturePayload", "CreateStatePayload", "UpdateStatePayload", "CreateFactPayload", "UpdateFactPayload", "UpdatePropertyPayload", "UpdateLayoutPayload", "DeleteConstructPayload", "StatePresentationPayload"]) {
   if (!schemas[name]) throw new Error(`OpenAPI 缺少 ${name}`);
 }
+assertUpdatePropertyContract();
+assertUpdateLayoutContract();
+assertRelationCatalogContract();
+assertDeleteConstructContract();
 
 const sourceDigest = createHash("sha256")
   .update(JSON.stringify(requiredCommands.map((name) => [name, schemas[name] ?? null])))
   .update(JSON.stringify(schemas.CommandCapabilityOption))
+  .update(JSON.stringify(schemas.RelationCatalogItem))
+  .update(JSON.stringify(schemas.RelationEndpointSummary))
+  .update(JSON.stringify(schemas.RelationEndpointRoleSummary))
   .update(JSON.stringify(schemas.StatePresentationPayload))
+  .update(JSON.stringify(schemas.UpdatePropertyPayload))
+  .update(JSON.stringify(schemas.UpdateLayoutPayload))
+  .update(JSON.stringify(schemas.DeleteConstructPayload))
+  .update(JSON.stringify(schemas.ImpactSummary))
   .digest("hex");
 const targets = new Map([
-  [resolve(root, "apps/web/src/shared/api/generated/apiEdtContract.ts"), enrichControlOptionContract(typescript(sourceDigest, commandTypes), "typescript")],
-  [resolve(root, "services/local-runtime/src/main/java/org/opm/localruntime/api/generated/ApiEdtContract.java"), enrichControlOptionContract(java(sourceDigest, commandTypes), "java")],
+  [resolve(root, "apps/web/src/shared/api/generated/apiEdtContract.ts"), enrichDeleteConstructContract(
+    enrichRelationCatalogContract(enrichPropertyContract(enrichLayoutContract(enrichControlOptionContract(typescript(sourceDigest, commandTypes), "typescript"), "typescript"), "typescript"), "typescript"),
+    "typescript",
+  )],
+  [resolve(root, "services/local-runtime/src/main/java/org/opm/localruntime/api/generated/ApiEdtContract.java"), enrichDeleteConstructContract(
+    enrichRelationCatalogContract(enrichPropertyContract(enrichLayoutContract(enrichControlOptionContract(java(sourceDigest, commandTypes), "java"), "java"), "java"), "java"),
+    "java",
+  )],
 ]);
 
 for (const [path, content] of targets) {
@@ -56,6 +73,136 @@ function enumValues(name) {
 
 function relative(path) {
   return path.slice(root.length + 1);
+}
+
+function assertDeleteConstructContract() {
+  const payload = schemas.DeleteConstructPayload;
+  const option = schemas.CommandCapabilityOption;
+  const required = ["selection_id", "construct_kind", "construct_id", "delete_mode", "impact_token"];
+  if (payload?.additionalProperties !== false || required.some((field) => !payload.required?.includes(field))
+      || payload.properties?.construct_kind?.enum?.join(",") !== "OCCURRENCE,ELEMENT,STATE,FACT,FEATURE"
+      || payload.properties?.delete_mode?.enum?.join(",") !== "REMOVE_OCCURRENCE,DELETE_TARGET,CASCADE"
+      || !schemas.DeleteTarget || !schemas.DeleteImpactItem || !schemas.DeleteImpactCounts
+      || !option?.properties?.delete_mode || !option?.properties?.delete_target) {
+    throw new Error("DeleteConstructPayload 与删除影响契约必须完整且封闭");
+  }
+}
+
+function enrichDeleteConstructContract(content, language) {
+  if (language === "typescript") {
+    return content
+      .replace(
+        "export interface ApiEdtImpactSummary {\n  affected_construct_count: number;\n  affected_context_count: number;\n  affected_sentence_count: number;\n  affected_finding_count: number;\n}",
+        "export type ApiEdtDeleteMode = \"REMOVE_OCCURRENCE\" | \"DELETE_TARGET\" | \"CASCADE\";\nexport type ApiEdtDeleteTargetKind = \"OCCURRENCE\" | \"ELEMENT\" | \"FEATURE\" | \"STATE\" | \"FACT\";\nexport interface ApiEdtDeleteTarget { kind: ApiEdtDeleteTargetKind; id: string; }\nexport interface ApiEdtDeleteImpactItem { kind: string; id: string; context_id?: string; effect: \"DIRECT\" | \"CASCADE\" | \"BLOCKER\"; }\nexport interface ApiEdtDeleteImpactCounts { contexts: number; occurrences: number; elements: number; features: number; states: number; facts: number; opl_sentences: number; traces: number; findings: number; }\nexport interface ApiEdtImpactSummary { input_revision: string; selected_occurrence_id: string; delete_mode: ApiEdtDeleteMode; target: ApiEdtDeleteTarget; items: ApiEdtDeleteImpactItem[]; counts: ApiEdtDeleteImpactCounts; }",
+      )
+      .replace(
+        "  impact_token?: string;\n}",
+        "  impact_token?: string;\n  delete_mode?: ApiEdtDeleteMode;\n  delete_target?: ApiEdtDeleteTarget;\n}",
+      )
+      .replace(
+        "export interface ApiEdtDeleteConstructPayload {\n  construct_kind: ApiEdtTargetKind;\n  construct_id: string;\n  impact_token: string;\n}",
+        "export interface ApiEdtDeleteConstructPayload {\n  selection_id: string;\n  construct_kind: ApiEdtDeleteTargetKind;\n  construct_id: string;\n  delete_mode: ApiEdtDeleteMode;\n  impact_token: string;\n}",
+      );
+  }
+  return content
+    .replace(
+      "    public record ImpactSummary(int affectedConstructCount, int affectedContextCount, int affectedSentenceCount, int affectedFindingCount) {\n        public ImpactSummary { if (affectedConstructCount < 0 || affectedContextCount < 0 || affectedSentenceCount < 0 || affectedFindingCount < 0) throw new IllegalArgumentException(\"impact counts must not be negative\"); }\n    }",
+      "    public record DeleteTarget(String kind, String id) { public DeleteTarget { Objects.requireNonNull(kind); Objects.requireNonNull(id); } }\n\n    public record DeleteImpactItem(String kind, String id, String contextId, String effect) { public DeleteImpactItem { Objects.requireNonNull(kind); Objects.requireNonNull(id); Objects.requireNonNull(effect); } }\n\n    public record DeleteImpactCounts(int contexts, int occurrences, int elements, int features, int states, int facts, int oplSentences, int traces, int findings) { public DeleteImpactCounts { if (contexts < 0 || occurrences < 0 || elements < 0 || features < 0 || states < 0 || facts < 0 || oplSentences < 0 || traces < 0 || findings < 0) throw new IllegalArgumentException(\"impact counts must not be negative\"); } }\n\n    public record ImpactSummary(String inputRevision, String selectedOccurrenceId, String deleteMode, DeleteTarget target, List<DeleteImpactItem> items, DeleteImpactCounts counts) { public ImpactSummary { Objects.requireNonNull(inputRevision); Objects.requireNonNull(selectedOccurrenceId); Objects.requireNonNull(deleteMode); Objects.requireNonNull(target); items = List.copyOf(items); Objects.requireNonNull(counts); } }",
+    )
+    .replace(
+      "public record DeleteConstructPayload(String constructKind, String constructId, String impactToken) {\n        public DeleteConstructPayload { Objects.requireNonNull(constructKind); Objects.requireNonNull(constructId); Objects.requireNonNull(impactToken); if (impactToken.length() < 16) throw new IllegalArgumentException(\"impact token is too short\"); }\n    }",
+      "public record DeleteConstructPayload(String selectionId, String constructKind, String constructId, String deleteMode, String impactToken) {\n        public DeleteConstructPayload { Objects.requireNonNull(selectionId); Objects.requireNonNull(constructKind); Objects.requireNonNull(constructId); Objects.requireNonNull(deleteMode); Objects.requireNonNull(impactToken); if (impactToken.length() < 16) throw new IllegalArgumentException(\"impact token is too short\"); }\n    }",
+    )
+    .replace(
+      "ImpactSummary impactSummary, String impactToken, String expiresWithRevision)",
+      "ImpactSummary impactSummary, String impactToken, String deleteMode, DeleteTarget deleteTarget, String expiresWithRevision)",
+    )
+    .replace(
+      "if (commandType == CommandType.DELETE_CONSTRUCT && (impactSummary == null || impactToken == null)) throw new IllegalArgumentException(\"delete option requires impact summary and token\");\n            if (commandType != CommandType.DELETE_CONSTRUCT && (impactSummary != null || impactToken != null)) throw new IllegalArgumentException(\"impact data is only valid for delete options\");",
+      "if (commandType == CommandType.DELETE_CONSTRUCT && (impactSummary == null || impactToken == null || deleteMode == null || deleteTarget == null)) throw new IllegalArgumentException(\"delete option requires impact summary and token\");\n            if (commandType != CommandType.DELETE_CONSTRUCT && (impactSummary != null || impactToken != null || deleteMode != null || deleteTarget != null)) throw new IllegalArgumentException(\"impact data is only valid for delete options\");",
+    )
+    .replace(
+      "\n        }\n\n        public Map<String, Object> toWire() {",
+      "\n        }\n\n        public CommandCapabilityOption(String capabilityQueryId, String optionId, CommandType commandType, String capabilityId, String baseFactCapabilityId, String displayName, List<String> groupPath, List<NormalizedEndpoint> normalizedEndpoints, List<RequiredField> requiredFields, List<AllowedModifier> allowedModifiers, AssetReference symbolDescriptor, AssetReference templateFamily, List<AssetReference> ruleRefs, boolean enabled, List<String> reasonCodes, ImpactSummary impactSummary, String impactToken, String expiresWithRevision) { this(capabilityQueryId, optionId, commandType, capabilityId, baseFactCapabilityId, displayName, groupPath, normalizedEndpoints, requiredFields, allowedModifiers, symbolDescriptor, templateFamily, ruleRefs, enabled, reasonCodes, impactSummary, impactToken, null, null, expiresWithRevision); }\n\n        public Map<String, Object> toWire() {",
+    )
+    .replace(
+      "if (impactSummary != null) { result.put(\"impact_summary\", impact(impactSummary)); result.put(\"impact_token\", impactToken); }",
+      "if (impactSummary != null) { result.put(\"impact_summary\", impact(impactSummary)); result.put(\"impact_token\", impactToken); result.put(\"delete_mode\", deleteMode); result.put(\"delete_target\", Map.of(\"kind\", deleteTarget.kind(), \"id\", deleteTarget.id())); }",
+    )
+    .replace(
+      "private static Map<String, Object> impact(ImpactSummary value) { return Map.of(\"affected_construct_count\", value.affectedConstructCount(), \"affected_context_count\", value.affectedContextCount(), \"affected_sentence_count\", value.affectedSentenceCount(), \"affected_finding_count\", value.affectedFindingCount()); }",
+      "private static Map<String, Object> impact(ImpactSummary value) { Map<String, Object> result = new LinkedHashMap<>(); result.put(\"input_revision\", value.inputRevision()); result.put(\"selected_occurrence_id\", value.selectedOccurrenceId()); result.put(\"delete_mode\", value.deleteMode()); result.put(\"target\", Map.of(\"kind\", value.target().kind(), \"id\", value.target().id())); result.put(\"items\", value.items().stream().map(item -> { Map<String, Object> wire = new LinkedHashMap<>(); wire.put(\"kind\", item.kind()); wire.put(\"id\", item.id()); if (item.contextId() != null) wire.put(\"context_id\", item.contextId()); wire.put(\"effect\", item.effect()); return Map.copyOf(wire); }).toList()); result.put(\"counts\", Map.of(\"contexts\", value.counts().contexts(), \"occurrences\", value.counts().occurrences(), \"elements\", value.counts().elements(), \"features\", value.counts().features(), \"states\", value.counts().states(), \"facts\", value.counts().facts(), \"opl_sentences\", value.counts().oplSentences(), \"traces\", value.counts().traces(), \"findings\", value.counts().findings())); return Map.copyOf(result); }",
+    );
+}
+
+function assertUpdatePropertyContract() {
+  const payload = schemas.UpdatePropertyPayload;
+  const target = payload?.properties?.target_ref;
+  if (payload?.additionalProperties !== false
+      || target?.additionalProperties !== false
+      || target?.properties?.target_kind?.const !== "ELEMENT"
+      || payload?.properties?.property_name?.const !== "name"
+      || payload?.properties?.value?.maxLength !== 256) {
+    throw new Error("UpdatePropertyPayload 必须保持封闭的 Object/Process name 契约");
+  }
+  const variants = schemas.ExecuteEditCommandRequest?.allOf?.flatMap((item) => item.oneOf ?? []) ?? [];
+  if (variants.filter((item) => item.properties?.command_type?.const === "UPDATE_PROPERTY").length !== 1) {
+    throw new Error("ExecuteEditCommandRequest 必须仅包含一个 UPDATE_PROPERTY 分支");
+  }
+  const legacyTypes = schemas.LegacyEditCommand?.properties?.command_type?.enum ?? [];
+  if (legacyTypes.includes("UPDATE_PROPERTY")) {
+    throw new Error("UPDATE_PROPERTY 不得回退到 LegacyEditCommand 任意 payload");
+  }
+}
+
+function assertUpdateLayoutContract() {
+  const payload = schemas.UpdateLayoutPayload;
+  const roles = payload?.["x-opm-owned-construct-roles"];
+  if (payload?.additionalProperties !== false
+      || JSON.stringify(payload?.required) !== JSON.stringify(["occurrence_id", "layout"])
+      || JSON.stringify(roles) !== JSON.stringify(["OBJECT_NODE", "PROCESS_NODE", "ATTRIBUTE_NODE", "OPERATION_NODE", "STATE_NODE", "FEATURE_STATE_NODE"])) {
+    throw new Error("UpdateLayoutPayload 必须保持 owned Object/Process/Attribute/Operation/State occurrence 契约");
+  }
+  const layout = payload?.properties?.layout;
+  if (layout?.additionalProperties !== false
+      || JSON.stringify(layout?.required) !== JSON.stringify(["x", "y"])
+      || layout?.properties?.x?.type !== "number"
+      || layout?.properties?.y?.type !== "number") {
+    throw new Error("UpdateLayoutPayload.layout 必须保持封闭 x/y 数值契约");
+  }
+}
+
+function assertRelationCatalogContract() {
+  const item = schemas.RelationCatalogItem;
+  const endpoint = schemas.RelationEndpointSummary;
+  const role = schemas.RelationEndpointRoleSummary;
+  if (item?.additionalProperties !== false
+      || JSON.stringify(item?.properties?.interaction_mode?.enum) !== JSON.stringify(["CREATE_FACT", "UPDATE_SELECTED_FACT"])
+      || endpoint?.additionalProperties !== false
+      || role?.additionalProperties !== false
+      || role?.properties?.state_qualification_allowed?.type !== "boolean") {
+    throw new Error("Relation Catalog 必须保持 selection-aware 的封闭交互与端点摘要契约");
+  }
+  const required = new Set(item.required ?? []);
+  for (const field of ["interaction_mode", "symbol_descriptor", "endpoint_summary"]) {
+    if (!required.has(field)) throw new Error(`RelationCatalogItem 缺少必填字段 ${field}`);
+  }
+  if ((endpoint.required ?? []).includes("max_endpoints") || (role.required ?? []).includes("max_occurs")) {
+    throw new Error("Relation Catalog 无上限字段必须可缺失且不可用 null 表示");
+  }
+}
+
+function enrichRelationCatalogContract(content, language) {
+  if (language === "typescript") {
+    return content.replace(
+      "export interface ApiEdtImpactSummary {",
+      "export type ApiEdtRelationInteractionMode = \"CREATE_FACT\" | \"UPDATE_SELECTED_FACT\";\n\nexport interface ApiEdtRelationEndpointRoleSummary {\n  role: string;\n  target_kinds: Array<\"ELEMENT\" | \"STATE\" | \"FEATURE\" | \"FACT\">;\n  min_occurs: number;\n  max_occurs?: number;\n  state_qualification_allowed: boolean;\n}\n\nexport interface ApiEdtRelationEndpointSummary {\n  min_endpoints: number;\n  max_endpoints?: number;\n  roles: ApiEdtRelationEndpointRoleSummary[];\n}\n\nexport interface ApiEdtRelationCatalogItem {\n  family: \"PROCEDURAL\" | \"CONTROL\" | \"STRUCTURAL\";\n  capability_id: string;\n  display_name: string;\n  symbol_id: string;\n  interaction_mode: ApiEdtRelationInteractionMode;\n  symbol_descriptor: ApiEdtAssetReference;\n  endpoint_summary: ApiEdtRelationEndpointSummary;\n  enabled: boolean;\n  reason_codes: string[];\n}\n\nexport interface ApiEdtImpactSummary {",
+    );
+  }
+  return content.replace(
+    "    public record ImpactSummary(",
+    "    public record RelationEndpointRoleSummary(String role, List<String> targetKinds, int minOccurs, Integer maxOccurs, boolean stateQualificationAllowed) {\n        public RelationEndpointRoleSummary { Objects.requireNonNull(role); targetKinds = List.copyOf(targetKinds); if (targetKinds.isEmpty() || minOccurs < 0 || (maxOccurs != null && maxOccurs < minOccurs)) throw new IllegalArgumentException(\"relation endpoint role is invalid\"); }\n        public Map<String, Object> toWire() { Map<String, Object> result = new LinkedHashMap<>(); result.put(\"role\", role); result.put(\"target_kinds\", targetKinds); result.put(\"min_occurs\", minOccurs); if (maxOccurs != null) result.put(\"max_occurs\", maxOccurs); result.put(\"state_qualification_allowed\", stateQualificationAllowed); return Map.copyOf(result); }\n    }\n\n    public record RelationEndpointSummary(int minEndpoints, Integer maxEndpoints, List<RelationEndpointRoleSummary> roles) {\n        public RelationEndpointSummary { roles = List.copyOf(roles); if (minEndpoints < 0 || (maxEndpoints != null && maxEndpoints < minEndpoints)) throw new IllegalArgumentException(\"relation endpoint summary is invalid\"); }\n        public Map<String, Object> toWire() { Map<String, Object> result = new LinkedHashMap<>(); result.put(\"min_endpoints\", minEndpoints); if (maxEndpoints != null) result.put(\"max_endpoints\", maxEndpoints); result.put(\"roles\", roles.stream().map(RelationEndpointRoleSummary::toWire).toList()); return Map.copyOf(result); }\n    }\n\n    public record RelationCatalogItem(String family, String capabilityId, String displayName, String symbolId, String interactionMode, AssetReference symbolDescriptor, RelationEndpointSummary endpointSummary, boolean enabled, List<String> reasonCodes) {\n        public RelationCatalogItem { Objects.requireNonNull(family); Objects.requireNonNull(capabilityId); Objects.requireNonNull(displayName); Objects.requireNonNull(symbolId); Objects.requireNonNull(interactionMode); Objects.requireNonNull(symbolDescriptor); Objects.requireNonNull(endpointSummary); reasonCodes = List.copyOf(reasonCodes); }\n        public Map<String, Object> toWire() { return Map.of(\"family\", family, \"capability_id\", capabilityId, \"display_name\", displayName, \"symbol_id\", symbolId, \"interaction_mode\", interactionMode, \"symbol_descriptor\", asset(symbolDescriptor), \"endpoint_summary\", endpointSummary.toWire(), \"enabled\", enabled, \"reason_codes\", reasonCodes); }\n    }\n\n    public record ImpactSummary(",
+  );
 }
 
 function enrichControlOptionContract(content, language) {
@@ -91,6 +238,42 @@ function enrichControlOptionContract(content, language) {
       'allowedModifiers.stream().map(modifier -> Map.of("modifier_id", modifier.modifierId(), "allowed_values", modifier.allowedValues())).toList()',
       'allowedModifiers.stream().map(modifier -> { Map<String, Object> value = new LinkedHashMap<>(); value.put("modifier_id", modifier.modifierId()); value.put("value_options", modifier.valueOptions()); value.put("min_occurs", modifier.minOccurs()); value.put("max_occurs", modifier.maxOccurs()); if (modifier.atomicGroupId() != null) value.put("atomic_group_id", modifier.atomicGroupId()); return Map.copyOf(value); }).toList()',
     );
+}
+
+function enrichLayoutContract(content, language) {
+  if (language === "typescript") {
+    return content
+      .replace(
+        "export interface ApiEdtCreateFactPayload {",
+        "export interface ApiEdtUpdateLayoutPayload {\n  occurrence_id: string;\n  layout: { x: number; y: number };\n}\n\nexport interface ApiEdtCreateFactPayload {",
+      )
+      .replace(
+        '  | { command_type: "DELETE_CONSTRUCT"; payload: ApiEdtDeleteConstructPayload }',
+        '  | { command_type: "UPDATE_LAYOUT"; payload: ApiEdtUpdateLayoutPayload }\n  | { command_type: "DELETE_CONSTRUCT"; payload: ApiEdtDeleteConstructPayload }',
+      );
+  }
+  return content.replace(
+    "    public record CreateFactPayload(",
+    "    public record UpdateLayoutPayload(String occurrenceId, Map<String, Object> layout) {\n        public UpdateLayoutPayload { Objects.requireNonNull(occurrenceId); layout = Map.copyOf(layout); }\n    }\n\n    public record CreateFactPayload(",
+  );
+}
+
+function enrichPropertyContract(content, language) {
+  if (language === "typescript") {
+    return content
+      .replace(
+        "export interface ApiEdtUpdateLayoutPayload {",
+        "export interface ApiEdtUpdatePropertyPayload {\n  target_ref: { target_kind: \"ELEMENT\"; target_id: string };\n  property_name: \"name\";\n  value: string;\n  capability_query_id: string;\n  selected_option_id: string;\n}\n\nexport interface ApiEdtUpdateLayoutPayload {",
+      )
+      .replace(
+        '  | { command_type: "UPDATE_LAYOUT"; payload: ApiEdtUpdateLayoutPayload }',
+        '  | { command_type: "UPDATE_PROPERTY"; payload: ApiEdtUpdatePropertyPayload }\n  | { command_type: "UPDATE_LAYOUT"; payload: ApiEdtUpdateLayoutPayload }',
+      );
+  }
+  return content.replace(
+    "    public record UpdateLayoutPayload(",
+    "    public record UpdatePropertyPayload(TargetLocator targetRef, String propertyName, String value, String capabilityQueryId, String selectedOptionId) {\n        public UpdatePropertyPayload { Objects.requireNonNull(targetRef); Objects.requireNonNull(propertyName); Objects.requireNonNull(value); Objects.requireNonNull(capabilityQueryId); Objects.requireNonNull(selectedOptionId); }\n    }\n\n    public record UpdateLayoutPayload(",
+  );
 }
 
 function typescript(digest, commands) {

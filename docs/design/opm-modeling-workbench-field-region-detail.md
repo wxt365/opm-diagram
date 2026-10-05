@@ -1,12 +1,12 @@
 # OPM 单机建模工具页面字段与区块明细表
 
-文档版本：`v1.0`
+文档版本：`v1.1`
 
 文档状态：`FROZEN_INCLUDED`；P01-P06、完整画布候选与检查器字段冻结
 
 全局设计状态、延期边界和开发准入以 `opm-design-freeze-baseline.md` 为唯一事实源。
 
-更新时间：2026-07-28
+更新时间：2026-09-11
 
 ## Task Type
 
@@ -138,7 +138,8 @@
 | --- | --- | --- | --- | --- |
 | `project_name/model_name` | 当前项目 / 模型 | Project/Model Query | 只读 | 点击返回 P02，不在栏内直接改名 |
 | `profile_binding` | Profile 名称和版本 | M02 + M06 | 只读 | 变更打开 OV04 |
-| `active_revision` | 修订短标识和类型 | Edit Session + Version Query | 只读 | 必须与投影 revision 一致 |
+| `active_revision` | 实际 committed Revision 的短标识和类型 | Edit Session + Version Query | 只读 | 必须与投影 revision 一致；HEAD URL 省略 `revision` 时仍显示实际值，提交后更新 Header 但不改 URL |
+| `revision_locator_mode` | 活动 HEAD / 精确 Revision | Route + Version Query | 只读 | HEAD canonical URL 仅携带 Context；历史/Snapshot/Baseline/永久链接携带精确 Revision ID且只读 |
 | `access_mode` | 可编辑草稿/只读快照/只读基线/需恢复 | Derived UI from M09 | 只读 | 使用文字和图标表达 |
 | `edit_submit_state` | 预览/提交/阻断/已提交/保存失败 | Edit Session | 只读 | 不把 committed 显示为 saved |
 | `autosave_state` | 待保存/保存中/已保存/失败 | Version Query | 只读 | 显示最后保存时间和重试入口 |
@@ -173,7 +174,7 @@
 | `relation_candidates` | query/option ID、Capability、Control 的 base Fact Capability、规范端点、字段、reason；删除时含 impact summary/token | API-EDT-001 | 只读候选 | 按 Profile、资产、Context、端点、State、已有 Fact 动态过滤；token 不展示、不拼装 |
 | `relation_candidate_fields` | labels、modifiers、condition、fan members、completeness | Edit Session + Capability Option | 候选编辑 | option/base revision 变化后重新过滤 |
 | `symbol/template/rule_refs` | descriptor、模板族、规则与 digest | API-EDT-001 + Profile Binding | 只读 | 缺任一 required 资产不得提交 |
-| `viewport_scale/translation` | 视图比例和平移 | Derived UI | 本地视图 | 不产生 revision/text/validation 变化 |
+| `viewport_scale/translation` | 视图比例和平移 | Derived UI | 本地视图 | 不产生 revision/text/validation 变化，也不进入 URL/history state |
 | `fit_view/locate` | 适配画布/定位 | Derived UI | 本地视图 | 与语义 zoom 使用不同事件 |
 | `element_position` | 普通坐标 | Context Projection | 命令编辑 | 只改 Layout，不改 Fact |
 | `semantic_order` | Process in-zoom 垂直偏序 | Context + Semantic Model | 条件编辑 | 必须作为语义命令更新文本 |
@@ -323,6 +324,9 @@
 4. 当前 OPL/OPT 高亮和 Finding 高亮；
 5. 临时关系候选、拖拽预览和未提交表单值。
 6. capability query/option ID、不可用 reason、最近关系和候选 OPL；这些只用于当前候选会话。
+7. 当前选择、激活工具、属性检查器开关、底部标签、面板尺寸及临时高亮；这些不得进入 URL/history state。
+
+`element_position` 仍可按布局命令产生新 Revision；是否产生 Revision 与 URL 展示策略独立。活动 HEAD 下布局提交只更新 Header 和 Projection，不把新 Revision ID 写入 URL。
 
 ## 13. 事实与建议
 

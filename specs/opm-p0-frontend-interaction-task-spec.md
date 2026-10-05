@@ -1,5 +1,7 @@
 # Spec: OPM P0 前端动态交互确认
 
+> 历史规格说明：本规格的活动 Revision URL 条款已由 `specs/opm-p03-stable-head-url-and-exact-revision-deeplink-design-task-spec.md` 取代；HEAD URL 省略 `revision`，精确 Revision 仅用于只读固定版本和永久链接。其余历史验收记录不变。
+
 ## Task Type
 
 `feature`
@@ -45,7 +47,7 @@ DEV-00 已建立 Vue 工程。设计输入已冻结 P01-P03 的页面、状态�
 
 ## 6. 实现约束
 
-- Vue Router 仅承载 project/model/revision/context 稳定定位；弹层、候选输入、viewport 和选择不进入 URL。
+- Vue Router 的当前活动口径见后继 HEAD/EXACT URL 规格；弹层、候选输入、viewport 和选择不进入 URL。
 - Pinia 不保存第二份正式 Semantic Model；本地状态仅用于设计确认。
 - 普通 viewport 缩放不得改变 revision、OPL 或校验状态；语义缩放必须先经确认弹层并显示新修订影响。
 - 只读基线必须禁用语义写入，同时保留查看、视口、定位和基于基线创建草稿。

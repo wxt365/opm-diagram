@@ -1,33 +1,30 @@
+import { createConstructEditing } from "./workbench/constructEditing";
+import { createWorkbenchState } from "./workbench/workbenchState";
+import { toContexts, toNode, toConsumption, toTextLines, operationHistoryCode, type RuntimeContext, type RuntimeTextLine } from "./workbench/projectionMapping";
+import { isJavaBlank } from "./workbench/candidateRules";
+import { message } from "./workbench/runtimeError";
 import { computed, reactive, ref } from "vue";
 import { defineStore } from "pinia";
+import { DraftWorkbenchSession, optionIsCurrent } from "@/shared/api/draftWorkbenchSession";
+import { sameDraftToken, draftRawJson } from "@/shared/api/draftRequestIdentity";
+import type { DraftToken, SaveState, DraftCommandType, OpenDraftResult, DraftFinding } from "@/shared/api/generated/draftWorkspaceContract";
+
+import { createRelationEditing } from "./workbench/relationEditing";
 
 import {
   LocalRuntimeApiError,
   localRuntimeApi,
   type FindingWire,
-  type NavigationNodeWire,
   type OperationRecordWire,
   type ProjectionConstructWire,
   type ReleaseVisualCommonFaultCommandWire,
   type RelationCatalogItemWire,
   type SuppressedStateWire,
 } from "@/shared/api/localRuntimeApi";
-import type { ApiEdtCommandCapabilityOption, ApiEdtStateRole } from "@/shared/api/generated/apiEdtContract";
-import type { BottomTab, ConsumptionRelation, OpdNode, ResourceState } from "@/shared/types/modeling";
+import type { WorkbenchCapabilityOption } from "@/shared/types/workbenchCapability";
+import type { BottomTab } from "@/shared/types/modeling";
 
-export interface RuntimeContext {
-  id: string;
-  label: string;
-  kind: string;
-}
-
-export interface RuntimeTextLine {
-  id: string;
-  text: string;
-  factIds: string[];
-  occurrenceIds: string[];
-}
-
+export type { RuntimeContext, RuntimeTextLine } from "./workbench/projectionMapping";
 type RelationCatalogFamily = RelationCatalogItemWire["family"];
 
 const relationCatalogFamilies: RelationCatalogFamily[] = ["PROCEDURAL", "CONTROL", "STRUCTURAL"];
@@ -42,57 +39,74 @@ export const useWorkbenchRuntimeStore = defineStore("workbench-runtime", () => {
   const textLines = ref<RuntimeTextLine[]>([]);
   const suppressedStates = ref<SuppressedStateWire[]>([]);
   const revisions = ref<Array<{ id: string; sequence: number; kind: string; createdAt: string }>>([]);
-  const findings = ref<FindingWire[]>([]);
+  const findings = ref<Array<FindingWire | DraftFinding>>([]);
   const operationRecords = ref<OperationRecordWire[]>([]);
   const selectedFindingId = ref("");
   const highlightedFindingTargetId = ref("");
   const releaseVisualCommonFaultCommand = ref<ReleaseVisualCommonFaultCommandWire | null>(null);
   const allowedCommands = ref<string[]>([]);
-  const stateCreateOption = ref<ApiEdtCommandCapabilityOption | null>(null);
-  const stateDeleteOption = ref<ApiEdtCommandCapabilityOption | null>(null);
-  const factDeleteOption = ref<ApiEdtCommandCapabilityOption | null>(null);
-  const stateCandidate = reactive({ phase: "idle" as "idle" | "placing" | "editing", ownerId: "", name: "", roles: ["INITIAL"] as ApiEdtStateRole[], x: 0, y: 0 });
-  const stateEditor = reactive({ name: "", roles: [] as ApiEdtStateRole[] });
-  const relationCandidate = reactive({ phase: "idle" as "idle" | "selecting-target" | "choosing" | "previewing", sourceId: "", targetId: "", endpointIds: [] as string[], options: [] as ApiEdtCommandCapabilityOption[], selectedOption: null as ApiEdtCommandCapabilityOption | null, candidateId: "", duration: "PT5M", labels: {} as Record<string, string>, collectionCompleteness: "" as "" | "COMPLETE" | "INCOMPLETE", direction: "DIRECTED" as "DIRECTED" | "BIDIRECTIONAL" });
-  const relationCatalog = reactive({ open: false, loading: false, search: "", expandedFamilies: [] as RelationCatalogFamily[], items: [] as RelationCatalogItemWire[] });
+  const stateCreateOption = ref<WorkbenchCapabilityOption | null>(null);
+  const elementNameOption = ref<WorkbenchCapabilityOption | null>(null);
+  const relationCatalog = reactive({ open: true, loading: true, search: "", expandedFamilies: [...relationCatalogFamilies] as RelationCatalogFamily[], items: [] as RelationCatalogItemWire[] });
   const rightPanel = reactive({ open: false });
-  const controlCandidate = reactive({ phase: "idle" as "idle" | "choosing", factId: "", options: [] as ApiEdtCommandCapabilityOption[] });
-  const structuralUpdateCandidate = reactive({ phase: "idle" as "idle" | "editing", factId: "", option: null as ApiEdtCommandCapabilityOption | null, labels: {} as Record<string, string>, collectionCompleteness: "" as "" | "COMPLETE" | "INCOMPLETE", direction: "DIRECTED" as "DIRECTED" | "BIDIRECTIONAL" });
   let loadSequence = 0;
-
-  const workbench = reactive({
-    resourceState: "loading" as ResourceState,
-    revision: "",
-    activeContextId: "",
-    selectedId: "",
-    nodes: [] as OpdNode[],
-    relations: [] as ConsumptionRelation[],
-    zoom: 100,
-    bottomTab: "text" as BottomTab,
-    validationState: "stale" as "current" | "running" | "stale" | "failed",
-    validationProgress: 0,
-    blockingFindings: 0,
-    commandState: "idle" as "idle" | "submitting" | "blocked" | "failed",
-    commandFeedback: "",
-    feedbackCode: null as string | null,
-    autosaveState: "saved" as "saved" | "save-failed",
-    lastAction: "正在打开工作台",
-    accessMode: "editable" as "editable" | "readonly",
+  let draftSession: DraftWorkbenchSession | null = null;
+  const draftToken = ref<DraftToken | null>(null);
+  const draftSaveState = ref<SaveState | null>(null);
+  const saving = ref(false);
+  const pendingDelivery = ref(false);
+  const saveError = ref("");
+  const manualCapture = ref<DraftToken | null>(null);
+  const automaticCapture = ref<DraftToken | null>(null);
+  let editInFlight: Promise<boolean> | null = null;
+  let statusPolling = false;
+  const editingIdentity = computed(() => draftToken.value ? draftRawJson(draftToken.value) : workbench.revision);
+  const saveLabel = computed(() => {
+    if (!draftToken.value) return workbench.autosaveState === "saved" ? "已保存" : "保存失败";
+    if (workbench.resourceState !== "ready") return "草稿未就绪";
+    if (workbench.commandState === "submitting") return "编辑待确认";
+    if (pendingDelivery.value) return "存在待确认操作";
+    if (saveError.value || draftSaveState.value?.last_error) return "保存失败";
+    if (saving.value || (draftSaveState.value && draftSaveState.value.in_flight !== "NONE")) return "保存中";
+    const state = draftSaveState.value;
+    if (state?.dirty_since) return "草稿已保护 · 等待保存";
+    if (manualCapture.value && sameDraftToken(manualCapture.value, draftToken.value)) return "已手动保存";
+    if (automaticCapture.value && sameDraftToken(automaticCapture.value, draftToken.value)) return "已自动保存";
+    return "草稿已保护";
   });
+  function currentOption(option: WorkbenchCapabilityOption) { return optionIsCurrent(option, draftToken.value, workbench.revision); }
+  async function queryCapabilities(project: string, model: string, context: string, revision: string, selection?: string, intent?: string, endpoints?: string[]) {
+    const session = draftSession, token = draftToken.value;
+    if (!session || !token) {
+      const legacyIntent = intent as Parameters<typeof localRuntimeApi.commandCapabilities>[5];
+      return endpoints === undefined ? localRuntimeApi.commandCapabilities(project, model, context, revision, selection, legacyIntent)
+        : localRuntimeApi.commandCapabilities(project, model, context, revision, selection, legacyIntent, endpoints);
+    }
+    if (!intent) throw new LocalRuntimeApiError("INPUT_INVALID", "草稿候选必须带明确意图。");
+    const result = await session.capabilities(token, context, selection, intent as DraftCommandType, endpoints);
+    if (session !== draftSession || !draftToken.value || !sameDraftToken(token, draftToken.value) || context !== workbench.activeContextId) throw new LocalRuntimeApiError("DRAFT_CONFLICT", "草稿查询已过期。");
+    return { data: { ...result.data, options: result.data.options as WorkbenchCapabilityOption[] } };
+  }
 
-  const isReadonly = computed(() => workbench.accessMode === "readonly");
+  const workbench = createWorkbenchState();
+
+  const isReadonly = computed(() => workbench.resourceState !== "ready" || workbench.accessMode === "readonly" || workbench.locationMode === "EXACT");
   const selectedNode = computed(() => workbench.nodes.find((node) => node.id === workbench.selectedId));
   const selectedRelation = computed(() => workbench.relations.find((relation) => relation.id === workbench.selectedId));
+  const { relationCandidate, controlCandidate, structuralUpdateCandidate, activateRelationCatalogItem, armRelationCreation, cancelRelationCandidate, handleRelationGesture, resolveRelationCandidates, submitRelationCandidate, chooseRelationCandidate, rebuildRelationPreview, continueRelationEndpoints, confirmRelationCandidate, armControlUpdate, cancelControlCandidate, chooseControlCandidate, submitControlCandidate, confirmControlCandidate, armStructuralUpdate, cancelStructuralUpdate, submitStructuralUpdate } = createRelationEditing({ workbench, projectId, modelId, isReadonly, selectedRelation, allowedCommands, rightPanel, relationCatalog, editingIdentity, queryCapabilities, currentOption, execute, canEdit, block });
+
   const selectedObjectSuppressedStates = computed(() => {
     const selected = selectedNode.value;
     if (!selected || selected.kind !== "object") return [];
     return suppressedStates.value.filter((state) => state.owner_ref.target_kind === "ELEMENT" && state.owner_ref.target_id === selected.id);
   });
+  const { constructActions, stateCandidate, stateEditor, armStateCreation, placeState, cancelStateCandidate, submitStateCandidate, saveSelectedState, changeStatePresentation, makeSuppressedStateExplicit, requestConstructActions, chooseConstructDelete, cancelConstructDelete } = createConstructEditing({ workbench, projectId, modelId, isReadonly, selectedNode, selectedObjectSuppressedStates, stateCreateOption, queryCapabilities, execute, block, getLoadSequence: () => loadSequence, isDraftSession: () => Boolean(draftSession) });
+
   const activeContext = computed(() => contexts.value.find((context) => context.id === workbench.activeContextId));
   const captureViewState = computed(() => {
     const selectedTargetId = selectedRelation.value?.id ?? selectedNode.value?.id ?? "";
     const selectionKind = selectedRelation.value ? "relation" : selectedNode.value ? "single-element" : "none";
-    const bottomMode = workbench.bottomTab === "findings" ? "FINDINGS" : workbench.bottomTab === "history" ? "HISTORY" : "";
+    const bottomMode = !workbench.bottomPanelExpanded ? "" : workbench.bottomTab === "findings" ? "FINDINGS" : workbench.bottomTab === "history" ? "HISTORY" : "";
     const catalogOpen = relationCatalog.open;
     return {
       readRevision: workbench.revision,
@@ -102,11 +116,11 @@ export const useWorkbenchRuntimeStore = defineStore("workbench-runtime", () => {
       rightMode: !rightPanel.open ? "" : selectedRelation.value ? "inspector-relation-fields" : selectedNode.value ? "inspector-element-fields" : "",
       bottomOpen: Boolean(bottomMode),
       bottomMode,
-      relationCandidateState: relationCandidate.phase === "previewing" ? "preview" : "none",
-      relationCandidateCapabilityId: relationCandidate.phase === "previewing" ? relationCandidate.selectedOption?.capability_ref.capability_id ?? "" : "",
-      relationCandidateId: relationCandidate.phase === "previewing" ? relationCandidate.candidateId : "",
-      relationCandidateSourceTargetId: relationCandidate.phase === "previewing" ? relationCandidate.sourceId : "",
-      relationCandidateTargetTargetId: relationCandidate.phase === "previewing" ? relationCandidate.targetId : "",
+      relationCandidateState: relationCandidate.phase === "candidate-preview" || controlCandidate.phase === "previewing" ? "preview" : "none",
+      relationCandidateCapabilityId: relationCandidate.phase === "candidate-preview" ? relationCandidate.selectedOption?.capability_ref.capability_id ?? "" : controlCandidate.selectedOption?.capability_ref.capability_id ?? "",
+      relationCandidateId: relationCandidate.phase === "candidate-preview" ? relationCandidate.candidateId : controlCandidate.previewSpec?.candidateId ?? "",
+      relationCandidateSourceTargetId: relationCandidate.phase === "candidate-preview" ? relationCandidate.sourceId : "",
+      relationCandidateTargetTargetId: relationCandidate.phase === "candidate-preview" ? relationCandidate.targetId : "",
       catalogOpen,
       catalogSearch: relationCatalog.search,
       catalogProceduralCount: catalogOpen ? relationCatalogItems("PROCEDURAL").length : 0,
@@ -135,18 +149,22 @@ export const useWorkbenchRuntimeStore = defineStore("workbench-runtime", () => {
   }
 
   async function openRelationCatalog() {
+    relationCatalog.open = true;
+    await refreshRelationCatalog();
+  }
+
+  async function refreshRelationCatalog(selectionId = selectedRelation.value?.id) {
     if (!projectId.value || !modelId.value || !workbench.revision || !workbench.activeContextId) return;
     relationCatalog.loading = true;
-    relationCatalog.open = true;
-    relationCatalog.search = "";
-    relationCatalog.expandedFamilies = [];
-    workbench.selectedId = "";
     try {
-      const result = await localRuntimeApi.relationCatalog(projectId.value, modelId.value, workbench.activeContextId, workbench.revision);
+      const identity = editingIdentity.value;
+      const sequence = loadSequence;
+      const result = draftSession && draftToken.value
+        ? await draftSession.catalog(draftToken.value, workbench.activeContextId, selectionId)
+        : await localRuntimeApi.relationCatalog(projectId.value, modelId.value, workbench.activeContextId, workbench.revision, selectionId);
+      if (identity !== editingIdentity.value || sequence !== loadSequence) return;
       relationCatalog.items = result.data.items;
-      workbench.lastAction = "已打开 Runtime 关系目录。";
     } catch (error) {
-      relationCatalog.open = false;
       relationCatalog.items = [];
       workbench.commandFeedback = message(error);
     } finally {
@@ -160,20 +178,55 @@ export const useWorkbenchRuntimeStore = defineStore("workbench-runtime", () => {
     relationCatalog.expandedFamilies = [];
   }
 
-  async function load(nextProjectId: string, nextModelId: string, requestedContext?: string, requestedRevision?: string) {
+  async function load(nextProjectId: string, nextModelId: string, requestedContext?: string, requestedRevision?: string, retainReady = false, refreshHead = false): Promise<boolean> {
     const sequence = ++loadSequence;
+    const head = refreshHead || requestedRevision === undefined || requestedRevision === "head";
+    saving.value = false;
+    manualCapture.value = null; automaticCapture.value = null;
     projectId.value = nextProjectId;
     modelId.value = nextModelId;
-    workbench.resourceState = "loading";
+    workbench.locationMode = head ? "HEAD" : "EXACT";
+    if (!retainReady) workbench.accessMode = "readonly";
+    if (!refreshHead) workbench.commandState = "idle";
+    cancelRelationCandidate();
+    cancelControlCandidate();
+    cancelStateCandidate();
+    cancelStructuralUpdate();
+    cancelConstructDelete();
+    if (!retainReady) workbench.resourceState = "loading";
     workbench.commandFeedback = "";
     workbench.feedbackCode = null;
     releaseVisualCommonFaultCommand.value = null;
+    elementNameOption.value = null;
     try {
-      const session = await localRuntimeApi.workspaceSession(nextProjectId, nextModelId);
-      const revision = requestedRevision ?? session.meta.read_revision;
-      const contextId = requestedContext ?? session.data.current_context_id;
+      if (head) {
+        const candidateSession = new DraftWorkbenchSession(nextProjectId, nextModelId);
+        let opened: OpenDraftResult | null = null;
+        try { opened = await candidateSession.open(requestedContext ?? null); }
+        catch (error) { if (!(error instanceof LocalRuntimeApiError) || error.code !== "DRAFT_MODE_REQUIRED") throw error; }
+        if (sequence !== loadSequence) return false;
+        if (opened) {
+          let recoveryError = "";
+          try { await candidateSession.recover(); }
+          catch (error) { recoveryError = message(error); }
+          if (sequence !== loadSequence) return false;
+          opened = await candidateSession.open(requestedContext ?? null);
+          const snapshot = await candidateSession.read(opened);
+          if (sequence !== loadSequence) return false;
+          draftSession = candidateSession; pendingDelivery.value = !!recoveryError; saveError.value = recoveryError;
+          applyDraftSnapshot(snapshot); return true;
+        }
+      }
+      draftSession = null; draftToken.value = null; draftSaveState.value = null; pendingDelivery.value = false; saveError.value = "";
+      const session = await localRuntimeApi.workspaceSession(nextProjectId, nextModelId, requestedRevision, requestedContext);
+      if (sequence !== loadSequence) return false;
+      const revision = session.meta.read_revision;
+      const contextId = session.data.current_context_id;
       if (!revision || !contextId) throw new LocalRuntimeApiError("WORKSPACE_INVALID", "工作台会话缺少当前修订或 Context。");
-      const [project, navigation, projection, capabilities, text, history, nextFindings, nextOperationRecords, releaseCommand] = await Promise.all([
+      if (requestedRevision !== undefined && requestedRevision !== "head" && revision !== requestedRevision) {
+        throw new LocalRuntimeApiError("WORKSPACE_INVALID", "会话返回的修订与精确入口不一致。");
+      }
+      const [project, navigation, projection, capabilities, text, history, nextFindings, nextOperationRecords, releaseCommand, catalog] = await Promise.all([
         localRuntimeApi.getProject(nextProjectId),
         localRuntimeApi.navigation(nextProjectId, nextModelId, contextId, revision),
         localRuntimeApi.projection(nextProjectId, nextModelId, contextId, revision),
@@ -186,14 +239,21 @@ export const useWorkbenchRuntimeStore = defineStore("workbench-runtime", () => {
           if (error instanceof LocalRuntimeApiError && error.code === "NOT_FOUND") return null;
           throw error;
         }),
+        localRuntimeApi.relationCatalog(nextProjectId, nextModelId, contextId, revision),
       ]);
-      if (sequence !== loadSequence) return;
+      if (sequence !== loadSequence) return false;
+      if (projection.meta?.read_revision !== revision || projection.data.context_id !== contextId
+        || [navigation, capabilities, text, nextFindings, nextOperationRecords, catalog].some((result) => result.meta && result.meta.read_revision !== revision)) {
+        throw new LocalRuntimeApiError("WORKSPACE_INVALID", "工作台投影修订不一致。");
+      }
       projectName.value = project.name;
       modelName.value = session.data.model.name;
       profileLabel.value = `${session.data.model.profile_id} ${session.data.model.profile_version}`;
       workbench.revision = revision;
       workbench.activeContextId = contextId;
-      workbench.accessMode = session.data.model.access_mode === "EDITABLE_DRAFT" ? "editable" : "readonly";
+      const editable = head && (refreshHead ? session.data.model.head_revision === revision : session.data.model.access_mode === "EDITABLE_DRAFT");
+      workbench.locationMode = head && (editable || refreshHead) ? "HEAD" : "EXACT";
+      workbench.accessMode = editable ? "editable" : "readonly";
       contexts.value = toContexts(navigation.data, contextId);
       applyProjection(projection.data.constructs);
       suppressedStates.value = projection.data.suppressed_states;
@@ -206,29 +266,134 @@ export const useWorkbenchRuntimeStore = defineStore("workbench-runtime", () => {
       highlightedFindingTargetId.value = "";
       rightPanel.open = false;
       releaseVisualCommonFaultCommand.value = releaseCommand?.data ?? null;
+      relationCatalog.open = true;
+      relationCatalog.loading = false;
+      relationCatalog.search = "";
+      relationCatalog.expandedFamilies = [...relationCatalogFamilies];
+      relationCatalog.items = catalog.data.items;
       workbench.resourceState = "ready";
+      workbench.commandState = "idle";
       workbench.lastAction = `已打开 ${activeContext.value?.label ?? contextId}`;
+      if (requestedContext !== undefined && requestedContext !== contextId) workbench.commandFeedback = "指定 Context 不属于此版本，已打开该版本的根系统图。";
       const initialObject = workbench.nodes.find((node) => node.id === workbench.selectedId && node.kind === "object");
-      if (initialObject) await refreshStateCreateOption(initialObject.id);
+      if (initialObject) void refreshStateCreateOption(initialObject.id);
+      return sequence === loadSequence;
     } catch (error) {
-      if (sequence !== loadSequence) return;
+      if (sequence !== loadSequence) return false;
       workbench.resourceState = "error";
+      workbench.commandState = "failed";
+      workbench.accessMode = "readonly";
+      workbench.revision = "";
+      workbench.activeContextId = "";
+      workbench.selectedId = "";
+      workbench.nodes = [];
+      workbench.relations = [];
+      contexts.value = [];
+      textLines.value = [];
+      revisions.value = [];
+      findings.value = [];
+      operationRecords.value = [];
+      allowedCommands.value = [];
+      relationCatalog.items = [];
       workbench.commandFeedback = message(error);
       workbench.lastAction = "工作台读取失败";
+      return false;
     }
   }
 
   async function selectContext(contextId: string) {
     if (!projectId.value || !modelId.value || !workbench.revision || contextId === workbench.activeContextId) return;
-    await load(projectId.value, modelId.value, contextId, workbench.revision);
+    cancelRelationCandidate();
+    cancelControlCandidate();
+    await load(projectId.value, modelId.value, contextId, workbench.locationMode === "EXACT" ? workbench.revision : undefined);
+  }
+
+  function applyDraftSnapshot(snapshot: Awaited<ReturnType<DraftWorkbenchSession["read"]>>) {
+    projectName.value = snapshot.project.name; modelName.value = snapshot.model.name;
+    profileLabel.value = `${snapshot.model.profile_id} ${snapshot.model.profile_version}`;
+    draftToken.value = snapshot.opened.draft_token; draftSaveState.value = snapshot.opened.save_state;
+    workbench.revision = [...snapshot.history].sort((a, b) => b.sequence - a.sequence)[0]?.revision_id ?? snapshot.model.head_revision ?? "";
+    workbench.activeContextId = snapshot.opened.context_id;
+    contexts.value = toContexts(snapshot.navigation, workbench.activeContextId);
+    const selected = workbench.selectedId;
+    applyProjection(snapshot.constructs);
+    if ([...workbench.nodes, ...workbench.relations].some(item => item.id === selected)) workbench.selectedId = selected;
+    suppressedStates.value = snapshot.suppressed;
+    textLines.value = toTextLines(snapshot.text.sentences, snapshot.text.traces);
+    findings.value = snapshot.findings.items;
+    workbench.blockingFindings = snapshot.findings.validation_summary.blocking;
+    operationRecords.value = []; releaseVisualCommonFaultCommand.value = null;
+    revisions.value = snapshot.history.map(item => ({ id: item.revision_id, sequence: item.sequence, kind: item.kind, createdAt: item.created_at }));
+    relationCatalog.items = snapshot.catalog; relationCatalog.loading = false;
+    // 只开放已实现命令的入口，提交仍必须经过 Runtime 的 exact token 候选授权。
+    allowedCommands.value = ["CREATE_ELEMENT", "CREATE_FEATURE", "CREATE_STATE", "CREATE_FACT", "UPDATE_PROPERTY", "UPDATE_LAYOUT", "UPDATE_STATE", "UPDATE_FACT", "DELETE_CONSTRUCT", "STATE_EXPLICIT", "STATE_SUPPRESS", "UNFOLD", "FOLD"];
+    workbench.resourceState = "ready"; workbench.accessMode = pendingDelivery.value ? "readonly" : "editable";
+    workbench.locationMode = "HEAD"; workbench.commandState = "idle";
+    workbench.commandFeedback = saveError.value; workbench.lastAction = `活动草稿 · 编辑 ${draftToken.value.edit_seq}`;
+    workbench.validationState = "stale"; stateCreateOption.value = null; elementNameOption.value = null;
+    if (selectedNode.value && ["object", "attribute", "operation"].includes(selectedNode.value.kind) && !isReadonly.value) void refreshStateCreateOption(selectedNode.value.id);
+  }
+
+  async function retryDraftDelivery() {
+    if (draftSession) await load(projectId.value, modelId.value, workbench.activeContextId);
+  }
+
+  function leaveWorkbench() {
+    loadSequence++;
+    draftSession = null; draftToken.value = null; draftSaveState.value = null;
+    saving.value = false; workbench.accessMode = "readonly";
+  }
+
+  async function pollDraftState() {
+    if (!draftSession || !draftToken.value || statusPolling || workbench.resourceState !== "ready" || editInFlight) return;
+    statusPolling = true;
+    const session = draftSession, sequence = loadSequence, token = draftToken.value;
+    try {
+      const opened = await session.open(workbench.activeContextId);
+      if (sequence !== loadSequence || session !== draftSession || editInFlight || !draftToken.value || !sameDraftToken(token, draftToken.value)) return;
+      if (!sameDraftToken(opened.draft_token, token)) {
+        workbench.accessMode = "readonly"; saveError.value = "草稿已在其他页面更新，请重新加载。";
+        workbench.commandFeedback = saveError.value; return;
+      }
+      if (draftSaveState.value?.dirty_since && opened.save_state.dirty_since === null && opened.save_state.checkpoint_token
+        && !saving.value && !pendingDelivery.value) automaticCapture.value = opened.save_state.checkpoint_token;
+      draftSaveState.value = opened.save_state;
+    } catch (error) { if (sequence === loadSequence) saveError.value = message(error); }
+    finally { statusPolling = false; }
+  }
+
+  async function saveDraft(pin = false): Promise<string | null> {
+    if (!draftSession || saving.value || workbench.locationMode !== "HEAD") return null;
+    const session = draftSession, sequence = loadSequence;
+    const pendingEdit = editInFlight;
+    if (pendingEdit && !await pendingEdit) return null;
+    if (sequence !== loadSequence || session !== draftSession || isReadonly.value || saving.value || !draftToken.value) return null;
+    if (stateCandidate.phase !== "idle" || controlCandidate.phase !== "idle" || structuralUpdateCandidate.phase !== "idle"
+      || !["idle", "relation-armed"].includes(relationCandidate.phase)) { block("请先完成或取消当前候选，再保存。"); return null; }
+    const captured = { ...draftToken.value };
+    saving.value = true; saveError.value = "";
+    try {
+      const result = pin ? await session.pin(captured) : await session.save(captured);
+      if (sequence !== loadSequence || session !== draftSession) return null;
+      if (!pin) manualCapture.value = captured;
+      const history = await localRuntimeApi.revisions(session.project, session.model);
+      if (sequence !== loadSequence || session !== draftSession) return null;
+      revisions.value = history.map(item => ({ id: item.revision_id, sequence: item.sequence, kind: item.kind, createdAt: item.created_at }));
+      workbench.revision = [...history].sort((a, b) => b.sequence - a.sequence)[0]?.revision_id ?? result.revision_id;
+      await pollDraftState(); return result.revision_id;
+    } catch (error) {
+      if (sequence === loadSequence) {
+        saveError.value = message(error); workbench.commandFeedback = saveError.value;
+        let pending = true;
+        try { pending = (await session.pending()).length > 0; } catch { /* 无法读取队列时保守保留待确认状态。 */ }
+        if (sequence === loadSequence && session === draftSession) pendingDelivery.value = pending;
+      }
+      return null;
+    } finally { if (session === draftSession) saving.value = false; }
   }
 
   async function selectConstruct(id: string) {
     if (!workbench.nodes.some((node) => node.id === id) && !workbench.relations.some((relation) => relation.id === id)) return;
-    if (relationCandidate.phase === "selecting-target" && workbench.nodes.some((node) => node.id === id)) {
-      selectRelationEndpoint(id);
-      return;
-    }
     workbench.selectedId = id;
     const node = workbench.nodes.find((item) => item.id === id);
     if (node?.kind === "object" || node?.kind === "attribute" || node?.kind === "operation") await refreshStateCreateOption(node.id);
@@ -236,17 +401,13 @@ export const useWorkbenchRuntimeStore = defineStore("workbench-runtime", () => {
     if (node?.kind === "state") {
       stateEditor.name = node.label;
       stateEditor.roles = [...(node.stateRoles ?? [])];
-      await refreshStateDeleteOption(node.id);
-    } else {
-      stateDeleteOption.value = null;
     }
-    const relation = workbench.relations.find((item) => item.id === id);
-    if (relation) await refreshFactDeleteOption(relation.id);
-    else factDeleteOption.value = null;
+    await refreshRelationCatalog(workbench.relations.some((relation) => relation.id === id) ? id : undefined);
   }
 
   function setBottomTab(tab: BottomTab) {
     workbench.bottomTab = tab;
+    workbench.bottomPanelExpanded = true;
   }
 
   function openRightPanel() {
@@ -277,7 +438,7 @@ export const useWorkbenchRuntimeStore = defineStore("workbench-runtime", () => {
     if (isReadonly.value) return block("当前修订为只读版本，不能创建 Feature。");
     if (!projectId.value || !modelId.value || !workbench.revision || !workbench.activeContextId) return;
     try {
-      const capabilities = await localRuntimeApi.commandCapabilities(projectId.value, modelId.value, workbench.activeContextId, workbench.revision, owner.id, "CREATE_FEATURE");
+      const capabilities = await queryCapabilities(projectId.value, modelId.value, workbench.activeContextId, workbench.revision, owner.id, "CREATE_FEATURE");
       const option = capabilities.data.options.find((item) => item.command_type === "CREATE_FEATURE" && item.enabled && item.required_fields.some((field) => field.field_id === "feature_kind" && field.allowed_values?.includes(kind)));
       if (!option) return block("当前 Profile 不支持创建该 Feature。");
       const ordinal = workbench.nodes.filter((node) => node.kind === (kind === "ATTRIBUTE" ? "attribute" : "operation")).length + 1;
@@ -309,311 +470,75 @@ export const useWorkbenchRuntimeStore = defineStore("workbench-runtime", () => {
     await execute({ commandType: "CREATE_FACT", payload: { kind: "CONSUMPTION", object_id: object.id, state_id: selectedState?.id, process_id: process.id, layout: { x: (object.x + process.x) / 2, y: (object.y + process.y) / 2 } } });
   }
 
-  function armRelationCreation() {
-    const source = selectedNode.value;
-    if (isReadonly.value) return block("当前修订为只读版本，不能创建关系。");
-    relationCandidate.phase = "selecting-target";
-    relationCandidate.sourceId = source?.id ?? "";
-    relationCandidate.targetId = "";
-    relationCandidate.endpointIds = source ? [source.id] : [];
-    relationCandidate.options = [];
-    relationCandidate.selectedOption = null;
-    relationCandidate.candidateId = "";
-    relationCandidate.labels = {};
-    relationCandidate.collectionCompleteness = "";
-    relationCandidate.direction = "DIRECTED";
-    relationCandidate.duration = "PT5M";
-    workbench.lastAction = "请选择关系端点；完成后查看可用关系。";
+  async function moveElement(occurrenceId: string, x: number, y: number) {
+    const node = workbench.nodes.find((item) => item.occurrenceId === occurrenceId);
+    if (!node || node.occurrenceRole !== "owned") return;
+    const accepted = canEdit("UPDATE_LAYOUT") && await execute({ commandType: "UPDATE_LAYOUT", payload: { occurrence_id: occurrenceId, layout: { x, y } } });
+    // 失败时重新投影已持久化坐标，连同本地跟随的状态一起恢复。
+    if (!accepted) workbench.nodes = workbench.nodes.map((item) => ({ ...item }));
   }
 
-  function cancelRelationCandidate() {
-    relationCandidate.phase = "idle";
-    relationCandidate.sourceId = "";
-    relationCandidate.targetId = "";
-    relationCandidate.endpointIds = [];
-    relationCandidate.options = [];
-    relationCandidate.selectedOption = null;
-    relationCandidate.candidateId = "";
-    relationCandidate.labels = {};
-    relationCandidate.collectionCompleteness = "";
-  }
-
-  function selectRelationEndpoint(id: string) {
-    if (relationCandidate.endpointIds.length >= 16) return block("当前候选最多支持 16 个端点，请先查看可用关系。");
-    if (relationCandidate.endpointIds.length > 1 && relationCandidate.endpointIds.includes(id)) return block("除 Self-invocation 外，不能重复选择同一端点。");
-    relationCandidate.endpointIds.push(id);
-    relationCandidate.targetId = id;
-    workbench.lastAction = `已选择 ${relationCandidate.endpointIds.length} 个端点；可继续选择，或查看可用关系。`;
-  }
-
-  async function resolveRelationCandidates() {
-    if (!projectId.value || !modelId.value || !workbench.revision || !workbench.activeContextId || relationCandidate.endpointIds.length < 2) return;
+  async function beginElementNameEdit(elementId: string): Promise<boolean> {
+    const node = workbench.nodes.find((item) => item.id === elementId);
+    elementNameOption.value = null;
+    if (!node || (node.kind !== "object" && node.kind !== "process")) return false;
+    if (isReadonly.value) {
+      block("当前修订为只读版本，不能编辑名称。");
+      return false;
+    }
+    if (!projectId.value || !modelId.value || !workbench.revision || !workbench.activeContextId) return false;
     try {
-      const result = await localRuntimeApi.commandCapabilities(projectId.value, modelId.value, workbench.activeContextId, workbench.revision, undefined, "CREATE_FACT", relationCandidate.endpointIds);
-      relationCandidate.options = result.data.options.filter((option) => option.command_type === "CREATE_FACT" && option.enabled);
-      relationCandidate.phase = "choosing";
-      if (!relationCandidate.options.length) block("所选端点没有可提交的过程关系。");
-      else workbench.lastAction = "请选择要创建的过程关系。";
+      const capabilities = await queryCapabilities(
+        projectId.value, modelId.value, workbench.activeContextId, workbench.revision, elementId, "UPDATE_PROPERTY",
+      );
+      const option = capabilities.data.options.find((item) => item.command_type === "UPDATE_PROPERTY");
+      if (!capabilities.data.allowed.includes("UPDATE_PROPERTY") || !option?.enabled) {
+        const reason = option?.reason_codes[0]
+          ?? capabilities.data.forbidden.find((item) => item.command_type === "UPDATE_PROPERTY")?.reason_code
+          ?? "PROFILE_CAPABILITY_DISABLED";
+        block(`当前名称不可编辑：${reason}。`);
+        return false;
+      }
+      elementNameOption.value = option;
+      workbench.selectedId = elementId;
+      return true;
     } catch (error) {
-      cancelRelationCandidate();
+      workbench.commandState = "failed";
       workbench.commandFeedback = message(error);
+      workbench.feedbackCode = error instanceof LocalRuntimeApiError ? error.code : null;
+      return false;
     }
   }
 
-  async function submitRelationCandidate(option: ApiEdtCommandCapabilityOption) {
-    if ((relationCandidate.phase !== "choosing" && relationCandidate.phase !== "previewing") || !canEdit("CREATE_FACT")) return;
-    const durationRequired = option.required_fields.some((field) => field.field_id === "duration" && field.required);
-    if (durationRequired && !relationCandidate.duration.trim()) return block("该 Exception Link 必须填写 duration。");
-    const family = relationFactFamily(option.capability_ref.capability_id);
-    if (!family) return block("当前 Capability 没有可提交的 Fact family。");
-    const structural = option.capability_ref.capability_id.startsWith("CAP-ISO-STRUCT-");
-    const labels = Object.entries(relationCandidate.labels)
-      .filter(([, text]) => text.trim())
-      .map(([slot_id, text]) => ({ slot_id, text: text.trim() }));
-    const direction = relationDirection(option, relationCandidate.direction);
-    if (!direction) return block("Runtime 结构关系候选缺少方向约束。");
-    const requiredLabelSlots = requiredStructuralLabelSlots(option, direction);
-    if (structural && option.required_fields.some((field) => field.field_id === "labels" && field.required)
-      && requiredLabelSlots.some((slot) => !labels.some((label) => label.slot_id === slot))) {
-      return block("请填写所有必填关系标签。");
+  async function renameElement(elementId: string, value: string): Promise<boolean> {
+    const node = workbench.nodes.find((item) => item.id === elementId);
+    if (!node || (node.kind !== "object" && node.kind !== "process")) return false;
+    if (value === node.label) return true;
+    if (isJavaBlank(value) || [...value].length > 256) {
+      workbench.feedbackCode = "INVALID_ARGUMENT";
+      block("Element 名称必须为非空白且不超过 256 个 Unicode code point。");
+      return false;
     }
-    if (structural && option.required_fields.some((field) => field.field_id === "collection_completeness") && !relationCandidate.collectionCompleteness) {
-      return block("请选择 fan 的完整性。");
+    let option = elementNameOption.value;
+    const optionTarget = option?.normalized_endpoints.find((endpoint) => endpoint.role === "PROPERTY_TARGET")?.target_ref.target_id;
+    if (!option || optionTarget !== elementId || !currentOption(option)) {
+      if (!await beginElementNameEdit(elementId)) return false;
+      option = elementNameOption.value;
     }
-    await execute({ commandType: "CREATE_FACT", payload: {
-      context_id: workbench.activeContextId,
-      capability_ref: { capability_id: option.capability_ref.capability_id },
-      fact_family: family,
-      normalized_endpoints: option.normalized_endpoints.map((endpoint) => ({ role: endpoint.role, target_ref: { target_kind: endpoint.target_ref.target_kind as "ELEMENT" | "STATE", target_id: endpoint.target_ref.target_id }, ordinal: endpoint.ordinal })),
-      direction,
-      labels,
-      modifiers: durationRequired ? [{ modifier_id: "duration", value: relationCandidate.duration.trim() }] : [],
-      logical_groups: [],
-      ...(structural ? { collection_completeness: relationCandidate.collectionCompleteness || "NOT_APPLICABLE" } : {}),
-      occurrence: { ownership: "OWNED", construct_role: "PROCEDURAL_LINK" },
-      layout: { x: 180, y: 80 },
+    if (!option) return false;
+    const succeeded = await execute({ commandType: "UPDATE_PROPERTY", payload: {
+      target_ref: { target_kind: "ELEMENT", target_id: elementId },
+      property_name: "name",
+      value,
       capability_query_id: option.capability_query_id,
       selected_option_id: option.option_id,
     } });
-    if (workbench.commandState === "idle") cancelRelationCandidate();
-  }
-
-  function chooseRelationCandidate(option: ApiEdtCommandCapabilityOption) {
-    if (option.capability_ref.capability_id === "CAP-ISO-PROC-001") {
-      relationCandidate.selectedOption = option;
-      relationCandidate.candidateId = "candidate.visual.candidate-layer";
-      relationCandidate.phase = "previewing";
-      workbench.lastAction = "过程关系候选正在预览；确认后才会提交。";
-      return;
-    }
-    if (!option.capability_ref.capability_id.startsWith("CAP-ISO-STRUCT-")) {
-      void submitRelationCandidate(option);
-      return;
-    }
-    relationCandidate.selectedOption = option;
-    relationCandidate.labels = {};
-    const labels = option.required_fields.find((field) => field.field_id === "labels");
-    (labels?.allowed_values ?? []).forEach((slot) => { relationCandidate.labels[slot] = ""; });
-    relationCandidate.collectionCompleteness = "";
-    const direction = option.required_fields.find((field) => field.field_id === "direction");
-    const allowedDirections = direction?.allowed_values ?? [];
-    relationCandidate.direction = allowedDirections.includes("BIDIRECTIONAL") && allowedDirections.length === 1 ? "BIDIRECTIONAL" : "DIRECTED";
-  }
-
-  async function confirmRelationCandidate() {
-    const option = relationCandidate.selectedOption;
-    if (!option || relationCandidate.phase !== "previewing") return;
-    await submitRelationCandidate(option);
-  }
-
-  async function armControlUpdate() {
-    const relation = selectedRelation.value;
-    if (!relation || isReadonly.value || !projectId.value || !modelId.value || !workbench.revision || !workbench.activeContextId) return;
-    try {
-      const result = await localRuntimeApi.commandCapabilities(projectId.value, modelId.value, workbench.activeContextId, workbench.revision, relation.id, "UPDATE_FACT");
-      allowedCommands.value = result.data.allowed;
-      controlCandidate.factId = relation.id;
-      controlCandidate.options = result.data.options.filter((option) => option.command_type === "UPDATE_FACT" && option.enabled && option.base_fact_capability_ref?.capability_id === relation.capabilityId);
-      controlCandidate.phase = controlCandidate.options.length ? "choosing" : "idle";
-      if (!controlCandidate.options.length) block("当前基础关系没有可提交的 Control Link。");
-      else workbench.lastAction = "请选择要附加到基础 Fact 的 Control Link。";
-    } catch (error) {
-      cancelControlCandidate();
-      workbench.commandFeedback = message(error);
-    }
-  }
-
-  function cancelControlCandidate() {
-    controlCandidate.phase = "idle";
-    controlCandidate.factId = "";
-    controlCandidate.options = [];
-  }
-
-  async function submitControlCandidate(option: ApiEdtCommandCapabilityOption) {
-    const relation = selectedRelation.value;
-    const baseCapabilityId = option.base_fact_capability_ref?.capability_id;
-    if (controlCandidate.phase !== "choosing" || !relation || relation.id !== controlCandidate.factId || !baseCapabilityId || !canEdit("UPDATE_FACT")) return;
-    const modifiers = option.allowed_modifiers.map((modifier) => ({ modifier_id: modifier.modifier_id, value: modifier.value_options[0] }));
-    if (modifiers.some((modifier) => !modifier.value)) return block("Runtime Control 候选缺少固定 Modifier 值。");
-    await execute({ commandType: "UPDATE_FACT", payload: {
-      fact_id: relation.id,
-      expected_capability_ref: { capability_id: baseCapabilityId },
-      replacement: { modifiers },
-      capability_query_id: option.capability_query_id,
-      selected_option_id: option.option_id,
-    } });
-    if (workbench.commandState === "idle") cancelControlCandidate();
-  }
-
-  async function armStructuralUpdate() {
-    const relation = selectedRelation.value;
-    if (!relation?.capabilityId?.startsWith("CAP-ISO-STRUCT-") || isReadonly.value || !projectId.value || !modelId.value || !workbench.revision || !workbench.activeContextId) return;
-    try {
-      const result = await localRuntimeApi.commandCapabilities(projectId.value, modelId.value, workbench.activeContextId, workbench.revision, relation.id, "UPDATE_FACT");
-      allowedCommands.value = result.data.allowed;
-      const option = result.data.options.find((item) => item.command_type === "UPDATE_FACT" && item.enabled && item.capability_ref.capability_id === relation.capabilityId);
-      if (!option) return block("当前结构关系没有可提交的更新候选。");
-      structuralUpdateCandidate.factId = relation.id;
-      structuralUpdateCandidate.option = option;
-      structuralUpdateCandidate.labels = Object.fromEntries((option.required_fields.find((field) => field.field_id === "labels")?.allowed_values ?? [])
-        .map((slot) => [slot, relation.labels?.find((label) => label.slotId === slot)?.text ?? ""]));
-      structuralUpdateCandidate.collectionCompleteness = relation.collectionCompleteness === "COMPLETE" || relation.collectionCompleteness === "INCOMPLETE"
-        ? relation.collectionCompleteness : "";
-      structuralUpdateCandidate.direction = relation.direction === "BIDIRECTIONAL" ? "BIDIRECTIONAL" : "DIRECTED";
-      structuralUpdateCandidate.phase = "editing";
-      workbench.lastAction = "编辑结构关系标签、方向或完整性。";
-    } catch (error) {
-      cancelStructuralUpdate();
-      workbench.commandFeedback = message(error);
-    }
-  }
-
-  function cancelStructuralUpdate() {
-    structuralUpdateCandidate.phase = "idle";
-    structuralUpdateCandidate.factId = "";
-    structuralUpdateCandidate.option = null;
-    structuralUpdateCandidate.labels = {};
-    structuralUpdateCandidate.collectionCompleteness = "";
-    structuralUpdateCandidate.direction = "DIRECTED";
-  }
-
-  async function submitStructuralUpdate() {
-    const relation = selectedRelation.value;
-    const option = structuralUpdateCandidate.option;
-    if (structuralUpdateCandidate.phase !== "editing" || !option || !relation || relation.id !== structuralUpdateCandidate.factId || !canEdit("UPDATE_FACT")) return;
-    const labels = Object.entries(structuralUpdateCandidate.labels).filter(([, text]) => text.trim())
-      .map(([slot_id, text]) => ({ slot_id, text: text.trim() }));
-    const direction = relationDirection(option, structuralUpdateCandidate.direction);
-    if (!direction) return block("Runtime 结构关系候选缺少方向约束。");
-    const requiredLabels = requiredStructuralLabelSlots(option, direction);
-    if (option.required_fields.some((field) => field.field_id === "labels" && field.required)
-      && requiredLabels.some((slot) => !labels.some((label) => label.slot_id === slot))) {
-      return block("请填写所有必填关系标签。");
-    }
-    const completenessRequired = option.required_fields.some((field) => field.field_id === "collection_completeness");
-    const collectionCompleteness = structuralUpdateCandidate.collectionCompleteness;
-    const collectionCompletenessValue = collectionCompleteness === "COMPLETE" || collectionCompleteness === "INCOMPLETE"
-      ? collectionCompleteness : undefined;
-    if (completenessRequired && !collectionCompletenessValue) return block("请选择 fan 的完整性。");
-    await execute({ commandType: "UPDATE_FACT", payload: {
-      fact_id: relation.id,
-      expected_capability_ref: { capability_id: option.capability_ref.capability_id },
-      replacement: {
-        direction,
-        labels,
-        ...(collectionCompletenessValue ? { collection_completeness: collectionCompletenessValue } : {}),
-      },
-      capability_query_id: option.capability_query_id,
-      selected_option_id: option.option_id,
-    } });
-    if (workbench.commandState === "idle") cancelStructuralUpdate();
-  }
-
-  function armStateCreation() {
-    const owner = selectedNode.value;
-    if (isReadonly.value) return block("当前修订为只读版本，不能创建 State。");
-    if (!owner || (owner.kind !== "object" && owner.kind !== "attribute" && owner.kind !== "operation")) return block("请先选择一个 Object 或 Feature，再创建 State。");
-    if (!stateCreateOption.value?.enabled) return block("当前 Object 不支持创建 State。");
-    stateCandidate.phase = "placing";
-    stateCandidate.ownerId = owner.id;
-    stateCandidate.name = "";
-    stateCandidate.roles = ["INITIAL"];
-    workbench.lastAction = "请在已选择 Object 内点击 State 位置。";
-  }
-
-  function placeState(ownerId: string) {
-    const owner = workbench.nodes.find((node) => node.id === ownerId);
-    if (stateCandidate.phase !== "placing" || !owner || ownerId !== stateCandidate.ownerId) return;
-    const stateCount = workbench.nodes.filter((node) => node.kind === "state" && node.ownerId === ownerId).length;
-    stateCandidate.phase = "editing";
-    stateCandidate.x = owner.x + 36;
-    stateCandidate.y = owner.y + 4 + stateCount * 34;
-    workbench.lastAction = "请输入 State 名称并选择角色。";
-  }
-
-  function cancelStateCandidate() {
-    stateCandidate.phase = "idle";
-    stateCandidate.ownerId = "";
-  }
-
-  async function submitStateCandidate() {
-    const option = stateCreateOption.value;
-    if (!option || stateCandidate.phase !== "editing") return;
-    if (!stateCandidate.name.trim()) return block("State 名称不能为空。");
-    await execute({ commandType: "CREATE_STATE", payload: {
-      context_id: workbench.activeContextId,
-      owner_ref: { target_kind: selectedNode.value?.kind === "attribute" || selectedNode.value?.kind === "operation" ? "FEATURE" : "ELEMENT", target_id: stateCandidate.ownerId },
-      capability_ref: option.capability_ref,
-      name_or_value: stateCandidate.name.trim(),
-      state_roles: stateCandidate.roles,
-      occurrence: { ownership: "OWNED", construct_role: selectedNode.value?.kind === "attribute" || selectedNode.value?.kind === "operation" ? "FEATURE_STATE_NODE" : "STATE_NODE" },
-      layout: { x: stateCandidate.x, y: stateCandidate.y },
-      capability_query_id: option.capability_query_id,
-      selected_option_id: option.option_id,
-    } });
-    if (workbench.commandState === "idle") cancelStateCandidate();
-  }
-
-  async function saveSelectedState() {
-    const state = selectedNode.value;
-    if (!state || state.kind !== "state" || !state.ownerId) return;
-    await execute({ commandType: "UPDATE_STATE", payload: {
-      state_id: state.id,
-      expected_owner_ref: { target_kind: "ELEMENT", target_id: state.ownerId },
-      changes: { name_or_value: stateEditor.name.trim(), state_roles: stateEditor.roles },
-      capability_query_id: stateCreateOption.value?.capability_query_id ?? "query.state.update",
-      selected_option_id: stateCreateOption.value?.option_id ?? "option.state.update",
-    } });
-  }
-
-  async function changeStatePresentation(commandType: "STATE_EXPLICIT" | "STATE_SUPPRESS" | "UNFOLD" | "FOLD") {
-    const state = selectedNode.value;
-    if (!state || state.kind !== "state") return;
-    await execute({ commandType, payload: { context_id: workbench.activeContextId, state_id: state.id } });
-  }
-
-  async function makeSuppressedStateExplicit(stateId: string) {
-    const state = selectedObjectSuppressedStates.value.find((item) => item.state_id === stateId);
-    if (!state) return block("该抑制 State 不属于当前选择的 Object。");
-    await execute({ commandType: "STATE_EXPLICIT", payload: { context_id: workbench.activeContextId, state_id: state.state_id } });
-  }
-
-  async function deleteSelectedState() {
-    const state = selectedNode.value;
-    const option = stateDeleteOption.value;
-    if (!state || state.kind !== "state" || !option?.impact_token) return;
-    if (!option.enabled) return block("该 State 已被 Fact 引用，不能删除。");
-    await execute({ commandType: "DELETE_CONSTRUCT", payload: { construct_kind: "STATE", construct_id: state.id, impact_token: option.impact_token } });
-  }
-
-  async function deleteSelectedFact() {
-    const fact = selectedRelation.value;
-    const option = factDeleteOption.value;
-    if (!fact || !option?.enabled || !option.impact_token) return;
-    await execute({ commandType: "DELETE_CONSTRUCT", payload: { construct_kind: "FACT", construct_id: fact.id, impact_token: option.impact_token } });
+    if (succeeded) elementNameOption.value = null;
+    return succeeded;
   }
 
   async function runValidation() {
+    if (draftSession) { workbench.commandFeedback = "当前显示草稿核心校验（INCOMPLETE）；完整规则校验尚未接入。"; return; }
     if (!projectId.value || !modelId.value || !workbench.revision) return;
     workbench.validationState = "running";
     workbench.validationProgress = 0;
@@ -650,19 +575,29 @@ export const useWorkbenchRuntimeStore = defineStore("workbench-runtime", () => {
   }
 
   async function submitReleaseVisualCommonFaultCommand() {
+    if (isReadonly.value || workbench.commandState === "submitting") return;
     const command = releaseVisualCommonFaultCommand.value;
     if (!command || !projectId.value || !modelId.value || !workbench.revision || !workbench.activeContextId) return;
     workbench.commandState = "submitting";
     workbench.commandFeedback = "";
     workbench.feedbackCode = null;
+    const sequence = loadSequence;
     try {
       const result = await localRuntimeApi.executeReleaseVisualCommonFaultCommand(projectId.value, modelId.value, workbench.activeContextId, workbench.revision, command);
+      if (sequence !== loadSequence) return;
       if (!result.meta.committed_revision) throw new LocalRuntimeApiError("COMMAND_NOT_COMMITTED", "命令未返回已提交修订。", true);
       workbench.autosaveState = "saved";
       workbench.validationState = "stale";
-      workbench.commandState = "idle";
-      await load(projectId.value, modelId.value, workbench.activeContextId, result.meta.committed_revision);
+      await load(
+        projectId.value,
+        modelId.value,
+        workbench.activeContextId,
+        result.meta.committed_revision,
+        "commandType" in command && command.commandType === "UPDATE_LAYOUT",
+        true,
+      );
     } catch (error) {
+      if (sequence !== loadSequence) return;
       const apiError = error instanceof LocalRuntimeApiError ? error : undefined;
       workbench.commandState = apiError?.code === "REVISION_CONFLICT" || apiError?.code === "VALIDATION_BLOCKED" ? "blocked" : "failed";
       workbench.autosaveState = apiError?.retryable ? "save-failed" : "saved";
@@ -675,24 +610,54 @@ export const useWorkbenchRuntimeStore = defineStore("workbench-runtime", () => {
     block(reason);
   }
 
-  async function execute(command: Parameters<typeof localRuntimeApi.executeP0Command>[4]) {
-    if (!projectId.value || !modelId.value || !workbench.revision || !workbench.activeContextId) return;
+  function execute(command: Parameters<typeof localRuntimeApi.executeP0Command>[4]): Promise<boolean> {
+    if (editInFlight) return Promise.resolve(false);
+    const promise = executeCommand(command);
+    editInFlight = promise;
+    void promise.finally(() => { if (editInFlight === promise) editInFlight = null; });
+    return promise;
+  }
+
+  async function executeCommand(command: Parameters<typeof localRuntimeApi.executeP0Command>[4]): Promise<boolean> {
+    if (isReadonly.value || workbench.commandState === "submitting") return false;
+    if (!projectId.value || !modelId.value || !workbench.revision || !workbench.activeContextId) return false;
     workbench.commandState = "submitting";
     workbench.commandFeedback = "";
     workbench.feedbackCode = null;
+    const sequence = loadSequence;
     try {
+      if (draftSession && draftToken.value) {
+        const session = draftSession;
+        const result = await session.edit(draftToken.value, workbench.activeContextId, command);
+        if (sequence !== loadSequence || session !== draftSession) return false;
+        const opened = await session.open(workbench.activeContextId);
+        if (!sameDraftToken(opened.draft_token, result.result_token)) throw new LocalRuntimeApiError("DRAFT_CONFLICT", "草稿已被其他页面推进，请重新加载。");
+        const snapshot = await session.read(opened);
+        if (sequence !== loadSequence || session !== draftSession) return false;
+        applyDraftSnapshot(snapshot); return true;
+      }
       const result = await localRuntimeApi.executeP0Command(projectId.value, modelId.value, workbench.activeContextId, workbench.revision, command);
+      if (sequence !== loadSequence) return false;
       if (!result.meta.committed_revision) throw new LocalRuntimeApiError("COMMAND_NOT_COMMITTED", "命令未返回已提交修订。", true);
       workbench.autosaveState = "saved";
       workbench.validationState = "stale";
-      workbench.commandState = "idle";
-      await load(projectId.value, modelId.value, workbench.activeContextId, result.meta.committed_revision);
+      return await load(projectId.value, modelId.value, workbench.activeContextId, result.meta.committed_revision, command.commandType === "UPDATE_LAYOUT", true);
     } catch (error) {
+      if (sequence !== loadSequence) return false;
       const apiError = error instanceof LocalRuntimeApiError ? error : undefined;
       workbench.commandState = apiError?.code === "REVISION_CONFLICT" || apiError?.code === "VALIDATION_BLOCKED" ? "blocked" : "failed";
       workbench.autosaveState = apiError?.retryable ? "save-failed" : "saved";
       workbench.feedbackCode = apiError?.code ?? null;
       workbench.commandFeedback = message(error);
+      if (draftSession) {
+        const session = draftSession;
+        let pending = true;
+        try { pending = (await session.pending()).length > 0; } catch { /* 无法读取队列时保守保留待确认状态。 */ }
+        if (sequence !== loadSequence || session !== draftSession) return false;
+        pendingDelivery.value = pending;
+        if (pendingDelivery.value || apiError?.code === "DRAFT_CONFLICT") workbench.accessMode = "readonly";
+      }
+      return false;
     }
   }
 
@@ -722,141 +687,18 @@ export const useWorkbenchRuntimeStore = defineStore("workbench-runtime", () => {
 
   async function refreshStateCreateOption(selectionId: string) {
     if (!projectId.value || !modelId.value || !workbench.revision || !workbench.activeContextId) return;
+    const sequence = loadSequence;
+    const identity = editingIdentity.value;
     try {
-      const capabilities = await localRuntimeApi.commandCapabilities(projectId.value, modelId.value, workbench.activeContextId, workbench.revision, selectionId, "CREATE_STATE");
+      const capabilities = await queryCapabilities(projectId.value, modelId.value, workbench.activeContextId, workbench.revision, selectionId, "CREATE_STATE");
+      if (sequence !== loadSequence || identity !== editingIdentity.value || selectionId !== workbench.selectedId) return;
       stateCreateOption.value = capabilities.data.options.find((option) => option.command_type === "CREATE_STATE") ?? null;
     } catch (error) {
+      if (sequence !== loadSequence || identity !== editingIdentity.value || selectionId !== workbench.selectedId) return;
       stateCreateOption.value = null;
       workbench.commandFeedback = message(error);
     }
   }
 
-  async function refreshStateDeleteOption(selectionId: string) {
-    if (!projectId.value || !modelId.value || !workbench.revision || !workbench.activeContextId) return;
-    try {
-      const capabilities = await localRuntimeApi.commandCapabilities(projectId.value, modelId.value, workbench.activeContextId, workbench.revision, selectionId, "DELETE_CONSTRUCT");
-      stateDeleteOption.value = capabilities.data.options.find((option) => option.command_type === "DELETE_CONSTRUCT") ?? null;
-    } catch (error) {
-      stateDeleteOption.value = null;
-      workbench.commandFeedback = message(error);
-    }
-  }
-
-  async function refreshFactDeleteOption(selectionId: string) {
-    if (!projectId.value || !modelId.value || !workbench.revision || !workbench.activeContextId) return;
-    try {
-      const capabilities = await localRuntimeApi.commandCapabilities(projectId.value, modelId.value, workbench.activeContextId, workbench.revision, selectionId, "DELETE_CONSTRUCT");
-      factDeleteOption.value = capabilities.data.options.find((option) => option.command_type === "DELETE_CONSTRUCT") ?? null;
-    } catch (error) {
-      factDeleteOption.value = null;
-      workbench.commandFeedback = message(error);
-    }
-  }
-
-  return { projectId, modelId, projectName, modelName, profileLabel, contexts, textLines, revisions, findings, operationRecords, selectedFindingId, highlightedFindingTargetId, releaseVisualCommonFaultCommand, workbench, isReadonly, selectedNode, selectedRelation, selectedObjectSuppressedStates, stateCreateOption, stateDeleteOption, factDeleteOption, stateCandidate, stateEditor, relationCandidate, relationCatalog, relationCatalogFamilies, rightPanel, controlCandidate, structuralUpdateCandidate, captureViewState, load, selectContext, selectConstruct, setBottomTab, openRightPanel, closeRightPanel, setViewportZoom, addElement, addFeature, addConsumption, openRelationCatalog, closeRelationCatalog, relationCatalogItems, isRelationCatalogExpanded, toggleRelationCatalogFamily, armRelationCreation, cancelRelationCandidate, resolveRelationCandidates, submitRelationCandidate, chooseRelationCandidate, confirmRelationCandidate, armControlUpdate, cancelControlCandidate, submitControlCandidate, armStructuralUpdate, cancelStructuralUpdate, submitStructuralUpdate, armStateCreation, placeState, cancelStateCandidate, submitStateCandidate, saveSelectedState, changeStatePresentation, makeSuppressedStateExplicit, deleteSelectedState, deleteSelectedFact, runValidation, locateText, selectFinding, locateFinding, submitReleaseVisualCommonFaultCommand, unavailable };
+  return { leaveWorkbench, draftToken, draftSaveState, saving, pendingDelivery, saveError, saveLabel, editingIdentity, saveDraft, retryDraftDelivery, pollDraftState, projectId, modelId, projectName, modelName, profileLabel, contexts, textLines, revisions, findings, operationRecords, selectedFindingId, highlightedFindingTargetId, releaseVisualCommonFaultCommand, workbench, isReadonly, selectedNode, selectedRelation, selectedObjectSuppressedStates, stateCreateOption, constructActions, stateCandidate, stateEditor, relationCandidate, relationCatalog, relationCatalogFamilies, rightPanel, controlCandidate, structuralUpdateCandidate, captureViewState, load, selectContext, selectConstruct, setBottomTab, openRightPanel, closeRightPanel, setViewportZoom, addElement, addFeature, addConsumption, moveElement, beginElementNameEdit, renameElement, openRelationCatalog, closeRelationCatalog, relationCatalogItems, isRelationCatalogExpanded, toggleRelationCatalogFamily, activateRelationCatalogItem, armRelationCreation, handleRelationGesture, cancelRelationCandidate, resolveRelationCandidates, submitRelationCandidate, chooseRelationCandidate, rebuildRelationPreview, continueRelationEndpoints, confirmRelationCandidate, armControlUpdate, cancelControlCandidate, chooseControlCandidate, submitControlCandidate, confirmControlCandidate, armStructuralUpdate, cancelStructuralUpdate, submitStructuralUpdate, armStateCreation, placeState, cancelStateCandidate, submitStateCandidate, saveSelectedState, changeStatePresentation, makeSuppressedStateExplicit, requestConstructActions, chooseConstructDelete, cancelConstructDelete, runValidation, locateText, selectFinding, locateFinding, submitReleaseVisualCommonFaultCommand, unavailable };
 });
-
-function operationHistoryCode(record: OperationRecordWire): string | null {
-  const diagnosticId = record.diagnostic_id;
-  if (!diagnosticId) return null;
-  const code = diagnosticId.slice(diagnosticId.lastIndexOf(".") + 1);
-  return ["VALIDATION_BLOCKED", "REVISION_CONFLICT", "READONLY"].includes(code) ? code : null;
-}
-
-function toContexts(data: { process_tree: NavigationNodeWire[]; object_forest: NavigationNodeWire[]; views: NavigationNodeWire[] }, fallbackId: string): RuntimeContext[] {
-  const nodes = [...data.process_tree, ...data.object_forest, ...data.views];
-  return (nodes.length ? nodes : [{ context_id: fallbackId, label: fallbackId, context_kind: "SYSTEM_DIAGRAM", has_children: false }]).map((item) => ({ id: item.context_id, label: item.label, kind: item.context_kind }));
-}
-
-function toNode(value: ProjectionConstructWire): OpdNode {
-  return {
-    id: value.target_id,
-    occurrenceId: value.occurrence_id,
-    label: value.label ?? value.target_id,
-    kind: value.construct_role === "PROCESS_NODE" ? "process" : value.construct_role === "ATTRIBUTE_NODE" ? "attribute" : value.construct_role === "OPERATION_NODE" ? "operation" : value.construct_role === "STATE_NODE" || value.construct_role === "FEATURE_STATE_NODE" ? "state" : "object",
-    x: value.layout.x,
-    y: value.layout.y,
-    valueDomain: "-",
-    visibility: "public",
-    multiplicity: "1",
-    architectureLayer: "产品",
-    occurrenceRole: "owned",
-    ownerId: value.owner_id,
-    stateRoles: value.state_roles,
-    explicitness: value.explicitness,
-    foldState: value.fold_state,
-  };
-}
-
-function toConsumption(value: ProjectionConstructWire, nodes: OpdNode[]): ConsumptionRelation[] {
-  const occurrenceIdForTarget = (targetId: string) => nodes.find((node) => node.id === targetId)?.occurrenceId ?? targetId;
-  if (value.endpoints?.length) {
-    const ordered = [...value.endpoints].sort((left, right) => left.ordinal - right.ordinal);
-    const source = ordered[0];
-    const target = ordered.length === 3 ? ordered[1] : ordered[1];
-    if (!source || !target) return [];
-    return [{
-      id: value.target_id,
-      occurrenceId: value.occurrence_id,
-      sourceId: source.target_id,
-      targetId: target.target_id,
-      sourceOccurrenceId: occurrenceIdForTarget(source.target_id),
-      targetOccurrenceId: occurrenceIdForTarget(target.target_id),
-      symbolRef: value.symbol_ref ?? "symbol.link.procedural",
-      layoutRef: value.layout_ref ?? value.occurrence_id,
-      capabilityId: value.capability_id,
-      endpoints: ordered.map((endpoint) => ({ role: endpoint.role, targetId: endpoint.target_id, targetKind: endpoint.target_kind, ordinal: endpoint.ordinal })),
-      duration: value.modifiers?.find((modifier) => modifier.modifier_id === "duration")?.value,
-      controlCapability: value.modifiers?.find((modifier) => modifier.modifier_id === "control.capability")?.value,
-      controlSegment: value.modifiers?.find((modifier) => modifier.modifier_id === "control.segment")?.value === "PROCESS_INPUT" ? "PROCESS_INPUT" : undefined,
-      labels: value.labels?.map((label) => ({ slotId: label.slot_id, text: label.text })),
-      direction: value.direction,
-      collectionCompleteness: value.collection_completeness,
-    }];
-  }
-  if (!value.source_id || !value.process_id) return [];
-  return [{
-    id: value.target_id,
-    occurrenceId: value.occurrence_id,
-    sourceId: value.source_id,
-    targetId: value.process_id,
-    sourceOccurrenceId: value.source_occurrence_id ?? value.source_id,
-    targetOccurrenceId: value.target_occurrence_id ?? value.process_id,
-    symbolRef: value.symbol_ref ?? "symbol.consumption.v1",
-    layoutRef: value.layout_ref ?? value.occurrence_id,
-  }];
-}
-
-function proceduralFactFamily(capabilityId: string): "TRANSFORMATION" | "ENABLING" | "PROFILE_FACT" | undefined {
-  if (["CAP-ISO-PROC-001", "CAP-ISO-PROC-002", "CAP-ISO-PROC-003", "CAP-ISO-PROC-006", "CAP-ISO-PROC-007", "CAP-ISO-PROC-008", "CAP-ISO-PROC-009", "CAP-ISO-PROC-010"].includes(capabilityId)) return "TRANSFORMATION";
-  if (["CAP-ISO-PROC-004", "CAP-ISO-PROC-005", "CAP-ISO-PROC-011", "CAP-ISO-PROC-012"].includes(capabilityId)) return "ENABLING";
-  if (["CAP-ISO-PROC-013", "CAP-ISO-PROC-014", "CAP-ISO-PROC-015", "CAP-ISO-PROC-016"].includes(capabilityId)) return "PROFILE_FACT";
-  return undefined;
-}
-
-function relationFactFamily(capabilityId: string): "TRANSFORMATION" | "ENABLING" | "PROFILE_FACT" | "STRUCTURAL" | undefined {
-  return capabilityId.startsWith("CAP-ISO-STRUCT-") ? "STRUCTURAL" : proceduralFactFamily(capabilityId);
-}
-
-function relationDirection(option: ApiEdtCommandCapabilityOption, selected: "DIRECTED" | "BIDIRECTIONAL"): "DIRECTED" | "BIDIRECTIONAL" | undefined {
-  const direction = option.required_fields.find((field) => field.field_id === "direction");
-  if (!direction) return "DIRECTED";
-  const allowedDirections = direction.allowed_values ?? [];
-  return allowedDirections.includes(selected) ? selected : allowedDirections[0] as "DIRECTED" | "BIDIRECTIONAL" | undefined;
-}
-
-function requiredStructuralLabelSlots(option: ApiEdtCommandCapabilityOption, direction: "DIRECTED" | "BIDIRECTIONAL" | undefined): string[] {
-  const slots = option.required_fields.find((field) => field.field_id === "labels")?.allowed_values ?? [];
-  return direction === "DIRECTED" ? slots.filter((slot) => slot !== "reverse_tag") : slots;
-}
-
-function toTextLines(sentences: Array<{ sentence_id: string; text: string }>, traces: Array<{ sentence_id: string; fact_ids: string[]; occurrence_ids: string[] }>): RuntimeTextLine[] {
-  return sentences.map((sentence) => {
-    const trace = traces.find((item) => item.sentence_id === sentence.sentence_id);
-    return { id: sentence.sentence_id, text: sentence.text, factIds: trace?.fact_ids ?? [], occurrenceIds: trace?.occurrence_ids ?? [] };
-  });
-}
-
-function message(error: unknown) {
-  return error instanceof LocalRuntimeApiError ? error.message : "本地请求失败，请重试。";
-}

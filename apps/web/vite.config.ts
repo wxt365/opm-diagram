@@ -23,6 +23,10 @@ export default defineConfig({
         target: runtimeOrigin,
         changeOrigin: true,
       },
+      "/api/v2": {
+        target: runtimeOrigin,
+        changeOrigin: true,
+      },
       "/api/v1/events": {
         target: runtimeOrigin,
         changeOrigin: true,

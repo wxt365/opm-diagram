@@ -70,6 +70,15 @@ class LocalApiControllerTest {
         Map<String, Object> workspaceResult = response(perform(get("/api/v1/projects/{projectId}/models/{modelId}/workspace-session", projectId, modelId).param("request_id", "request.workspace.001")).andExpect(status().isOk()).andReturn());
         String contextId = string(data(workspaceResult).get("root_context_id"));
 
+        Map<String, Object> exactWorkspace = response(perform(get("/api/v1/projects/{projectId}/models/{modelId}/workspace-session", projectId, modelId)
+                .param("request_id", "request.workspace.exact").param("revision", revision).param("context", "context.foreign")).andExpect(status().isOk()).andReturn());
+        org.junit.jupiter.api.Assertions.assertEquals(contextId, data(exactWorkspace).get("current_context_id"));
+        org.junit.jupiter.api.Assertions.assertEquals("READONLY_SNAPSHOT", ((Map<?, ?>) data(exactWorkspace).get("model")).get("access_mode"));
+        perform(get("/api/v1/projects/{projectId}/models/{modelId}/workspace-session", projectId, modelId)
+                .param("request_id", "request.workspace.invalid").param("revision", "../bad")).andExpect(status().isBadRequest());
+        perform(get("/api/v1/projects/{projectId}/models/{modelId}/workspace-session", projectId, modelId)
+                .param("request_id", "request.workspace.missing").param("revision", "revision.missing")).andExpect(status().isNotFound());
+
         perform(get("/api/v1/projects/{projectId}/models/{modelId}/contexts/{contextId}/navigation", projectId, modelId, contextId).param("request_id", "request.navigation.001").param("revision", revision)).andExpect(status().isOk());
         perform(get("/api/v1/projects/{projectId}/models/{modelId}/contexts/{contextId}/projection", projectId, modelId, contextId).param("request_id", "request.projection.001").param("revision", revision)).andExpect(status().isOk());
         perform(get("/api/v1/projects/{projectId}/models/{modelId}/contexts/{contextId}/command-capabilities", projectId, modelId, contextId).param("request_id", "request.capabilities.001").param("revision", revision)).andExpect(status().isOk());
@@ -153,6 +162,105 @@ class LocalApiControllerTest {
     }
 
     @Test
+    void updatesElementNameAndReturnsInvalidArgumentForBlankNameThroughMvc() throws Exception {
+        ModelFixture fixture = createModelFixture("name-edit");
+        Map<String, Object> option = capabilityOption(
+                fixture, fixture.firstObjectId(), "UPDATE_PROPERTY", List.of(), "CAP-OBJECT-001");
+        Map<String, Object> payload = map(
+                "target_ref", map("target_kind", "ELEMENT", "target_id", fixture.firstObjectId()),
+                "property_name", "name",
+                "value", "Renamed Object",
+                "capability_query_id", option.get("capability_query_id"),
+                "selected_option_id", option.get("option_id"));
+
+        Map<String, Object> updateResult = response(perform(write(command(fixture), editRequest(
+                        "request.name-edit.001", "command.name-edit.001", fixture.revision(), "UPDATE_PROPERTY", payload)))
+                .andExpect(status().isOk())
+                .andReturn());
+        String committedRevision = committed(updateResult);
+        Map<String, Object> projection = response(perform(get(
+                        "/api/v1/projects/{projectId}/models/{modelId}/contexts/{contextId}/projection",
+                        fixture.projectId(), fixture.modelId(), fixture.contextId())
+                .param("request_id", "request.name-edit.projection.001")
+                .param("revision", committedRevision)).andExpect(status().isOk()).andReturn());
+        Map<?, ?> renamed = ((List<?>) data(projection).get("constructs")).stream()
+                .map(Map.class::cast)
+                .filter(item -> fixture.firstObjectId().equals(item.get("target_id")))
+                .findFirst()
+                .orElseThrow();
+        assertEquals("Renamed Object", renamed.get("label"));
+
+        ModelFixture current = new ModelFixture(
+                fixture.projectId(), fixture.modelId(), fixture.contextId(), committedRevision,
+                fixture.firstObjectId(), fixture.secondObjectId(), fixture.processId(), fixture.factId());
+        Map<String, Object> currentOption = capabilityOption(
+                current, current.firstObjectId(), "UPDATE_PROPERTY", List.of(), "CAP-OBJECT-001");
+        Map<String, Object> blankPayload = map(
+                "target_ref", map("target_kind", "ELEMENT", "target_id", current.firstObjectId()),
+                "property_name", "name",
+                "value", "   ",
+                "capability_query_id", currentOption.get("capability_query_id"),
+                "selected_option_id", currentOption.get("option_id"));
+        MvcResult blankResult = perform(write(command(current), editRequest(
+                        "request.name-edit.blank.001", "command.name-edit.blank.001", committedRevision,
+                        "UPDATE_PROPERTY", blankPayload)))
+                .andExpect(status().isBadRequest())
+                .andReturn();
+        assertErrorEnvelope(blankResult, "INVALID_ARGUMENT", "INPUT");
+    }
+
+    @Test
+    void updatesOwnedAttributeLayoutThroughMvc() throws Exception {
+        ModelFixture fixture = createModelFixture("attribute-layout");
+        Map<String, Object> option = capabilityOption(
+                fixture, fixture.firstObjectId(), "CREATE_FEATURE", List.of(), "CAP-FEAT-ATTRIBUTE-001");
+        Map<String, Object> featurePayload = map(
+                "context_id", fixture.contextId(),
+                "owner_element_id", fixture.firstObjectId(),
+                "feature_id", "feature.mvc.attribute-layout.temperature",
+                "feature_kind", "ATTRIBUTE",
+                "capability_ref", option.get("capability_ref"),
+                "name", "Temperature",
+                "occurrence", map("ownership", "OWNED", "construct_role", "ATTRIBUTE_NODE"),
+                "layout", map("x", 260, "y", 80),
+                "capability_query_id", option.get("capability_query_id"),
+                "selected_option_id", option.get("option_id"));
+        String featureRevision = committed(response(perform(write(command(fixture), editRequest(
+                        "request.mvc.attribute-layout.create.001", "command.mvc.attribute-layout.create.001",
+                        fixture.revision(), "CREATE_FEATURE", featurePayload)))
+                .andExpect(status().isOk()).andReturn()));
+
+        ModelFixture featureFixture = new ModelFixture(
+                fixture.projectId(), fixture.modelId(), fixture.contextId(), featureRevision,
+                fixture.firstObjectId(), fixture.secondObjectId(), fixture.processId(), fixture.factId());
+        Map<String, Object> projection = response(perform(get(
+                        "/api/v1/projects/{projectId}/models/{modelId}/contexts/{contextId}/projection",
+                        fixture.projectId(), fixture.modelId(), fixture.contextId())
+                .param("request_id", "request.mvc.attribute-layout.projection.before")
+                .param("revision", featureRevision)).andExpect(status().isOk()).andReturn());
+        Map<?, ?> attribute = ((List<?>) data(projection).get("constructs")).stream()
+                .map(Map.class::cast)
+                .filter(item -> "feature.mvc.attribute-layout.temperature".equals(item.get("target_id")))
+                .findFirst().orElseThrow();
+
+        String movedRevision = committed(response(perform(write(command(featureFixture), editRequest(
+                        "request.mvc.attribute-layout.move.001", "command.mvc.attribute-layout.move.001", featureRevision,
+                        "UPDATE_LAYOUT", map("occurrence_id", attribute.get("occurrence_id"), "layout", map("x", 360, "y", 240)))))
+                .andExpect(status().isOk()).andReturn()));
+        Map<String, Object> movedProjection = response(perform(get(
+                        "/api/v1/projects/{projectId}/models/{modelId}/contexts/{contextId}/projection",
+                        fixture.projectId(), fixture.modelId(), fixture.contextId())
+                .param("request_id", "request.mvc.attribute-layout.projection.after")
+                .param("revision", movedRevision)).andExpect(status().isOk()).andReturn());
+        Map<?, ?> moved = ((List<?>) data(movedProjection).get("constructs")).stream()
+                .map(Map.class::cast)
+                .filter(item -> "feature.mvc.attribute-layout.temperature".equals(item.get("target_id")))
+                .findFirst().orElseThrow();
+        assertEquals(360.0d, ((Number) ((Map<?, ?>) moved.get("layout")).get("x")).doubleValue());
+        assertEquals(240.0d, ((Number) ((Map<?, ?>) moved.get("layout")).get("y")).doubleValue());
+    }
+
+    @Test
     void returnsTheFrozenRuntimeRelationCatalogWithoutCommandAuthorization() throws Exception {
         ModelFixture fixture = createModelFixture("relation-catalog");
 
@@ -169,10 +277,32 @@ class LocalApiControllerTest {
         assertEquals(16, items.stream().filter(item -> "PROCEDURAL".equals(item.get("family"))).count());
         assertEquals(8, items.stream().filter(item -> "CONTROL".equals(item.get("family"))).count());
         assertEquals(10, items.stream().filter(item -> "STRUCTURAL".equals(item.get("family"))).count());
+        Map<String, Object> consumption = items.getFirst();
+        assertEquals("CREATE_FACT", consumption.get("interaction_mode"));
+        assertEquals("symbol.link.consumption", ((Map<?, ?>) consumption.get("symbol_descriptor")).get("id"));
+        assertEquals(2, ((Map<?, ?>) consumption.get("endpoint_summary")).get("min_endpoints"));
+        assertEquals(2, ((List<?>) ((Map<?, ?>) consumption.get("endpoint_summary")).get("roles")).size());
         items.stream().filter(item -> "CONTROL".equals(item.get("family"))).forEach(item -> {
             assertEquals(false, item.get("enabled"));
             assertEquals(List.of("CONTROL_REQUIRES_BASE_FACT"), item.get("reason_codes"));
         });
+
+        Map<String, Object> selectedResponse = response(perform(get("/api/v1/projects/{projectId}/models/{modelId}/contexts/{contextId}/relation-catalog",
+                fixture.projectId(), fixture.modelId(), fixture.contextId())
+                .param("request_id", "request.relation-catalog.selected.001")
+                .param("revision", fixture.revision())
+                .param("selection_id", fixture.factId())).andExpect(status().isOk()).andReturn());
+        List<Map<String, Object>> selectedItems = ((List<?>) data(selectedResponse).get("items")).stream().map(Map.class::cast)
+                .map(item -> (Map<String, Object>) item).toList();
+        Set<String> enabledControls = selectedItems.stream()
+                .filter(item -> "CONTROL".equals(item.get("family")) && Boolean.TRUE.equals(item.get("enabled")))
+                .map(item -> string(item.get("capability_id")))
+                .collect(java.util.stream.Collectors.toSet());
+        assertEquals(Set.of("CAP-ISO-CTRL-001", "CAP-ISO-CTRL-005"), enabledControls);
+        Map<String, Object> transformingEvent = selectedItems.stream()
+                .filter(item -> "CAP-ISO-CTRL-001".equals(item.get("capability_id"))).findFirst().orElseThrow();
+        assertEquals("UPDATE_SELECTED_FACT", transformingEvent.get("interaction_mode"));
+        assertEquals("BASE_PROCEDURAL_FACT", ((Map<?, ?>) ((List<?>) ((Map<?, ?>) transformingEvent.get("endpoint_summary")).get("roles")).getFirst()).get("role"));
     }
 
     @Test
@@ -339,6 +469,11 @@ class LocalApiControllerTest {
 
     @SuppressWarnings("unchecked")
     private void assertErrorEnvelope(MvcResult result, String expectedCode) throws Exception {
+        assertErrorEnvelope(result, expectedCode, "DOMAIN");
+    }
+
+    @SuppressWarnings("unchecked")
+    private void assertErrorEnvelope(MvcResult result, String expectedCode, String expectedCategory) throws Exception {
         assertEquals(MediaType.APPLICATION_PROBLEM_JSON_VALUE, result.getResponse().getContentType());
         byte[] rawBody = result.getResponse().getContentAsByteArray();
         String decoded = StandardCharsets.UTF_8.newDecoder()
@@ -352,7 +487,7 @@ class LocalApiControllerTest {
         Map<String, Object> error = (Map<String, Object>) envelope.get("error");
         assertEquals(Set.of("code", "category", "message", "retryable", "diagnostic_id"), error.keySet());
         assertEquals(expectedCode, error.get("code"));
-        assertEquals("DOMAIN", error.get("category"));
+        assertEquals(expectedCategory, error.get("category"));
         assertEquals(false, error.get("retryable"));
         assertTrue(string(error.get("message")).length() > 0);
         assertTrue(string(error.get("diagnostic_id")).matches("^[A-Za-z][A-Za-z0-9._:-]{2,159}$"));

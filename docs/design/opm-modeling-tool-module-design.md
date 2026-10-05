@@ -1,12 +1,12 @@
 # OPM 单机建模工具模块详细设计
 
-文档版本：`v1.0`
+文档版本：`v1.1`
 
 文档状态：`FROZEN_INCLUDED`；M01-M12 职责与开发边界冻结
 
 全局设计状态、延期边界和开发准入以 `opm-design-freeze-baseline.md` 为唯一事实源。
 
-更新时间：2026-07-27
+更新时间：2026-09-11
 
 ## Task Type
 
@@ -81,7 +81,9 @@
 3. 视口缩放不产生语义命令；
 4. OPD 元素、文本语句和问题定位共享稳定追踪标识；
 5. 键盘和鼠标均可完成核心操作；
-6. 不仅依赖颜色表达错误、可见性或引用状态。
+6. 不仅依赖颜色表达错误、可见性或引用状态；
+7. Workbench Router 区分活动 `HEAD` 与只读 `EXACT`：HEAD URL 省略 Revision，Header 显示实际 committed Revision；精确 Revision 只用于固定版本和永久链接；
+8. `DraftRevisionCommitted` 更新 Header、编辑基线和投影，不直接把新 Revision 写入 HEAD URL。
 
 非目标：页面信息架构、组件树和视觉规范在页面设计包中定义。
 
@@ -246,6 +248,8 @@ Profile Package 的字段、96 项能力闭包、符号/语法/适配器依赖�
 
 ### 5.9 M09 版本、基线与历史
 
+2026-09-11：新增 [混合保存模式](opm-hybrid-save-and-draft-recovery-design.md)。M09 负责模型级手动/10 秒自动保存、去重、固定版本与保留；M03/M08 负责 token 一致的编辑校验/文本，M12 负责增量与检查点原子持久化。下表及旧 DraftRevisionCommitted 的 Revision-only 流程保留为 V1 兼容模式；V2 的普通编辑仅生成草稿 edit_seq，自动检查点不新增历史 Revision。业务策略已冻结，代码未切换，机器契约由 HS-01 承接。
+
 目标：区分会话撤销、草稿保存、命名快照、不可变基线和操作记录。
 
 | 对象 | 可变性 | 创建条件 | 用途 |
@@ -257,6 +261,8 @@ Profile Package 的字段、96 项能力闭包、符号/语法/适配器依赖�
 | Operation Record | 追加 | 本地动作完成或失败 | 诊断和追溯 |
 
 Diff 以稳定 ID 对齐 Element、Fact、Context 和 Occurrence；布局差异与语义差异分开呈现。规则升级不能重写旧 Baseline 的结论，只能生成新规则重检报告或迁移版本。
+
+M09 是 URL Revision 语义的唯一业务 owner：省略 `revision`/兼容输入 `revision=head` 解析活动 Draft Head；精确 `revision_id` 验证归属并固定只读 Revision；Named Snapshot/Baseline 解析到其不可变 Revision 和 access mode。非法或跨 Model 的精确 Revision 必须拒绝，不得回退 HEAD。M01 只负责 route parse/canonicalize 和导航反馈，不自行推断 Revision 归属。
 
 ### 5.10 M10 交换、备份与恢复
 
@@ -342,7 +348,7 @@ Diff 以稳定 ID 对齐 Element、Fact、Context 和 Occurrence；布局差异�
 
 | 事件 | 生产者 | 消费者 | 用途 |
 | --- | --- | --- | --- |
-| DraftRevisionCommitted | M03 | M01、M09 | 更新工作台和自动保存状态 |
+| DraftRevisionCommitted | M03 | M01、M09 | 更新 Header、编辑基线、工作台投影和自动保存状态；HEAD URL 保持不变 |
 | TextProjectionUpdated | M08 | M01 | 刷新对应 Paragraph/Sentence |
 | ValidationCompleted | M07 | M01、M09 | 更新问题视图和证据摘要 |
 | BaselineCreated | M09 | M01、M10、M11 | 启用导出或发布包准备 |

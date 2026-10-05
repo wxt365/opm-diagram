@@ -1,0 +1,333 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "OPM 草稿保存 API（Save/SaveState/Pin 已实现）",
+    "version": "0.2.0-draft"
+  },
+  "servers": [
+    {
+      "url": "http://127.0.0.1:17850/api/v2"
+    }
+  ],
+  "security": [
+    {
+      "localSession": []
+    }
+  ],
+  "paths": {
+    "/projects/{project_id}/models/{model_id}/draft/save": {
+      "parameters": [
+        {
+          "name": "project_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "$ref": "../schemas/opm-draft-save-v02.schema.json#/$defs/Id"
+          }
+        },
+        {
+          "name": "model_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "$ref": "../schemas/opm-draft-save-v02.schema.json#/$defs/Id"
+          }
+        }
+      ],
+      "post": {
+        "operationId": "SaveDraft",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "../schemas/opm-draft-save-v02.schema.json#/$defs/SaveRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../schemas/opm-draft-save-v02.schema.json#/$defs/SaveResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "保存协议错误；错误码映射见策略设计及 HS-02G",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../schemas/opm-draft-save-v02.schema.json#/$defs/SaveError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "保存协议错误；错误码映射见策略设计及 HS-02G",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../schemas/opm-draft-save-v02.schema.json#/$defs/SaveError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "保存协议错误；错误码映射见策略设计及 HS-02G",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../schemas/opm-draft-save-v02.schema.json#/$defs/SaveError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "保存协议错误；错误码映射见策略设计及 HS-02G",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../schemas/opm-draft-save-v02.schema.json#/$defs/SaveError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "保存协议错误；错误码映射见策略设计及 HS-02G",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../schemas/opm-draft-save-v02.schema.json#/$defs/SaveError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "保存协议错误；错误码映射见策略设计及 HS-02G",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../schemas/opm-draft-save-v02.schema.json#/$defs/SaveError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projects/{project_id}/models/{model_id}/draft/pin": {
+      "parameters": [
+        {
+          "name": "project_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "$ref": "../schemas/opm-draft-save-v02.schema.json#/$defs/Id"
+          }
+        },
+        {
+          "name": "model_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "$ref": "../schemas/opm-draft-save-v02.schema.json#/$defs/Id"
+          }
+        }
+      ],
+      "post": {
+        "operationId": "PinDraftRevision",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "../schemas/opm-draft-save-v02.schema.json#/$defs/PinRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../schemas/opm-draft-save-v02.schema.json#/$defs/PinResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "保存协议错误；错误码映射见策略设计及 HS-02G",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../schemas/opm-draft-save-v02.schema.json#/$defs/SaveError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "保存协议错误；错误码映射见策略设计及 HS-02G",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../schemas/opm-draft-save-v02.schema.json#/$defs/SaveError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "保存协议错误；错误码映射见策略设计及 HS-02G",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../schemas/opm-draft-save-v02.schema.json#/$defs/SaveError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "保存协议错误；错误码映射见策略设计及 HS-02G",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../schemas/opm-draft-save-v02.schema.json#/$defs/SaveError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "保存协议错误；错误码映射见策略设计及 HS-02G",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../schemas/opm-draft-save-v02.schema.json#/$defs/SaveError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "保存协议错误；错误码映射见策略设计及 HS-02G",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../schemas/opm-draft-save-v02.schema.json#/$defs/SaveError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projects/{project_id}/models/{model_id}/draft/save-state": {
+      "parameters": [
+        {
+          "name": "project_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "$ref": "../schemas/opm-draft-save-v02.schema.json#/$defs/Id"
+          }
+        },
+        {
+          "name": "model_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "$ref": "../schemas/opm-draft-save-v02.schema.json#/$defs/Id"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "GetDraftSaveState",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../schemas/opm-draft-save-v02.schema.json#/$defs/SaveState"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "保存协议错误；错误码映射见策略设计及 HS-02G",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../schemas/opm-draft-save-v02.schema.json#/$defs/SaveError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "保存协议错误；错误码映射见策略设计及 HS-02G",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../schemas/opm-draft-save-v02.schema.json#/$defs/SaveError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "保存协议错误；错误码映射见策略设计及 HS-02G",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../schemas/opm-draft-save-v02.schema.json#/$defs/SaveError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "保存协议错误；错误码映射见策略设计及 HS-02G",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../schemas/opm-draft-save-v02.schema.json#/$defs/SaveError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "保存协议错误；错误码映射见策略设计及 HS-02G",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../schemas/opm-draft-save-v02.schema.json#/$defs/SaveError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "保存协议错误；错误码映射见策略设计及 HS-02G",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../schemas/opm-draft-save-v02.schema.json#/$defs/SaveError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "localSession": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-OPM-Session"
+      }
+    }
+  }
+}

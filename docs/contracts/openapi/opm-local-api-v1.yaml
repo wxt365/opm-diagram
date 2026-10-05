@@ -132,6 +132,16 @@ paths:
       tags: [Models]
       operationId: API-PRJ-009
       summary: 打开模型并取得工作台会话
+      description: 省略 revision 或传 head 解析活动草稿；无草稿时解析最近 Baseline。精确 Revision 校验 Model 归属并始终只读。Context 在目标版本解析，缺失或非法时返回目标根；无可用版本返回 404。
+      parameters:
+        - name: revision
+          in: query
+          required: false
+          schema: {$ref: "#/components/schemas/StableId"}
+        - name: context
+          in: query
+          required: false
+          schema: {type: string}
       responses:
         "200":
           description: 工作台会话
@@ -230,6 +240,11 @@ paths:
       summary: 读取活动 Profile 的全量关系工具目录
       description: >-
         目录只表示可见 capability，不是创建或更新 Fact 的授权。Control 条目只能通过既有 Procedural Fact 的 UPDATE_FACT 候选形成。
+      parameters:
+        - name: selection_id
+          in: query
+          description: 当前 Context 内选中的 committed Fact；仅用于计算 Control 目录项可用性。
+          schema: {type: string}
       responses:
         "200":
           description: 与修订绑定的关系目录
@@ -575,7 +590,11 @@ components:
         model_id: {$ref: "#/components/schemas/StableId"}
         project_id: {$ref: "#/components/schemas/StableId"}
         name: {type: string, minLength: 1, maxLength: 256}
-        head_revision: {$ref: "#/components/schemas/StableId"}
+        head_revision:
+          description: 当前活动草稿 Head；无活动草稿时为 null，不代表本次读取目标。
+          oneOf:
+            - {$ref: "#/components/schemas/StableId"}
+            - {type: "null"}
         profile_id: {$ref: "#/components/schemas/StableId"}
         profile_version: {$ref: "#/components/schemas/Version"}
         rule_version: {$ref: "#/components/schemas/Version"}
@@ -792,19 +811,47 @@ components:
               type: array
               minItems: 34
               maxItems: 34
-              items:
-                type: object
-                additionalProperties: false
-                required: [family, capability_id, display_name, symbol_id, enabled, reason_codes]
-                properties:
-                  family: {type: string, enum: [PROCEDURAL, CONTROL, STRUCTURAL]}
-                  capability_id: {$ref: "#/components/schemas/StableId"}
-                  display_name: {type: string, minLength: 1, maxLength: 256}
-                  symbol_id: {$ref: "#/components/schemas/StableId"}
-                  enabled: {type: boolean}
-                  reason_codes:
-                    type: array
-                    items: {type: string, minLength: 1, maxLength: 128}
+              items: {$ref: "#/components/schemas/RelationCatalogItem"}
+    RelationCatalogItem:
+      type: object
+      additionalProperties: false
+      required: [family, capability_id, display_name, symbol_id, interaction_mode, symbol_descriptor, endpoint_summary, enabled, reason_codes]
+      properties:
+        family: {type: string, enum: [PROCEDURAL, CONTROL, STRUCTURAL]}
+        capability_id: {$ref: "#/components/schemas/StableId"}
+        display_name: {type: string, minLength: 1, maxLength: 256}
+        symbol_id: {$ref: "#/components/schemas/StableId"}
+        interaction_mode: {type: string, enum: [CREATE_FACT, UPDATE_SELECTED_FACT]}
+        symbol_descriptor: {$ref: "#/components/schemas/AssetReference"}
+        endpoint_summary: {$ref: "#/components/schemas/RelationEndpointSummary"}
+        enabled: {type: boolean}
+        reason_codes:
+          type: array
+          items: {type: string, minLength: 1, maxLength: 128}
+    RelationEndpointSummary:
+      type: object
+      additionalProperties: false
+      required: [min_endpoints, roles]
+      properties:
+        min_endpoints: {type: integer, minimum: 0}
+        max_endpoints: {type: integer, minimum: 0}
+        roles:
+          type: array
+          items: {$ref: "#/components/schemas/RelationEndpointRoleSummary"}
+    RelationEndpointRoleSummary:
+      type: object
+      additionalProperties: false
+      required: [role, target_kinds, min_occurs, state_qualification_allowed]
+      properties:
+        role: {type: string, minLength: 1, maxLength: 128}
+        target_kinds:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items: {type: string, enum: [ELEMENT, STATE, FEATURE, FACT]}
+        min_occurs: {type: integer, minimum: 0}
+        max_occurs: {type: integer, minimum: 0}
+        state_qualification_allowed: {type: boolean}
     ReleaseVisualCommonFaultCommandResult:
       type: object
       additionalProperties: false
@@ -852,6 +899,8 @@ components:
             - $ref: "#/components/schemas/CreateStateCommand"
             - $ref: "#/components/schemas/UpdateStateCommand"
             - $ref: "#/components/schemas/UpdateFactCommand"
+            - $ref: "#/components/schemas/UpdatePropertyCommand"
+            - $ref: "#/components/schemas/UpdateLayoutCommand"
             - $ref: "#/components/schemas/DeleteConstructCommand"
             - $ref: "#/components/schemas/StateExplicitCommand"
             - $ref: "#/components/schemas/StateSuppressCommand"
@@ -932,12 +981,46 @@ components:
     ImpactSummary:
       type: object
       additionalProperties: false
-      required: [affected_construct_count, affected_context_count, affected_sentence_count, affected_finding_count]
+      required: [input_revision, selected_occurrence_id, delete_mode, target, items, counts]
       properties:
-        affected_construct_count: {type: integer, minimum: 0}
-        affected_context_count: {type: integer, minimum: 0}
-        affected_sentence_count: {type: integer, minimum: 0}
-        affected_finding_count: {type: integer, minimum: 0}
+        input_revision: {$ref: "#/components/schemas/StableId"}
+        selected_occurrence_id: {$ref: "#/components/schemas/StableId"}
+        delete_mode: {type: string, enum: [REMOVE_OCCURRENCE, DELETE_TARGET, CASCADE]}
+        target: {$ref: "#/components/schemas/DeleteTarget"}
+        items:
+          type: array
+          items: {$ref: "#/components/schemas/DeleteImpactItem"}
+        counts: {$ref: "#/components/schemas/DeleteImpactCounts"}
+    DeleteTarget:
+      type: object
+      additionalProperties: false
+      required: [kind, id]
+      properties:
+        kind: {type: string, enum: [OCCURRENCE, ELEMENT, FEATURE, STATE, FACT]}
+        id: {$ref: "#/components/schemas/StableId"}
+    DeleteImpactItem:
+      type: object
+      additionalProperties: false
+      required: [kind, id, effect]
+      properties:
+        kind: {type: string, enum: [OCCURRENCE, ELEMENT, FEATURE, STATE, FACT, CONTEXT, OPL_SENTENCE, TRACE, FINDING]}
+        id: {$ref: "#/components/schemas/StableId"}
+        context_id: {$ref: "#/components/schemas/StableId"}
+        effect: {type: string, enum: [DIRECT, CASCADE, BLOCKER]}
+    DeleteImpactCounts:
+      type: object
+      additionalProperties: false
+      required: [contexts, occurrences, elements, features, states, facts, opl_sentences, traces, findings]
+      properties:
+        contexts: {type: integer, minimum: 0}
+        occurrences: {type: integer, minimum: 0}
+        elements: {type: integer, minimum: 0}
+        features: {type: integer, minimum: 0}
+        states: {type: integer, minimum: 0}
+        facts: {type: integer, minimum: 0}
+        opl_sentences: {type: integer, minimum: 0}
+        traces: {type: integer, minimum: 0}
+        findings: {type: integer, minimum: 0}
     CapabilityReasonCode:
       type: string
       enum:
@@ -995,6 +1078,8 @@ components:
         reason_codes: {type: array, items: {$ref: "#/components/schemas/CapabilityReasonCode"}}
         impact_summary: {$ref: "#/components/schemas/ImpactSummary"}
         impact_token: {type: string, minLength: 16, maxLength: 2048}
+        delete_mode: {type: string, enum: [REMOVE_OCCURRENCE, DELETE_TARGET, CASCADE]}
+        delete_target: {$ref: "#/components/schemas/DeleteTarget"}
         expires_with_revision: {$ref: "#/components/schemas/StableId"}
       allOf:
         - if:
@@ -1002,12 +1087,14 @@ components:
               command_type: {const: DELETE_CONSTRUCT}
             required: [command_type]
           then:
-            required: [impact_summary, impact_token]
+            required: [impact_summary, impact_token, delete_mode, delete_target]
           else:
             not:
               anyOf:
                 - required: [impact_summary]
                 - required: [impact_token]
+                - required: [delete_mode]
+                - required: [delete_target]
     OccurrenceInput:
       type: object
       additionalProperties: false
@@ -1184,10 +1271,12 @@ components:
     DeleteConstructPayload:
       type: object
       additionalProperties: false
-      required: [construct_kind, construct_id, impact_token]
+      required: [selection_id, construct_kind, construct_id, delete_mode, impact_token]
       properties:
-        construct_kind: {type: string, enum: [ELEMENT, STATE, FACT, FEATURE, CONTEXT]}
+        selection_id: {$ref: "#/components/schemas/StableId"}
+        construct_kind: {type: string, enum: [OCCURRENCE, ELEMENT, STATE, FACT, FEATURE]}
         construct_id: {$ref: "#/components/schemas/StableId"}
+        delete_mode: {type: string, enum: [REMOVE_OCCURRENCE, DELETE_TARGET, CASCADE]}
         impact_token: {type: string, minLength: 16, maxLength: 2048}
     StatePresentationPayload:
       type: object
@@ -1197,6 +1286,36 @@ components:
         context_id: {$ref: "#/components/schemas/StableId"}
         state_id: {$ref: "#/components/schemas/StableId"}
         layout: {$ref: "#/components/schemas/NodeLayoutInput"}
+    UpdatePropertyPayload:
+      type: object
+      additionalProperties: false
+      required: [target_ref, property_name, value, capability_query_id, selected_option_id]
+      properties:
+        target_ref:
+          type: object
+          additionalProperties: false
+          required: [target_kind, target_id]
+          properties:
+            target_kind: {const: ELEMENT}
+            target_id: {$ref: "#/components/schemas/StableId"}
+        property_name: {const: name}
+        value: {type: string, minLength: 1, maxLength: 256}
+        capability_query_id: {$ref: "#/components/schemas/StableId"}
+        selected_option_id: {$ref: "#/components/schemas/StableId"}
+    UpdateLayoutPayload:
+      type: object
+      additionalProperties: false
+      x-opm-owned-construct-roles: [OBJECT_NODE, PROCESS_NODE, ATTRIBUTE_NODE, OPERATION_NODE, STATE_NODE, FEATURE_STATE_NODE]
+      required: [occurrence_id, layout]
+      properties:
+        occurrence_id: {$ref: "#/components/schemas/StableId"}
+        layout:
+          type: object
+          additionalProperties: false
+          required: [x, y]
+          properties:
+            x: {type: number}
+            y: {type: number}
     CreateElementCommand:
       type: object
       required: [command_type, payload]
@@ -1236,6 +1355,18 @@ components:
       properties:
         command_type: {const: UPDATE_FACT}
         payload: {$ref: "#/components/schemas/UpdateFactPayload"}
+    UpdatePropertyCommand:
+      type: object
+      required: [command_type, payload]
+      properties:
+        command_type: {const: UPDATE_PROPERTY}
+        payload: {$ref: "#/components/schemas/UpdatePropertyPayload"}
+    UpdateLayoutCommand:
+      type: object
+      required: [command_type, payload]
+      properties:
+        command_type: {const: UPDATE_LAYOUT}
+        payload: {$ref: "#/components/schemas/UpdateLayoutPayload"}
     DeleteConstructCommand:
       type: object
       required: [command_type, payload]
@@ -1272,7 +1403,7 @@ components:
       properties:
         command_type:
           type: string
-          enum: [UPDATE_PROPERTY, CREATE_CONTEXT, UPDATE_LAYOUT, UPDATE_SEMANTIC_LAYOUT, SEMANTIC_IN_ZOOM, SEMANTIC_OUT_ZOOM]
+          enum: [CREATE_CONTEXT, UPDATE_SEMANTIC_LAYOUT, SEMANTIC_IN_ZOOM, SEMANTIC_OUT_ZOOM]
         payload: {type: object, additionalProperties: true}
     EditCommandResult:
       type: object

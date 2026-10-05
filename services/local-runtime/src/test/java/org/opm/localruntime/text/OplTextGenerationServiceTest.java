@@ -725,7 +725,7 @@ class OplTextGenerationServiceTest {
         SemanticRevision revision = fixture();
         SemanticRevision.Fact source = revision.facts().getFirst();
         SemanticRevision.Fact invalid = new SemanticRevision.Fact(
-                "fact.invalid." + caseId, source.family(),
+                source.id(), source.family(),
                 new SemanticRevision.CapabilityReference(capabilityId, source.capability().profileId(), source.capability().profileVersion()),
                 endpoints, SemanticRevision.Direction.DIRECTED, List.of(), source.source(), source.normalization());
         SemanticRevision candidate = copy(revision, List.of(invalid), revision.contexts(), revision.occurrences());
@@ -747,7 +747,7 @@ class OplTextGenerationServiceTest {
                 "element.handling", SemanticRevision.CoreKind.PROCESS, process.capability(),
                 new SemanticRevision.QualifiedName(process.name().namespace(), "Handling"), List.of(), process.source(), process.normalization());
         SemanticRevision.Fact invalid = new SemanticRevision.Fact(
-                "fact.invalid.self.invocation", SemanticRevision.FactFamily.PROFILE_FACT,
+                source.id(), SemanticRevision.FactFamily.PROFILE_FACT,
                 new SemanticRevision.CapabilityReference("CAP-ISO-PROC-014", source.capability().profileId(), source.capability().profileVersion()),
                 List.of(
                         invalidProceduralEndpoint("self.invoking", "INVOKING_PROCESS", "element.processing", 0),
@@ -1036,7 +1036,8 @@ class OplTextGenerationServiceTest {
         SemanticRevision.Context root = revision.contexts().getFirst();
         SemanticRevision.Context expandedRoot = new SemanticRevision.Context(root.id(), root.kind(), root.capability(), root.name(),
                 List.of("occurrence.raw.material", "occurrence.processing", "occurrence.structural"), root.source());
-        List<SemanticRevision.Occurrence> occurrences = new ArrayList<>(revision.occurrences());
+        List<SemanticRevision.Occurrence> occurrences = new ArrayList<>(revision.occurrences().stream()
+                .filter(value -> expandedRoot.occurrenceIds().contains(value.id())).toList());
         occurrences.add(new SemanticRevision.Occurrence("occurrence.structural", root.id(), SemanticRevision.TargetKind.FACT, structural.id(),
                 SemanticRevision.OccurrenceOwnership.OWNED, "STRUCTURAL_LINK", "layout.consumption"));
 
@@ -1089,7 +1090,7 @@ class OplTextGenerationServiceTest {
     }
 
     @Test
-    void rejectsNonP0Context() {
+    void rejectsRefinementThatBorrowsAnotherContextsOccurrenceIds() {
         SemanticRevision revision = fixture();
         SemanticRevision.Context root = revision.contexts().getFirst();
         SemanticRevision.Context refinement = new SemanticRevision.Context(
@@ -1100,7 +1101,7 @@ class OplTextGenerationServiceTest {
         OplGenerationException exception = assertThrows(OplGenerationException.class,
                 () -> service.generate(withRefinement, refinement.id(), grammarWithConsumptionTemplates(withRefinement)));
 
-        assertEquals(OplGenerationCode.TEXT_PLAN_UNSUPPORTED, exception.code());
+        assertEquals(OplGenerationCode.TEXT_TRACE_INCOMPLETE, exception.code());
     }
 
     @Test

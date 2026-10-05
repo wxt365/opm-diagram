@@ -1,4 +1,153 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { copyWorkbenchPermalink } from "./helpers/workbench-revision";
+
+test("底部工作区折叠释放画布空间，只读提示不再占一行", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await openNewWorkbench(page, "Canvas space E2E");
+  await commitAndRead(page, page.getByTestId("p03-tool-object"));
+  const toggle = page.getByTestId("p03-bottom-toggle");
+  const initialUrl = page.url();
+  const revision = await revisionTag(page);
+  const canvasHeight = () => page.locator(".canvas-frame").evaluate((el) => el.getBoundingClientRect().height);
+  const expandedHeight = await canvasHeight();
+  await toggle.focus();
+  await page.keyboard.press("Enter");
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
+  await expect(page.getByTestId("p03-text-panel")).toBeHidden();
+  await expect(page.locator(".bottom-panel")).toHaveCSS("height", "38px");
+  await expect.poll(canvasHeight).toBe(expandedHeight + 202);
+  await expect(page.locator(".validation-status")).toBeVisible();
+  expect(page.url()).toBe(initialUrl);
+  await expect(page.locator(".revision-tag")).toHaveText(revision);
+  await commitAndRead(page, page.getByTestId("p03-tool-process"));
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
+  for (const tab of ["text", "findings", "history", "method"]) {
+    await page.getByTestId(`p03-tab-${tab}`).click();
+    await expect(toggle).toHaveAttribute("aria-expanded", "true");
+    await expect(page.locator("#p03-bottom-content")).toBeVisible();
+    await page.getByTestId(`p03-tab-${tab}`).click();
+    await expect(toggle).toHaveAttribute("aria-expanded", "false");
+  }
+  const { revision: headRevision } = await copyWorkbenchPermalink(page);
+  await page.getByTestId("p03-version-select").selectOption(headRevision);
+  await expect(page.getByTestId("p03-readonly-banner")).toBeVisible();
+  await expect(page.locator('.workbench-header [data-testid="p03-readonly-banner"]')).toHaveText("只读");
+  await expect(page.locator(".workbench-notices")).toBeHidden();
+  await expect(page.getByTestId("p03-tool-object")).toBeDisabled();
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
+  await page.screenshot({ path: test.info().outputPath("canvas-bottom-collapsed.png") });
+  await toggle.click();
+  await expect(page.locator(".bottom-panel")).toHaveCSS("height", "240px");
+  await page.getByTestId("p03-tab-text").click();
+  await expect(page.getByTestId("p03-text-panel")).toBeVisible();
+  await page.screenshot({ path: test.info().outputPath("canvas-bottom-expanded.png") });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await toggle.click();
+  await expect(page.locator(".bottom-panel")).toHaveCSS("height", "38px");
+  await expect(page.locator("#p03-bottom-content")).toBeHidden();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+  await toggle.click();
+  await expect(page.getByTestId("p03-text-panel")).toBeVisible();
+});
+
+test("连线上输入关系名称、双击改名及重开保持 Fact 和 OPL 一致", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await openNewWorkbench(page, "On edge labels E2E");
+  await commitAndRead(page, page.getByTestId("p03-tool-object"));
+  await commitAndRead(page, page.getByTestId("p03-tool-object"));
+  const before = await revisionTag(page);
+  const commands: Record<string, unknown>[] = [];
+  page.on("request", (request) => {
+    if (request.method() === "POST" && request.url().endsWith("/commands")) {
+      const body = request.postDataJSON();
+      commands.push(request.url().endsWith("/draft/commands") ? body.command : body);
+    }
+  });
+  await activateRelationCatalogItem(page, "STRUCTURAL", "CAP-ISO-STRUCT-001");
+  await dragRelationEndpoint(page, page.locator(".x6-node").first(), page.locator(".x6-node").nth(1));
+  const input = page.getByTestId("p03-structural-label-forward_tag");
+  await expect(input).toBeVisible();
+  await expect(input).toBeFocused();
+  await expect(input).toHaveAccessibleName("关系名称 / Relation name");
+  const previewPath = page.locator(".x6-edge [data-opm-candidate-cell-id]");
+  await expectInputOnEdge(input, previewPath);
+  await input.fill("   ");
+  await input.press("Enter");
+  await expect(page.locator(".revision-tag")).toHaveText(before);
+  await expect(committedRelationAnchors(page)).toHaveCount(0);
+  await page.getByTestId("p03-zoom-in").click();
+  await expectInputOnEdge(input, previewPath);
+  await input.fill("supplies");
+  await input.dispatchEvent("compositionstart");
+  await input.press("Enter");
+  await expect(committedRelationAnchors(page)).toHaveCount(0);
+  await input.dispatchEvent("compositionend");
+  const created = await commitRelationParametersAndRead(page);
+  await expect(committedRelationAnchors(page)).toHaveCount(1);
+  await expect(page.getByTestId("p03-opl-sentence").filter({ hasText: "supplies" })).toBeVisible();
+  expect(commands).toHaveLength(1);
+  const factId = await committedRelationAnchors(page).evaluate((el) => el.closest(".x6-edge")?.getAttribute("data-cell-id"));
+
+  const doubleClickEdge = async () => {
+    const point = await edgeScreenPoint(committedRelationAnchors(page), 0.7);
+    await page.mouse.dblclick(point.x, point.y);
+    await expect(page.getByTestId("p03-relation-label-editor")).toBeVisible();
+  };
+  await doubleClickEdge();
+  const rename = page.getByTestId("p03-relation-rename-forward_tag");
+  await expect(rename).toHaveValue("supplies");
+  await expect(rename).toBeFocused();
+  await expect(page.getByTestId("p03-right-panel")).toHaveCount(0);
+  await expectInputOnEdge(rename, committedRelationAnchors(page));
+  await rename.press("Enter");
+  await expect(page.getByTestId("p03-relation-label-editor")).toHaveCount(0);
+  await expect(page.locator(".revision-tag")).toHaveText(created);
+  expect(commands).toHaveLength(1);
+
+  await doubleClickEdge();
+  await rename.fill("cancelled name");
+  await rename.press("Escape");
+  await expect(page.getByTestId("p03-relation-label-editor")).toHaveCount(0);
+  await expect(page.locator(".revision-tag")).toHaveText(created);
+  await doubleClickEdge();
+  await rename.fill("delivers");
+  await page.screenshot({ path: test.info().outputPath("on-edge-label-editor.png") });
+  await rename.press("Enter");
+  await expect(page.locator(".revision-tag")).not.toHaveText(created);
+  const renamed = await revisionTag(page);
+  await expect(page.getByTestId("p03-relation-label-editor")).toHaveCount(0);
+  await expect(page.getByTestId("p03-opl-sentence").filter({ hasText: "delivers" })).toBeVisible();
+  expect(commands).toHaveLength(2);
+  expect(commands[1]).toMatchObject({ command_type: "UPDATE_FACT", payload: { fact_id: factId, replacement: { labels: [{ slot_id: "forward_tag", text: "delivers" }] } } });
+  expect(Object.keys((commands[1].payload as { replacement: object }).replacement)).toEqual(["labels"]);
+  await page.reload();
+  await expectWorkbenchReady(page);
+  await expect(page.locator(".revision-tag")).toHaveText(renamed);
+  await expect(committedRelationAnchors(page)).toHaveCount(1);
+  expect(await committedRelationAnchors(page).evaluate((el) => el.closest(".x6-edge")?.getAttribute("data-cell-id"))).toBe(factId);
+  await expect(page.getByTestId("p03-opl-sentence").filter({ hasText: "delivers" })).toBeVisible();
+  await doubleClickEdge();
+  await expect(rename).toHaveValue("delivers");
+});
+
+async function edgeScreenPoint(path: Locator, ratio: number) {
+  return path.evaluate((element, position) => {
+    const edge = element as SVGPathElement;
+    const point = edge.getPointAtLength(edge.getTotalLength() * position);
+    const matrix = edge.getScreenCTM();
+    if (!matrix) throw new Error("连线路径尚未进入可见画布");
+    const screen = new DOMPoint(point.x, point.y).matrixTransform(matrix);
+    return { x: screen.x, y: screen.y };
+  }, ratio);
+}
+
+async function expectInputOnEdge(input: Locator, path: Locator) {
+  await expect.poll(async () => {
+    const box = await input.boundingBox();
+    const point = await edgeScreenPoint(path, 0.35);
+    return Boolean(box && point.x >= box.x - 10 && point.x <= box.x + box.width + 10 && Math.abs(point.y - box.y - box.height / 2) < 30);
+  }).toBe(true);
+}
 
 test("真实 P01 到 P03 主路径提交并在三个视口重开", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1200 });
@@ -18,13 +167,55 @@ test("真实 P01 到 P03 主路径提交并在三个视口重开", async ({ page
   await page.getByTestId("ov02-create-model").getByRole("button", { name: "创建并打开工作台" }).click();
   await expectWorkbenchReady(page);
 
+  const toolbarBox = await page.getByTestId("p03-canvas-toolchain").boundingBox();
+  const paletteBox = await page.getByTestId("p03-relation-tool-palette").boundingBox();
+  if (!toolbarBox || !paletteBox) throw new Error("主工具栏或关系工具不可见");
+  expect(paletteBox.y).toBeGreaterThanOrEqual(toolbarBox.y);
+  expect(paletteBox.y + paletteBox.height).toBeLessThanOrEqual(toolbarBox.y + toolbarBox.height);
+  const consumptionTool = page.getByTestId("p03-relation-quick-option-CAP-ISO-PROC-001");
+  await expect(consumptionTool).toHaveAttribute("title", "生成/消耗关系 / Result / Consumption\n生成 / Result：过程 → 对象\n消耗 / Consumption：对象 → 过程");
+  await expect(page.getByTestId("p03-relation-quick-option-CAP-ISO-PROC-002")).toHaveCount(0);
+  const consumptionToolBox = await consumptionTool.boundingBox();
+  const consumptionSymbolBox = await consumptionTool.locator(".relation-tool-symbol").boundingBox();
+  const proceduralExpandBox = await page.getByTestId("p03-relation-menu-toggle-PROCEDURAL").boundingBox();
+  if (!consumptionToolBox || !consumptionSymbolBox || !proceduralExpandBox) throw new Error("关系工具尺寸不可观测");
+  expect(Math.round(consumptionToolBox.width)).toBe(34);
+  expect(Math.round(consumptionToolBox.height)).toBe(32);
+  expect(Math.round(consumptionSymbolBox.width)).toBe(32);
+  expect(Math.round(consumptionSymbolBox.height)).toBe(18);
+  expect(Math.round(proceduralExpandBox.width)).toBe(28);
+  await page.getByTestId("p03-relation-menu-toggle-PROCEDURAL").click();
+  const relationMenuBox = await page.getByTestId("p03-relation-menu-PROCEDURAL").boundingBox();
+  const relationMenuSymbolBox = await page.getByTestId("p03-relation-menu-option-CAP-ISO-PROC-001").locator(".relation-tool-symbol").boundingBox();
+  if (!relationMenuBox || !relationMenuSymbolBox) throw new Error("关系下拉尺寸不可观测");
+  expect(relationMenuBox.width).toBeLessThanOrEqual(256);
+  expect(Math.round(relationMenuSymbolBox.width)).toBe(42);
+  expect(Math.round(relationMenuSymbolBox.height)).toBe(20);
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("p03-tool-object")).toHaveAttribute("title", "创建对象 / Create Object");
+
   const initialRevision = await revisionTag(page);
-  await page.getByTestId("p03-tool-consumption").click();
-  await expect(page.locator(".command-feedback")).toContainText("请先创建一个 Object 和一个 Process");
+  await page.getByTestId("p03-relation-quick-option-CAP-ISO-PROC-001").click();
+  await expect(page.getByTestId("p03-canvas")).toHaveAttribute("data-relation-gesture-phase", "relation-armed");
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("p03-canvas")).toHaveAttribute("data-relation-gesture-phase", "idle");
   await expect(page.locator(".revision-tag")).toHaveText(initialRevision);
 
   await commitAndRead(page, page.getByTestId("p03-tool-object"));
   await expect(page.locator(".x6-node")).toHaveCount(1);
+  await expect(page.getByTestId("p03-right-panel")).toHaveCount(0);
+  const editorWidthWithoutInspector = await page.locator(".editor-panel").evaluate((element) => element.getBoundingClientRect().width);
+  const propertyRevision = await revisionTag(page);
+  await page.locator(".x6-node").first().click({ button: "right", position: { x: 10, y: 10 } });
+  await expect(page.getByTestId("p03-construct-open-properties")).toBeVisible();
+  await page.getByTestId("p03-construct-open-properties").click();
+  await expect(page.getByTestId("p03-right-panel")).toBeVisible();
+  const editorWidthWithInspector = await page.locator(".editor-panel").evaluate((element) => element.getBoundingClientRect().width);
+  expect(editorWidthWithoutInspector - editorWidthWithInspector).toBeGreaterThanOrEqual(260);
+  await expect(page.locator(".revision-tag")).toHaveText(propertyRevision);
+  await page.getByTestId("p03-right-panel-close").click();
+  await expect(page.getByTestId("p03-right-panel")).toHaveCount(0);
+  await expect.poll(() => page.locator(".editor-panel").evaluate((element) => element.getBoundingClientRect().width)).toBe(editorWidthWithoutInspector);
   await commitAndRead(page, page.getByTestId("p03-tool-process"));
   await expect(page.locator(".x6-node")).toHaveCount(2);
   await page.locator(".x6-node").first().click({ position: { x: 10, y: 10 } });
@@ -42,20 +233,13 @@ test("真实 P01 到 P03 主路径提交并在三个视口重开", async ({ page
   await page.getByTestId("p03-state-name").fill("Finished");
   await commitAndRead(page, page.getByTestId("p03-state-candidate").getByRole("button", { name: "创建", exact: true }));
   await expect(page.locator(".x6-node")).toHaveCount(4);
-  await page.locator(".x6-node").nth(2).click();
-  const committedRevision = await commitAndRead(page, page.getByTestId("p03-tool-consumption"));
-  await expect(page.locator(".x6-edge")).toHaveCount(1);
+  const committedRevision = await createProceduralRelation(page, canvasNode(page, "Ready"), [canvasNode(page, "Process 1")], "CAP-ISO-PROC-006");
+  await expect(committedRelationAnchors(page)).toHaveCount(1);
   await expect(page.getByTestId("p03-opl-sentence")).toHaveText("Process 1 consumes Ready Object 1.");
   expect(stateRevision).not.toBe(committedRevision);
 
-  await page.locator(".x6-node").nth(1).click();
-  await page.getByTestId("p03-tool-procedural-relation").click();
-  await expect(page.getByTestId("p03-relation-target")).toBeVisible();
-  await page.locator(".x6-node").first().click({ position: { x: 10, y: 10 } });
-  await page.getByTestId("p03-relation-resolve").click();
-  await expect(page.getByTestId("p03-relation-catalog")).toBeVisible();
-  const resultRevision = await commitAndRead(page, page.getByTestId("p03-relation-option-CAP-ISO-PROC-002"));
-  await expect(page.locator(".x6-edge")).toHaveCount(2);
+  const resultRevision = await createProceduralRelation(page, canvasNode(page, "Process 1"), [canvasNode(page, "Object 1")], "CAP-ISO-PROC-002");
+  await expect(committedRelationAnchors(page)).toHaveCount(2);
   await expect(page.getByTestId("p03-opl-sentence")).toHaveCount(2);
   await expect(page.getByText("Process 1 yields Object 1.", { exact: true })).toBeVisible();
 
@@ -65,16 +249,14 @@ test("真实 P01 到 P03 主路径提交并在三个视口重开", async ({ page
   const canvasFrame = page.locator(".canvas-frame");
   const frameBox = await canvasFrame.boundingBox();
   if (!frameBox) throw new Error("未找到画布编辑区域");
-  const toolbarBottom = await page.locator(".editor-toolbar").evaluate((element) => element.getBoundingClientRect().bottom);
+  const toolbarBottom = await page.getByTestId("p03-canvas-toolchain").evaluate((element) => element.getBoundingClientRect().bottom);
   await expect.poll(async () => (await canvasNode(page, "Ready").boundingBox())?.y ?? Number.NEGATIVE_INFINITY).toBeGreaterThan(toolbarBottom + 4);
-  await canvasNode(page, "Ready").click();
-  await page.getByTestId("p03-tool-procedural-relation").click();
-  await canvasNode(page, "Process 1").click();
-  await canvasNode(page, "Finished").click();
-  await page.getByTestId("p03-relation-resolve").click();
-  await expect(page.getByTestId("p03-relation-option-CAP-ISO-PROC-008")).toBeVisible();
-  await commitAndRead(page, page.getByTestId("p03-relation-option-CAP-ISO-PROC-008"));
-  await expect(page.locator(".x6-edge")).toHaveCount(4);
+  await dragCanvasWithPanTool(page, frameBox, -72, -48);
+  await dragCanvasWithPanTool(page, frameBox, 72, 48);
+  await page.getByTestId("p03-tool-select").click();
+  await expect(page.getByTestId("p03-tool-select")).toHaveAttribute("aria-pressed", "true");
+  await createProceduralRelation(page, canvasNode(page, "Ready"), [canvasNode(page, "Process 1"), canvasNode(page, "Finished")], "CAP-ISO-PROC-008");
+  await expect(committedRelationAnchors(page)).toHaveCount(3);
   await expect(page.getByText("Process 1 changes Object 1 from Ready to Finished.", { exact: true })).toBeVisible();
 
   await commitAndRead(page, page.getByTestId("p03-tool-process"));
@@ -83,33 +265,22 @@ test("真实 P01 到 P03 主路径提交并在三个视口重开", async ({ page
   await expect(processTwo).toHaveCount(1);
   await panCanvas(page, frameBox, -260);
   await expect.poll(async () => (await processOne.boundingBox())?.y ?? Number.NEGATIVE_INFINITY).toBeGreaterThan(toolbarBottom + 4);
-  await processOne.click();
-  await page.getByTestId("p03-tool-procedural-relation").click();
   await panCanvas(page, frameBox, 260);
   await expect.poll(async () => (await processTwo.boundingBox())?.y ?? Number.POSITIVE_INFINITY).toBeLessThan(frameBox.y + frameBox.height - 32);
-  await processTwo.click();
-  await page.getByTestId("p03-relation-resolve").click();
-  await expect(page.getByTestId("p03-relation-option-CAP-ISO-PROC-013")).toBeVisible();
-  await commitAndRead(page, page.getByTestId("p03-relation-option-CAP-ISO-PROC-013"));
-  await expect(page.locator(".x6-edge")).toHaveCount(5);
+  await createProceduralRelation(page, processOne, [processTwo], "CAP-ISO-PROC-013");
+  await expect(committedRelationAnchors(page)).toHaveCount(4);
   await expect(page.getByText("Process 1 invokes Process 2.", { exact: true })).toBeVisible();
 
   await panCanvas(page, frameBox, -260);
   await expect.poll(async () => (await processOne.boundingBox())?.y ?? Number.NEGATIVE_INFINITY).toBeGreaterThan(toolbarBottom + 4);
-  await processOne.click();
-  await page.getByTestId("p03-tool-procedural-relation").click();
   await panCanvas(page, frameBox, 260);
   await expect.poll(async () => (await processTwo.boundingBox())?.y ?? Number.POSITIVE_INFINITY).toBeLessThan(frameBox.y + frameBox.height - 32);
-  await processTwo.click();
-  await page.getByTestId("p03-relation-resolve").click();
-  await expect(page.getByTestId("p03-relation-option-CAP-ISO-PROC-015")).toBeVisible();
-  await page.getByTestId("p03-relation-duration").fill("PT5M");
-  const exceptionRevision = await commitAndRead(page, page.getByTestId("p03-relation-option-CAP-ISO-PROC-015"));
-  await expect(page.locator(".x6-edge")).toHaveCount(6);
+  const exceptionRevision = await createProceduralRelation(page, processOne, [processTwo], "CAP-ISO-PROC-015", "PT5M");
+  await expect(committedRelationAnchors(page)).toHaveCount(5);
   await expect(page.getByText("When Process 1 exceeds PT5M, Process 2 handles the exception.", { exact: true })).toBeVisible();
 
   await page.getByTestId("p03-tab-history").click();
-  await expect(page.getByTestId("p03-history-panel").locator("p")).toHaveCount(12);
+  await expect(page.getByTestId("p03-history-panel")).toHaveText("当前修订没有 Operation Record。");
   await page.getByTestId("p03-tab-text").click();
 
   await page.getByTestId("p03-run-validation").click();
@@ -120,13 +291,15 @@ test("真实 P01 到 P03 主路径提交并在三个视口重开", async ({ page
   await expectWorkbenchReady(page);
   await expect(page.locator(".revision-tag")).toHaveText(exceptionRevision);
   await expect(page.locator(".x6-node")).toHaveCount(6);
-  await expect(page.locator(".x6-edge")).toHaveCount(6);
+  await expect(committedRelationAnchors(page)).toHaveCount(5);
   await expect(page.getByTestId("p03-opl-sentence")).toHaveCount(5);
   await expect(page.getByText("Process 1 yields Object 1.", { exact: true })).toBeVisible();
   await expect(page.getByText("Process 1 changes Object 1 from Ready to Finished.", { exact: true })).toBeVisible();
   await expect(page.getByText("Process 1 invokes Process 2.", { exact: true })).toBeVisible();
   await expect(page.getByText("When Process 1 exceeds PT5M, Process 2 handles the exception.", { exact: true })).toBeVisible();
   await page.getByTestId("p03-opl-sentence").filter({ hasText: "Process 1 invokes Process 2." }).click();
+  await expect(page.getByTestId("p03-right-panel")).toHaveCount(0);
+  await openSelectedInspector(page);
   await expect(page.locator(".inspector-panel .panel-heading strong")).toHaveText("关系");
   await expect(page.locator(".inspector-panel")).toContainText("CAP-ISO-PROC-013");
 
@@ -149,38 +322,92 @@ test("Self-invocation 与 Undertime Exception 以独立 Runtime 路径提交并�
   await commitAndRead(page, page.getByTestId("p03-tool-process"));
   const processOne = canvasNode(page, "Process 1");
   const processTwo = canvasNode(page, "Process 2");
-  const canvasFrame = page.locator(".canvas-frame");
-  const frameBox = await canvasFrame.boundingBox();
-  if (!frameBox) throw new Error("未找到画布编辑区域");
   await expect(processOne).toBeVisible();
   await expect(processTwo).toBeVisible();
 
-  await processOne.click({ position: { x: 20, y: 20 } });
-  await page.getByTestId("p03-tool-procedural-relation").click();
-  await processOne.click({ position: { x: 20, y: 20 } });
-  await page.getByTestId("p03-relation-resolve").click();
-  await expect(page.getByTestId("p03-relation-option-CAP-ISO-PROC-014")).toBeVisible();
-  await commitAndRead(page, page.getByTestId("p03-relation-option-CAP-ISO-PROC-014"));
+  await createProceduralRelation(page, processOne, [processOne], "CAP-ISO-PROC-014");
   await expect(page.getByText("Process 1 invokes itself.", { exact: true })).toBeVisible();
 
-  await processOne.click({ position: { x: 20, y: 20 } });
-  await page.getByTestId("p03-tool-procedural-relation").click();
-  await panCanvas(page, frameBox, 260);
-  await expect.poll(async () => (await processTwo.boundingBox())?.y ?? Number.POSITIVE_INFINITY).toBeLessThan(frameBox.y + frameBox.height - 32);
-  await processTwo.click({ position: { x: 20, y: 20 } });
-  await page.getByTestId("p03-relation-resolve").click();
-  await expect(page.getByTestId("p03-relation-option-CAP-ISO-PROC-016")).toBeVisible();
-  await page.getByTestId("p03-relation-duration").fill("PT3M");
-  const revision = await commitAndRead(page, page.getByTestId("p03-relation-option-CAP-ISO-PROC-016"));
-  await expect(page.locator(".x6-edge")).toHaveCount(2);
+  const revision = await createProceduralRelation(page, processOne, [processTwo], "CAP-ISO-PROC-016", "PT3M");
+  await expect(committedRelationAnchors(page)).toHaveCount(2);
   await expect(page.getByText("When Process 1 is under PT3M, Process 2 handles the exception.", { exact: true })).toBeVisible();
 
   await page.reload();
   await expectWorkbenchReady(page);
   await expect(page.locator(".revision-tag")).toHaveText(revision);
-  await expect(page.locator(".x6-edge")).toHaveCount(2);
+  await expect(committedRelationAnchors(page)).toHaveCount(2);
   await expect(page.getByText("Process 1 invokes itself.", { exact: true })).toBeVisible();
   await expect(page.getByText("When Process 1 is under PT3M, Process 2 handles the exception.", { exact: true })).toBeVisible();
+});
+
+test("Object 左键选择、拖动布局并在刷新后保持位置", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await openNewWorkbench(page, "Element layout interaction");
+
+  await commitAndRead(page, page.getByTestId("p03-tool-object"));
+  await commitAndRead(page, page.getByTestId("p03-tool-process"));
+  const object = canvasNode(page, "Object 1");
+  await expect(object).toBeVisible();
+  await object.click({ position: { x: 32, y: 32 } });
+  await expect(page.getByTestId("p03-right-panel")).toHaveCount(0);
+  await openSelectedInspector(page);
+  await expect(page.locator(".inspector-panel .panel-heading strong")).toHaveText("对象");
+
+  const before = await object.boundingBox();
+  if (!before) throw new Error("未找到可拖动 Object 的边界");
+  const revisionBefore = await revisionTag(page);
+  await page.mouse.move(before.x + 40, before.y + 36);
+  await page.mouse.down();
+  await page.mouse.move(before.x + 120, before.y + 96, { steps: 8 });
+  await page.mouse.up();
+  await expect(page.locator(".revision-tag")).not.toHaveText(revisionBefore);
+  const revisionAfterMove = await revisionTag(page);
+  const moved = await object.boundingBox();
+  if (!moved) throw new Error("拖动后 Object 不可见");
+  expect(moved.x).toBeGreaterThan(before.x + 60);
+  expect(moved.y).toBeGreaterThan(before.y + 40);
+
+  await page.reload();
+  await expectWorkbenchReady(page);
+  await expect(page.locator(".revision-tag")).toHaveText(revisionAfterMove);
+  const persisted = await canvasNode(page, "Object 1").boundingBox();
+  if (!persisted) throw new Error("刷新后 Object 不可见");
+  expect(Math.round(persisted.x)).toBe(Math.round(moved.x));
+  expect(Math.round(persisted.y)).toBe(Math.round(moved.y));
+});
+
+test("Attribute 拖动布局并在刷新后保持位置", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await openNewWorkbench(page, "Attribute layout interaction");
+
+  await commitAndRead(page, page.getByTestId("p03-tool-object"));
+  const object = canvasNode(page, "Object 1");
+  await object.click({ position: { x: 20, y: 20 } });
+  await commitAndRead(page, page.getByTestId("p03-tool-attribute"));
+  const attribute = canvasNode(page, "Attribute 1");
+  await expect(attribute).toBeVisible();
+
+  const before = await attribute.boundingBox();
+  if (!before) throw new Error("未找到可拖动 Attribute 的边界");
+  const revisionBefore = await revisionTag(page);
+  await page.mouse.move(before.x + 30, before.y + 22);
+  await page.mouse.down();
+  await page.mouse.move(before.x + 120, before.y + 92, { steps: 8 });
+  await page.mouse.up();
+  await expect(page.locator(".revision-tag")).not.toHaveText(revisionBefore);
+  const revisionAfterMove = await revisionTag(page);
+  const moved = await attribute.boundingBox();
+  if (!moved) throw new Error("拖动后 Attribute 不可见");
+  expect(moved.x).toBeGreaterThan(before.x + 60);
+  expect(moved.y).toBeGreaterThan(before.y + 40);
+
+  await page.reload();
+  await expectWorkbenchReady(page);
+  await expect(page.locator(".revision-tag")).toHaveText(revisionAfterMove);
+  const persisted = await canvasNode(page, "Attribute 1").boundingBox();
+  if (!persisted) throw new Error("刷新后 Attribute 不可见");
+  expect(Math.round(persisted.x)).toBe(Math.round(moved.x));
+  expect(Math.round(persisted.y)).toBe(Math.round(moved.y));
 });
 
 test("使能关系与 State 指定变体从 Runtime 候选提交并重开", async ({ page }) => {
@@ -206,7 +433,7 @@ test("使能关系与 State 指定变体从 Runtime 候选提交并重开", asyn
   await createProceduralRelation(page, objectOne, [process], "CAP-ISO-PROC-005");
   await createProceduralRelation(page, ready, [process], "CAP-ISO-PROC-011");
   const revision = await createProceduralRelation(page, ready, [process], "CAP-ISO-PROC-012");
-  await expect(page.locator(".x6-edge")).toHaveCount(4);
+  await expect(committedRelationAnchors(page)).toHaveCount(4);
   await expect(page.getByText("Object 1 handles Process 1.", { exact: true })).toBeVisible();
   await expect(page.getByText("Process 1 requires Object 1.", { exact: true })).toBeVisible();
   await expect(page.getByText("Ready Object 1 handles Process 1.", { exact: true })).toBeVisible();
@@ -215,7 +442,7 @@ test("使能关系与 State 指定变体从 Runtime 候选提交并重开", asyn
   await page.reload();
   await expectWorkbenchReady(page);
   await expect(page.locator(".revision-tag")).toHaveText(revision);
-  await expect(page.locator(".x6-edge")).toHaveCount(4);
+  await expect(committedRelationAnchors(page)).toHaveCount(4);
   await expect(page.getByText("Ready Object 1 handles Process 1.", { exact: true })).toBeVisible();
   await expect(page.getByText("Process 1 requires Ready Object 1.", { exact: true })).toBeVisible();
 });
@@ -246,7 +473,7 @@ test("Effect 与剩余 State 指定变体从 Runtime 候选提交并重开", asy
   await createProceduralRelation(page, objectOne, [process, objectTwo], "CAP-ISO-PROC-003");
   await createProceduralRelation(page, ready, [process, objectOne], "CAP-ISO-PROC-009");
   const revision = await createProceduralRelation(page, objectOne, [process, finished], "CAP-ISO-PROC-010");
-  await expect(page.locator(".x6-edge")).toHaveCount(8);
+  await expect(committedRelationAnchors(page)).toHaveCount(5);
   await expect(page.getByText("Process 1 consumes Ready Object 1.", { exact: true })).toBeVisible();
   await expect(page.getByText("Process 1 yields Finished Object 1.", { exact: true })).toBeVisible();
   await expect(page.getByText("Process 1 affects Object 2.", { exact: true })).toBeVisible();
@@ -256,12 +483,49 @@ test("Effect 与剩余 State 指定变体从 Runtime 候选提交并重开", asy
   await page.reload();
   await expectWorkbenchReady(page);
   await expect(page.locator(".revision-tag")).toHaveText(revision);
-  await expect(page.locator(".x6-edge")).toHaveCount(8);
+  await expect(committedRelationAnchors(page)).toHaveCount(5);
   await expect(page.getByText("Process 1 consumes Ready Object 1.", { exact: true })).toBeVisible();
   await expect(page.getByText("Process 1 yields Finished Object 1.", { exact: true })).toBeVisible();
   await expect(page.getByText("Process 1 affects Object 2.", { exact: true })).toBeVisible();
   await expect(page.getByText("Process 1 changes Object 1 from Ready.", { exact: true })).toBeVisible();
   await expect(page.getByText("Process 1 changes Object 1 to Finished.", { exact: true })).toBeVisible();
+});
+
+test("生成消耗共用一个工具，双向拖线保持独立 Fact、OPL 和重开结果", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await openNewWorkbench(page, "Combined transformation E2E");
+  await commitAndRead(page, page.getByTestId("p03-tool-object"));
+  await commitAndRead(page, page.getByTestId("p03-tool-process"));
+  const commands: Record<string, unknown>[] = [];
+  page.on("request", (request) => {
+    if (request.method() === "POST" && request.url().endsWith("/commands")) {
+      const body = request.postDataJSON();
+      commands.push(request.url().endsWith("/draft/commands") ? body.command : body);
+    }
+  });
+  const object = canvasNode(page, "Object 1");
+  const process = canvasNode(page, "Process 1");
+  // 两次都点击同一个入口，仅改变用户拖线方向。
+  await createProceduralRelation(page, object, [process], "CAP-ISO-PROC-001");
+  await createProceduralRelation(page, process, [object], "CAP-ISO-PROC-001");
+  expect(commands).toHaveLength(2);
+  expect(commands[0]).toMatchObject({ command_type: "CREATE_FACT", payload: { capability_ref: { capability_id: "CAP-ISO-PROC-001" } } });
+  expect(commands[1]).toMatchObject({ command_type: "CREATE_FACT", payload: { capability_ref: { capability_id: "CAP-ISO-PROC-002" } } });
+  await expect(committedRelationAnchors(page)).toHaveCount(2);
+  const signatures = await edgeVisualSignatures(page);
+  expect(signatures.every((edge) => isClosedArrow(edge.target))).toBe(true);
+  expect(new Set(signatures.map((edge) => edge.path)).size).toBe(2);
+  await expect(page.getByText("Process 1 consumes Object 1.", { exact: true })).toBeVisible();
+  await expect(page.getByText("Process 1 yields Object 1.", { exact: true })).toBeVisible();
+  const revision = await revisionTag(page);
+  await page.reload();
+  await expectWorkbenchReady(page);
+  await expect(page.locator(".revision-tag")).toHaveText(revision);
+  await expect(committedRelationAnchors(page)).toHaveCount(2);
+  expect(await edgeVisualSignatures(page)).toEqual(signatures);
+  await expect(page.getByText("Process 1 consumes Object 1.", { exact: true })).toBeVisible();
+  await expect(page.getByText("Process 1 yields Object 1.", { exact: true })).toBeVisible();
+  await page.screenshot({ path: test.info().outputPath("combined-transformation.png") });
 });
 
 test("16 类 Procedural Link 以冻结的 SVG marker、路径和时间注记呈现", async ({ page }) => {
@@ -299,6 +563,7 @@ test("16 类 Procedural Link 以冻结的 SVG marker、路径和时间注记呈�
   await createProceduralRelation(page, processOne, [processTwo], "CAP-ISO-PROC-016", "PT3M");
 
   const edges = page.locator(".x6-edge");
+  await expect(committedRelationAnchors(page)).toHaveCount(16);
   await expect(edges).toHaveCount(20);
   const visualSignatures = await edgeVisualSignatures(page);
   expect(visualSignatures.filter((edge) => isClosedArrow(edge.target))).toHaveLength(16);
@@ -336,12 +601,12 @@ test("八类 Control 从基础 Procedural Fact 的 Runtime 候选提交并重开
   await createProceduralRelation(page, objectTwo, [process], "CAP-ISO-PROC-004");
   await createProceduralRelation(page, ready, [process], "CAP-ISO-PROC-006");
   await createProceduralRelation(page, available, [process], "CAP-ISO-PROC-011");
-  await expect(page.locator(".x6-edge")).toHaveCount(4);
+  await expect(committedRelationAnchors(page)).toHaveCount(4);
 
-  await applyControl(page, 0, "CAP-ISO-CTRL-001");
-  await applyControl(page, 1, "CAP-ISO-CTRL-002");
-  await applyControl(page, 2, "CAP-ISO-CTRL-003");
-  await applyControl(page, 3, "CAP-ISO-CTRL-004");
+  await applyControlForText(page, "Process 1 consumes Object 1.", "CAP-ISO-CTRL-001");
+  await applyControlForText(page, "Object 2 handles Process 1.", "CAP-ISO-CTRL-002");
+  await applyControlForText(page, "Process 1 consumes Ready Object 1.", "CAP-ISO-CTRL-003");
+  await applyControlForText(page, "Available Object 2 handles Process 1.", "CAP-ISO-CTRL-004");
   await expect(page.locator(".x6-edge-label").filter({ hasText: "e" })).toHaveCount(4);
 
   await createProceduralRelation(page, objectOne, [process, objectTwo], "CAP-ISO-PROC-003");
@@ -365,7 +630,7 @@ test("八类 Control 从基础 Procedural Fact 的 Runtime 候选提交并重开
   await page.reload();
   await expectWorkbenchReady(page);
   await expect(page.locator(".revision-tag")).toHaveText(revision);
-  await expect(page.locator(".x6-edge")).toHaveCount(10);
+  await expect(committedRelationAnchors(page)).toHaveCount(8);
   await expect(page.locator(".x6-edge-label").filter({ hasText: "c" })).toHaveCount(4);
   const traceCases = [
     ["Object 1 initiates Process 1, which consumes Object 1.", "CAP-ISO-CTRL-001"],
@@ -379,6 +644,7 @@ test("八类 Control 从基础 Procedural Fact 的 Runtime 候选提交并重开
   ] as const;
   for (const [sentence, capabilityId] of traceCases) {
     await page.getByText(sentence, { exact: true }).click();
+    await openSelectedInspector(page);
     await expect(page.locator(".inspector-panel")).toContainText(capabilityId);
   }
 });
@@ -400,19 +666,19 @@ test("Feature Value State 支持 Exhibition 与 State-specified Characterization
   const high = canvasNode(page, "High");
   await expect(high).toBeVisible();
 
-  const exhibitionRevision = await createStructuralRelation(page, object, attribute, "CAP-ISO-STRUCT-006", "COMPLETE");
-  await expect(page.locator(".x6-edge")).toHaveCount(2);
+  const exhibitionRevision = await createStructuralRelation(page, attribute, object, "CAP-ISO-STRUCT-006", "COMPLETE", undefined, true);
+  await expect(committedRelationAnchors(page)).toHaveCount(1);
 
-  const characterizationRevision = await createStructuralRelation(page, object, high, "CAP-ISO-STRUCT-009");
+  const characterizationRevision = await createStructuralRelation(page, high, object, "CAP-ISO-STRUCT-009");
   expect(exhibitionRevision).not.toBe(characterizationRevision);
-  await expect(page.locator(".x6-edge")).toHaveCount(4);
+  await expect(committedRelationAnchors(page)).toHaveCount(2);
   await expect(page.locator(".x6-node").filter({ hasText: "Attribute 1" })).toHaveCount(1);
   await expect(page.locator(".x6-node").filter({ hasText: "High" })).toHaveCount(1);
 
   await page.reload();
   await expectWorkbenchReady(page);
   await expect(page.locator(".revision-tag")).toHaveText(characterizationRevision);
-  await expect(page.locator(".x6-edge")).toHaveCount(4);
+  await expect(committedRelationAnchors(page)).toHaveCount(2);
   await expect(page.locator(".x6-node").filter({ hasText: "Attribute 1" })).toHaveCount(1);
   await expect(page.locator(".x6-node").filter({ hasText: "High" })).toHaveCount(1);
 });
@@ -435,11 +701,11 @@ test("Structural tagged 与 Aggregation fan 以稳定 Fact ID 更新完整性并
     forward_tag: "contains",
     reverse_tag: "belongs to",
   });
-  await expect(page.locator(".x6-edge")).toHaveCount(1);
+  await expect(committedRelationAnchors(page)).toHaveCount(1);
 
   const fanRevision = await createStructuralRelation(page, whole, [partA, partB], "CAP-ISO-STRUCT-005", "INCOMPLETE");
   expect(taggedRevision).not.toBe(fanRevision);
-  await expect(page.locator(".x6-edge")).toHaveCount(4);
+  await expect(committedRelationAnchors(page)).toHaveCount(2);
   await expect(page.getByText("...", { exact: true })).toHaveCount(1);
 
   const fanFactId = await selectIncompleteFan(page);
@@ -447,7 +713,7 @@ test("Structural tagged 与 Aggregation fan 以稳定 Fact ID 更新完整性并
   await expect(page.getByTestId("p03-structural-update")).toBeVisible();
   await page.getByTestId("p03-structural-update-completeness").selectOption("COMPLETE");
   const completeRevision = await commitAndRead(page, page.getByTestId("p03-structural-update").getByRole("button", { name: "保存", exact: true }));
-  await expect(page.locator(".x6-edge")).toHaveCount(4);
+  await expect(committedRelationAnchors(page)).toHaveCount(2);
   await expect(page.locator(`[data-cell-id="${fanFactId}.root"]`)).toHaveCount(1);
   await expect(page.getByText("...", { exact: true })).toHaveCount(0);
 
@@ -512,6 +778,7 @@ test("十类 Structural Link 均通过 Runtime 候选生成 OPL、Trace 并在�
   ] as const;
   for (const [sentence, capabilityId] of traceCases) {
     await page.getByTestId("p03-opl-sentence").filter({ hasText: sentence }).click();
+    await openSelectedInspector(page);
     await expect(page.locator(".inspector-panel")).toContainText(capabilityId);
   }
 });
@@ -540,14 +807,25 @@ async function createState(page: Page, owner: Locator, name: string) {
 }
 
 async function createProceduralRelation(page: Page, source: Locator, targets: Locator[], capabilityId: string, duration?: string): Promise<string> {
-  await source.click({ position: { x: 20, y: 20 } });
-  await page.getByTestId("p03-tool-procedural-relation").click();
-  for (const target of targets) await target.click({ position: { x: 20, y: 20 } });
-  await page.getByTestId("p03-relation-resolve").click();
-  const option = page.getByTestId(`p03-relation-option-${capabilityId}`);
-  await expect(option).toBeVisible();
-  if (duration) await page.getByTestId("p03-relation-duration").fill(duration);
-  return commitAndRead(page, option);
+  const revisionBefore = await revisionTag(page);
+  await activateRelationCatalogItem(page, "PROCEDURAL", capabilityId);
+  for (const [index, target] of targets.entries()) {
+    if (index > 0) await prepareNextRelationEndpoint(page);
+    await dragRelationEndpoint(page, source, target);
+  }
+  let revision: string;
+  if (duration) {
+    await expect(page.getByTestId("p03-relation-preview")).toBeVisible();
+    await page.getByTestId("p03-relation-duration").fill(duration);
+    revision = await commitRelationParametersAndRead(page);
+  } else {
+    await expect(page.locator(".revision-tag")).not.toHaveText(revisionBefore);
+    revision = await revisionTag(page);
+  }
+  await expect(page.getByTestId("p03-relation-preview")).toHaveCount(0);
+  await expect(page.getByTestId("p03-canvas")).toHaveAttribute("data-relation-preview-id", "");
+  await expect.poll(() => candidateCellIds(page)).toEqual([]);
+  return revision;
 }
 
 function pathSegmentCount(path: string): number {
@@ -595,54 +873,156 @@ async function createStructuralRelation(
   capabilityId: string,
   completeness?: "COMPLETE" | "INCOMPLETE",
   labels?: Record<string, string>,
+  reselectBeforeConfirm = false,
 ): Promise<string> {
-  await source.click({ position: { x: 20, y: 20 } });
-  await page.getByTestId("p03-tool-structural-relation").click();
-  for (const endpoint of Array.isArray(target) ? target : [target]) await endpoint.click({ position: { x: 20, y: 20 } });
-  await page.getByTestId("p03-relation-resolve").click();
-  const option = page.getByTestId(`p03-relation-option-${capabilityId}`);
-  await expect(option).toBeVisible();
-  await option.click();
-  const form = page.getByTestId("p03-structural-candidate");
-  await expect(form).toBeVisible();
-  if (completeness) await page.getByTestId("p03-structural-completeness").selectOption(completeness);
-  for (const [slot, text] of Object.entries(labels ?? {})) await page.getByTestId(`p03-structural-label-${slot}`).fill(text);
-  return commitAndRead(page, form.getByRole("button", { name: "创建", exact: true }));
+  const revisionBefore = await revisionTag(page);
+  await activateRelationCatalogItem(page, "STRUCTURAL", capabilityId);
+  const targets = Array.isArray(target) ? target : [target];
+  for (const [index, endpoint] of targets.entries()) {
+    await dragRelationEndpoint(page, source, endpoint, {
+      shift: index < targets.length - 1,
+      alt: index === targets.length - 1 && completeness === "INCOMPLETE",
+    });
+  }
+  const form = page.getByTestId("p03-relation-candidate");
+  let revision: string;
+  if (labels || completeness === "INCOMPLETE") {
+    await expect(form).toBeVisible();
+    if (labels) {
+      if (completeness) await page.getByTestId("p03-structural-completeness").selectOption(completeness);
+      for (const [slot, text] of Object.entries(labels)) await page.getByTestId(`p03-structural-label-${slot}`).fill(text);
+      revision = await commitRelationParametersAndRead(page);
+    } else {
+      const before = await revisionTag(page);
+      await page.getByTestId("p03-structural-completeness").selectOption(completeness ?? "COMPLETE");
+      await expect(page.locator(".revision-tag")).not.toHaveText(before);
+      revision = await revisionTag(page);
+    }
+  } else {
+    await expect(page.locator(".revision-tag")).not.toHaveText(revisionBefore);
+    revision = await revisionTag(page);
+  }
+  if (reselectBeforeConfirm) {
+    const relationCount = await committedRelationAnchors(page).count();
+    const otherCapabilityId = capabilityId === "CAP-ISO-STRUCT-007" ? "CAP-ISO-STRUCT-006" : "CAP-ISO-STRUCT-007";
+    await activateRelationCatalogItem(page, "STRUCTURAL", otherCapabilityId);
+    await expect(committedRelationAnchors(page)).toHaveCount(relationCount);
+    await expect(page.locator(".revision-tag")).toHaveText(revision);
+    await expect(page.getByTestId(`p03-relation-quick-option-${otherCapabilityId}`)).toHaveClass(/is-active/);
+  }
+  await expect(page.getByTestId("p03-relation-preview")).toHaveCount(0);
+  await expect(page.getByTestId("p03-canvas")).toHaveAttribute("data-relation-preview-id", "");
+  await expect.poll(() => candidateCellIds(page)).toEqual([]);
+  return revision;
 }
 
 async function selectIncompleteFan(page: Page): Promise<string> {
   const root = page.locator('.x6-edge[data-cell-id$=".root"]');
   await expect(root).toHaveCount(1);
   const cellId = await root.getAttribute("data-cell-id");
-  await root.locator('path[cursor="pointer"]').click({ force: true });
+  await page.getByTestId("p03-opl-sentence").filter({ hasText: "and at least one other part." }).click();
+  await openSelectedInspector(page);
   await expect(page.getByText("不完整", { exact: true })).toBeVisible();
   const factId = cellId?.replace(/\.root$/, "");
   if (!factId) throw new Error("未找到 Aggregation fan 的稳定 Fact ID");
   return factId;
 }
 
-async function applyControl(page: Page, relationIndex: number, capabilityId: string): Promise<string> {
-  await page.locator(".x6-edge").nth(relationIndex).click();
+async function applyControlForText(page: Page, relationText: string, capabilityId: string): Promise<string> {
+  await page.getByRole("button", { name: relationText, exact: true }).click();
+  await openSelectedInspector(page);
   return applySelectedControl(page, capabilityId);
 }
 
-async function applyControlForText(page: Page, relationText: string, capabilityId: string): Promise<string> {
-  await page.getByTestId("p03-opl-sentence").filter({ hasText: relationText }).click();
-  return applySelectedControl(page, capabilityId);
+async function openSelectedInspector(page: Page) {
+  if (!await page.getByTestId("p03-right-panel").isVisible()) await page.getByTestId("p03-right-panel-open").click();
 }
 
 async function applySelectedControl(page: Page, capabilityId: string): Promise<string> {
-  await expect(page.getByTestId("p03-control-open")).toBeVisible();
-  await page.getByTestId("p03-control-open").click();
-  await expect(page.getByTestId("p03-control-catalog")).toBeVisible();
-  const option = page.getByTestId(`p03-control-option-${capabilityId}`);
-  await expect(option).toBeVisible();
-  return commitAndRead(page, option);
+  await activateRelationCatalogItem(page, "CONTROL", capabilityId);
+  await expect(page.getByTestId("p03-control-preview")).toBeVisible();
+  const revision = await commitAndRead(page, page.getByTestId("p03-control-preview-confirm"));
+  await expect(page.getByTestId("p03-control-preview")).toHaveCount(0);
+  await expect(page.getByTestId("p03-canvas")).toHaveAttribute("data-relation-preview-id", "");
+  await expect.poll(() => candidateCellIds(page)).toEqual([]);
+  return revision;
+}
+
+async function activateRelationCatalogItem(
+  page: Page,
+  family: "PROCEDURAL" | "CONTROL" | "STRUCTURAL",
+  capabilityId: string,
+  expectedPhase = "relation-armed",
+) {
+  if (capabilityId === "CAP-ISO-PROC-002") capabilityId = "CAP-ISO-PROC-001";
+  await expect(page.getByTestId(`p03-relation-toolbar-${family}`)).toBeVisible();
+  const quickItem = page.getByTestId(`p03-relation-quick-option-${capabilityId}`);
+  const item = await quickItem.count()
+    ? quickItem
+    : page.getByTestId(`p03-relation-menu-option-${capabilityId}`);
+  if (!await quickItem.count()) await page.getByTestId(`p03-relation-menu-toggle-${family}`).click();
+  await expect(item).toBeEnabled();
+  await item.click();
+  if (family !== "CONTROL") {
+    await expect(page.getByTestId("p03-canvas")).toHaveAttribute("data-relation-gesture-phase", expectedPhase);
+  }
+}
+
+async function dragRelationEndpoint(page: Page, source: Locator, target: Locator, modifiers: { shift?: boolean; alt?: boolean } = {}) {
+  await source.scrollIntoViewIfNeeded();
+  await target.scrollIntoViewIfNeeded();
+  const sourcePoint = await nodeGesturePoint(source);
+  const targetPoint = await nodeGesturePoint(target);
+  await page.mouse.move(sourcePoint.x, sourcePoint.y);
+  if (modifiers.shift) await page.keyboard.down("Shift");
+  if (modifiers.alt) await page.keyboard.down("Alt");
+  await page.mouse.down();
+  await expect(page.getByTestId("p03-canvas")).toHaveAttribute("data-relation-gesture-phase", "dragging");
+  await page.mouse.move(targetPoint.x, targetPoint.y, { steps: 8 });
+  await page.mouse.up();
+  if (modifiers.alt) await page.keyboard.up("Alt");
+  if (modifiers.shift) await page.keyboard.up("Shift");
+  await expect(page.getByTestId("p03-canvas")).not.toHaveAttribute("data-relation-gesture-phase", "dragging");
+  // fan 的下一段必须等待本段异步候选查询完成，不能在 filtering 时提前按下鼠标。
+  await expect(page.getByTestId("p03-canvas")).not.toHaveAttribute("data-relation-gesture-phase", "candidate-filtering");
+}
+
+async function nodeGesturePoint(node: Locator) {
+  const box = await node.boundingBox();
+  if (!box) throw new Error("关系端点不可见");
+  const centered = box.height <= 32 || await node.locator("ellipse").count() > 0;
+  return centered
+    ? { x: box.x + box.width / 2, y: box.y + box.height / 2 }
+    : { x: box.x + Math.min(20, box.width / 2), y: box.y + Math.min(20, box.height / 2) };
+}
+
+async function prepareNextRelationEndpoint(page: Page) {
+  const canvas = page.getByTestId("p03-canvas");
+  const continueMessage = page.locator(".canvas-state").filter({ hasText: "继续拖线" });
+  await expect(continueMessage).toBeVisible();
+  await expect(canvas).toHaveAttribute("data-relation-gesture-phase", "relation-armed");
+}
+
+function committedRelationAnchors(page: Page): Locator {
+  return page.locator('.x6-edge [data-opm-capture-cell-id]');
+}
+
+async function candidateCellIds(page: Page): Promise<string[]> {
+  return page.locator('[data-opm-candidate-cell-id]').evaluateAll((elements) => elements.map((element) =>
+    element.closest('.x6-cell')?.getAttribute('data-cell-id') ?? 'unknown',
+  ));
 }
 
 async function commitAndRead(page: Page, trigger: Locator): Promise<string> {
   const before = await revisionTag(page);
   await trigger.click();
+  await expect(page.locator(".revision-tag")).not.toHaveText(before);
+  return revisionTag(page);
+}
+
+async function commitRelationParametersAndRead(page: Page): Promise<string> {
+  const before = await revisionTag(page);
+  await page.getByTestId("p03-relation-candidate").locator("input").last().press("Enter");
   await expect(page.locator(".revision-tag")).not.toHaveText(before);
   return revisionTag(page);
 }
@@ -656,8 +1036,27 @@ function canvasNode(page: Page, label: string): Locator {
 }
 
 async function panCanvas(page: Page, frame: { x: number; y: number; width: number; height: number }, deltaY: number) {
-  await page.getByTestId("p03-canvas").hover({ position: { x: frame.width - 24, y: 36 } });
+  await page.getByTestId("p03-tool-pan").click();
+  await expect(page.getByTestId("p03-canvas")).toHaveAttribute("data-canvas-tool", "pan");
+  await page.locator(".opd-canvas-host").hover({ position: { x: frame.width - 24, y: 36 } });
   await page.mouse.wheel(0, deltaY);
+}
+
+async function dragCanvasWithPanTool(page: Page, frame: { x: number; y: number; width: number; height: number }, deltaX: number, deltaY: number) {
+  const trackedNode = page.locator(".x6-node").first();
+  const before = await trackedNode.boundingBox();
+  if (!before) throw new Error("平移前节点位置不可观测");
+  await page.getByTestId("p03-tool-pan").click();
+  await expect(page.getByTestId("p03-canvas")).toHaveAttribute("data-canvas-tool", "pan");
+  const start = { x: frame.x + frame.width - 120, y: frame.y + frame.height - 120 };
+  await page.mouse.move(start.x, start.y);
+  await page.mouse.down();
+  await page.mouse.move(start.x + deltaX, start.y + deltaY, { steps: 4 });
+  await page.mouse.up();
+  await expect.poll(async () => {
+    const after = await trackedNode.boundingBox();
+    return after ? { x: Math.round(after.x - before.x), y: Math.round(after.y - before.y) } : null;
+  }).toEqual({ x: deltaX, y: deltaY });
 }
 
 
@@ -678,7 +1077,7 @@ async function expectDesktopWorkbenchLayout(page: Page) {
   });
 
   expect(layout.bottom).toBe(240);
-  expect(layout.validation).toBe(43);
+  expect(layout.validation).toBe(38);
   expect(layout.documentWidth).toBeLessThanOrEqual(layout.viewportWidth);
 }
 

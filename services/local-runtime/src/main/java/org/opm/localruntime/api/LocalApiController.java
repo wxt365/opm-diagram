@@ -53,8 +53,10 @@ class LocalApiController {
     }
 
     @GetMapping("/projects/{projectId}/models/{modelId}/workspace-session")
-    Map<String, Object> workspace(@PathVariable String projectId, @PathVariable String modelId, @RequestParam("request_id") String requestId) {
-        return service.workspace(requestId, projectId, modelId);
+    Map<String, Object> workspace(@PathVariable String projectId, @PathVariable String modelId, @RequestParam("request_id") String requestId,
+                                  @RequestParam(value = "revision", required = false) String revision,
+                                  @RequestParam(value = "context", required = false) String context) {
+        return service.workspace(requestId, projectId, modelId, revision, context);
     }
 
     @GetMapping("/projects/{projectId}/models/{modelId}/contexts/{contextId}/navigation")
@@ -80,8 +82,9 @@ class LocalApiController {
 
     @GetMapping("/projects/{projectId}/models/{modelId}/contexts/{contextId}/relation-catalog")
     Map<String, Object> relationCatalog(@PathVariable String projectId, @PathVariable String modelId, @PathVariable String contextId,
-                                        @RequestParam("request_id") String requestId, @RequestParam("revision") String revision) {
-        return service.relationCatalog(requestId, projectId, modelId, contextId, revision);
+                                        @RequestParam("request_id") String requestId, @RequestParam("revision") String revision,
+                                        @RequestParam(value = "selection_id", required = false) String selectionId) {
+        return service.relationCatalog(requestId, projectId, modelId, contextId, revision, selectionId);
     }
 
     @GetMapping("/projects/{projectId}/models/{modelId}/contexts/{contextId}/release-visual-common-fault-command")

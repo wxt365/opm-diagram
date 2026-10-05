@@ -1,12 +1,12 @@
 # OPM 符号与文本生成实现契约
 
-文档版本：`v1.0`
+文档版本：`v1.7`
 
 文档状态：`FROZEN_INCLUDED`；当前符号、concrete OPL、Token/Trace 与 golden 输入冻结
 
 全局设计状态、延期边界和开发准入以 `opm-design-freeze-baseline.md` 为唯一事实源。
 
-更新时间：2026-07-29
+更新时间：2026-09-05
 
 ## Task Type
 
@@ -87,6 +87,10 @@ SymbolDescriptor {
 
 `symbol_id` 是语义资产引用，不是 DOM ID 或 X6 shape 名。X6 node/edge 只能保存 `occurrence_id`、`target_id`、`symbol_id` 和布局投影；不得把 X6 Cell JSON 写回 Semantic Model 作为事实源。
 
+前端不得在统一画布组件中复制各 `SymbolDescriptor` 的业务语义。Object、Process、State、Attribute、Operation 的独立 Node Definition 只把已绑定 Descriptor 和 Projection 映射为纯 RenderSpec；共享 X6 adapter 再装配 Cell。Node 是表现层图元，不改变领域 Element/State/Feature 分类。Definition 注册、未知 kind 拒绝、影响隔离和迁移规则由 [OPD 节点定义与渲染注册架构](opm-opd-node-renderer-architecture.md) 冻结。
+
+Relation Descriptor 的实现边界固定为一项 Capability 一个 Definition/Decorator：16 个 Procedural、10 个 Structural 以基础 Fact `capability_id` 注册，8 个 Control 以 `control.capability` 注册 decorator。共享 factory 可以复用几何和 annotation 算法，但不得合并 Capability 注册项；Control decorator 必须保留基础 RelationRenderSpec identity。
+
 ### 3.3 `RelationSymbolDescriptor`
 
 ```text
@@ -136,6 +140,8 @@ RelationSymbolDescriptor {
 | `symbol.state.basic` | `ROUNDED_RECT` | `88 x 28` | `64 x 24` | 居中，内边距 8 | 圆角 10；不能脱离 owner object 单独存在 |
 
 名称编辑使用 HTML 输入覆盖层，提交前只产生候选值；完成 `API-EDT-002` 后才更新正式标签。超长名称优先换行并扩高，不缩小字体，不溢出结点，不改变稳定 ID。
+
+P03 Object/Process 名称覆盖层的机器行为由 `specs/opm-p03-element-name-editing-task-spec.md` 冻结：覆盖层以 X6 `localToClient` 跟随缩放、平移、resize、移动和重绘；`Enter` 提交、`Escape` 取消、失焦取消，输入法 composing 期间不触发；失败保留输入和值域焦点，成功只在 committed Revision 重读后更新正式标签。
 
 ### 4.3 状态修饰
 
@@ -286,6 +292,25 @@ Renderer 和 OPL Planner 只读取基础 Fact 上的受控 pair：`control.capab
 | `completeness` | fundamental junction 下方纵线 | 只由完整性字段控制 |
 
 标签位置由 route 投影保存，但 slot 语义由 Descriptor 决定。用户可移动 label position，不能把 forward label 拖到 reverse slot 改变语义。
+
+### 5.10 候选符号复用与正式文本隔离
+
+1. 16 个 Procedural 和 10 个 Structural 在 Runtime 查询、直接提交、参数编辑或失败恢复期间需要临时渲染时，必须读取当前 option 的 exact `symbol_descriptor`，并调用同一 Capability Definition 的 preview 路径；marker、label slot、route family、fan junction 和方向均采用 Runtime 规范端点与 Descriptor，不采用用户拖线方向。
+2. pointer drag 尚未释放时可以显示无语义临时线；option 已选后必须替换为最终 Capability 的标准 `RelationPreviewRenderSpec`，禁止继续使用通用虚线。
+3. preview spec 只使用 candidate identity，禁止包含正式 `fact_id/occurrence_id/relation_group_id/capture_anchor`；取消、换端点、Context 切换或查询失败必须删除全部 preview Cell。
+4. Control preview 只在已提交 Procedural RenderSpec 上叠加 candidate-layer `e/c` annotation，不创建第二关系；确认后的正式 Decorator 继续保持基础 Fact、Occurrence、Relation Group 和 capture anchor。
+5. 候选期不得运行正式 Planner/Generator/Composer/Trace，不建立 Text Artifact、Sentence、Token 或 Trace。界面可以显示模板族和端点摘要，但不得把推测文本标为 OPL。
+6. 只有 `CREATE_FACT/UPDATE_FACT` 在同一原子事务成功后，才允许生成正式 OPL/Trace 和 committed capture anchor；直接提交与参数编辑提交遵循同一边界，失败不得残留部分文本或 anchor。
+
+### 5.11 工具栏标准缩略符号
+
+1. 34 个活动关系工具只以 exact `symbol_descriptor.id` 解析 glyph；名称、Capability 顺序和 family 不参与符号推断。未知 ID 返回 unsupported，按钮禁用且不得绘制通用箭头。
+2. Consumption/Result 使用目标端闭合空心箭头，Effect 使用双端闭合空心箭头；Agent/Instrument 分别使用实心圆/空心圆；State-specified 变体在相应端点叠加 State 轮廓。
+3. Invocation 使用折线/闪电形 shaft 加闭合空心箭头，Self-invocation 使用回环；Overtime/Undertime 分别显示一条/两条异常斜短杠。
+4. Event/Condition Control 复用基础 transforming/enabling marker，并分别附加 `e/c`；State-specified Control 同样叠加 State 轮廓，不创建第二条线。
+5. 单向 Tagged 使用开放箭头，Bidirectional/Reciprocal 使用双端开放 harpoon；Aggregation、Exhibition、Generalization、Classification 分别使用实心三角、空心大三角内嵌实心小三角、空心三角、空心大三角内嵌实心圆。
+6. 工具栏 glyph 是标准符号的无身份缩略投影，不产生 Fact、Occurrence、Relation Group、capture anchor、OPL 或 Trace；正式画布仍由相同 Descriptor 对应的 Capability Definition/Decorator 构建。
+7. 主工具栏同排的 `5/4/5` 高频项与每族完整下拉项必须复用同一 glyph resolver；常驻/下拉只是两种纯图标呈现位置，不得复制、简化或替换 Symbol primitive，也不得在按钮内显示关系名称或描述。双语 `title/aria-label` 的中英文标准名称均按稳定 Capability ID 显式映射，英文逐字节等于活动 Profile 名称；显示名不参与 glyph 解析。Tooltip 不显示端点或机器代码；下拉打开、关闭和工具栏滚动同样不得产生语义工件。
 
 ## 6. 视口缩放与语义缩放隔离
 
@@ -507,7 +532,7 @@ consumption event
 
 #### 7.4.2 产品确定性句序
 
-P0 只启用单个根 Context 中的基础 Consumption。排序键冻结为：
+P0 初始范围只启用单个根 Context 中的基础 Consumption；后继 Capability 范围沿当前 Grammar，Context 范围由第 7.4.3 节取代。排序键冻结为：
 
 ```text
 context_path_ordinal
@@ -522,6 +547,16 @@ context_path_ordinal
 `product_sentence_family_rank` 固定为 Thing Description `100`、Structural `200`、Procedural `300`、Context Management `400`。这是版本化 Grammar 资产中的产品确定性策略，不是 ISO precedence。Control 合成句的 `sentence_slot_rank=0` 且不保留基础句；Bidirectional forward/reverse 分别为 `0/1`；Reciprocal、fan 和其他单句为 `0`。列表成员继续按 endpoint ordinal 输出。
 
 同一 Grammar 版本不得改变 rank；需要调整时发布新 Grammar 版本和 digest。某一模型出现未覆盖的合句或段落场景时返回 `TEXT_PLAN_UNSUPPORTED`，不得仅靠 stable ID 排序后声称标准已定义该顺序。
+
+#### 7.4.3 多 Context 文本范围与身份（HS-02H）
+
+[多 Context 文本与保存规格](../../specs/opm-hybrid-save-context-text-task-spec.md) 冻结 SYSTEM_DIAGRAM、PROCESS_REFINEMENT、OBJECT_REFINEMENT、MODEL_VIEW 的显式成员文本支持；不推导父子细化、跨图句子合并或 Profile Context 语句。PROFILE_CONTEXT/未知 Context 返回 TEXT_PLAN_UNSUPPORTED。
+
+Context occurrence_ids 必须与归属本图的 occurrence 完整闭合。Legacy 和 ISO 分支仅消费当前图有 FACT occurrence 的 Fact，按 Fact ID 去重，保留 OWNED Fact/必要端点规则；不能因其他图的 ISO Fact 改变当前图生成分支。成员缺失、跨图、遗漏或必要 owner 不可用返回 TEXT_TRACE_INCOMPLETE；重复成员原始输入由现有语义 reader 提前拒绝，不放宽构造器。
+
+根图既有句子身份和 golden bytes 不变；非根 sentence_id = identifier("sentence", context_id, existing_sentence_id)，existing_sentence_id 仍使用原 Grammar 模板、Fact 和文本公式。Token/Trace 按原算法从该句子 ID 派生，Artifact/Paragraph 沿原 revision/context 算法；排序、句式、Control 合成和端点 ordinal 不改。Trace/token occurrence source 只能来自本图。空图生成一个空 Paragraph、零句子/Trace，仍有真实 Artifact 和 digest。
+
+这是应用层新增非根图规划域，不修改冻结 Profile/Grammar bytes，不宣称支持只有 REFERENCED/VIEW_DERIVED 必要 owner 的视图。整模型保存还需覆盖所有 Fact 的 OWNED occurrence，并验证全部 Context，不能用本图成功替代整模型文本完整性。
 
 ### 7.5 Token 与 Trace 映射
 

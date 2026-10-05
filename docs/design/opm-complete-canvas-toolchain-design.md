@@ -1,12 +1,12 @@
 # OPM 完整画布工具链设计
 
-文档版本：`v1.0`
+文档版本：`v1.12`
 
 文档状态：`FROZEN_INCLUDED`；完整画布与 OPL/Trace 开发输入冻结，机器和运行证据按开发包形成
 
 全局设计状态、延期边界和开发准入以 `opm-design-freeze-baseline.md` 为唯一事实源。
 
-更新时间：2026-07-29
+更新时间：2026-09-07
 
 ## Task Type
 
@@ -81,8 +81,9 @@
 2. **Profile 驱动**：工具可见性、端点合法性、修饰组合和禁用原因均来自当前 Revision 的精确 Profile/Rule/Symbol/Grammar 绑定。
 3. **候选而非猜测**：用户拖线方向不等于规范 source/target；歧义必须展示候选菜单。
 4. **图标表达工具，符号表达语义**：通用操作使用 Lucide 图标；OPM 领域工具使用 Symbol Catalog 缩略符号，不使用颜色代替关系类型。
+   2026-09-15 图元修正见 [工具栏图元一致性规格](../../specs/opm-p03-toolbar-symbol-fidelity-bugfix-task-spec.md)：五类创建入口采用矩形、椭圆及容器内圆角矩形；特征入口的短分支仅为归属提示。关系半箭头和状态端点不得遮挡。Control 工具图标为代表样式，最终预览复用基础关系并叠加注记。恢复 100% 缩放不等同于内容适配。
 5. **高频直达、全量可搜索**：Object、Process、State 提供固定快捷入口；34 项关系能力进入分组、搜索和最近使用菜单，不平铺占满工具栏。
-6. **预览与提交隔离**：候选图形和候选 OPL 具有明确预览态，只有 `API-EDT-002` 返回 committed revision 后才成为正式投影。
+6. **预览与提交隔离**：候选图形和参数具有明确预览态，候选期不生成正式 OPL/Trace；只有 `API-EDT-002` 返回 committed revision 后才形成正式图文投影。
 7. **视口与语义隔离**：放大视图、缩小视图、平移和适配画布不产生 Revision；内缩放、外缩放、显式/抑制和展开/折叠是语义命令。
 8. **不可用要可解释**：被 Profile、端点、Context、State、只读模式或资产证据阻断的工具必须提供稳定 reason code 和可读原因。
 
@@ -100,14 +101,10 @@ panel-opd-editor
 │   │   ├── tool-create-process
 │   │   └── tool-create-state
 │   ├── tool-group-relations
-│   │   └── tool-relation-split-button
-│   │       ├── tool-relation-primary
-│   │       └── menu-relation-catalog
-│   │           ├── field-relation-search
-│   │           ├── group-recent-relations
-│   │           ├── group-procedural-relations
-│   │           ├── group-control-relations
-│   │           └── group-structural-relations
+│   │   └── relation-tool-palette
+│   │       ├── group-procedural-relations (16)
+│   │       ├── group-control-relations (8)
+│   │       └── group-structural-relations (10)
 │   ├── tool-group-semantic
 │   │   ├── menu-state-visibility
 │   │   ├── menu-folding
@@ -135,12 +132,20 @@ panel-opd-editor
 
 | 组件 | 拥有状态 | 禁止拥有 |
 | --- | --- | --- |
-| `editor-toolchain` | 当前本地工具模式、最近关系、菜单开关 | Capability 合法性规则、Semantic Model |
-| `menu-relation-catalog` | 搜索词、展开分组、焦点项 | 硬编码的允许关系集合 |
+| `editor-toolchain` | 当前本地工具模式、当前关系 Capability | Capability 合法性规则、Semantic Model |
+| `relation-tool-palette` | Runtime 原序目录项、选中态、横向滚动位置 | 硬编码的允许关系集合、最近使用 fallback |
 | `editor-candidate-layer` | source/target hover、候选路径、候选符号、候选错误 | committed Fact |
 | `editor-projection-layer` | 当前 Context Projection 的 ViewModel | 正式 Element/State/Fact 副本 |
 | `editor-command-feedback` | submitting/blocked/failed 的当前候选反馈 | 把 failed 映射为 committed |
 | `editor-viewport-controls` | scale/translation/fit target | Revision、语义 zoom |
+
+### 4.1 元素 Definition 与渲染装配
+
+`editor-projection-layer` 的内部实现固定采用一类节点一个 Definition 文件：Object、Process、State、Attribute、Operation 分别注册到类型安全 `NodeDefinitionRegistry`，产生纯 `NodeRenderSpec`，再由共享 X6 adapter 创建或增量更新 Cell。这里的 Node 是表现层图元，不改变领域 Element/State/Feature 分类；不得使用 Vue 类继承、每实例组件文件、运行时目录扫描或未知 kind 通用矩形 fallback。
+
+关系按 Capability 独立实现：16 个 Procedural 与 10 个 Structural 各一个 Definition，8 个 Control 各一个 Decorator；Procedural、Control、Structural 三族只组织目录和共享 helper。具体 symbol、marker、label slot 和 route 继续由版本化 Symbol Catalog 决定。Definition 不审批 Profile Capability；工具是否可用和命令是否合法仍以服务端 Candidate/Option 为准。Control Decorator 只增加 `e/c` 等受控注记，不改变基础 Fact/Occurrence/Relation Group identity。完整架构以 [OPD 节点定义与渲染注册架构](opm-opd-node-renderer-architecture.md) 为准。
+
+普通布局编辑允许当前根 Context 的 owned Object、Process、Attribute、Operation 和 State occurrence，依照[状态布局修正规格](../../specs/opm-p03-owned-state-layout-and-exhibition-bugfix-task-spec.md)。State 只能在 owner 内容区移动，owner 移动同步可见 owned State；保留语义 owner/kind/Fact/OPL。Fact、非 owned 和跨 Context occurrence 仍不可通过该命令移动，Runtime 复核完整目标与归属。
 
 ## 5. 工具链固定分组
 
@@ -153,7 +158,7 @@ panel-opd-editor
 | 平移 | Lucide `Hand` | 平移画布 | `tool-mode-changed(PAN)` | 不产生 Revision |
 | 撤销 | Lucide `Undo2` | 撤销 | `undo-requested` | 使用应用撤销命令 |
 | 重做 | Lucide `Redo2` | 重做 | `redo-requested` | 使用应用重做命令 |
-| 删除 | Lucide `Trash2` | 删除所选内容 | `delete-requested` | 必须先取影响摘要 |
+| 删除 | 无独立工具栏图标 | 右键构造操作菜单或 `Delete/Backspace` | `construct-action-requested` | 右键菜单项/键盘可直接提交，但必须先取 Runtime option/token，不能直接删除 Cell |
 | 缩小视图 | Lucide `ZoomOut` | 缩小视图 | `viewport-zoom-requested` | 视口事件 |
 | 放大视图 | Lucide `ZoomIn` | 放大视图 | `viewport-zoom-requested` | 视口事件 |
 | 适配画布 | Lucide `Maximize` | 适配画布 | `viewport-fit-requested` | 视口事件 |
@@ -167,19 +172,26 @@ panel-opd-editor
 | Object | `symbol.object.basic` 缩略符号 | 在画布创建 Object | 可用 | 可用 |
 | Process | `symbol.process.basic` 缩略符号 | 在画布创建 Process | 可用 | 可用 |
 | State | `symbol.state.basic` 置于 Object 轮廓内的缩略符号 | 给 Object/Attribute 创建 State | 禁用并提示“先选择对象或属性” | 进入 owner 锁定创建态 |
-| Relation | 当前最近使用关系的标准符号缩略图 | 进入关系 armed 态 | 可打开目录 | 按选择预筛目录 |
+| Relation palette | 当前 `symbol_descriptor.id` 对应的标准缩略符号 | 直接选择 Runtime 关系能力 | Procedural/Structural 可选；Control 禁用 | 按选择刷新 Control 可用性 |
 | Semantic refinement | Symbol Catalog 的显式/抑制、折叠、语义 zoom 图标 + 文本 | 打开语义动作菜单 | 按 Context 决定 | 按选择与 Profile 过滤 |
 
 领域工具缩略图必须从当前 `symbol_catalog_ref + digest` 解析。描述符缺失、版本不匹配或来源证据未满足生产门槛时，工具显示为不可用，不使用手绘替代图标启用关系。
 
-### 5.3 关系 split-button
+### 5.3 主工具栏单排关系分组
 
-1. 主按钮使用最近一次成功创建且当前仍允许的关系；没有最近项时只显示“选择关系”图标。
-2. 下拉菜单固定分组为“最近使用 / 过程关系 / 控制关系 / 结构关系”。
-3. 搜索匹配关系名称、Capability ID、别名和 OPL 关键词，但提交使用稳定 Capability ID。
-4. 每项展示标准符号缩略图、正式名称、端点摘要和状态；不展示长段说明。
-5. 被当前端点阻断但属于活动 Profile 的项可在“显示不可用项”模式出现，并展示 reason；Profile 为 `FORBIDDEN/N/A` 的项完全不出现。
-6. 菜单最多保留 8 个最近项；最近项只存本地偏好，不进入模型或 Revision。
+1. 画布主工具栏唯一顺序为 `选择/平移 | Object/Process/Attribute/Operation/State | Procedural | Control | Structural | 缩放/适配`，关系工具不得单独占用第二排；各区域以竖线分隔。窄屏由整条主工具栏横向滚动，不换行或压缩符号。
+2. 高频直达项为 `生成/消耗(001+002)、PROC-003/004/005`、`CTRL-001/002/005/006`、`STRUCT-001/005/006/007/008`，分别常驻 `4/4/5` 个图标；这只是 UI 编排，不复制端点或可用性规则。
+3. 每组末尾的向下箭头按 Runtime 原序展开纯图标目录。Catalog 仍为 `16/8/10` 个能力，基础生成/消耗聚合后呈现 `15/8/10` 个工具。一次只展开一个族；点击外部、按 `Escape` 或选择项目后关闭。即使全组不可用，目录仍可展开查看原因。
+4. 常驻图标与目录项都是可聚焦直接操作按钮，页面不显示族名称、数量、关系名称或端点描述。按钮均从 exact `symbol_descriptor.id` 渲染，并以稳定 Capability ID 显式映射中英文标准名称；`title/aria-label` 固定为“中文标准名称 / English standard name”，禁用时第二行只追加可读的双语操作原因。Tooltip 不得暴露 endpoint role、target kind、reason code、Capability ID 或其他机器字段。
+5. Procedural/Structural 项的 `interaction_mode=CREATE_FACT`，选择后进入拖线；Control 的 `interaction_mode=UPDATE_SELECTED_FACT`，仅当当前选择是有可用 `UPDATE_FACT` option 的 committed Procedural Fact 时进入 Control 预览。
+6. 被当前 Context、selection 或资产阻断但属于活动 Profile 的项保留并显示禁用状态；Profile 为 `FORBIDDEN/N/A` 的项不出现。未知 Symbol ID 不绘制通用替代箭头，必须禁用对应按钮。
+7. 前端不维护 `16/8/10`、端点合法性或 Capability 可用性的规则副本；目录来自 `API-CAT-001`，端点选择后必须再由 `API-EDT-001` 授权。
+8. 展开面板使用视口固定浮层，浮在工具栏和画布之上，不改变画布高度，也不受工具栏 overflow 裁剪；主工具栏滚动时按当前组箭头重新定位，且不得越出可见视口。
+9. 关系常驻按钮固定为 `34 x 32px`、符号为 `32 x 18px`、展开按钮为 `28 x 32px`；下拉符号固定为 `42 x 20px`，四列面板最大宽度为 `256px`。
+9. 关系选中态只由当前 relation/control candidate 的 exact Capability ID 驱动；取消、Context/Revision 切换和提交后清除，不维护默认或最近使用关系。
+10. 当前仅实现普通二元关系的稳定自动分轨；在 Fact route/vertices 的 `UPDATE_LAYOUT` payload、Runtime 校验和重开投影冻结并实现前，不显示 X6 vertex handle，也不保存浏览器临时折点。
+
+上述第 5.3 节的生成/消耗组合入口以 [组合工具规格](../../specs/opm-p03-combined-transformation-tool-task-spec.md) 为准：提示名称与方向说明，单向不可用时追加该方向原因；显式传递 TRANSFORMATION 意图，按 Runtime 规范端点与拖线方向匹配，最终仍提交原 001 或 002。组合入口的选中态覆盖两成员，Symbol 使用可用成员描述符，Fact/OPL/Trace 不合并。
 
 ## 6. State 完整交互设计
 
@@ -258,25 +270,21 @@ stateDiagram-v2
 ```mermaid
 stateDiagram-v2
     [*] --> idle
-    idle --> armed: 选择关系工具
-    armed --> source_selected: 选择第一个端点
-    source_selected --> filtering: hover/选择第二端点
-    filtering --> preview: 唯一合法候选
-    filtering --> filtering: 多个候选时打开菜单
-    filtering --> blocked: 无合法候选
-    preview --> submitting: 用户确认
-    preview --> source_selected: 更换第二端点
-    preview --> idle: 取消
-    submitting --> committed: 返回 committed_revision
-    submitting --> blocked: 领域/文本/规则阻断
-    submitting --> failed: 系统或持久化失败
-    submitting --> source_selected: revision conflict 后刷新候选
-    blocked --> filtering: 更换端点/类型/修饰
-    blocked --> idle: 放弃
-    failed --> submitting: 重试
-    failed --> idle: 放弃
-    committed --> armed: 连续创建开启
-    committed --> idle: 单次创建结束
+    idle --> relation_armed: 选择Procedural或Structural目录项
+    relation_armed --> dragging: 节点按下
+    dragging --> dragging: pointer move
+    dragging --> endpoint_selected: 在节点释放
+    dragging --> cancelled: 空白/非法Cell/Escape
+    endpoint_selected --> relation_armed: 未达到Catalog min_endpoints
+    endpoint_selected --> candidate_filtering: 查询Runtime候选
+    candidate_filtering --> candidate_preview: 选择option并补齐参数
+    candidate_filtering --> cancelled: 零候选或取消
+    candidate_preview --> relation_armed: fan继续添加端点
+    candidate_preview --> candidate_filtering: 端点集合变化
+    candidate_preview --> confirmed: 无自由参数时直接复核提交；否则补齐参数后提交
+    candidate_preview --> cancelled: 取消
+    confirmed --> idle: committed Projection已接纳
+    cancelled --> idle: 临时Cell已释放
 ```
 
 状态字段：
@@ -284,10 +292,11 @@ stateDiagram-v2
 ```text
 RelationCandidateState {
   phase
+  selected_catalog_capability_id
+  interaction_mode
   capability_query_id
-  selected_capability_id?
-  first_endpoint_locator?
-  second_endpoint_locator?
+  selected_occurrence_ids[]
+  pointer?
   normalized_endpoints[]
   candidate_options[]
   selected_option_id?
@@ -303,6 +312,22 @@ RelationCandidateState {
 
 `candidate_options` 必须是后端根据固定 `base_revision` 计算的短期候选。Revision 变化、Context 变化、Profile binding 变化或端点变化时立即失效。
 
+X6 只发出 `relation-drag-start/relation-drag-move/relation-endpoint-selected/relation-cancelled`，且只携带 exact occurrence ID、画布坐标或稳定取消原因。X6 不查询 Runtime、不推断 role/direction、不生成 Command payload。拖线中的 pointer edge 可以使用中性临时线；释放并选定 option 后必须用该 Capability 的 `RelationPreviewRenderSpec` 替换，不能继续显示通用虚线。
+
+### 7.1 Runtime 候选与直接创建门
+
+全部 16 Procedural 和 10 Structural 固定经过“端点 -> Runtime option -> exact option refresh -> `CREATE_FACT`”。Runtime 返回唯一匹配 option 且不缺少用户必填 `duration`、`labels` 或多值 `direction` 时，最终端点松开后直接提交，不显示通用确认门。`collection_completeness` 默认 `COMPLETE`；unbounded fan 按住 `Shift` 松开继续收集端点，最终一次不按 `Shift` 松开直接提交。参数变化重建 preview；端点集合变化重新查询。
+
+preview 是 Runtime 查询、参数编辑或失败恢复期间的 candidate layer 临时 RenderSpec，不包含 Fact/Occurrence/relation/capture identity，不生成正式 OPL/Trace。提交前再次读取当前 Revision option并精确匹配规范端点和资产 ref；成功后只提交一次，失败保留输入与 preview。需要用户参数时使用不改变画布布局的内联浮层，第一个字段自动聚焦，`Enter` 提交，`Escape` 或关闭图标取消；不得显示创建确认按钮，也不得把所有关系强制放入二次确认流程。选择其他基础关系工具时，未提交 preview 静默取消并直接切换，不写顶部阻断反馈。
+
+Control 不进入拖线：选择 committed Procedural Fact 后，从目录查询 `UPDATE_FACT` options，以同一基础 RenderSpec 叠加临时 `e/c` annotation；确认后更新同一 Fact。Control preview 和 committed decorator 都不得创建第二 edge、Fact、Occurrence、Relation Group 或 capture anchor。
+
+### 7.2 多端点与取消
+
+fan 从 preview 选择“继续添加端点”回到 `relation-armed`，已验证端点按用户选择顺序保留；Runtime 返回的 role/ordinal/direction 才是规范顺序。Self-invocation 允许同一 Process occurrence重复出现；State-specified 使用 exact State occurrence，不回退 owner。
+
+打开目录、drag、preview、取消、空白释放、非法 Cell、无候选、参数失败和 Runtime 查询失败均保持 head Revision 不变，且零新增 Fact、Occurrence、Relation Group、OPL/Trace 和 capture anchor。
+
 ## 8. 候选过滤与端点归一化
 
 ### 8.1 过滤顺序
@@ -316,7 +341,7 @@ RelationCandidateState {
 -> State owner 与 state_qualification
 -> 已有 Fact、扇出、完整/不完整集合和逻辑组约束
 -> 标签、方向、modifier 组合
--> 候选 OPL/Trace 可生成性
+-> 正式 OPL/Trace 资产可用性预检
 ```
 
 任一层阻断都返回稳定 reason code；UI 显示首要原因并可展开全部原因。
@@ -509,7 +534,7 @@ UPDATE_FACT {
 }
 ```
 
-State 删除继续使用 `DELETE_CONSTRUCT`，但 payload 必须包含 `construct_kind=STATE`、`construct_id` 和未过期 impact token。State 显式/抑制继续使用现有 `STATE_EXPLICIT/STATE_SUPPRESS`。`CREATE_ELEMENT` 不得接收 State。
+State 删除遵守统一构造生命周期：先以 selected State occurrence 查询 `DELETE_CONSTRUCT` impact option，再以 exact selection/mode/target/token 提交。State 显式/抑制继续使用现有 `STATE_EXPLICIT/STATE_SUPPRESS`。`CREATE_ELEMENT` 不得接收 State。
 
 `CREATE_FEATURE` 只接受已存在 Element 作为 owner，并原子维护 owner 的 `feature_ids`。它不创建独立 Thing，不接收自由 `value_schema_ref`，也不替代 `CREATE_ELEMENT`。首期 P03 使用两个目录入口“属性”“操作”：用户先选择 owner Element，Runtime 对 `CREATE_FEATURE` 返回唯一可用 option；未选 owner 时返回 `ENDPOINT_KIND_MISMATCH`。投影 construct role 固定为 `ATTRIBUTE_NODE` 或 `OPERATION_NODE`，Feature Value State 为 `FEATURE_STATE_NODE`。Feature 结点和 Feature Value State 均由 Runtime Projection 返回，前端不得由关系端点临时拼接。
 
@@ -540,7 +565,7 @@ CommandCapabilityOption {
 }
 ```
 
-`impact_summary/impact_token` 仅在 `DELETE_CONSTRUCT` option 返回，且必须绑定 construct、影响集合摘要、Revision 和 Profile/Rule/Symbol/Grammar binding；前端不得从 Trace 数量或当前 Projection 自行生成 token。
+`impact_summary/impact_token` 仅在 `DELETE_CONSTRUCT` option 返回，且必须绑定 selected occurrence、mode、target、完整影响集合、Revision 和 Profile/Rule/Symbol/Grammar binding；前端不得从 Trace 数量或当前 Projection 自行生成 token。occurrence 移除、目标删除、显式 CASCADE 和 Control Modifier 移除的唯一语义以应用 API 契约第 7.2.1b 节为准。
 
 当前工作区 OpenAPI 已承载结构化 option、`base_fact_capability_ref`、Modifier 基数/原子组和 State/Fact command union，Revision 0.1 Schema 已承载 Fact `modifiers[]`。0.2 目标语义由全量冻结基线第 6 章冻结；完整 State/关系联调仍必须先由 `DEV-CANVAS-00` 发布版本化机器契约、生成前端类型并通过正反 contract test，禁止把草案文件存在或前端手写临时 DTO 宣称为已验收。
 
@@ -572,8 +597,8 @@ CommandCapabilityOption {
 | `O` | Object 工具 | 当前 Profile 允许时 |
 | `P` | Process 工具 | 当前 Profile 允许时 |
 | `S` | State 工具 | 必须有合法 owner |
-| `L` | 打开关系目录 | 焦点进入搜索框 |
-| `Delete/Backspace` | 删除所选 | 文本输入内只删除文字 |
+| `L` | 聚焦关系工具带 | 焦点进入首个可用 Procedural 项，不自动选择或提交 |
+| `Delete/Backspace` | 查询后直接删除所选构造 | 不显示右键菜单；按 `DELETE_TARGET -> CASCADE -> REMOVE_OCCURRENCE` 选择 enabled option；文本输入内只删除文字；无选择时无操作且不得触发浏览器导航；不得绕过 impact token |
 | `Ctrl/Cmd + Z` | 撤销 | editable draft |
 | `Ctrl/Cmd + Shift + Z` | 重做 | editable draft |
 | `Ctrl/Cmd + 0` | 适配画布 | 不产生 Revision |
@@ -584,7 +609,7 @@ CommandCapabilityOption {
 要求：
 
 1. 工具栏使用 roving tabindex，方向键在同组内移动；`Tab` 在组间移动。
-2. 关系目录搜索结果使用 listbox/option 语义，读出名称、端点摘要、可用状态和原因。
+2. 单行关系工具带使用 toolbar/group/button/menu 语义，常驻图标和展开项均读出标准双语名称；禁用项追加可读原因。端点摘要和机器 reason code 不进入工具提示。
 3. Canvas construct 必须有可聚焦代理，读出类型、名称、State owner 或关系端点摘要。
 4. candidate/blocked/committed 通过 `aria-live` 简短播报，不能只用颜色或动画。
 5. Escape 关闭最内层交互，不跨层清空未提交检查器表单。
@@ -593,21 +618,21 @@ CommandCapabilityOption {
 
 ### 15.1 桌面 `>820px`
 
-1. 工具链竖排固定在画布左上内侧；viewport controls 固定右下；二者不覆盖检查器和底栏。
-2. 关系目录以 anchored popover 打开，宽度受画布可用空间约束，长名称换行。
-3. 工具栏组尺寸稳定，提交状态只在 `editor-command-feedback` 显示，不撑大按钮。
+1. 唯一主工具栏位于画布上方；选择/平移、构造、三族关系和 viewport controls 同排，viewport controls 位于最右侧，不覆盖检查器和底栏。
+2. 三族关系在主工具栏中以竖线分隔；每组只显示 `4/4/5` 个高频标准图标和一个完整目录箭头，完整目录同样只显示图标，目录浮层不挤压画布。
+3. 工具栏组尺寸稳定，提交状态只在 `editor-command-feedback` 显示，不撑大按钮；画布内容区最小高度为 `360px`，较矮视口由画布容器滚动，不允许节点落到 OPL 面板后方而无法命中。
 
 ### 15.2 窄屏 `<=820px`
 
-1. 工具链变为底部横向可滚动工具条，Object/Process/State/Relation 始终在首屏；通用次要工具进入 overflow menu。
-2. 关系目录使用全宽 bottom sheet，搜索框固定顶部，分组列表独立滚动。
+1. 主工具栏整体横向可滚动且不换行，Object/Process/State、三族关系和 viewport controls 均可通过滚动到达；不创建第二排或独立关系滚动区。
+2. 每族完整纯图标目录仍由本组箭头打开，不改为全局 bottom sheet；固定浮层不被横向滚动容器裁剪。
 3. 检查器使用独立 bottom sheet；打开时画布保留可见区域，不叠放 card。
 4. 创建 fan、编辑复杂逻辑/概率和语义 zoom 影响确认可查看但默认提示转到桌面完成；这属于输入效率降级，不改变模型能力。
 
 ### 15.3 紧凑屏 `<=520px`
 
 1. 保证查看、选择、定位、视口缩放、Object/Process/State 基本创建和单关系创建主路径。
-2. 不在同一屏同时打开关系目录、检查器和底部 OPL；后打开者替换前一个面板并保留其本地状态。
+2. 检查器和底部 OPL 不得覆盖单排主工具栏；画布与主工具栏分别滚动，展开目录锚定当前箭头并保持在视口可见区域。
 3. 所有按钮、标签和错误文案允许换行；不得缩小字体适配长术语。
 
 ## 16. 大图、性能与错误状态
@@ -619,7 +644,7 @@ CommandCapabilityOption {
 1. 以 `1,000` 个可见 construct、`2,000` 个可见 edge 的代表 fixture 验证 pan/zoom、选择和候选 hover；
 2. 搜索、关系候选和规则过滤不得扫描 X6 Cell 推导语义，使用服务器候选和稳定索引；
 3. Projection 更新按稳定 ID diff，candidate/finding/focus overlay 与基础 symbol 分层；
-4. 关系目录 34 项可直接渲染，不需要虚拟滚动；Context/搜索结果按真实规模决定虚拟化；
+4. 关系工具带常驻渲染 13 个高频图标；每次只渲染一个族的完整目录，最多 15 项，不需要虚拟滚动；Context 结果按真实规模决定虚拟化；
 5. 性能不满足门槛时允许降低非语义动画，不允许省略 marker、标签、State 或 Finding。
 
 准确阈值、采样方法和测试环境已由 `DEV-CANVAS-06` 规格冻结：300/600 基线为 frame P95 `<=32 ms`、选择 P95 `<=100 ms`，1,000/2,000 压力集为 `<=50 ms`、`<=200 ms`；10,000 结点模型保存/快照/全量校验分别 `<=10/15/60 s`。这些仍是待实现验收目标，不是当前运行事实或 ISO 要求。
@@ -630,7 +655,7 @@ CommandCapabilityOption {
 | --- | --- | --- | --- |
 | `blocked` | 保留 committed Projection | 保留并突出错误字段/端点 | 修正或取消 |
 | `revision-conflict` | 刷新前保持旧 read revision 标识 | 标记过期，不可直接重放 | 刷新 Projection、重算候选 |
-| `text-generation-blocked` | 不显示候选为正式关系 | 保留候选 OPL 但标明非正式 | 修正模型或资产 |
+| `text-generation-blocked` | 不显示候选为正式关系 | 保留候选参数与标准符号 preview，不生成候选 OPL | 修正模型或资产 |
 | `persistence-failed` | 回到最近 committed Projection | 保留可重试输入 | 重试或放弃 |
 | `symbol-asset-missing` | 已有构造显示受控错误占位且阻断编辑 | 不提供替代自由符号 | 修复绑定资产 |
 | `projection-load-failed` | 不显示空白画布冒充空模型 | 无 | 重试、返回、恢复 |
@@ -641,8 +666,8 @@ CommandCapabilityOption {
 | --- | --- |
 | 工具链 | `P03-canvas-toolchain` |
 | Object/Process/State | `P03-tool-object`、`P03-tool-process`、`P03-tool-state` |
-| 关系 split-button | `P03-tool-relation-primary`、`P03-tool-relation-menu` |
-| 关系搜索/选项 | `P03-relation-search`、`P03-relation-option-{capabilityId}` |
+| 单行分组关系工具带 | `P03-relation-tool-palette`、`P03-relation-toolbar-{family}`、`P03-relation-menu-toggle-{family}` |
+| 关系选项 | `P03-relation-quick-option-{capabilityId}`、`P03-relation-menu-option-{capabilityId}` |
 | candidate layer | `P03-relation-candidate` |
 | command feedback | `P03-command-feedback` |
 | viewport | `P03-viewport-zoom-in/out/fit/scale` |
@@ -656,12 +681,12 @@ X6 SVG 内部生成的 DOM 层级和 class 不作为 E2E 选择器。Construct �
 | 层级 | 必须证明 | 代表验收 |
 | --- | --- | --- |
 | Symbol 组件 | node/marker/label slot/route 与描述符一致 | Object/Process/State + 16/8/10 缩略图和画布符号 |
-| Candidate 单元 | Profile、端点、Context、State、已有 Fact 过滤与归一化 | 拖线顺序反转仍得到规范端点；歧义不自动提交 |
+| Candidate 单元 | Profile、端点、Context、State、已有 Fact 过滤、归一化和 preview identity | 拖线顺序反转仍得到规范端点；26 个基础 Capability 均不自动提交 |
 | API 契约 | `API-EDT-001/002` 候选和命令 DTO 可生成且错误稳定 | CREATE/UPDATE State、CREATE/UPDATE Fact、旧 revision 失效 |
 | 领域集成 | State owner、fan、modifier、文本与原子 Revision 闭合 | 任一文本/规则失败无 partial revision |
 | OPL golden | Control 20 个基础组合、Structural 全部合法 variant 和关键组合反例 | 主 ID + variant manifest、字节/Token/Trace/digest 可重复 |
 | 浏览器视觉 | 标准符号、长标签、缩放、折叠、Finding 不重叠 | `25%/100%/400%` + 桌面/窄屏截图和 canvas pixel 检查 |
-| E2E | 用户从工具选择到 committed Projection/OPL/Trace | State、过程关系、控制修饰、结构 fan、blocked/conflict/readonly |
+| E2E | 用户从目录、拖线、Runtime 候选到直接 committed Projection/OPL/Trace；必要参数单独编辑 | binary、Shift fan、Self-invocation、State-specified、Control、取消/空白/无候选/失败、reload |
 | 性能 | 大图下工具选择、候选和视口操作可用 | 独立性能规格与固定 fixture/机器报告 |
 
 完整关系生产启用门槛：

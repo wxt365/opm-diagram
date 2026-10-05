@@ -59,6 +59,21 @@
                 </includes>
             </resource>
             <resource>
+                <directory>../../docs/contracts/migrations/sqlite/hybrid-save</directory>
+                <targetPath>db/hybrid-save</targetPath>
+                <includes><include>V3__hybrid_save_foundation.sql</include></includes>
+            </resource>
+            <resource>
+                <directory>../../docs/contracts/migrations/sqlite-checkpoint</directory>
+                <targetPath>db/checkpoint</targetPath>
+                <includes><include>V4__checkpoint_capture_overlay.sql</include></includes>
+            </resource>
+            <resource>
+                <directory>../../docs/contracts/migrations/sqlite-pin</directory>
+                <targetPath>db/pin</targetPath>
+                <includes><include>V5__pin_retention_nullable_sequence.sql</include></includes>
+            </resource>
+            <resource>
                 <directory>../../docs/contracts/schemas</directory>
                 <targetPath>releaseevidence/schema</targetPath>
                 <includes>

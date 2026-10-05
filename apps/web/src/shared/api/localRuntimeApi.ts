@@ -3,10 +3,28 @@ import type {
   ApiEdtCreateFactPayload,
   ApiEdtCreateStatePayload,
   ApiEdtDeleteConstructPayload,
+  ApiEdtRelationCatalogItem,
   ApiEdtStatePresentationPayload,
   ApiEdtUpdateFactPayload,
+  ApiEdtUpdateLayoutPayload,
+  ApiEdtUpdatePropertyPayload,
   ApiEdtUpdateStatePayload,
 } from "./generated/apiEdtContract";
+import type * as Draft from "./generated/draftWorkspaceContract";
+import type { PinResult, SaveResult } from "./generated/draftSaveContract";
+
+export interface DraftQueryContracts {
+  open: [Draft.OpenDraftRequest, Draft.OpenDraftResult];
+  projection: [Draft.DraftQueryRequest, Draft.DraftProjectionResult];
+  text: [Draft.DraftQueryRequest, Draft.DraftTextResult];
+  navigation: [Draft.DraftQueryRequest, Draft.DraftNavigationResult];
+  findings: [Draft.DraftQueryRequest, Draft.DraftFindingsResult];
+  "relation-catalog": [Draft.DraftRelationCatalogRequest, Draft.DraftRelationCatalogResult];
+  capabilities: [Draft.DraftCapabilitiesRequest, Draft.DraftCapabilitiesResult];
+  receipts: [Draft.DraftReceiptRequest, Draft.DraftReceiptResult];
+}
+
+export interface DraftMutationResults { EDIT: Draft.DraftEditResult; SAVE: SaveResult; PIN: PinResult }
 
 export type ResourceAccessMode = "EDITABLE_DRAFT" | "READONLY_SNAPSHOT" | "READONLY_BASELINE";
 
@@ -23,7 +41,7 @@ export interface ModelWire {
   model_id: string;
   project_id: string;
   name: string;
-  head_revision: string;
+  head_revision: string | null;
   profile_id: string;
   profile_version: string;
   rule_version: string;
@@ -112,14 +130,7 @@ export interface TextTraceWire {
   occurrence_ids: string[];
 }
 
-export interface RelationCatalogItemWire {
-  family: "PROCEDURAL" | "CONTROL" | "STRUCTURAL";
-  capability_id: string;
-  display_name: string;
-  symbol_id: string;
-  enabled: boolean;
-  reason_codes: string[];
-}
+export type RelationCatalogItemWire = ApiEdtRelationCatalogItem;
 
 export interface RevisionWire {
   revision_id: string;
@@ -180,6 +191,8 @@ export type P0Command =
   | { commandType: "CREATE_STATE"; payload: ApiEdtCreateStatePayload }
   | { commandType: "UPDATE_STATE"; payload: ApiEdtUpdateStatePayload }
   | { commandType: "UPDATE_FACT"; payload: ApiEdtUpdateFactPayload }
+  | { commandType: "UPDATE_PROPERTY"; payload: ApiEdtUpdatePropertyPayload }
+  | { commandType: "UPDATE_LAYOUT"; payload: ApiEdtUpdateLayoutPayload }
   | { commandType: "DELETE_CONSTRUCT"; payload: ApiEdtDeleteConstructPayload }
   | { commandType: "STATE_EXPLICIT" | "STATE_SUPPRESS" | "UNFOLD" | "FOLD"; payload: ApiEdtStatePresentationPayload };
 
@@ -201,15 +214,29 @@ interface ProfileRuleBinding {
 export class LocalRuntimeApiError extends Error {
   readonly code: string;
   readonly retryable: boolean;
+  readonly reasonCode: string | null;
 
-  constructor(code: string, message: string, retryable = false) {
+  constructor(code: string, message: string, retryable = false, reasonCode: string | null = null) {
     super(message);
     this.code = code;
     this.retryable = retryable;
+    this.reasonCode = reasonCode;
   }
 }
 
 class LocalRuntimeApi {
+  draftQuery<K extends keyof DraftQueryContracts>(project: string, model: string, operation: K,
+    request: DraftQueryContracts[K][0]): Promise<DraftQueryContracts[K][1]> {
+    return this.writeRaw(draftPath(project, model, operation), JSON.stringify(request));
+  }
+
+  // raw 已由传输 owner 持久化；重试不能重新序列化或分配另一 command_id。
+  draftMutation<K extends keyof DraftMutationResults>(project: string, model: string, operation: K,
+    raw: string): Promise<DraftMutationResults[K]> {
+    const path = { EDIT: "commands", SAVE: "save", PIN: "pin" }[operation];
+    return this.writeRaw(draftPath(project, model, path), raw);
+  }
+
   async listProjects(query?: string): Promise<ProjectWire[]> {
     const params = new URLSearchParams({ request_id: requestId("query.projects") });
     if (query?.trim()) params.set("query", query.trim());
@@ -246,8 +273,11 @@ class LocalRuntimeApi {
     return (await this.request<QueryEnvelope<WorkspaceSessionWire>>(`/api/v1/projects/${encodeURIComponent(projectId)}/models/${encodeURIComponent(modelId)}/workspace-session?${queryRequestId("workspace")}`)).data;
   }
 
-  async workspaceSession(projectId: string, modelId: string): Promise<QueryEnvelope<WorkspaceSessionWire>> {
-    return this.request<QueryEnvelope<WorkspaceSessionWire>>(`/api/v1/projects/${encodeURIComponent(projectId)}/models/${encodeURIComponent(modelId)}/workspace-session?${queryRequestId("workspace")}`);
+  async workspaceSession(projectId: string, modelId: string, revision?: string, context?: string): Promise<QueryEnvelope<WorkspaceSessionWire>> {
+    const params = new URLSearchParams(queryRequestId("workspace"));
+    if (revision !== undefined) params.set("revision", revision);
+    if (context !== undefined) params.set("context", context);
+    return this.request<QueryEnvelope<WorkspaceSessionWire>>(`/api/v1/projects/${encodeURIComponent(projectId)}/models/${encodeURIComponent(modelId)}/workspace-session?${params}`);
   }
 
   async navigation(projectId: string, modelId: string, contextId: string, revision: string): Promise<QueryEnvelope<{ current_path: string[]; process_tree: NavigationNodeWire[]; object_forest: NavigationNodeWire[]; views: NavigationNodeWire[] }>> {
@@ -266,8 +296,10 @@ class LocalRuntimeApi {
     return this.request<QueryEnvelope<ApiEdtCommandCapabilitiesData>>(`/api/v1/projects/${encodeURIComponent(projectId)}/models/${encodeURIComponent(modelId)}/contexts/${encodeURIComponent(contextId)}/command-capabilities?${params}`);
   }
 
-  async relationCatalog(projectId: string, modelId: string, contextId: string, revision: string): Promise<QueryEnvelope<{ items: RelationCatalogItemWire[] }>> {
-    return this.queryContext(projectId, modelId, contextId, revision, "relation-catalog");
+  async relationCatalog(projectId: string, modelId: string, contextId: string, revision: string, selectionId?: string): Promise<QueryEnvelope<{ items: RelationCatalogItemWire[] }>> {
+    const params = new URLSearchParams({ request_id: requestId("query.relation-catalog"), revision });
+    if (selectionId) params.set("selection_id", selectionId);
+    return this.request<QueryEnvelope<{ items: RelationCatalogItemWire[] }>>(`/api/v1/projects/${encodeURIComponent(projectId)}/models/${encodeURIComponent(modelId)}/contexts/${encodeURIComponent(contextId)}/relation-catalog?${params}`);
   }
 
   async textProjection(projectId: string, modelId: string, contextId: string, revision: string): Promise<QueryEnvelope<{ artifact_id: string; modality: "OPL" | "OPT"; sentences: TextSentenceWire[]; traces: TextTraceWire[] }>> {
@@ -328,6 +360,10 @@ class LocalRuntimeApi {
   }
 
   private async write<T>(path: string, body: Record<string, unknown>): Promise<T> {
+    return this.writeRaw(path, JSON.stringify(body));
+  }
+
+  private async writeRaw<T>(path: string, raw: string): Promise<T> {
     const token = window.__OPM_LOCAL_SESSION__;
     if (!token) {
       throw new LocalRuntimeApiError("LOCAL_SESSION_INVALID", "本地会话尚未就绪，请刷新页面后重试。");
@@ -338,7 +374,7 @@ class LocalRuntimeApi {
         "Content-Type": "application/json",
         "X-OPM-Session": token,
       },
-      body: JSON.stringify(body),
+      body: raw,
     });
   }
 
@@ -350,15 +386,30 @@ class LocalRuntimeApi {
       throw new LocalRuntimeApiError("RUNTIME_UNAVAILABLE", "本地运行时不可用，请确认服务已启动。", true);
     }
     const payload = await json(response);
+    const isDraft = path.startsWith("/api/v2/");
     if (!response.ok) {
-      const error = asError(payload);
-      throw new LocalRuntimeApiError(error?.code ?? "REQUEST_FAILED", error?.message ?? "本地请求失败，请重试。", error?.retryable ?? false);
+      const error = isDraft ? asDraftError(payload) : asError(payload);
+      throw new LocalRuntimeApiError(error?.code ?? "REQUEST_FAILED", error?.message ?? "本地请求失败，请重试。", error?.retryable ?? false,
+        isDraft ? asDraftError(payload)?.reason_code ?? null : null);
     }
+    if (isDraft && (!payload || typeof payload !== "object" || Array.isArray(payload) || Object.keys(payload).length === 0))
+      throw new LocalRuntimeApiError("DRAFT_RESPONSE_INVALID", "草稿响应无效，待确认请求已保留。");
     return payload as T;
   }
 }
 
 export const localRuntimeApi = new LocalRuntimeApi();
+
+function draftPath(project: string, model: string, operation: string): string {
+  return `/api/v2/projects/${encodeURIComponent(project)}/models/${encodeURIComponent(model)}/draft/${operation}`;
+}
+
+function asDraftError(payload: unknown): { code: string; message: string; retryable: boolean; reason_code: string | null } | undefined {
+  if (!payload || typeof payload !== "object" || !("code" in payload) || !("message" in payload) || !("retryable" in payload)
+    || typeof payload.code !== "string" || typeof payload.message !== "string" || typeof payload.retryable !== "boolean") return undefined;
+  return { code: payload.code, message: payload.message, retryable: payload.retryable,
+    reason_code: "reason_code" in payload && typeof payload.reason_code === "string" ? payload.reason_code : null };
+}
 
 function activeBinding(): ProfileRuleBinding {
   const binding = window.__OPM_ACTIVE_PROFILE_BINDING__;

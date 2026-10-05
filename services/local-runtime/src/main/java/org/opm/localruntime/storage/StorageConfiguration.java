@@ -10,6 +10,6 @@ class StorageConfiguration {
 
     @Bean
     ProjectDatabaseFactory projectDatabaseFactory(StorageProperties properties) {
-        return new ProjectDatabaseFactory(properties.root());
+        return ProjectDatabaseFactory.journaledDrafts(properties.root());
     }
 }

@@ -26,6 +26,10 @@ final class FlywayProjectSchemaMigrator {
     }
 
     ProjectDatabaseOpenResult migrate(Path databasePath) {
+        return migrate(databasePath, false);
+    }
+
+    ProjectDatabaseOpenResult migrate(Path databasePath, boolean newDatabaseOnly) {
         Path normalizedDatabasePath = databasePath.toAbsolutePath().normalize();
         Optional<Path> recoveryPoint = Optional.empty();
         boolean databaseExisted = Files.isRegularFile(normalizedDatabasePath);
@@ -40,6 +44,9 @@ final class FlywayProjectSchemaMigrator {
                     .load();
 
             flyway.validate();
+            if (newDatabaseOnly && databaseExisted && hasPendingMigration(flyway)) {
+                throw new StorageAccessException("已有开发库必须显式重置或迁移，不能在新建模式中隐式升级");
+            }
             if (hasPendingMigration(flyway) && databaseExisted && Files.size(normalizedDatabasePath) > 0) {
                 recoveryPoint = Optional.of(createRecoveryPoint(normalizedDatabasePath));
             }

@@ -1,12 +1,14 @@
 # OPM 单机建模工具应用 API 契约
 
-文档版本：`v1.0`
+2026-09-15：UPDATE_LAYOUT 的 owned role 集合扩展至 Operation、State、Feature State，payload 不变；状态容纳与父移动联动由 Runtime 原子执行，草稿只产生一条 journal edit，继续按混合保存策略形成检查点。角色/owner/Context 校验、夹取算法、失败与回滚见[状态布局修正规格](../../specs/opm-p03-owned-state-layout-and-exhibition-bugfix-task-spec.md)，替代旧三类移动限制。
+
+文档版本：`v1.3`
 
 文档状态：`FROZEN_INCLUDED`；应用语义与完整画布 0.2 目标契约冻结，机器发布和执行证据待开发包验收
 
 全局设计状态、延期边界和开发准入以 `opm-design-freeze-baseline.md` 为唯一事实源。
 
-更新时间：2026-07-28
+更新时间：2026-09-03
 
 ## Task Type
 
@@ -17,6 +19,12 @@
 本文档冻结 P01-P06 页面调用 M02-M12 应用能力时的操作标识、通用包络、关键输入、结果、状态守卫、并发幂等和结构化错误语义。
 
 本文档中的“API”表示模块化单体的应用边界。P0 操作已经映射到 `docs/contracts/openapi/opm-local-api-v1.yaml` 的本地 HTTP 契约；未进入首批 OpenAPI 的操作继续保持传输无关，后续映射不得改变本文定义的命令、查询、事务和错误语义。
+
+`UPDATE_LAYOUT` 仅携带 `occurrence_id` 和二维有限数 `x/y`，不得携带目标、Context、尺寸或级联集合。允许当前根 Context 的 owned Object/Process/Attribute/Operation/State，Runtime 复核 role/kind/owner 后执行；State 在 owner 内容区夹取位置，父节点移动原子更新其可见 owned 状态布局。尺寸扩展由 Runtime 的容纳规则计算。Fact、非 owned 和跨 Context occurrence 继续拒绝；语义及 OPL/Trace 不变，活动草稿沿混合保存策略持久化。完整边界由 `specs/opm-p03-owned-state-layout-and-exhibition-bugfix-task-spec.md` 冻结。
+
+`UPDATE_PROPERTY` 的首个受控切片只允许修改 Object/Process 的 `name`。payload 固定为 `target_ref={target_kind=ELEMENT,target_id}`、`property_name=name`、`value`、`capability_query_id` 和 `selected_option_id`，禁止扩展字段。名称保留原字符串，按 Unicode code point 限制为最多 256，空白值非法，不执行唯一性校验；成功只替换 Element `QualifiedName.local_name`。旧 Revision、Baseline、同值和重复命令的精确语义由 `specs/opm-p03-element-name-editing-task-spec.md` 第 6、7 节冻结。
+
+`DELETE_CONSTRUCT` 的完整 P03 生命周期由 `specs/opm-p03-unified-construct-lifecycle-design-task-spec.md` 冻结：删除从 selected occurrence 取得 Runtime impact option，而不是由画布 Cell 推断 target 或 cascade；当前 0.2 OpenAPI、生成 DTO 与 Runtime 仍待后继原子实现规格同步。
 
 本文档本身不重复冻结：
 
@@ -130,6 +138,8 @@
 
 ### 6.2 Revision 守卫
 
+新模式修正：以下 revision-only 守卫与第 4/5/6.3 节的包络、提交语义继续适用于 `REVISION_PER_EDIT_V1` 和历史 EXACT 查询。`JOURNALED_DRAFT_V2` 使用独立 draft token、DURABLE 编辑回执和 Save/Pin 协议，详见 [混合保存设计](opm-hybrid-save-and-draft-recovery-design.md)。不得将草稿序号写入 committed_revision；新机器 OpenAPI 与生成类型由 [HS-01](../../specs/opm-hybrid-save-strategy-implementation-task-spec.md) 交付后再接入消费端，当前 API 实现未改变。
+
 1. 所有模型语义、Context、语义布局、Profile 转换和版本写命令必须携带 `base_revision`；
 2. 普通 viewport、焦点、筛选和面板状态不携带 base_revision，也不产生模型修订；
 3. base_revision 不是当前可写 Draft Revision 时返回 `REVISION_CONFLICT`，不自动合并或覆盖；
@@ -172,6 +182,7 @@
 | API-EDT-003 | UndoEditCommand | Command | M03-M09/M12 | P03 | 新 committed_revision |
 | API-EDT-004 | RedoEditCommand | Command | M03-M09/M12 | P03 | 新 committed_revision |
 | API-EDT-005 | GetEditSessionState | Query | M03/M09 | P03 | revision、Undo/Redo、脏状态和保存状态 |
+| API-CAT-001 | GetRelationCatalog | Query | M06 | P03 | selection-aware 16/8/10 关系目录、符号、端点摘要和进入模式 |
 
 `ExecuteEditCommand` 的 P0 机器契约覆盖结点/基础关系创建与删除、属性修改、Context 创建、普通/语义布局、状态显式/抑制、展开/折叠和语义 in/out-zoom。完整画布在相同 operationId 下扩展 State/Fact command union；新增 command_type 必须先补 Profile 能力、校验、文本、持久化和验收映射。
 
@@ -181,7 +192,7 @@
 CommandCapabilityQuery {
   input_revision
   intent                    // CREATE_ELEMENT | CREATE_FEATURE | CREATE_STATE | CREATE_FACT |
-                            // UPDATE_STATE | UPDATE_FACT | DELETE_CONSTRUCT |
+                            // UPDATE_STATE | UPDATE_FACT | UPDATE_PROPERTY | DELETE_CONSTRUCT |
                             // SEMANTIC_REFINEMENT
   selection_locators[]
   first_endpoint_locator?
@@ -239,9 +250,58 @@ Control option 必须恰好返回 `control.capability` 与 `control.segment` 两
 4. option 绑定 `input_revision`，Revision、Context、Profile binding、端点或 draft field 改变后失效；
 5. 当前完整画布稳定 reason code 至少覆盖 `PROFILE_CAPABILITY_DISABLED/SYMBOL_ASSET_MISSING/TEXT_TEMPLATE_MISSING/ENDPOINT_KIND_MISMATCH/STATE_OWNER_MISMATCH/CONTEXT_NOT_ALLOWED/FACT_ALREADY_EXISTS/MODIFIER_COMBINATION_INVALID/READ_ONLY_REVISION/REVISION_STALE`；
 6. `DELETE_CONSTRUCT` option 必须返回固定 `input_revision` 的 `impact_summary + impact_token`；其他 intent 禁止返回 impact token，前端不得自行拼装；
-7. impact token 绑定 construct、影响集合摘要、Revision 和 binding，任一项变化即失效；
+7. impact token 绑定 selection、mode、target、影响集合摘要、Revision 和 binding，任一项变化即失效；
 8. reason code 是候选解释，不替代第 11 章提交错误码。
 9. Control option 的 `capability_ref` 是所选 `CAP-ISO-CTRL-*`，`base_fact_capability_ref` 是允许被修饰的 Procedural Capability；非 Control option 禁止返回后者。
+
+#### 7.2.1a `API-CAT-001 RelationCatalogQuery`
+
+```text
+RelationCatalogQuery {
+  input_revision
+  context_id
+  selection_id?             // 当前 committed Fact；只影响 Control 进入状态
+}
+
+RelationCatalogItem {
+  family                     // PROCEDURAL | CONTROL | STRUCTURAL
+  capability_id
+  display_name
+  interaction_mode           // CREATE_FACT | UPDATE_SELECTED_FACT
+  symbol_descriptor          // exact id/version/digest
+  endpoint_summary {
+    min_endpoints
+    max_endpoints?
+    roles[] {
+      role
+      target_kinds[]
+      min_occurs
+      max_occurs?
+      state_qualification_allowed
+    }
+  }
+  enabled
+  reason_codes[]
+}
+```
+
+目录固定返回活动 Profile 可见的 `16 Procedural / 8 Control / 10 Structural`。它不返回 `FORBIDDEN/N_A` Capability，也不构成最终端点授权。Procedural/Structural 使用 `CREATE_FACT`；Control 使用 `UPDATE_SELECTED_FACT`，仅当 `selection_id` 是当前 Context 中的 committed Procedural Fact 且存在匹配 `UPDATE_FACT` option 时 enabled，否则至少返回 `CONTROL_REQUIRES_BASE_FACT` 或更高优先级的 binding/readonly reason。
+
+`endpoint_summary` 是 Runtime 从当前 Profile/Rule/Catalog 生成的展示摘要，不是前端规则表；用户选择端点后必须调用 `API-EDT-001`，最终以 option 的 `normalized_endpoints/required_fields/allowed_modifiers` 为准。`symbol_descriptor` 必须与后续 option 的 exact ref 匹配；不匹配时阻断 preview 和提交。
+
+目录查询、搜索、排序和 item 选择均不产生 Command、Revision、Operation Record、Fact、Occurrence、OPL/Trace 或 capture anchor。
+
+#### 7.2.1b `DELETE_CONSTRUCT` 影响协议
+
+删除查询的 `selection_locators[]` 只接受当前 Projection 的 exact occurrence ID。Runtime 为同一 selection 分别计算可用的 `REMOVE_OCCURRENCE`、`DELETE_TARGET` 或 `CASCADE` option；前端不得根据 `target_kind`、owner、线条或 Trace 自行构造模式或影响集合。
+
+`impact_summary` 是完整而非计数提示，固定包含 `input_revision`、`selected_occurrence_id`、`delete_mode`、`target{kind,id}`、规范排序且去重的 `items[]`、以及 Context/Occurrence/Element/Feature/State/Fact/OPL Sentence/Trace/Finding 九类计数。每个 item 固定为 `{kind,id,context_id?,effect}`，`effect` 只能为 `DIRECT`、`CASCADE` 或 disabled option 中的 `BLOCKER`。enabled option 不得带 blocker、不得截断 items；无法产生完整闭包时 option disabled 且不发 token。
+
+`REMOVE_OCCURRENCE` 只移除当前 Context occurrence；它仅对 referenced occurrence 或仍保有其他 owned occurrence 的目标 enabled，Fact 不提供该模式。`DELETE_TARGET` 删除目标、其全部 owned occurrence 和自动派生文本/追踪投影；若仍有引用 occurrence、owned Feature/State、Fact、细化 Context 或其他依赖则以 `DELETE_DEPENDENCY_EXISTS` 阻断。只有 Runtime 能完整列出闭包时才提供 `CASCADE`；确认即删除 token 所绑定的全部 `DIRECT/CASCADE` 项，禁止静默级联。
+
+后继 OpenAPI payload 固定为 `selection_id + construct_kind + construct_id + delete_mode + impact_token`，全部必填、`additionalProperties=false`。`REMOVE_OCCURRENCE` 只能为 `construct_kind=OCCURRENCE` 且 construct ID 等于 selection；其余模式只能为 `ELEMENT|FEATURE|STATE|FACT`。token 必须精确绑定 project/model/context、Revision、binding、selection、mode、target、规范 impact、query 与 option。token 形状错误返回 `INVALID_ARGUMENT/400`；所有绑定不一致返回 `IMPACT_TOKEN_STALE/409`；取消、阻断、token 错误和持久化失败均不得产生 Revision 或部分删除。
+
+Control 不走 `DELETE_CONSTRUCT`。选中的 committed Procedural Fact 含有效 Control 原子组时，`UPDATE_FACT` 返回 `REMOVE_CONTROL` 表示选项；确认提交 `replacement.modifiers=[]`，保留基础 Fact、endpoints、layout、capture anchor 和 Fact ID，仅重生成该 Fact 的 OPL/Trace。
 
 #### 7.2.2 `API-EDT-002` 完整画布 command union
 
@@ -301,8 +361,10 @@ UpdateFactPayload {
 }
 
 DeleteConstructPayload {
-  construct_kind            // ELEMENT | STATE | FACT | FEATURE | CONTEXT
+  selection_id              // exact selected occurrence
+  construct_kind            // OCCURRENCE | ELEMENT | STATE | FACT | FEATURE
   construct_id
+  delete_mode               // REMOVE_OCCURRENCE | DELETE_TARGET | CASCADE
   impact_token
 }
 ```
@@ -315,7 +377,7 @@ Payload 规则：
 4. ISO Control 使用基础 Fact 的两个受控 Modifier，不创建脱离基础关系的自由 Fact，也不把基础 Fact 的 `fact_family/capability_ref` 改为 Control；
 5. fundamental fan 的多个 refinee 是同一 Fact 的 ordered endpoints，更新成员保持 Fact ID；
 6. `UPDATE_STATE` 不允许改变 owner；跨 owner 移动需要未来专用影响分析命令；
-7. `DELETE_CONSTRUCT` 的 impact token 必须由固定 Revision 的影响查询产生，过期或影响集合变化时阻断；
+7. `DELETE_CONSTRUCT` 的 impact token 必须由固定 Revision 的完整影响查询产生，payload 的 selection/mode/target 与 token 不相等、过期或影响集合变化时阻断；
 8. capability query/option ID 必须属于相同 base revision、binding、intent 和候选摘要，不能跨命令复用。
 
 ISO Control 的 wire payload 冻结为：

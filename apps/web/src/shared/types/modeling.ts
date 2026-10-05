@@ -48,6 +48,8 @@ export interface OpdNode {
   kind: "object" | "process" | "attribute" | "operation" | "state";
   x: number;
   y: number;
+  width?: number;
+  height?: number;
   valueDomain: string;
   visibility: "public" | "protected" | "private";
   multiplicity: string;

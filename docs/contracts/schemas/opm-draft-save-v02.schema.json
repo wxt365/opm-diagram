@@ -1,0 +1,142 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://opm.local/schemas/draft-save/0.2",
+  "title": "草稿保存协议 0.2",
+  "oneOf": [
+    { "$ref": "#/$defs/SaveRequest" }, { "$ref": "#/$defs/PinRequest" },
+    { "$ref": "#/$defs/SaveResult" }, { "$ref": "#/$defs/PinResult" },
+    { "$ref": "#/$defs/SaveState" }, { "$ref": "#/$defs/SaveError" },
+    { "$ref": "#/$defs/DraftPreparationRequest" }, { "$ref": "#/$defs/DraftPreparationReport" },
+    { "$ref": "#/$defs/DraftActivationRequest" }, { "$ref": "#/$defs/DraftActivationReport" }
+  ],
+  "$defs": {
+    "Id": { "type": "string", "minLength": 1, "maxLength": 256, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$" },
+    "Digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "UtcTime": { "type": "string", "format": "date-time", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$" },
+    "DraftToken": {
+      "type": "object", "additionalProperties": false,
+      "required": ["draft_id", "edit_seq", "binding_digest"],
+      "properties": {
+        "draft_id": { "$ref": "#/$defs/Id" },
+        "edit_seq": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+        "binding_digest": { "$ref": "#/$defs/Digest" }
+      }
+    },
+    "SaveRequest": {
+      "type": "object", "additionalProperties": false,
+      "required": ["save_id", "target_draft_token", "reason"],
+      "properties": {
+        "save_id": { "$ref": "#/$defs/Id" },
+        "target_draft_token": { "$ref": "#/$defs/DraftToken" },
+        "reason": { "type": "string", "enum": ["MANUAL"] }
+      }
+    },
+    "PinRequest": {
+      "type": "object", "additionalProperties": false,
+      "required": ["pin_id", "target_draft_token", "purpose"],
+      "properties": {
+        "pin_id": { "$ref": "#/$defs/Id" },
+        "target_draft_token": { "$ref": "#/$defs/DraftToken" },
+        "purpose": { "type": "string", "enum": ["PERMALINK", "SNAPSHOT", "BASELINE", "EXPORT"] }
+      }
+    },
+    "SaveResult": {
+      "type": "object", "additionalProperties": false,
+      "required": ["save_id", "status", "captured_token", "checkpoint_id", "revision_id", "head_token"],
+      "properties": {
+        "save_id": { "$ref": "#/$defs/Id" },
+        "status": { "type": "string", "enum": ["SAVED", "UNCHANGED"] },
+        "captured_token": { "$ref": "#/$defs/DraftToken" },
+        "checkpoint_id": { "$ref": "#/$defs/Id" },
+        "revision_id": { "$ref": "#/$defs/Id" },
+        "head_token": { "$ref": "#/$defs/DraftToken" }
+      }
+    },
+    "PinResult": {
+      "type": "object", "additionalProperties": false,
+      "required": ["pin_id", "revision_id", "captured_token"],
+      "properties": {
+        "pin_id": { "$ref": "#/$defs/Id" },
+        "revision_id": { "$ref": "#/$defs/Id" },
+        "captured_token": { "$ref": "#/$defs/DraftToken" }
+      }
+    },
+    "SaveError": {
+      "type": "object", "additionalProperties": false,
+      "required": ["code", "message", "retryable"],
+      "properties": {
+        "code": { "type": "string", "enum": ["INPUT_INVALID", "DRAFT_CONFLICT", "READ_ONLY_REVISION", "RULE_VERSION_CONFLICT", "IDEMPOTENCY_MISMATCH", "PERSISTENCE_FAILED", "DRAFT_RECOVERY_REQUIRED", "NOT_FOUND", "LOCAL_SESSION_INVALID", "DRAFT_MODE_REQUIRED", "SAVE_VALIDATION_BLOCKED"] },
+        "message": { "type": "string", "minLength": 1 },
+        "retryable": { "type": "boolean" }
+      }
+    },
+    "DraftPreparationRequest": {
+      "type": "object", "additionalProperties": false,
+      "required": ["project_id", "model_id", "expected_revision_id", "expected_document_sha256", "expected_binding_digest", "draft_id", "checkpoint_id", "requested_at"],
+      "properties": {
+        "project_id": { "$ref": "#/$defs/Id" },
+        "model_id": { "$ref": "#/$defs/Id" },
+        "expected_revision_id": { "$ref": "#/$defs/Id" },
+        "expected_document_sha256": { "$ref": "#/$defs/Digest" },
+        "expected_binding_digest": { "$ref": "#/$defs/Digest" },
+        "draft_id": { "$ref": "#/$defs/Id" },
+        "checkpoint_id": { "$ref": "#/$defs/Id" },
+        "requested_at": { "$ref": "#/$defs/UtcTime" }
+      }
+    },
+    "DraftPreparationReport": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schema_id", "schema_version", "status", "request", "token", "content_digest", "artifact_digest", "backup_sha256", "prepared_sha256", "backup_bytes", "prepared_bytes"],
+      "properties": {
+        "schema_id": { "type": "string", "enum": ["OPM-DRAFT-PREPARATION"] },
+        "schema_version": { "type": "string", "enum": ["0.1"] },
+        "status": { "type": "string", "enum": ["PREPARED"] },
+        "request": { "$ref": "#/$defs/DraftPreparationRequest" },
+        "token": { "$ref": "#/$defs/DraftToken" },
+        "content_digest": { "$ref": "#/$defs/Digest" },
+        "artifact_digest": { "$ref": "#/$defs/Digest" },
+        "backup_sha256": { "$ref": "#/$defs/Digest" },
+        "prepared_sha256": { "$ref": "#/$defs/Digest" },
+        "backup_bytes": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+        "prepared_bytes": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 }
+      }
+    },
+    "DraftActivationRequest": {
+      "type": "object", "additionalProperties": false,
+      "required": ["preparation_report_sha256", "activated_at"],
+      "properties": {
+        "preparation_report_sha256": { "$ref": "#/$defs/Digest" },
+        "activated_at": { "$ref": "#/$defs/UtcTime" }
+      }
+    },
+    "DraftActivationReport": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schema_id", "schema_version", "status", "request", "preparation", "database_sha256", "database_bytes", "context_count", "readback_digest"],
+      "properties": {
+        "schema_id": { "type": "string", "enum": ["OPM-DRAFT-ACTIVATION"] },
+        "schema_version": { "type": "string", "enum": ["0.1"] },
+        "status": { "type": "string", "enum": ["ACTIVATED_COPY"] },
+        "request": { "$ref": "#/$defs/DraftActivationRequest" },
+        "preparation": { "$ref": "#/$defs/DraftPreparationReport" },
+        "database_sha256": { "$ref": "#/$defs/Digest" },
+        "database_bytes": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+        "context_count": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+        "readback_digest": { "$ref": "#/$defs/Digest" }
+      }
+    },
+    "SaveState": {
+      "type": "object", "additionalProperties": false,
+      "required": ["durable_token", "checkpoint_token", "last_manual_revision", "dirty_since", "deadline", "in_flight", "pending_manual_target", "last_error"],
+      "properties": {
+        "durable_token": { "$ref": "#/$defs/DraftToken" },
+        "checkpoint_token": { "anyOf": [{ "$ref": "#/$defs/DraftToken" }, { "type": "null" }] },
+        "last_manual_revision": { "anyOf": [{ "$ref": "#/$defs/Id" }, { "type": "null" }] },
+        "dirty_since": { "anyOf": [{ "$ref": "#/$defs/UtcTime" }, { "type": "null" }] },
+        "deadline": { "anyOf": [{ "$ref": "#/$defs/UtcTime" }, { "type": "null" }] },
+        "in_flight": { "type": "string", "enum": ["NONE", "AUTO", "MANUAL", "PIN"] },
+        "pending_manual_target": { "anyOf": [{ "$ref": "#/$defs/DraftToken" }, { "type": "null" }] },
+        "last_error": { "anyOf": [{ "$ref": "#/$defs/SaveError" }, { "type": "null" }] }
+      }
+    }
+  }
+}

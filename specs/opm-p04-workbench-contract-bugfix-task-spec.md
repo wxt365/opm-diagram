@@ -1,5 +1,7 @@
 # Spec: OPM P04 工作台契约修复
 
+> 历史规格说明：本规格中“活动 Revision 随提交写入 URL”和“非法 Revision 回退当前 Draft”的条款已由 `specs/opm-p03-stable-head-url-and-exact-revision-deeplink-design-task-spec.md` 取代。以下内容保留为当时实现与验收记录，不再作为活动 URL 设计输入。
+
 ## Task Type
 
 `bugfix`

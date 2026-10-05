@@ -1,12 +1,12 @@
 # OPM 单机建模工具文档索引
 
-更新时间：2026-08-29
+更新时间：2026-09-11
 
 ## 1. 文档目的
 
 本文档是 OPM 单机建模工具需求、标准、架构和后续开发准备材料的统一入口。
 
-当前`32`项设计责任按`design/opm-design-freeze-baseline.md` `v1.71`记录为：`22`项`FROZEN_INCLUDED`、`10`项`FROZEN_DEFERRED`、`0`项`BLOCKED`。Final production source唯一活动链为`9048bb3... -> C -> S -> A -> R`；Stage=`20/2/7/29`，O..R=`48=36 M+12 A`。A=`db854055...`保留Fault lifecycle与Browser proof并闭合release discovery/source guard；R先完成API/Runtime `5 M`及Final Runner source guard `2 M`，再实现Context `0.1`、194/388 schedule、四Driver exact dispatch、完整CaseExecution/五参数调用、Runner-owned RUN_SETUP identity绑定、一次性同源client、API Exchange与唯一production bridge。Runner Source Set活动目标为`0.2/24`；Service及其测试不进入Source Set，Runtime JAR必须从同一R重建。设计输入已冻结，C/S/A source已形成并验证；R、Context/bridge、真实controlled/`194/388`、Report、Gate、Candidate、Activation、Capability、production及ISO证据均未生成或执行。
+当前`32`项设计责任按`design/opm-design-freeze-baseline.md` `v1.91`记录为：`22`项`FROZEN_INCLUDED`、`10`项`FROZEN_DEFERRED`、`0`项`BLOCKED`。Final production source唯一活动链为`9048bb3... -> C -> S -> A -> R`；Stage=`20/2/7/29`，O..R=`48=36 M+12 A`。A=`db854055...`保留Fault lifecycle与Browser proof并闭合release discovery/source guard；R先完成API/Runtime `5 M`及Final Runner source guard `2 M`，再实现Context `0.1`、194/388 schedule、四Driver exact dispatch、完整CaseExecution/五参数调用、Runner-owned RUN_SETUP identity绑定、一次性同源client、API Exchange与唯一production bridge。Runner Source Set活动目标为`0.2/24`；Service及其测试不进入Source Set，Runtime JAR必须从同一R重建。设计输入已冻结，C/S/A source已形成并验证；R、Context/bridge、真实controlled/`194/388`、Report、Gate、Candidate、Activation、Capability、production及ISO证据均未生成或执行。P03 活动 HEAD 稳定 URL 与精确 Revision 深链已冻结，代码实现尚未开始。
 
 ## 2. 正式入口
 
@@ -36,10 +36,13 @@
 1. `design/opm-modeling-workbench-page-design.md`：P01-P06 页面组、工作台 IA、主动作、守卫和回流。
 2. `design/opm-modeling-workbench-state-model.md`：导航、编辑、保存、文本、校验、选择、弹层和任务状态。
 3. `design/opm-modeling-workbench-field-region-detail.md`：页面区块、字段来源、编辑性和动作守卫。
-4. `design/opm-modeling-workbench-component-interaction.md`：组件树、交互事件、模块契约映射和原型关注点。
-5. `design/opm-complete-canvas-toolchain-design.md`：State、图标工具链、关系候选、16/8/10 全量能力映射、字段/事件/键盘/响应式和验收矩阵。
+4. `design/opm-modeling-workbench-component-interaction.md`：组件树、交互事件、关系拖线状态机、模块契约映射和原型关注点。
+5. `design/opm-complete-canvas-toolchain-design.md`：State、单行三族关系工具带、`5/4/5`高频直达、Runtime完整目录、统一候选preview、16/8/10全量能力映射、字段/事件/键盘/响应式和验收矩阵。
+6. `design/opm-opd-node-renderer-architecture.md`：五种节点独立Definition、16/8/10 Capability独立Definition/Decorator、committed/preview RenderSpec、类型安全注册表、共享X6 adapter、关系gesture和增量迁移。
 
 ### 2.5 应用与数据契约
+
+新增变更（2026-09-11）：[混合保存与草稿恢复策略](design/opm-hybrid-save-and-draft-recovery-design.md)，[设计规格](../specs/opm-hybrid-save-strategy-design-task-spec.md)、[设计 Checklist](checklists/opm-hybrid-save-strategy-design-checklist.md)、[分阶段实施任务](../specs/opm-hybrid-save-strategy-implementation-task-spec.md)。策略及逻辑契约已冻结，机器 Schema/DDL 与实现尚未交付，当前软件保存行为不变；状态以冻结基线 v1.93 的新增变更记录为准。
 
 1. `design/opm-modeling-tool-application-api-contract.md`：应用命令/查询、包络、revision/幂等、任务和错误语义。
 2. `design/opm-modeling-tool-persistence-contract.md`：逻辑数据对象、Revision 提交包、原子事务、迁移和恢复。
@@ -56,10 +59,11 @@
 1. `design/opm-development-technology-baseline.md`：ARC-007/008/009、运行拓扑、技术栈和工程结构。
 2. `design/opm-physical-data-and-migration-design.md`：SQLite、资产目录、迁移、`.opmp` 和恢复。
 3. `design/opm-symbol-and-text-generation-implementation-contract.md`：P0 与完整画布的 symbol/marker/label slot/route、Control/Structural concrete OPL、precedence、Token/Trace 和 golden manifest。
-4. `contracts/schemas/*.json`：Revision、Profile、Rule Set JSON Schema 2020-12。
-5. `contracts/examples/*.json`：三个通过 Schema 验证的代表样例。
-6. `contracts/openapi/opm-local-api-v1.yaml`：P0 本地 HTTP OpenAPI 3.1。
-7. `contracts/migrations/sqlite/*`：SQLite Flyway V1 与验证 SQL。
+4. `design/opm-opd-node-renderer-architecture.md`：Projection 到 Node/Capability Definition、Control Decorator、RenderSpec、registry、X6 adapter 和 Editor 的前端机器边界。
+5. `contracts/schemas/*.json`：Revision、Profile、Rule Set JSON Schema 2020-12。
+6. `contracts/examples/*.json`：三个通过 Schema 验证的代表样例。
+7. `contracts/openapi/opm-local-api-v1.yaml`：P0 本地 HTTP OpenAPI 3.1。
+8. `contracts/migrations/sqlite/*`：SQLite Flyway V1 与验证 SQL。
 
 ### 2.8 原型、handoff 与执行包
 
@@ -83,6 +87,15 @@
 
 1. `checklists/opm-online-modeling-tool-requirements-checklist.md`：Task 1-18 的 Spec Mapping、范围和验证记录。
 2. `checklists/opm-complete-canvas-toolchain-design-checklist.md`：完整画布设计补齐的 Spec Mapping、覆盖和验证记录。
+2a. [`OPD 节点渲染注册架构设计规格`](../specs/opm-opd-node-renderer-registry-design-task-spec.md) 与 `checklists/opm-opd-node-renderer-registry-design-checklist.md`：Node Definition、Registry、RenderSpec、共享 X6 adapter、Editor、影响隔离和后继迁移边界。
+2b. [`OPD Capability Definition 粒度修正规格`](../specs/opm-opd-capability-definition-granularity-design-bugfix-task-spec.md) 与 `checklists/opm-opd-capability-definition-granularity-design-bugfix-checklist.md`：16 Procedural、8 Control Decorator、10 Structural 独立实现、族级 helper 和 Capability Registry 冻结记录。
+2c. [`P03 Attribute 布局编辑规格`](../specs/opm-p03-attribute-layout-editing-task-spec.md) 与 `checklists/opm-p03-attribute-layout-editing-checklist.md`：`UPDATE_LAYOUT` 扩展到 owned Attribute occurrence 的 OpenAPI、Runtime、Vue 拖放、重开 E2E 与拒绝边界。
+2d. [`P03关系手势与统一候选设计修正规格`](../specs/opm-p03-relation-gesture-and-candidate-interaction-design-bugfix-task-spec.md) 与 `checklists/opm-p03-relation-gesture-and-candidate-interaction-design-bugfix-checklist.md`：历史单一关系入口、selection-aware 16/8/10目录、七阶段拖线、四类X6意图、26基础preview/confirm、Control同Fact更新和零提交边界；入口呈现已由 2h 取代。
+2e. [`P03关系手势与统一候选实现规格`](../specs/opm-p03-relation-gesture-and-candidate-interaction-implementation-task-spec.md) 与 `checklists/opm-p03-relation-gesture-and-candidate-interaction-implementation-checklist.md`：Catalog/OpenAPI/Runtime、Vue Store/View、X6 gesture、preview RenderSpec与binary/fan/Self/State-specified/reload E2E已实现并完成本地功能范围验证；发布边界以对应 checklist 为准。
+2f. [`P03统一画布构造生命周期设计规格`](../specs/opm-p03-unified-construct-lifecycle-design-task-spec.md) 与 [`实现规格`](../specs/opm-p03-unified-construct-lifecycle-implementation-task-spec.md)、`checklists/opm-p03-unified-construct-lifecycle-design-checklist.md`、`checklists/opm-p03-unified-construct-lifecycle-implementation-checklist.md`：Object、Process、Attribute、Operation、State、Fact 的 Runtime impact 删除协议，以及右键/键盘构造操作菜单、Control Modifier 移除、occurrence/target/CASCADE 边界已实现并完成本地功能范围验证；发布边界以实现 checklist 为准。
+2g. [`P03直接删除与平行关系分轨规格`](../specs/opm-p03-direct-delete-and-parallel-relation-layout-task-spec.md) 与 `checklists/opm-p03-direct-delete-and-parallel-relation-layout-checklist.md`：右键一次点击、键盘无菜单直接删除，以及普通二元关系的稳定对称分轨和 X6 geometry 更新边界。
+2h. [`P03单行分组关系工具栏与标准符号规格`](../specs/opm-p03-grouped-relation-toolbar-and-standard-symbol-task-spec.md) 与 `checklists/opm-p03-grouped-relation-toolbar-and-standard-symbol-checklist.md`：三族单行竖线分组、`5/4/5` 高频图标、完整 `16/8/10` 下拉目录、34 个 exact Symbol glyph 与标准双语 tooltip、selection-aware Control、未知 Symbol 拒绝和手动关系路由延期边界。
+2i. [`P03活动 HEAD 稳定 URL 与精确 Revision 深链设计规格`](../specs/opm-p03-stable-head-url-and-exact-revision-deeplink-design-task-spec.md) 与 `checklists/opm-p03-stable-head-url-and-exact-revision-deeplink-design-checklist.md`：活动草稿省略 `revision`、Header 显示实际 committed Revision、固定版本/永久链接使用只读精确 Revision、临时 UI 状态不进入 URL，以及布局 Revision 与 URL 解耦的冻结记录；实现尚未开始。
 3. [`DEV-CANVAS-05 规格`](../specs/opm-dev-canvas-05-opl-trace-golden-task-spec.md) 与 `checklists/opm-dev-canvas-05-opl-trace-golden-checklist.md`：OPL/Trace/golden 机器实现边界。
 4. [`DEV-CANVAS-06 规格`](../specs/opm-dev-canvas-06-toolchain-release-task-spec.md) 与 `checklists/opm-dev-canvas-06-toolchain-release-checklist.md`：工具链、视觉、E2E、性能和发布边界。
 5. [`Golden Authoring 设计规格`](../specs/opm-dev-canvas-06-golden-authoring-design-task-spec.md) 与 `checklists/opm-dev-canvas-06-golden-authoring-design-checklist.md`：独立 authoring 设计冻结、Spec Mapping 和验证记录。

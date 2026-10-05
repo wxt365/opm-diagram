@@ -337,7 +337,8 @@ public final class ProjectionDigestV01 {
         }
     }
 
-    private static String binary64Hex(double value) {
+    public static String binary64Hex(double value) {
+        if (!Double.isFinite(value)) throw new IllegalArgumentException("binary64 编码只接受有限数字。");
         long bits = Double.doubleToRawLongBits(value);
         byte[] bytes = ByteBuffer.allocate(Long.BYTES).order(ByteOrder.BIG_ENDIAN).putLong(bits).array();
         return HexFormat.of().formatHex(bytes);

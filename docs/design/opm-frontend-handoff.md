@@ -1,12 +1,12 @@
 # OPM 单机建模工具前端交付标注
 
-文档版本：`v1.0`
+文档版本：`v1.13`
 
 文档状态：`FROZEN_INCLUDED`；P0 与完整画布前端 handoff 冻结，联调仍受机器契约 Gate 约束
 
 全局设计状态、延期边界和开发准入以 `opm-design-freeze-baseline.md` 为唯一事实源。
 
-更新时间：2026-07-28
+更新时间：2026-09-11
 
 ## Task Type
 
@@ -28,6 +28,7 @@
 8. `opm-prototype-acceptance-report.md`
 9. `docs/contracts/openapi/opm-local-api-v1.yaml`
 10. `prototype/index.html`、`prototype/styles.css`、`prototype/app.js`
+11. `opm-opd-node-renderer-architecture.md`
 
 ## 3. 交付范围
 
@@ -73,6 +74,10 @@ apps/web/src/
   app/                         router、shell、bootstrap
   modules/projects/            P01/P02、project/model query
   modules/workbench/           P03、X6 adapter、workspace stores
+    opd/core/                   Node/Relation Definition、RenderSpec、registry、X6 adapter
+    opd/nodes/                  Object/Process/State/Attribute/Operation Definition
+    opd/relations/              16 Procedural、8 Control Decorator、10 Structural Definition
+    opd/editors/                名称、State、Relation 独立 Editor
   modules/versions/            P04 与版本复用区块
   modules/conformance/         P05 与 Finding/Task 复用区块
   modules/local-data/          P06
@@ -90,16 +95,25 @@ apps/web/src/
 6. 原型不进入生产构建。
 7. 通用工具图标采用 Lucide，OPM 领域图标必须来自 Symbol Catalog；当前前端未直接依赖 Lucide，后续前端任务规格必须显式允许并冻结准确依赖版本，或通过现有图标库 ADR 给出等价替代。
 8. 应用 bootstrap 在任何项目查询或编辑器写命令前执行冻结浏览器矩阵和必需 Web API 检查；不支持时只渲染兼容性阻断页。
+9. 每种内置节点使用独立 Definition 文件，通过显式 registry 和共享 X6 adapter 装配；Node 只表示表现层图元，不改变领域 Element/State/Feature 分类；不使用 Vue 类继承、每实例文件或运行时插件扫描。
+10. Relation Registry 以基础 `capability_id` 精确注册 16 Procedural + 10 Structural，Control Decorator Registry 以 `control.capability` 注册 8 项；family 不是 production 最终查找键。
+11. Definition 只产生纯 RenderSpec，Editor 只产生用户意图；Runtime Capability Option 和 committed Revision 仍是允许性与正式状态的唯一来源。
+12. 后继迁移必须保持 capture anchor、`data-testid`、名称编辑、visual/E2E 和性能契约，并以 occurrence 稳定键增量调和替代正常更新中的全量清空。
 
 ## 6. 全局实现口径
 
 ### 6.1 导航与恢复
 
-1. route 只保存 project/model/revision/context 和可恢复筛选；
-2. viewport、选择、拖拽候选、未提交表单和弹层不进入 URL；
-3. P03 -> P04/P05 回流保存 Context、稳定选择、底部标签和 viewport bookmark；
-4. 刷新只恢复查询，不重复命令或自动确认弹层；
-5. Snapshot/Baseline route 强制只读，不能由控件状态推断。
+1. P03 route 只保存 project/model/context 和 Revision 定位模式：活动草稿 canonical URL 省略 `revision`，精确历史/Snapshot/Baseline/永久链接使用 `revision=<revision_id>`；
+2. `revision=head` 仅为兼容输入，进入后用 replace 规范化为省略 `revision`，不得形成第二种 canonical HEAD URL；
+3. Header 始终显示实际 committed Revision；HEAD 下命令成功只更新 Header、编辑基线和 Projection，不改 URL、不新增 history entry；
+4. viewport、选择、拖拽候选、未提交表单、工具、菜单、弹层、属性/底部面板状态和临时高亮不得进入 URL 或 history state；
+5. P03 -> P04/P05 回流可在会话内保存 Context、稳定选择、底部标签和 viewport bookmark，但只有 Context 进入 URL；
+6. 刷新、前进和后退只恢复 Context 及 HEAD/EXACT 资源定位，不重复命令或恢复临时画布状态；
+7. Snapshot/Baseline/历史 Revision 的 EXACT route 强制只读；返回活动草稿或创建草稿后切换为 canonical HEAD URL；
+8. 非法或跨 Model 的精确 Revision 必须拒绝且不得回退 HEAD；缺失/非法 Context 在目标 Revision 内解析根 Context并规范化；
+9. 复制永久链接以 Header 当前实际 committed Revision 生成 EXACT URL；不得复制 HEAD URL 冒充永久链接；
+10. 布局命令是否产生 Revision 与 URL 策略独立，即使产生新 Revision，HEAD URL 仍不改变。
 
 ### 6.2 数据来源与一致性
 
@@ -164,29 +178,32 @@ apps/web/src/
 | --- | --- | --- | --- | --- |
 | 工具链 | `editor-toolchain` | Profile/Symbol binding、access mode | tool mode | 只保存本地工具状态 |
 | State 工具 | `tool-create-state` | owner selection、State capability option | `state-create-requested` | 无合法 owner 时禁用 |
-| 关系入口 | `tool-relation-split-button` | 最近关系、结构化 capability options | relation armed/catalog open | 不硬编码 allowed list |
-| 关系目录 | `menu-relation-catalog` | 16/8/10 分组、search、reason codes | option selected | FORBIDDEN/N/A 不显示 |
-| 候选层 | `editor-candidate-layer` | normalized endpoints、descriptor、route preview | submit/cancel | 不写 context-projection |
+| 主工具栏内关系工具组 | `relation-tool-palette` | selection-aware 16/8/10、interaction mode、exact symbol descriptor、endpoint summary、reason | 高频直达或族目录选择后 arm create/query Control | 与画布工具同排；`5/4/5` 高频纯图标、竖线分组、三组完整纯图标目录、标准双语 tooltip 与可读禁用原因；机器端点/reason 不进入 tooltip，不硬编码 allowed/endpoint rules，不提供未知 Symbol fallback |
+| 候选层 | `editor-candidate-layer` | normalized endpoints、exact descriptor、RelationPreviewRenderSpec | add endpoint/confirm/cancel | 不写 context-projection/anchor/OPL/Trace |
 | State 检查器 | `inspector-state-fields` | State DTO、role options、trace | candidate changed | owner 只读 |
 | Relation 检查器 | `inspector-relation-fields` | Fact/endpoints/labels/modifiers | requery/update candidate | 先重算再提交 |
+| 构造生命周期 | `editor-construct-actions-menu` | selected occurrence、impact option、Control remove option、pointer anchor? | open properties / impact query/direct submit/cancel | 右键首项打开属性且零 Revision；删除项仍由 Runtime 驱动；键盘无菜单并按固定优先级提交 |
+| 属性检查器 | `inspector-properties-dock` | selection、rightPanel.open、candidate task state | open/close local view state | 默认不渲染且不占第三列；右键首项或工具栏图标打开；关闭保留 selection；候选任务可强制显示右侧区 |
 | 命令反馈 | `editor-command-feedback` | submitting/blocked/conflict/failed | retry/cancel/locate | 不把 committed 当 saved |
 
-关系候选状态必须使用 `idle/armed/source-selected/filtering/preview/submitting/blocked/failed/committed`；State 使用 `unavailable/ready/placing/editing/preview/submitting/blocked/failed/committed`。字段、转换和错误恢复以 `opm-complete-canvas-toolchain-design.md` 为唯一专题基线。
+基础关系候选状态必须使用 `idle/relation-armed/dragging/endpoint-selected/candidate-filtering/candidate-preview/confirmed/cancelled`；提交中的异步反馈继续使用公共 `submitting/blocked/failed`。Control 使用 selected committed Procedural Fact 的独立 `UPDATE_FACT` preview，不进入拖线。State 使用 `unavailable/ready/placing/editing/preview/submitting/blocked/failed/committed`。字段、转换和错误恢复以 `opm-complete-canvas-toolchain-design.md` 为唯一专题基线。
 
 稳定测试入口：
 
 1. `P03-canvas-toolchain`；
 2. `P03-tool-object/process/state`；
-3. `P03-tool-relation-primary/menu`；
-4. `P03-relation-search`、`P03-relation-option-{capabilityId}`；
+3. `P03-relation-tool-palette`、`P03-relation-toolbar-{family}`、`P03-relation-menu-toggle-{family}`；
+4. `P03-relation-quick-option-{capabilityId}`、`P03-relation-menu-option-{capabilityId}`；
 5. `P03-relation-candidate`、`P03-command-feedback`；
 6. `P03-inspector-state-*`、`P03-inspector-relation-*`。
+7. `P03-construct-actions-menu`；直接删除不再存在确认弹层测试入口。
+8. `P03-right-panel`、`P03-right-panel-open`、`P03-right-panel-close`、`P03-construct-open-properties`。
 
 ## 8. Store 切片
 
 | Store | 正式字段 | 禁止拥有 |
 | --- | --- | --- |
-| `route-context` | project/model/revision/context/page | 未提交表单 |
+| `route-context` | project/model/context/page、HEAD/EXACT 模式及 EXACT revision | 实际 HEAD Revision、未提交表单、viewport/selection/tool/panel 状态 |
 | `workspace-resource` | session、Profile binding、access mode | Semantic Model 副本 |
 | `editor-session` | base revision、candidate、submit、undo/redo availability | 领域规则 |
 | `capability-options` | query id、base revision、结构化 option、reason、impact summary/token、expiry | 自定义 Capability 判定或 impact token 拼装 |
@@ -200,7 +217,7 @@ apps/web/src/
 
 1. P0 自定义 Object/Process node 与 Consumption edge 读取 Symbol Catalog；完整画布增量加入 State、16/8/10 relation descriptor；
 2. Cell metadata 仅保存 occurrence/target/symbol/layout 引用；
-3. Cell 拖动结束产生布局 candidate，端点重连产生语义 candidate；
+3. owned Object、Process、Attribute、Operation、State Cell 拖动结束上送一条 `UPDATE_LAYOUT`；State 限制在 owner 内容区，owner 拖动实时带动状态和装饰，Runtime 原子保存联动布局。Fact 和装饰 Cell 不可独立提交该命令。详见 `opm-p03-owned-state-layout-and-exhibition-bugfix-task-spec.md`；
 4. 服务器提交成功后全量或增量替换 Projection；失败恢复已提交视图；
 5. viewport 事件只更新 `view-state`，绝不调用 API-EDT-002；
 6. semantic zoom 先弹影响确认，再以明确 command_type 提交；
@@ -209,6 +226,11 @@ apps/web/src/
 9. Fundamental Structural fan 映射为一个 Fact + junction + branches，不能拆成多条正式 binary Fact。
 10. Event/Condition 使用基础 edge 的 annotation，不复制重叠 edge；只读取 `control.capability/control.segment` pair，Effect 只修饰输入 segment。
 11. 完整 marker、label slot 和 route family 只由 Symbol Descriptor 驱动，不在 Vue/X6 adapter 按 Capability 写条件分支绘图。
+12. 关系 gesture adapter 只输出 `relation-drag-start/relation-drag-move/relation-endpoint-selected/relation-cancelled`；事件使用 exact occurrence ID，不携带 role、direction 或 Command payload。
+13. pointer drag 临时线在释放时删除；option 选定后由 Capability Definition 生成无 committed identity/capture anchor 的 `RelationPreviewRenderSpec`，26 个基础 Capability 均须确认后才能提交。
+14. fan 继续添加端点、Self-invocation 重复 Process occurrence 和 State-specified exact State occurrence均由 Store 状态与 Runtime normalization闭合；X6 不判断合法性。
+15. 同一无向端点对上的普通二元关系由独立纯布局步骤以 `24px` 间距稳定分轨；fan、Effect、自调用和已有显式 route 不覆盖。X6 原位更新必须同步增加或清除折点。
+16. 关系工具与选择/平移、构造创建、缩放/适配位于同一排主工具栏，以竖线分隔并常驻 `5/4/5` 个高频标准图标；组尾箭头按 Runtime 原序展开完整纯图标 `16/8/10`，一次只开一组，外部点击、Escape 或选择后关闭。关系区不显示名称或数量，全部按钮以“中文标准名称 / English standard name”的 `title/aria-label` 提供双语提示，禁用时只追加可读原因。常驻按钮/符号为 `34 x 32px / 32 x 18px`，下拉符号为 `42 x 20px`，四列浮层最大 `256px`。窄屏由整条主工具栏横向滚动，固定目录浮层不被裁剪；画布内容最小高度 `360px`，较矮视口必须能滚动到节点。当前不得装配或持久化用户编辑的关系 vertex。
 
 ## 10. 接口映射总表
 
@@ -222,6 +244,7 @@ apps/web/src/
 | P03 command menu | API-EDT-001 | Profile 过滤的可用命令 |
 | P03 editing | API-EDT-002 | 原子语义命令 |
 | P03 State/complete relation candidate | API-EDT-001 扩展 | 结构化 option、规范端点、Control/base Fact Capability、symbol/template/rule refs、reason；删除时返回 impact summary/token |
+| P03 construct lifecycle | API-EDT-001/002 后继扩展 | exact selection、删除模式、完整 impact、opaque token 与 Control modifier removal；同一原子包生成 client/Runtime/Vue/E2E |
 | P03 State/complete relation submit | API-EDT-002 扩展 | `CREATE_STATE/UPDATE_STATE/CREATE_FACT/UPDATE_FACT`；删除命令携带未过期 impact token |
 | P03 text | API-TXT-001 | OPL 与 Trace |
 | P03 validation | API-VAL-001 | 固定 Revision 校验 |

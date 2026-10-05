@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://opm.local/schemas/draft-json-delta/1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "before_digest", "after_digest", "operations"],
+  "properties": {
+    "schema_id": { "const": "OPM-DRAFT-JSON-DELTA" },
+    "schema_version": { "const": "1" },
+    "before_digest": { "$ref": "#/$defs/digest" },
+    "after_digest": { "$ref": "#/$defs/digest" },
+    "operations": { "type": "array", "items": { "$ref": "#/$defs/operation" } }
+  },
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "json": { "oneOf": [
+      { "type": ["null", "boolean", "number", "string"] },
+      { "type": "array", "items": { "$ref": "#/$defs/json" } },
+      { "type": "object", "additionalProperties": { "$ref": "#/$defs/json" } }
+    ] },
+    "slot": { "oneOf": [
+      { "type": "object", "additionalProperties": false, "required": ["present"], "properties": { "present": { "const": false } } },
+      { "type": "object", "additionalProperties": false, "required": ["present", "value"], "properties": { "present": { "const": true }, "value": { "$ref": "#/$defs/json" } } }
+    ] },
+    "operation": {
+      "type": "object", "additionalProperties": false, "required": ["path", "before", "after"],
+      "properties": {
+        "path": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+        "before": { "$ref": "#/$defs/slot" }, "after": { "$ref": "#/$defs/slot" }
+      }
+    }
+  }
+}

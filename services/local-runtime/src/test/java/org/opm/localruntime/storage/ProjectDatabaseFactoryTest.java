@@ -29,11 +29,11 @@ class ProjectDatabaseFactoryTest {
     void migratesEmptyProjectDatabaseAndExposesSchemaVersionWithoutJdbcTypes() throws SQLException {
         ProjectDatabaseOpenResult.Ready ready = openReady("project-001");
 
-        assertEquals("1.0", ready.database().storageSchemaVersion().value());
+        assertEquals("1.1", ready.database().storageSchemaVersion().value());
         assertFalse(ready.recoveryPoint().isPresent());
 
         try (Connection connection = openRawConnection(ready.database().databasePath())) {
-            assertEquals(20, count(connection,
+            assertEquals(22, count(connection,
                     "SELECT COUNT(*) FROM sqlite_schema WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name <> 'flyway_schema_history'"));
             assertNoRows(connection, "PRAGMA foreign_key_check");
             assertEquals(1, count(connection,
@@ -47,7 +47,7 @@ class ProjectDatabaseFactoryTest {
         ProjectDatabaseOpenResult.Ready second = openReady("project-002");
 
         assertEquals(first.database().databasePath(), second.database().databasePath());
-        assertEquals("1.0", second.database().storageSchemaVersion().value());
+        assertEquals("1.1", second.database().storageSchemaVersion().value());
         SqliteConnectionFactory.verify(SqliteConnectionFactory.create(second.database().databasePath()));
 
         try (Connection connection = openRawConnection(second.database().databasePath())) {
@@ -77,7 +77,7 @@ class ProjectDatabaseFactoryTest {
         openReady("project-004");
         Path brokenMigrations = temporaryDirectory.resolve("broken-migrations");
         Files.createDirectories(brokenMigrations);
-        Files.writeString(brokenMigrations.resolve("V2__broken.sql"), "CREATE TABLE ;\n");
+        Files.writeString(brokenMigrations.resolve("V3__broken.sql"), "CREATE TABLE ;\n");
 
         ProjectDatabaseFactory factory = new ProjectDatabaseFactory(
                 temporaryDirectory,

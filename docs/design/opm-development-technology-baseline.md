@@ -1,12 +1,12 @@
 # OPM 单机建模工具开发技术基线
 
-文档版本：`v1.0`
+文档版本：`v1.2`
 
 文档状态：`FROZEN_INCLUDED`；当前开发技术基线冻结
 
 全局设计状态、延期边界和开发准入以 `opm-design-freeze-baseline.md` 为唯一事实源。
 
-更新时间：2026-07-27
+更新时间：2026-09-02
 
 ## Task Type
 
@@ -100,6 +100,17 @@ flowchart LR
 3. Launcher 打开默认浏览器，但应用必须在进入项目或工作台前校验版本和必需 Web API；
 4. 不受支持的默认浏览器只显示兼容性阻断页，允许复制 loopback 地址并重新检测，不允许忽略继续或发出写命令；
 5. 版本、视口、跨浏览器验收和变更入口以 `opm-design-freeze-baseline.md` 第 3 章为准。
+
+### 5.3 OPD 元素渲染架构
+
+1. Object、Process、State、Attribute、Operation 各自使用唯一独立 Definition 文件，共同实现类型安全 `OpdNodeDefinition`；不使用 Vue 组件类继承，也不为每个画布实例创建代码文件。`Node` 只表示画布图元，不改变领域 Element/State/Feature 分类。
+2. `NodeDefinitionRegistry` 负责 kind 到 Definition 的封闭映射；共享 X6 adapter 是 RenderSpec 到 Cell 的唯一 owner。
+3. 基础 Relation Registry 按 Capability ID 注册 16 个 Procedural 与 10 个 Structural Definition；Control Decorator Registry 按 `control.capability` 注册 8 个 Decorator，不把 Control 建成第二关系。
+4. Procedural、Control、Structural 只作为目录、共享 helper 和测试分组；production renderer 禁止以 family 为最终查找键或聚合 16/8/10 大型条件分支。
+5. Editor、Definition、RenderSpec、Registry、X6 adapter 和 Workbench Command adapter 必须分层；Profile 合法性和 Command 允许性仍以 Runtime Capability Query 为准。
+6. 内置 registry 是编译期显式装配，不是第三方插件 API；Profile、Rule、Grammar 和 Symbol 资产不得加载或执行 JavaScript。
+7. 正常 Projection 更新使用 occurrence-keyed 增量调和；选择、Finding、viewport 和单元素更新不得通过 `graph.clearCells()` 全量重建。
+8. 完整接口、目录、诊断、影响边界、迁移和验收以 [OPD 节点定义与渲染注册架构](opm-opd-node-renderer-architecture.md) 为唯一实现输入。
 
 ## 6. 本地运行时基线
 
