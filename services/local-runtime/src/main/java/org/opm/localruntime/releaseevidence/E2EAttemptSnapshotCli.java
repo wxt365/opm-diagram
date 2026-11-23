@@ -40,6 +40,8 @@ public final class E2EAttemptSnapshotCli {
     private E2EAttemptSnapshotCli() { }
 
     public static void main(String[] args) {
+        ((ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME))
+                .setLevel(ch.qos.logback.classic.Level.ERROR);
         int exitCode = run(args);
         if (exitCode != 0) System.exit(exitCode);
     }

@@ -55,6 +55,21 @@ class ExchangePackageReaderWriterTest {
         assertCode("EXCHANGE_IO_SECURITY_REJECTED", () -> new ExchangePackageReader().inspect(unsafe));
     }
 
+    @Test void manualSegmentRoutesSurviveNativePackageExportAndImport() throws Exception {
+        var json = new ObjectMapper(); var document = (ObjectNode) json.readTree(revision());
+        var route = ((ObjectNode) document.at("/layouts/0")).putArray("edge_routes").addObject()
+                .put("segment", "input").put("style", "CURVE").put("mode", "MANUAL");
+        route.putArray("points").addObject().put("x", 300.5).put("y", 400.25);
+        var original = input(); var target = temporary.resolve("routed.opmp");
+        new ExchangePackageWriter().writeModelRevision(target, new ExchangeModelRevisionInput(original.packageId(), original.createdAt(),
+                original.producerApplicationId(), original.producerVersion(), original.identityNamespace(), original.modelCatalogJson(),
+                json.writeValueAsBytes(document), original.capabilityReportJson()));
+        var restored = new ExchangePackageReader().readModelRevision(target).revision();
+        assertEquals("input", restored.layouts().get(0).edgeRoutes().get(0).segment());
+        assertEquals("CURVE", restored.layouts().get(0).edgeRoutes().get(0).style());
+        assertEquals(300.5, restored.layouts().get(0).edgeRoutes().get(0).points().get(0).x());
+    }
+
     @Test
     void rejectsNonCanonicalManifestAndRatioLimit() throws Exception {
         Path packageFile = writePackage();

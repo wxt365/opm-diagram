@@ -27,6 +27,8 @@ public final class E2ETransactionSnapshotCli {
     private E2ETransactionSnapshotCli() { }
 
     public static void main(String[] args) {
+        ((ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME))
+                .setLevel(ch.qos.logback.classic.Level.ERROR);
         int exitCode = run(args);
         if (exitCode != 0) System.exit(exitCode);
     }

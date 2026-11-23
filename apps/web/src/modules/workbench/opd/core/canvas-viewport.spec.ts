@@ -4,6 +4,32 @@ import { createCanvasViewport, fittedViewport } from "./canvas-viewport";
 
 afterEach(() => vi.unstubAllGlobals());
 describe("画布视口", () => {
+  it("X6 增量更新 SVG 后重新适应，同一几何不会重复缩放", async () => {
+    const { viewport, flush, element, content, onZoom } = fixture();
+    const stage = document.createElementNS("http://www.w3.org/2000/svg", "g"); stage.classList.add("x6-graph-svg-stage");
+    const body = document.createElementNS("http://www.w3.org/2000/svg", "rect"); stage.append(body); element.append(stage);
+    viewport.observePresentation(); viewport.fitToView(); flush();
+    content.width = 1000; body.setAttribute("width", "1000"); await Promise.resolve(); flush();
+    expect(onZoom).toHaveBeenLastCalledWith(32.6);
+    const count = onZoom.mock.calls.length;
+    body.setAttribute("fill", "blue"); await Promise.resolve(); flush();
+    expect(onZoom).toHaveBeenCalledTimes(count);
+    viewport.dispose();
+  });
+  it("新增元素以可见区域中心定位，包含缩放、平移、滚动并停止自动适应", () => {
+    const { viewport, graph, outer, element, flush } = fixture();
+    expect(viewport.getElementPosition()).toEqual({ x: 115, y: 174 });
+    viewport.fitToView();
+    graph.scale(0.5); graph.translate(-300, 90);
+    outer.scrollLeft = 120; outer.scrollTop = 40;
+    element.getBoundingClientRect = () => ({ left: -20, top: 160, width: 620, height: 600 }) as DOMRect;
+    const position = viewport.getElementPosition()!;
+    expect((position.x + 80) * 0.5 - 300).toBe(315);
+    expect((position.y + 36) * 0.5 + 90).toBe(250);
+    viewport.scheduleFit(); flush();
+    expect(graph.scale()).toEqual({ sx: 0.5, sy: 0.5 });
+    expect(graph.translate()).toEqual({ tx: -300, ty: 90 });
+  });
   it("宽图按实际窄屏进入边距内，包含负坐标且缩放可小于 25%", () => {
     const content = { x: -300, y: 200, width: 2600, height: 600 }, area = { x: 0, y: 0, width: 390, height: 420 };
     const fit = fittedViewport(content, area)!;
@@ -62,5 +88,5 @@ function fixture() {
   outer.getBoundingClientRect = () => ({ left: 100, top: 200, width: 390, height: 420 }) as DOMRect;
   element.getBoundingClientRect = () => ({ left: 100, top: 200, width: 620, height: 420 }) as DOMRect;
   const onZoom = vi.fn();
-  return { viewport: createCanvasViewport(() => graph as unknown as Graph, () => element, onZoom, () => 32), graph, content, outer, flush, onZoom };
+  return { viewport: createCanvasViewport(() => graph as unknown as Graph, () => element, onZoom, () => 32), graph, content, outer, element, flush, onZoom };
 }

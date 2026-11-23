@@ -1,6 +1,8 @@
+import { layoutMindmap, treeDescendants } from '@/shared/mindmap/mindmapTree';
 import type { MindmapDocument, MindmapNode } from '@/shared/api/generated/draftWorkspaceContract';
+import { randomUuid } from '@/shared/platform/browserCrypto';
 export const mindmapKinds: Record<MindmapNode['kind'], string> = { TOPIC: '主题', OBJECT: '对象', PROCESS: '过程', STATE: '状态', ATTRIBUTE: '属性', CONSTRAINT: '约束 / 问题', UNCLASSIFIED: '未分类' };
-export const newMindmapId = () => `node.${crypto.randomUUID()}`;
+export const newMindmapId = () => `node.${randomUuid()}`;
 /** 转换前只提示可在分析中修正的问题，正式可执行性仍由 Runtime 校验。 */
 export function mindmapConversionIssues(document: MindmapDocument, excludedIds: string[]) {
   const excluded = new Set(excludedIds), nodes = new Map(document.nodes.map(node => [node.id, node]));
@@ -24,22 +26,9 @@ export function mindmapConversionIssues(document: MindmapDocument, excludedIds: 
   return issues;
 }
 export function descendants(document: MindmapDocument, id: string): Set<string> {
-  const ids = new Set([id]);
-  for (let changed = true; changed;) { changed = false; for (const node of document.nodes) if (node.parent_id && ids.has(node.parent_id) && !ids.has(node.id)) { ids.add(node.id); changed = true; } }
-  return ids;
+  return treeDescendants(document, id);
 }
-export function mindmapLayout(document: MindmapDocument) {
-  const positions: Array<{ node: MindmapNode; x: number; y: number; parent: string | null }> = [];
-  let row = 0;
-  const visit = (id: string, depth: number): number => {
-    const node = document.nodes.find(node => node.id === id)!;
-    const children = node.collapsed ? [] : document.nodes.filter(child => child.parent_id === id).sort((a, b) => a.order - b.order);
-    const ys = children.map(child => visit(child.id, depth + 1));
-    const y = ys.length ? (ys[0]! + ys.at(-1)!) / 2 : 50 + row++ * 84;
-    positions.push({ node, x: 50 + depth * 220, y, parent: node.parent_id }); return y;
-  };
-  visit(document.root_id, 0); return positions;
-}
+export function mindmapLayout(document: MindmapDocument) { return layoutMindmap(document); }
 export function importMindmap(value: unknown, current: MindmapDocument): MindmapDocument {
   const pack = value as { format?: string; version?: number; document?: MindmapDocument };
   if (pack?.format !== 'opm-mindmap' || pack.version !== 1 || !pack.document || pack.document.format_version !== 1) throw new Error('不支持的脑图文件或格式版本。');
@@ -71,5 +60,5 @@ export function importMindmap(value: unknown, current: MindmapDocument): Mindmap
   return { ...current, root_id: remap.get(source.root_id)!, nodes: source.nodes.map(node => ({ id: remap.get(node.id)!, parent_id: node.parent_id ? remap.get(node.parent_id)! : null,
     order: node.order, label: node.label, note: node.note, kind: node.kind, collapsed: node.collapsed,
     owner_id: node.owner_id ? remap.get(node.owner_id)! : null, entity_ref: node.entity_ref ? remap.get(node.entity_ref)! : null, target_id: null })),
-    relations: source.relations.map(relation => ({ id: `relation.${crypto.randomUUID()}`, label: relation.label, capability_id: relation.capability_id, endpoints: relation.endpoints.map(id => remap.get(id)!) })) };
+    relations: source.relations.map(relation => ({ id: `relation.${randomUuid()}`, label: relation.label, capability_id: relation.capability_id, endpoints: relation.endpoints.map(id => remap.get(id)!) })) };
 }

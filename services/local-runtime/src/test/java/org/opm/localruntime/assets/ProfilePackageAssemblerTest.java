@@ -135,13 +135,13 @@ class ProfilePackageAssemblerTest {
         OplGenerationResult result = new OplTextGenerationService().generate(revision, revision.rootContextId(), assets);
 
         String ruleId = "rule.iso.proc.state-consumption.endpoints.v1";
-        assertEquals(java.util.List.of(ruleId), result.artifact().paragraphs().getFirst().sentences().getFirst().generationRuleIds());
-        assertEquals(java.util.List.of(ruleId), result.traces().getFirst().ruleIds());
-        assertTrue(result.artifact().paragraphs().getFirst().sentences().getFirst().tokens().stream()
+        assertEquals(java.util.List.of(ruleId), result.artifact().paragraphs().get(0).sentences().get(0).generationRuleIds());
+        assertEquals(java.util.List.of(ruleId), result.traces().get(0).ruleIds());
+        assertTrue(result.artifact().paragraphs().get(0).sentences().get(0).tokens().stream()
                 .flatMap(token -> token.sourceRefs().stream())
                 .filter(ref -> ref.sourceKind() == OplToken.SourceKind.RULE)
                 .allMatch(ref -> ruleId.equals(ref.stableId())));
-        assertTrue(result.traces().getFirst().sourceRefs().stream()
+        assertTrue(result.traces().get(0).sourceRefs().stream()
                 .filter(ref -> ref.sourceKind() == OplToken.SourceKind.GRAMMAR)
                 .allMatch(ref -> ref.fieldPath().startsWith("templates[template_id=") && !ref.fieldPath().startsWith("digest=")));
     }

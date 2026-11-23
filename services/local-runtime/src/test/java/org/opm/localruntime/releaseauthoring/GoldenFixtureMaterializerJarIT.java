@@ -155,11 +155,11 @@ class GoldenFixtureMaterializerJarIT {
     }
 
     @Test
-    void semanticVerifierRejectsAChangedSqliteStateAfterRawReferencesAreRecomputed() throws Exception {
+    void semanticVerifierRejectsAChangedSnapshotStateAfterRawReferencesAreRecomputed() throws Exception {
         Path runtimeJar = runtimeJar();
         Invocation invocation = invocation(runtimeJar);
         assertEquals(0, invoke(runtimeJar, invocation, sha256(Files.readAllBytes(runtimeJar))).exitCode());
-        try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + invocation.databasePath())) {
+        try (var connection = org.opm.localruntime.storage.SqliteTestSupport.connection(invocation.databasePath())) {
             connection.createStatement().executeUpdate("UPDATE model_head SET head_sequence = 999");
         }
         Files.deleteIfExists(invocation.databasePath().resolveSibling("project.db-wal"));
@@ -257,7 +257,10 @@ class GoldenFixtureMaterializerJarIT {
     void rejectsAnInvalidFamilyFixtureSetBeforeReportAcceptanceThroughThePackagedJar() throws Exception {
         Path runtimeJar = runtimeJar();
         Invocation invocation = invocation(runtimeJar);
-        mutatePlan(invocation, plan -> list(plan, "captures").removeLast());
+        mutatePlan(invocation, plan -> {
+            var captures = list(plan, "captures");
+            captures.remove(captures.size() - 1);
+        });
 
         ProcessResult result = invoke(runtimeJar, invocation, sha256(Files.readAllBytes(runtimeJar)));
 
@@ -365,7 +368,7 @@ class GoldenFixtureMaterializerJarIT {
             wallMicros.add(fixtureWallMicros);
             assertTrue(Files.isRegularFile(invocation.databasePath()));
         }
-        ProcessResult verified = verifyFull(batch.invocations().getFirst());
+        ProcessResult verified = verifyFull(batch.invocations().get(0));
         assertEquals(0, verified.exitCode(), verified.output());
         long totalWallMicros = elapsedMicros(batchStarted);
         long p95WallMicros = nearestRank(wallMicros, 0.95d);
@@ -528,7 +531,7 @@ class GoldenFixtureMaterializerJarIT {
             for (int occurrence = 0; occurrence < 9; occurrence++) captures.add(Map.of("capture_kind", "FAMILY", "fixture_ref", ref));
         }
         assertEquals(1170, captures.size());
-        JsonNode fixtureRoot = mapper.readTree(fixtures.getFirst().bytes());
+        JsonNode fixtureRoot = mapper.readTree(fixtures.get(0).bytes());
         Map<String, Object> plan = new LinkedHashMap<>();
         plan.put("schema_id", "OPM-DEV-CANVAS-06-GOLDEN-CAPTURE-PLAN-001");
         plan.put("schema_version", "0.1");
@@ -555,7 +558,7 @@ class GoldenFixtureMaterializerJarIT {
 
     private Invocation replaceTargetRef(Invocation invocation, Consumer<Map<String, Object>> mutation) throws Exception {
         Map<String, Object> plan = readPlan(invocation);
-        Map<String, Object> targetRef = new LinkedHashMap<>(map(map(list(plan, "captures").getFirst()), "fixture_ref"));
+        Map<String, Object> targetRef = new LinkedHashMap<>(map(map(list(plan, "captures").get(0)), "fixture_ref"));
         mutation.accept(targetRef);
         List<Object> captures = list(plan, "captures");
         for (int index = 0; index < 9; index++) map(captures.get(index)).put("fixture_ref", targetRef);

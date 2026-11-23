@@ -27,6 +27,175 @@ class DraftJournalRepositoryTest {
     // 仅存储测试结果，不作为实际语义生成证据。
     private static final String SUMMARY = "{\"blocking\":0,\"warning\":0,\"suggestion\":0,\"coverage_state\":\"EVIDENCE_MISSING\"}";
 
+    @Test void recoveryStateIgnoresLongHistoryAndTracksBothDirectionsAndBranches() throws Exception {
+        Path database = database("recovery-state", true); var repository = repository(database, 0);
+        var history = new OperationHistoryRepository(SqliteSnapshots.scope(database), clock(0));
+        var initial = repository.read(PROJECT, MODEL);
+        assertEquals(0, history.recovery(PROJECT, MODEL, JSON.valueToTree(initial.token())).path("items").size());
+        repository.commit(PROJECT, MODEL, request(initial, "command.first"), document -> move(document, 111));
+        var first = repository.read(PROJECT, MODEL);
+        repository.commit(PROJECT, MODEL, request(first, "command.second"), document -> move(document, 222));
+        try (var connection = SqliteTestSupport.connection(database)) {
+            for (int i = 0; i < 350; i++) execute(connection,
+                "INSERT INTO idempotency_record(operation_id,aggregate_id,command_id,request_digest,result_status,result_revision_id,result_json,created_at,expires_at) SELECT operation_id,aggregate_id,?,request_digest,result_status,result_revision_id,result_json,created_at,expires_at FROM idempotency_record WHERE operation_id='DRAFT_OPERATION_HISTORY_V1' AND aggregate_id=? AND command_id='EDIT.command.first'",
+                "EDIT.padding." + i, MODEL);
+        }
+        var second = repository.read(PROJECT, MODEL);
+        var state = history.recovery(PROJECT, MODEL, JSON.valueToTree(second.token()));
+        assertEquals(1, state.path("items").size()); assertTrue(state.path("next_before").isNull());
+        assertEquals("history.EDIT.command.second", state.at("/items/0/record_id").asText());
+        code("DRAFT_CONFLICT", () -> history.recovery(PROJECT, MODEL, JSON.valueToTree(first.token())));
+        repository.commit(PROJECT, MODEL, recoveryRequest(second, "command.undo.second", "history.EDIT.command.second", "UNDO"), DraftJournalRepositoryTest::proposal);
+        var undone = repository.read(PROJECT, MODEL);
+        state = history.recovery(PROJECT, MODEL, JSON.valueToTree(undone.token()));
+        assertEquals(2, state.path("items").size());
+        assertEquals("UNDO", state.at("/items/0/recovery_action").asText()); assertEquals("REDO", state.at("/items/1/recovery_action").asText());
+        new DraftSaveRepository(database, clock(10)).checkpoint(PROJECT, MODEL, ignored -> { });
+        assertEquals(2, history.recovery(PROJECT, MODEL, JSON.valueToTree(undone.token())).path("items").size());
+        repository.commit(PROJECT, MODEL, recoveryRequest(undone, "command.undo.first", "history.EDIT.command.first", "UNDO"), DraftJournalRepositoryTest::proposal);
+        assertEquals("REDO", history.recovery(PROJECT, MODEL, JSON.valueToTree(repository.read(PROJECT, MODEL).token())).at("/items/0/recovery_action").asText());
+        repository.commit(PROJECT, MODEL, request(repository.read(PROJECT, MODEL), "command.branch"), document -> move(document, 333));
+        state = history.recovery(PROJECT, MODEL, JSON.valueToTree(repository.read(PROJECT, MODEL).token()));
+        assertEquals(1, state.path("items").size()); assertEquals("UNDO", state.at("/items/0/recovery_action").asText());
+    }
+
+    @Test void multipleOperationsUndoToInitialAcrossSaveReopenAndBranch() throws Exception {
+        Path database = database("recovery", true); var repository = repository(database, 0);
+        var initial = repository.read(PROJECT, MODEL);
+        for (int step = 1; step <= 3; step++) {
+            final int value = step;
+            repository.commit(PROJECT, MODEL, request(repository.read(PROJECT, MODEL), "command.step" + step), document -> move(document, 100 + value));
+        }
+        new DraftSaveRepository(database, clock(10)).checkpoint(PROJECT, MODEL, ignored -> { });
+        for (int step = 3; step >= 1; step--) {
+            repository = repository(database, 12);
+            var current = repository.read(PROJECT, MODEL);
+            var undo = recoveryRequest(current, "command.undo" + step, "history.EDIT.command.step" + step, "UNDO");
+            repository.commit(PROJECT, MODEL, undo, DraftJournalRepositoryTest::proposal);
+            var after = repository.read(PROJECT, MODEL);
+            repository.commit(PROJECT, MODEL, undo, ignored -> { fail("Idempotent replay must not execute"); return null; });
+            assertEquals(after.token(), repository.read(PROJECT, MODEL).token());
+            var entries = new OperationHistoryRepository(SqliteSnapshots.scope(database), clock(12)).read(PROJECT, MODEL, "HEAD", null).get("items");
+            for (var entry : entries) {
+                if (entry.path("record_id").asText().equals("history.EDIT.command.step" + step)) assertEquals("REDO", entry.path("recovery_action").asText());
+                assertNotEquals("RESTORE_OPERATION", entry.path("operation").asText());
+            }
+            if (step > 1) assertTrue(entries.toString().contains("history.EDIT.command.step" + (step - 1)));
+        }
+        assertEquals(initial.documentJson(), repository.read(PROJECT, MODEL).documentJson());
+        repository.commit(PROJECT, MODEL, request(repository.read(PROJECT, MODEL), "command.branch"), document -> move(document, 456));
+        var branched = repository.read(PROJECT, MODEL);
+        var stale = recoveryRequest(branched, "command.stale", "history.EDIT.command.step3", "UNDO");
+        final var active = repository;
+        code("DRAFT_CONFLICT", () -> active.commit(PROJECT, MODEL, stale, DraftJournalRepositoryTest::proposal));
+        repository.commit(PROJECT, MODEL, recoveryRequest(branched, "command.undo.branch", "history.EDIT.command.branch", "UNDO"), DraftJournalRepositoryTest::proposal);
+        assertEquals(initial.documentJson(), repository.read(PROJECT, MODEL).documentJson());
+    }
+    @Test void oldJournalCanReconnectUndoHistoryWithoutStoredRecoverySlots() throws Exception {
+        Path database = database("old-recovery", true); var repository = repository(database, 0);
+        var initial = repository.read(PROJECT, MODEL);
+        repository.commit(PROJECT, MODEL, request(initial, "command.old1"), document -> move(document, 111));
+        repository.commit(PROJECT, MODEL, request(repository.read(PROJECT, MODEL), "command.old2"), document -> move(document, 222));
+        try (var connection = SqliteTestSupport.connection(database)) {
+            execute(connection, "DELETE FROM idempotency_record WHERE operation_id='DRAFT_OPERATION_RECOVERY_V1'");
+        }
+        for (int step = 2; step >= 1; step--) {
+            var history = new OperationHistoryRepository(SqliteSnapshots.scope(database), clock(0)).read(PROJECT, MODEL, "HEAD", null);
+            assertTrue(history.toString().contains("\"recovery_action\":\"UNDO\""));
+            repository.commit(PROJECT, MODEL, recoveryRequest(repository.read(PROJECT, MODEL), "command.old.undo" + step,
+                    "history.EDIT.command.old" + step, "UNDO"), DraftJournalRepositoryTest::proposal);
+        }
+        assertEquals(initial.documentJson(), repository.read(PROJECT, MODEL).documentJson());
+    }
+
+    @Test void redoChainSurvivesReopenDirectionChangesAndNewBranch() throws Exception {
+        Path database = database("redo-chain", true); var repository = repository(database, 0);
+        var states = new java.util.ArrayList<String>(); states.add(repository.read(PROJECT, MODEL).documentJson());
+        for (int i = 1; i <= 3; i++) {
+            final int x = i * 100;
+            repository.commit(PROJECT, MODEL, request(repository.read(PROJECT, MODEL), "command.edit" + i), document -> move(document, x));
+            states.add(repository.read(PROJECT, MODEL).documentJson());
+        }
+        for (int i = 3; i >= 1; i--) {
+            repository = repository(database, i + 10);
+            repository.commit(PROJECT, MODEL, recoveryRequest(repository.read(PROJECT, MODEL), "command.undo" + i, "history.EDIT.command.edit" + i, "UNDO"), DraftJournalRepositoryTest::proposal);
+            assertEquals(states.get(i - 1), repository.read(PROJECT, MODEL).documentJson());
+        }
+        new DraftSaveRepository(database, clock(20)).checkpoint(PROJECT, MODEL, ignored -> { });
+        for (int i = 1; i <= 3; i++) {
+            repository = repository(database, i + 20);
+            var history = new OperationHistoryRepository(SqliteSnapshots.scope(database), clock(25)).read(PROJECT, MODEL, "HEAD", null);
+            assertTrue(history.toString().contains("\"recovery_action\":\"REDO\""));
+            var redo = recoveryRequest(repository.read(PROJECT, MODEL), "command.redo" + i, "history.EDIT.command.edit" + i, "REDO");
+            repository.commit(PROJECT, MODEL, redo, DraftJournalRepositoryTest::proposal);
+            var after = repository.read(PROJECT, MODEL);
+            assertEquals(states.get(i), after.documentJson());
+            repository.commit(PROJECT, MODEL, redo, ignored -> { fail("Replay must not execute"); return null; });
+            assertEquals(after.token(), repository.read(PROJECT, MODEL).token());
+        }
+        repository.commit(PROJECT, MODEL, recoveryRequest(repository.read(PROJECT, MODEL), "command.undo-again", "history.EDIT.command.edit3", "UNDO"), DraftJournalRepositoryTest::proposal);
+        var beforeFailure = repository.read(PROJECT, MODEL);
+        var failed = recoveryRequest(beforeFailure, "command.failed-redo", "history.EDIT.command.edit3", "REDO");
+        final var active = repository;
+        assertThrows(IllegalStateException.class, () -> active.commit(PROJECT, MODEL, failed, document -> { throw new IllegalStateException("reject"); }));
+        assertEquals(beforeFailure.token(), repository.read(PROJECT, MODEL).token());
+        repository.commit(PROJECT, MODEL, failed, DraftJournalRepositoryTest::proposal);
+        assertEquals(states.get(3), repository.read(PROJECT, MODEL).documentJson());
+        repository.commit(PROJECT, MODEL, recoveryRequest(repository.read(PROJECT, MODEL), "command.undo-branch", "history.EDIT.command.edit3", "UNDO"), DraftJournalRepositoryTest::proposal);
+        repository.commit(PROJECT, MODEL, request(repository.read(PROJECT, MODEL), "command.new-branch"), document -> move(document, 999));
+        var stale = recoveryRequest(repository.read(PROJECT, MODEL), "command.stale-redo", "history.EDIT.command.edit3", "REDO");
+        code("DRAFT_CONFLICT", () -> active.commit(PROJECT, MODEL, stale, DraftJournalRepositoryTest::proposal));
+        assertFalse(new OperationHistoryRepository(SqliteSnapshots.scope(database), clock(30)).read(PROJECT, MODEL, "HEAD", null).toString().contains("\"recovery_action\":\"REDO\""));
+    }
+
+    @Test void failedRecoveryLeavesModelAndRecoveryPointUnchanged() throws Exception {
+        Path database = database("recovery-failed", true); var repository = repository(database, 0);
+        repository.commit(PROJECT, MODEL, request(repository.read(PROJECT, MODEL), "command.change"), document -> move(document, 123));
+        var changed = repository.read(PROJECT, MODEL);
+        var undo = recoveryRequest(changed, "command.undo", "history.EDIT.command.change", "UNDO");
+        assertThrows(IllegalStateException.class, () -> repository.commit(PROJECT, MODEL, undo, document -> { throw new IllegalStateException("reject"); }));
+        assertEquals(changed.token(), repository.read(PROJECT, MODEL).token());
+        repository.commit(PROJECT, MODEL, undo, DraftJournalRepositoryTest::proposal);
+        assertEquals(changed.token().edit_seq() + 1, repository.read(PROJECT, MODEL).token().edit_seq());
+    }
+
+    private static DraftWorkspaceContract.Document recoveryRequest(DraftJournalRepository.Snapshot snapshot, String command, String record, String action) {
+        var input = (ObjectNode) request(snapshot, command).value();
+        ((ObjectNode) input.get("scope")).put("intent", "RESTORE_OPERATION");
+        input.putObject("command").put("command_type", "RESTORE_OPERATION").putObject("payload").put("record_id", record).put("action", action);
+        return checked(input);
+    }
+
+    @Test void stateReadsMetadataWithoutReplayingDocumentAndRetainsScopeGuards() throws Exception {
+        Path database = database("state", true); var repository = repository(database, 0);
+        var initial = repository.read(PROJECT, MODEL);
+        assertState(initial, repository.readState(PROJECT, MODEL));
+        repository.commit(PROJECT, MODEL, request(initial, "command.state"), document -> move(document, 2));
+        var edited = repository.read(PROJECT, MODEL);
+        assertState(edited, repository.readState(PROJECT, MODEL));
+        code("NOT_FOUND", () -> repository.readState("project.other", MODEL));
+        try (var connection = org.opm.localruntime.storage.SqliteTestSupport.create(database).getConnection()) {
+            execute(connection, org.opm.localruntime.storage.SqliteTestSupport.dropTriggerSql(connection, "draft_content_no_update", "draft_content"));
+            execute(connection, "UPDATE draft_content SET artifact_json='{}'");
+        }
+        // 状态无须装载 JSON；真正打开草稿仍完整校验并拒绝损坏的内容。
+        assertState(edited, repository.readState(PROJECT, MODEL));
+        code("DRAFT_RECOVERY_REQUIRED", () -> repository.read(PROJECT, MODEL));
+        try (var coordinator = new org.opm.localruntime.application.DraftSaveCoordinator(PROJECT, MODEL,
+                new DraftSaveRepository(database, clock(0)), clockDocument -> fail("期限前不得读取或保存文档"), clock(0), System::nanoTime)) {
+            assertEquals(edited.token(), coordinator.state().durable_token());
+            coordinator.poll(); assertNull(coordinator.state().last_error());
+        }
+        Path old = database("state-old", false);
+        code("DRAFT_MODE_REQUIRED", () -> repository(old, 0).readState(PROJECT, MODEL));
+    }
+
+    private static void assertState(DraftJournalRepository.Snapshot full, DraftJournalRepository.StateSnapshot state) {
+        assertEquals(full.token(), state.token()); assertEquals(full.checkpointToken(), state.checkpointToken());
+        assertEquals(full.dirtySince(), state.dirtySince()); assertEquals(full.deadline(), state.deadline());
+        assertEquals(full.lastManualRevision(), state.lastManualRevision());
+    }
+
     @Test
     void persistsDeltasAndReceiptsWithoutGrowingRevisionOrContentBlobs() throws Exception {
         Path database = database("main", true); var first = repository(database, 0); var initial = first.read(PROJECT, MODEL);
@@ -42,7 +211,7 @@ class DraftJournalRepositoryTest {
         assertEquals(initial.token().draft_id(), reopened.token().draft_id());
         assertEquals(1, count(database, "revision_document")); assertEquals(1, count(database, "draft_content")); assertEquals(1, count(database, "draft_checkpoint"));
         assertEquals(0, count(database, "draft_savepoint")); assertEquals(2, count(database, "draft_journal")); assertEquals(2, count(database, "draft_receipt"));
-        try (var connection = SqliteConnectionFactory.create(database).getConnection(); var statement = connection.createStatement(); var rows = statement.executeQuery("SELECT delta_json FROM draft_journal ORDER BY edit_seq LIMIT 1")) {
+        try (var connection = org.opm.localruntime.storage.SqliteTestSupport.create(database).getConnection(); var statement = connection.createStatement(); var rows = statement.executeQuery("SELECT delta_json FROM draft_journal ORDER BY edit_seq LIMIT 1")) {
             assertTrue(rows.next()); assertTrue(rows.getString(1).contains("\"path\":[\"layouts\",\"0\",\"x\"]")); assertFalse(rows.getString(1).contains("profile_binding"));
             assertTrue(rows.getString(1).length() < initial.documentJson().length() / 4);
         }
@@ -77,7 +246,7 @@ class DraftJournalRepositoryTest {
         assertEquals(0, count(database, "draft_journal")); assertEquals(0, count(database, "draft_receipt")); assertEquals(initial, repository.read(PROJECT, MODEL));
         Path old = database("old", false); code("DRAFT_MODE_REQUIRED", () -> repository(old, 0).read(PROJECT, MODEL));
         Path legacy = database("legacy-v2", false, 2); code("DRAFT_MODE_REQUIRED", () -> repository(legacy, 0).read(PROJECT, MODEL));
-        Path absent = temporary.resolve("absent.sqlite"); code("INPUT_INVALID", () -> repository(absent, 0)); assertFalse(Files.exists(absent));
+        Path absent = temporary.resolve("absent.snapshot.json"); assertThrows(IllegalArgumentException.class, () -> repository(absent, 0)); assertFalse(Files.exists(absent));
     }
 
     @Test
@@ -93,24 +262,25 @@ class DraftJournalRepositoryTest {
     }
 
     @Test
-    void sqliteReceiptFailureRollsBackAlreadyWrittenDeltaAndStream() throws Exception {
+    void postgresReceiptFailureRollsBackAlreadyWrittenDeltaAndStream() throws Exception {
         Path database = database("sql-failure", true); var repository = repository(database, 0); var initial = repository.read(PROJECT, MODEL);
-        try (var connection = SqliteConnectionFactory.create(database).getConnection()) {
-            execute(connection, "CREATE TRIGGER test_receipt_failure BEFORE INSERT ON draft_receipt BEGIN SELECT RAISE(ABORT,'测试存储写入失败'); END");
+        try (var connection = org.opm.localruntime.storage.SqliteTestSupport.create(database).getConnection()) {
+            execute(connection, (org.opm.localruntime.storage.SqliteTestSupport.sqlite(connection) ? "CREATE TRIGGER test_receipt_failure BEFORE INSERT ON draft_receipt BEGIN SELECT RAISE(ABORT, '测试存储写入失败'); END" : "CREATE OR REPLACE FUNCTION fn_test_receipt_failure() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION '测试存储写入失败'; RETURN NEW; END $$; CREATE TRIGGER test_receipt_failure BEFORE INSERT ON draft_receipt FOR EACH ROW EXECUTE FUNCTION fn_test_receipt_failure()"));
         }
         code("PERSISTENCE_FAILED", () -> repository.commit(PROJECT, MODEL, request(initial, "command.1"), document -> move(document, 5)));
         assertEquals(initial, repository.read(PROJECT, MODEL)); assertEquals(0, count(database, "draft_journal")); assertEquals(0, count(database, "draft_receipt"));
     }
 
     @Test
-    void sqliteSerializesTwoRepositoryInstancesForTheSameExpectedToken() throws Exception {
+    void postgresSerializesTwoRepositoryInstancesForTheSameExpectedToken() throws Exception {
         Path database = database("concurrent", true); var normal = repository(database, 0); var initial = normal.read(PROJECT, MODEL);
         var entered = new CountDownLatch(1); var release = new CountDownLatch(1); var secondStarted = new CountDownLatch(1);
         var first = new DraftJournalRepository(database, clock(0), stage -> {
             if (!stage.equals("JOURNAL")) return; entered.countDown();
             try { assertTrue(release.await(5, TimeUnit.SECONDS)); } catch (InterruptedException exception) { throw new RuntimeException(exception); }
         });
-        try (var executor = java.util.concurrent.Executors.newFixedThreadPool(2)) {
+        var executor = java.util.concurrent.Executors.newFixedThreadPool(2);
+        try {
             var a = executor.submit(() -> first.commit(PROJECT, MODEL, request(initial, "command.first"), document -> move(document, 4)));
             assertTrue(entered.await(5, TimeUnit.SECONDS));
             var b = executor.submit(() -> { secondStarted.countDown(); return repository(database, 1).commit(PROJECT, MODEL, request(initial, "command.second"), document -> move(document, 5)); });
@@ -118,7 +288,7 @@ class DraftJournalRepositoryTest {
             assertEquals("DURABLE", a.get(10, TimeUnit.SECONDS).value().get("status").asText());
             var error = assertThrows(java.util.concurrent.ExecutionException.class, () -> b.get(10, TimeUnit.SECONDS));
             assertEquals("DRAFT_CONFLICT", ((DraftJournalRepository.Failure) error.getCause()).code());
-        }
+        } finally { release.countDown(); executor.shutdownNow(); }
         assertEquals(1, count(database, "draft_journal")); assertEquals(1, count(database, "draft_receipt"));
     }
 
@@ -127,12 +297,12 @@ class DraftJournalRepositoryTest {
         for (String damage : List.of("checkpoint", "gap", "delta", "receipt", "deadline")) {
             Path database = database(damage, true); var repository = repository(database, 0); var initial = repository.read(PROJECT, MODEL);
             repository.commit(PROJECT, MODEL, request(initial, "command.1"), document -> move(document, 1));
-            try (var connection = SqliteConnectionFactory.create(database).getConnection()) {
+            try (var connection = org.opm.localruntime.storage.SqliteTestSupport.create(database).getConnection()) {
                 switch (damage) {
-                    case "checkpoint" -> { execute(connection, "DROP TRIGGER draft_content_no_update"); execute(connection, "UPDATE draft_content SET artifact_json='{}'"); }
+                    case "checkpoint" -> { execute(connection, org.opm.localruntime.storage.SqliteTestSupport.dropTriggerSql(connection, "draft_content_no_update", "draft_content")); execute(connection, "UPDATE draft_content SET artifact_json='{}'"); }
                     case "gap" -> execute(connection, "DELETE FROM draft_journal");
-                    case "delta" -> { execute(connection, "DROP TRIGGER draft_journal_no_update"); execute(connection, "UPDATE draft_journal SET artifact_delta_json='{}'"); }
-                    case "receipt" -> { execute(connection, "DROP TRIGGER draft_receipt_no_update"); execute(connection, "UPDATE draft_receipt SET result_json='{}'"); }
+                    case "delta" -> { execute(connection, org.opm.localruntime.storage.SqliteTestSupport.dropTriggerSql(connection, "draft_journal_no_update", "draft_journal")); execute(connection, "UPDATE draft_journal SET artifact_delta_json='{}'"); }
+                    case "receipt" -> { execute(connection, org.opm.localruntime.storage.SqliteTestSupport.dropTriggerSql(connection, "draft_receipt_no_update", "draft_receipt")); execute(connection, "UPDATE draft_receipt SET result_json='{}'"); }
                     case "deadline" -> execute(connection, "UPDATE draft_stream SET dirty_since=NULL,deadline=NULL");
                 }
             }
@@ -160,29 +330,28 @@ class DraftJournalRepositoryTest {
     private static void code(String expected, org.junit.jupiter.api.function.Executable call) { assertEquals(expected, assertThrows(DraftJournalRepository.Failure.class, call).code()); }
     private Path database(String name, boolean activate) throws Exception { return database(name, activate, 3); }
     private Path database(String name, boolean activate, int version) throws Exception {
-        Path database = temporary.resolve(name + ".sqlite"), root = root(); var source = SqliteConnectionFactory.create(database);
-        Flyway.configure().dataSource(source).locations("filesystem:" + root.resolve("docs/contracts/migrations/sqlite")).target(String.valueOf(version)).mixed(true).load().migrate();
+        Path root=root(); var factory=new ProjectDatabaseFactory(temporary.resolve(name)); var source=factory.databaseScope(PROJECT);
         String raw = Files.readString(root.resolve("packages/profiles/profile.iso19450.2024.draft/0.2.0/golden/fixtures/g-opl-proc-001-consumption-object-pass.json"));
         var document = SaveContentDigestV1.read(raw); var binding = document.get("profile_binding");
         try (var connection = source.getConnection()) {
-            execute(connection, "INSERT INTO project_metadata VALUES (?,?,?,NULL,'ACTIVE',?,?,?,?)", PROJECT, "测试", "test", binding.at("/profile/id").asText(), binding.at("/profile/version").asText(), NOW, NOW);
-            execute(connection, "INSERT INTO model_catalog VALUES (?,?,?,?,?,'ACTIVE',?,?,?)", MODEL, PROJECT, "模型", "model", "描述", binding.toString(), NOW, NOW);
-            execute(connection, "INSERT INTO profile_package VALUES (?,?,?,'DRAFT','{}',?)", binding.at("/profile/id").asText(), binding.at("/profile/version").asText(), binding.at("/profile/digest/digest").asText(), NOW);
-            execute(connection, "INSERT INTO rule_set_package VALUES (?,?,?,'DRAFT','{}',?)", binding.at("/rule_set/id").asText(), binding.at("/rule_set/version").asText(), binding.at("/rule_set/digest/digest").asText(), NOW);
-            execute(connection, "INSERT INTO revision_document VALUES (?,?,?,'0.2',?,?,?,?,?,?,?,?,'TEST',1,?)", document.get("revision_id").asText(), MODEL, 2,
+            execute(connection, "INSERT INTO project_metadata(project_id,name,normalized_name,description,status,default_profile_id,default_profile_version,created_at,updated_at) VALUES (?,?,?,NULL,'ACTIVE',?,?,?,?)", PROJECT, "测试", "test", binding.at("/profile/id").asText(), binding.at("/profile/version").asText(), NOW, NOW);
+            execute(connection, "INSERT INTO model_catalog(model_id,project_id,name,normalized_name,description,status,profile_binding_json,created_at,updated_at) VALUES (?,?,?,?,?,'ACTIVE',?,?,?)", MODEL, PROJECT, "模型", "model", "描述", binding.toString(), NOW, NOW);
+            execute(connection, "INSERT INTO profile_package(profile_id,package_version,package_digest,lifecycle_status,package_json,installed_at) VALUES (?,?,?,'DRAFT','{}',?)", binding.at("/profile/id").asText(), binding.at("/profile/version").asText(), binding.at("/profile/digest/digest").asText(), NOW);
+            execute(connection, "INSERT INTO rule_set_package(rule_set_id,rule_set_version,rule_set_digest,lifecycle_status,package_json,installed_at) VALUES (?,?,?,'DRAFT','{}',?)", binding.at("/rule_set/id").asText(), binding.at("/rule_set/version").asText(), binding.at("/rule_set/digest/digest").asText(), NOW);
+            execute(connection, "INSERT INTO revision_document(revision_id,model_id,revision_sequence,schema_version,profile_id,profile_version,rule_set_id,rule_set_version,schema_set_json,profile_binding_json,document_json,document_digest,commit_reason,immutable,created_at) VALUES (?,?,?,'0.2',?,?,?,?,?,?,?,?,'TEST',1,?)", document.get("revision_id").asText(), MODEL, 2,
                     binding.at("/profile/id").asText(), binding.at("/profile/version").asText(), binding.at("/rule_set/id").asText(), binding.at("/rule_set/version").asText(),
-                    document.get("schema_set_ref").toString(), binding.toString(), raw, HybridSavePreparation.hash(raw), NOW);
-            execute(connection, "INSERT INTO model_head VALUES (?,?,1,?)", MODEL, document.get("revision_id").asText(), NOW);
-            if (version < 3) return database;
+                    document.get("schema_set_ref").toString(), binding.toString(), raw, org.opm.localruntime.storage.StorageDigests.hash(raw), NOW);
+            execute(connection, "INSERT INTO model_head(model_id,draft_head_revision_id,head_sequence,updated_at) VALUES (?,?,1,?)", MODEL, document.get("revision_id").asText(), NOW);
+            if (version < 3) return factory.snapshot(PROJECT);
             connection.setAutoCommit(false);
-            PreparedDraftRepository.seed(connection, new DraftPreparationRequest(PROJECT, MODEL, document.get("revision_id").asText(), HybridSavePreparation.hash(raw),
-                    binding.at("/binding_digest/digest").asText(), "draft.test", "checkpoint.seed", NOW), new PreparedDraftRepository.Source(raw, document), ignored -> { });
-            if (activate) execute(connection, "INSERT INTO model_save_mode VALUES (?,'JOURNALED_DRAFT_V2','draft.test')", MODEL);
+            DraftSeedRepository.seed(connection, new DraftPreparationRequest(PROJECT, MODEL, document.get("revision_id").asText(), org.opm.localruntime.storage.StorageDigests.hash(raw),
+                    binding.at("/binding_digest/digest").asText(), "draft.test", "checkpoint.seed", NOW), new DraftSeedRepository.Source(raw, document), ignored -> { });
+            if (activate) execute(connection, "INSERT INTO model_save_mode(model_id,mode,active_draft_id) VALUES (?,'JOURNALED_DRAFT_V2','draft.test')", MODEL);
             connection.commit();
         }
-        return database;
+        return factory.snapshot(PROJECT);
     }
-    private static Path root() { Path path = Path.of(System.getProperty("user.dir")).toAbsolutePath(); while (path != null && !Files.isDirectory(path.resolve("docs/contracts/migrations/sqlite"))) path = path.getParent(); assertNotNull(path); return path; }
-    private static long count(Path database, String table) throws Exception { try (var connection = SqliteConnectionFactory.create(database).getConnection(); var statement = connection.createStatement(); var rows = statement.executeQuery("SELECT count(*) FROM " + table)) { rows.next(); return rows.getLong(1); } }
+    private static Path root() { Path path = Path.of(System.getProperty("user.dir")).toAbsolutePath(); while (path != null && !Files.isDirectory(path.resolve("packages/profiles"))) path = path.getParent(); assertNotNull(path); return path; }
+    private static long count(Path database, String table) throws Exception { try (var connection = org.opm.localruntime.storage.SqliteTestSupport.create(database).getConnection(); var statement = connection.createStatement(); var rows = statement.executeQuery("SELECT count(*) FROM " + table)) { rows.next(); return rows.getLong(1); } }
     private static void execute(Connection connection, String sql, Object... values) throws Exception { try (var statement = connection.prepareStatement(sql)) { for (int i = 0; i < values.length; i++) statement.setObject(i + 1, values[i]); statement.executeUpdate(); } }
 }

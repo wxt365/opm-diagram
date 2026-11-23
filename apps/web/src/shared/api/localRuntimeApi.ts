@@ -11,15 +11,22 @@ import type {
   ApiEdtUpdateStatePayload,
 } from "./generated/apiEdtContract";
 import type * as Draft from "./generated/draftWorkspaceContract";
-import type { PinResult, SaveResult } from "./generated/draftSaveContract";
+import type { PinResult, SaveResult, SaveState } from "./generated/draftSaveContract";
 import { sameDraftToken } from "./draftRequestIdentity";
+import { randomUuid } from "@/shared/platform/browserCrypto";
+import type { NodeColorPalette } from "@/shared/nodeAppearance";
+import type { NodeAppearance, OpdNode } from "@/shared/types/modeling";
 
 export interface DraftQueryContracts {
+  "graph-analysis": [Draft.GraphAnalysisRequest, Draft.GraphAnalysisResult];
   mindmap: [Draft.MindmapRequest, Draft.MindmapResult];
   "method-summary": [Draft.MethodSummaryRequest, Draft.MethodSummaryResult];
   "operation-history": [Draft.OperationHistoryRequest, Draft.OperationHistoryResult];
+  "recovery-state": [Draft.RecoveryStateRequest, Draft.RecoveryStateResult];
   open: [Draft.OpenDraftRequest, Draft.OpenDraftResult];
   projection: [Draft.DraftQueryRequest, Draft.DraftProjectionResult];
+  canvas: [Draft.DraftQueryRequest, { opened: Draft.OpenDraftResult; projection: Draft.DraftProjectionResult }];
+  details: [Draft.DraftQueryRequest, { text: Draft.DraftTextResult | null; navigation: Draft.DraftNavigationResult; findings: Draft.DraftFindingsResult; catalog: Draft.DraftRelationCatalogResult }];
   text: [Draft.DraftQueryRequest, Draft.DraftTextResult];
   navigation: [Draft.DraftQueryRequest, Draft.DraftNavigationResult];
   findings: [Draft.DraftQueryRequest, Draft.DraftFindingsResult];
@@ -48,6 +55,7 @@ export interface ModelWire {
   model_id: string;
   project_id: string;
   name: string;
+  description?: string;
   head_revision: string | null;
   profile_id: string;
   profile_version: string;
@@ -100,7 +108,10 @@ export interface ProjectionConstructWire {
   target_kind: "ELEMENT" | "FEATURE" | "STATE" | "FACT";
   construct_role: string;
   label?: string;
-  layout: { x: number; y: number; width: number; height: number; z_order: number };
+  remark?: string;
+  /** Optional classification supplied by the embedding platform's host metadata. */
+  domain_type_label?: string;
+  layout: { x: number; y: number; width: number; height: number; z_order: number; edge_routes?: import("@/shared/types/modeling").EdgeRoute[]; appearance?: import("@/shared/types/modeling").NodeAppearance };
   source_id?: string;
   process_id?: string;
   source_occurrence_id?: string;
@@ -202,6 +213,7 @@ export type P0Command =
   | { commandType: "UPDATE_STATE"; payload: ApiEdtUpdateStatePayload }
   | { commandType: "UPDATE_FACT"; payload: ApiEdtUpdateFactPayload }
   | { commandType: "UPDATE_PROPERTY"; payload: ApiEdtUpdatePropertyPayload }
+  | { commandType: "UPDATE_PROPERTY"; payload: { target_ref: { target_kind: "ELEMENT" | "FEATURE" | "STATE"; target_id: string }; property_name: "remark"; value: string; capability_query_id: string; selected_option_id: string } }
   | { commandType: "UPDATE_LAYOUT"; payload: ApiEdtUpdateLayoutPayload }
   | { commandType: "DELETE_CONSTRUCT"; payload: ApiEdtDeleteConstructPayload }
   | { commandType: "STATE_EXPLICIT" | "STATE_SUPPRESS" | "UNFOLD" | "FOLD"; payload: ApiEdtStatePresentationPayload };
@@ -211,10 +223,11 @@ interface ErrorEnvelope {
     code?: string;
     message?: string;
     retryable?: boolean;
+    locators?: { entity_id: string; field_path: string }[];
   };
 }
 
-interface ProfileRuleBinding {
+export interface ProfileRuleBinding {
   profile_id: string;
   profile_version: string;
   rule_set_id: string;
@@ -225,6 +238,7 @@ export class LocalRuntimeApiError extends Error {
   readonly code: string;
   readonly retryable: boolean;
   readonly reasonCode: string | null;
+  locators: { entity_id: string; field_path: string }[] = [];
 
   constructor(code: string, message: string, retryable = false, reasonCode: string | null = null) {
     super(message);
@@ -243,7 +257,49 @@ export interface OpdJsonPackageWire {
   semantic_revision: { contexts: Array<{ context_id: string; name: { local_name: string } }>; elements: unknown[]; states: unknown[]; facts: unknown[]; [key: string]: unknown };
 }
 
-class LocalRuntimeApi {
+export interface RuntimeApiTransport {
+  baseUrl?: string;
+  session?: () => string | undefined;
+  binding?: () => ProfileRuleBinding;
+  accessToken?: () => Promise<string | undefined>;
+}
+
+export class LocalRuntimeApi {
+  private readonly pendingCatalogCreates = new Map<string, string>();
+  constructor(private readonly transport: RuntimeApiTransport = {}) {}
+  private async createCatalogResource<T>(path: string, kind: string, input: Record<string, unknown>): Promise<T> {
+    const key = JSON.stringify([path, input]);
+    let raw = this.pendingCatalogCreates.get(key);
+    if (!raw) {
+      raw = JSON.stringify({ request_id: requestId(`request.${kind}`), command_id: requestId(`command.${kind}`), ...input });
+      this.pendingCatalogCreates.set(key, raw);
+    }
+    // 服务端摘要包含 request_id；响应未确认时必须重放完整原文。
+    const result = await this.writeRaw<CommandEnvelope<T>>(path, raw);
+    if (!result?.data) throw new LocalRuntimeApiError('RESPONSE_INVALID', '创建结果未确认，请重试以核对原操作。', true);
+    if (this.pendingCatalogCreates.get(key) === raw) this.pendingCatalogCreates.delete(key);
+    return result.data;
+  }
+  async graphAnalysis(project: string, model: string, context: string, source: Draft.MethodSource,
+    options: Pick<Draft.GraphAnalysisRevisionRequest, "scope" | "include_hidden_states" | "include_boundary_nodes" | "include_state_ownership">): Promise<Draft.GraphAnalysisResult> {
+    const input = { request_id: requestId("query.graph"), context_id: context, ...options };
+    const result = "draft_token" in source
+      ? await this.draftQuery(project, model, "graph-analysis", { ...input, draft_token: source.draft_token })
+      : await this.writeRaw<Draft.GraphAnalysisResult>(`/api/v2/projects/${encodeURIComponent(project)}/models/${encodeURIComponent(model)}/revisions/${encodeURIComponent(source.revision_id)}/graph-analysis`, JSON.stringify(input));
+    const returned = result.source;
+    if (returned.request_id !== input.request_id || returned.project_id !== project || returned.model_id !== model
+      || returned.context_id !== context || returned.scope !== options.scope || returned.projection_version !== 1
+      || ("draft_token" in source ? !returned.draft_token || !sameDraftToken(source.draft_token, returned.draft_token)
+        : returned.revision_id !== source.revision_id || returned.draft_token !== null))
+      throw new LocalRuntimeApiError("WORKSPACE_INVALID", "图谱响应身份不一致，请刷新后重试。");
+    return result;
+  }
+  async canvasNodeColors(): Promise<NodeColorPalette> {
+    return (await this.request<{ data: NodeColorPalette }>("/api/v1/canvas/node-colors", { cache: "no-store" })).data;
+  }
+  async saveCanvasNodeColors(kind: OpdNode["kind"], colors: NodeAppearance): Promise<NodeAppearance> {
+    return (await this.write<{ data: NodeAppearance }>(`/api/v1/canvas/node-colors/${kind}`, { ...colors })).data;
+  }
   async methodSummary(project: string, model: string, context: string, source: Draft.MethodSource) {
     const request = { request_id: requestId("query.method"), context_id: context, source };
     const result = await this.draftQuery(project, model, "method-summary", request);
@@ -267,6 +323,10 @@ class LocalRuntimeApi {
     return this.writeRaw(draftPath(project, model, operation), JSON.stringify(request));
   }
 
+  draftSaveState(project: string, model: string): Promise<SaveState> {
+    return this.request(draftPath(project, model, "save-state"), { cache: "no-store" });
+  }
+
   // raw 已由传输 owner 持久化；重试不能重新序列化或分配另一 command_id。
   draftMutation<K extends keyof DraftMutationResults>(project: string, model: string, operation: K,
     raw: string): Promise<DraftMutationResults[K]> {
@@ -281,12 +341,7 @@ class LocalRuntimeApi {
   }
 
   async createProject(name: string, description: string): Promise<ProjectWire> {
-    return (await this.write<CommandEnvelope<ProjectWire>>("/api/v1/projects", {
-      request_id: requestId("request.project"),
-      command_id: requestId("command.project"),
-      name,
-      description,
-    })).data;
+    return this.createCatalogResource('/api/v1/projects', 'project', { name, description });
   }
 
   async getProject(projectId: string): Promise<ProjectWire> {
@@ -313,17 +368,14 @@ class LocalRuntimeApi {
 
   async importOpdJson(project: string, name: string, packageFile: OpdJsonPackageWire, commandId: string): Promise<ModelWire & { context_id: string }> {
     return (await this.write<CommandEnvelope<ModelWire & { context_id: string }>>(`/api/v1/projects/${encodeURIComponent(project)}/opd-json/import`, {
-      request_id: requestId("request.opd-import"), command_id: commandId, name, binding: activeBinding(), opd_package: packageFile,
+      request_id: requestId("request.opd-import"), command_id: commandId, name, binding: this.transport.binding?.() ?? activeBinding(), opd_package: packageFile,
     })).data;
   }
 
-  async createModel(projectId: string, name: string): Promise<ModelWire> {
-    return (await this.write<CommandEnvelope<ModelWire>>(`/api/v1/projects/${encodeURIComponent(projectId)}/models`, {
-      request_id: requestId("request.model"),
-      command_id: requestId("command.model"),
-      name,
-      binding: activeBinding(),
-    })).data;
+  async createModel(projectId: string, name: string, description = ''): Promise<ModelWire> {
+    return this.createCatalogResource(`/api/v1/projects/${encodeURIComponent(projectId)}/models`, 'model', {
+      name, ...(description ? { description } : {}), binding: this.transport.binding?.() ?? activeBinding(),
+    });
   }
 
   async openWorkspace(projectId: string, modelId: string): Promise<WorkspaceSessionWire> {
@@ -421,7 +473,7 @@ class LocalRuntimeApi {
   }
 
   private async writeRaw<T>(path: string, raw: string): Promise<T> {
-    const token = window.__OPM_LOCAL_SESSION__;
+    const token = this.transport.session ? this.transport.session() : window.__OPM_LOCAL_SESSION__;
     if (!token) {
       throw new LocalRuntimeApiError("LOCAL_SESSION_INVALID", "本地会话尚未就绪，请刷新页面后重试。");
     }
@@ -438,7 +490,12 @@ class LocalRuntimeApi {
   private async request<T>(path: string, init?: RequestInit): Promise<T> {
     let response: Response;
     try {
-      response = await fetch(path, init);
+      const session = this.transport.session ? this.transport.session() : window.__OPM_LOCAL_SESSION__;
+      const access = await this.transport.accessToken?.();
+      response = await fetch(`${this.transport.baseUrl ?? ""}${path}`, {
+        ...init, ...(this.transport.baseUrl ? { referrerPolicy: "origin" as const } : {}),
+        headers: { ...init?.headers, ...(session ? { "X-OPM-Session": session } : {}), ...(access ? { Authorization: `Bearer ${access}` } : {}) },
+      });
     } catch {
       throw new LocalRuntimeApiError("RUNTIME_UNAVAILABLE", "本地运行时不可用，请确认服务已启动。", true);
     }
@@ -446,8 +503,9 @@ class LocalRuntimeApi {
     const isDraft = path.startsWith("/api/v2/");
     if (!response.ok) {
       const error = isDraft ? asDraftError(payload) : asError(payload);
-      throw new LocalRuntimeApiError(error?.code ?? "REQUEST_FAILED", error?.message ?? "本地请求失败，请重试。", error?.retryable ?? false,
+      const failure = new LocalRuntimeApiError(error?.code ?? "REQUEST_FAILED", error?.message ?? "本地请求失败，请重试。", error?.retryable ?? false,
         isDraft ? asDraftError(payload)?.reason_code ?? null : null);
+      throw failure;
     }
     if (isDraft && (!payload || typeof payload !== "object" || Array.isArray(payload) || Object.keys(payload).length === 0))
       throw new LocalRuntimeApiError("DRAFT_RESPONSE_INVALID", "草稿响应无效，待确认请求已保留。");
@@ -462,6 +520,10 @@ function draftPath(project: string, model: string, operation: string): string {
 }
 
 function asDraftError(payload: unknown): { code: string; message: string; retryable: boolean; reason_code: string | null } | undefined {
+  if (payload && typeof payload === "object" && "code" in payload && payload.code === 1090
+    && "message" in payload && typeof payload.message === "string" && payload.message.startsWith("OPM_RUNTIME_REQUEST_FAILED: ")) {
+    try { payload = JSON.parse(payload.message.slice("OPM_RUNTIME_REQUEST_FAILED: ".length)); } catch { return undefined; }
+  }
   if (!payload || typeof payload !== "object" || !("code" in payload) || !("message" in payload) || !("retryable" in payload)
     || typeof payload.code !== "string" || typeof payload.message !== "string" || typeof payload.retryable !== "boolean") return undefined;
   return { code: payload.code, message: payload.message, retryable: payload.retryable,
@@ -477,7 +539,7 @@ function activeBinding(): ProfileRuleBinding {
 }
 
 function requestId(prefix: string): string {
-  return `${prefix}.${crypto.randomUUID().replaceAll("-", "")}`;
+  return `${prefix}.${randomUuid().replaceAll("-", "")}`;
 }
 
 function queryRequestId(scope: string): string {

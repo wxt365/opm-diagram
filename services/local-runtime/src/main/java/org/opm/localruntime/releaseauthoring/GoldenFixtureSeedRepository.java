@@ -77,7 +77,7 @@ public final class GoldenFixtureSeedRepository {
             ProjectDatabaseOpenResult opened;
             try {
                 fault("migration.before-open", "GFM_STORAGE_MIGRATION_FAILED");
-                ProjectDatabaseFactory factory = new ProjectDatabaseFactory(storageRoot);
+                ProjectDatabaseFactory factory = new ProjectDatabaseFactory(storageRoot, org.opm.localruntime.storage.SqliteSnapshots.tools(storageRoot), false);
                 opened = factory.open(projectId);
             } catch (GoldenFixtureMaterializationException exception) {
                 throw exception;
@@ -90,7 +90,7 @@ public final class GoldenFixtureSeedRepository {
             long migrationMicros = elapsedMicros(migrationStarted);
             long seedStarted = System.nanoTime();
             Instant createdAt = Instant.ofEpochSecond(sourceDateEpoch);
-            try (Connection connection = connect(ready.database().databasePath())) {
+            try (Connection connection = ready.database().databaseScope().getConnection()) {
                 connection.setAutoCommit(false);
                 try {
                     fault("seed.project_metadata", "GFM_STORAGE_WRITE_FAILED");
@@ -112,10 +112,10 @@ public final class GoldenFixtureSeedRepository {
             long seedMicros = elapsedMicros(seedStarted);
             long verifyStarted = System.nanoTime();
             fault("verify.before", "GFM_STORAGE_VERIFY_FAILED");
-            Map<String, Integer> counts = verify(ready.database().databasePath(), projectId, revision, fixtureSha256, fixtureBytes);
+            Map<String, Integer> counts = verify(org.opm.localruntime.storage.SqliteSnapshots.write(storageRoot, ready.database().databaseScope()), projectId, revision, fixtureSha256, fixtureBytes);
             long verifyMicros = elapsedMicros(verifyStarted);
             return new MaterializedFixture(projectId, revision.modelId(), revision.revisionId(), revision.revisionSequence(),
-                    ready.database().databasePath(), counts, HISTORY_MODE, new StageDurations(migrationMicros, seedMicros, verifyMicros));
+                    org.opm.localruntime.storage.SqliteSnapshots.write(storageRoot, ready.database().databaseScope()), counts, HISTORY_MODE, new StageDurations(migrationMicros, seedMicros, verifyMicros));
         } catch (GoldenFixtureMaterializationException exception) {
             throw exception;
         } catch (Exception exception) {
@@ -204,8 +204,7 @@ public final class GoldenFixtureSeedRepository {
         Map<String, Integer> counts = new LinkedHashMap<>();
         for (String table : new String[] {"project_metadata", "profile_package", "rule_set_package", "grammar_package", "model_catalog", "revision_document", "model_head", "revision_parent", "operation_record", "idempotency_record", "background_task", "asset_manifest", "element_index", "fact_endpoint_index", "occurrence_index", "finding_index", "text_trace_index"}) counts.put(table, 0);
         try (Connection connection = connect(database)) {
-            try (ResultSet result = connection.createStatement().executeQuery("PRAGMA integrity_check")) { if (!result.next() || !"ok".equals(result.getString(1))) throw new GoldenFixtureMaterializationException("GFM_STORAGE_VERIFY_FAILED", "SQLite integrity check failed."); }
-            try (ResultSet result = connection.createStatement().executeQuery("PRAGMA foreign_key_check")) { if (result.next()) throw new GoldenFixtureMaterializationException("GFM_STORAGE_VERIFY_FAILED", "SQLite foreign key check failed."); }
+            org.opm.localruntime.storage.SqliteSnapshots.verifyForeignKeys(connection);
             for (String table : counts.keySet()) try (ResultSet result = connection.createStatement().executeQuery("SELECT COUNT(*) FROM " + table)) { result.next(); counts.put(table, result.getInt(1)); }
             if (counts.entrySet().stream().anyMatch(entry -> expectedCount(entry.getKey()) != entry.getValue())) throw new GoldenFixtureMaterializationException("GFM_STORAGE_VERIFY_FAILED", "SQLite table counts differ from the single Revision contract.");
             try (PreparedStatement statement = connection.prepareStatement("SELECT document_json, document_digest FROM revision_document WHERE revision_id = ? AND model_id = ?")) {
@@ -224,8 +223,7 @@ public final class GoldenFixtureSeedRepository {
     }
 
     private Connection connect(Path database) throws Exception {
-        Connection connection = DriverManager.getConnection("jdbc:sqlite:" + database.toAbsolutePath() + "?foreign_keys=on");
-        connection.createStatement().execute("PRAGMA foreign_keys = ON");
+        Connection connection = org.opm.localruntime.storage.SqliteSnapshots.connection(database);
         return connection;
     }
 

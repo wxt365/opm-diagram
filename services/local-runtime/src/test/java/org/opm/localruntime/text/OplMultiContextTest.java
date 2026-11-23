@@ -23,12 +23,12 @@ class OplMultiContextTest {
         assertTrue(new SemanticRevisionValidator().validate(DraftSemanticView.read(document)).isEmpty());
         assertEquals(root, generate(document, CONTEXT));
         var child = generate(document, "context.child"); var other = generate(document, "context.other");
-        assertEquals(sentences(root).getFirst().text(), sentences(child).getFirst().text());
-        assertNotEquals(sentences(root).getFirst().sentenceId(), sentences(child).getFirst().sentenceId());
-        assertNotEquals(sentences(child).getFirst().sentenceId(), sentences(other).getFirst().sentenceId());
+        assertEquals(sentences(root).get(0).text(), sentences(child).get(0).text());
+        assertNotEquals(sentences(root).get(0).sentenceId(), sentences(child).get(0).sentenceId());
+        assertNotEquals(sentences(child).get(0).sentenceId(), sentences(other).get(0).sentenceId());
         assertNotEquals(child.artifact().artifactId(), other.artifact().artifactId());
-        assertNotEquals(child.traces().getFirst().traceId(), other.traces().getFirst().traceId());
-        assertNotEquals(sentences(child).getFirst().tokens().getFirst().tokenId(), sentences(other).getFirst().tokens().getFirst().tokenId());
+        assertNotEquals(child.traces().get(0).traceId(), other.traces().get(0).traceId());
+        assertNotEquals(sentences(child).get(0).tokens().get(0).tokenId(), sentences(other).get(0).tokens().get(0).tokenId());
         scoped(child, "context.child"); scoped(other, "context.other");
     }
 
@@ -50,7 +50,7 @@ class OplMultiContextTest {
         ((com.fasterxml.jackson.databind.node.ArrayNode) document.get("facts")).add(fact);
         for (var occurrence : document.get("occurrences")) if (occurrence.get("context_id").asText().equals("context.child") && occurrence.get("target_kind").asText().equals("FACT"))
             ((ObjectNode) occurrence).put("target_id", "fact.child");
-        assertEquals(root, generate(document, CONTEXT)); assertEquals(List.of("fact.child"), generate(document, "context.child").traces().getFirst().factIds());
+        assertEquals(root, generate(document, CONTEXT)); assertEquals(List.of("fact.child"), generate(document, "context.child").traces().get(0).factIds());
         var empty = ((ObjectNode) document.at("/contexts/0")).deepCopy().put("context_id", "context.empty").put("context_kind", "OBJECT_REFINEMENT");
         empty.putArray("occurrence_ids"); ((com.fasterxml.jackson.databind.node.ArrayNode) document.get("contexts")).add(empty);
         var result = generate(document, "context.empty"); assertEquals(1, result.artifact().paragraphs().size()); assertTrue(sentences(result).isEmpty()); assertTrue(result.traces().isEmpty());
@@ -84,8 +84,8 @@ class OplMultiContextTest {
         addOwnedContext(document, "context.child", "PROCESS_REFINEMENT");
         var revision = DraftSemanticView.read(document); var child = service.generate(revision, "context.child", grammar);
         assertEquals(root, service.generate(revision, CONTEXT, grammar));
-        assertEquals(sentences(root).getFirst().text(), sentences(child).getFirst().text());
-        assertNotEquals(sentences(root).getFirst().sentenceId(), sentences(child).getFirst().sentenceId()); scoped(child, "context.child");
+        assertEquals(sentences(root).get(0).text(), sentences(child).get(0).text());
+        assertNotEquals(sentences(root).get(0).sentenceId(), sentences(child).get(0).sentenceId()); scoped(child, "context.child");
     }
 
     private ObjectNode fixture(String file) throws Exception { return SaveContentDigestV1.read(Files.readString(root().resolve("packages/profiles/profile.iso19450.2024.draft/0.2.0/golden/fixtures/" + file))); }

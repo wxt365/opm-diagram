@@ -89,6 +89,7 @@ final class DraftCapabilityQuery {
         String target = occurrence == null ? selection : occurrence.targetId();
         var element = revision.elements().stream().filter(item -> item.id().equals(target)).findFirst().orElse(null);
         var selectedFeature = revision.features().stream().filter(item -> item.id().equals(target)).findFirst().orElse(null);
+        var selectedState = revision.states().stream().filter(item -> item.id().equals(target)).findFirst().orElse(null);
         if (reason == null) switch (intent) {
             case "CREATE_ELEMENT" -> {
                 if (selection != null) reason = "ENDPOINT_KIND_MISMATCH";
@@ -103,15 +104,15 @@ final class DraftCapabilityQuery {
                 else options.add(option(query, token, intent, element.capability().capabilityId(), "ELEMENT", element.id(), occurrence.id(), assets));
             }
             case "UPDATE_PROPERTY" -> {
-                String kind = element != null ? "ELEMENT" : selectedFeature != null ? "FEATURE" : null;
+                String kind = element != null ? "ELEMENT" : selectedFeature != null ? "FEATURE" : selectedState != null ? "STATE" : null;
                 boolean visible = kind != null && visible(revision, context, kind, target);
                 if (!visible) reason = "ENDPOINT_KIND_MISMATCH";
                 else options.add(option(query, token, intent,
-                        element != null ? element.capability().capabilityId() : selectedFeature.capability().capabilityId(),
+                        element != null ? element.capability().capabilityId() : selectedFeature != null ? selectedFeature.capability().capabilityId() : selectedState.capability().capabilityId(),
                         kind, target, null, assets));
             }
             case "UPDATE_LAYOUT" -> {
-                if (occurrence == null || !domain.draftLayoutAllowed(revision, selection)) reason = "ENDPOINT_KIND_MISMATCH";
+                if (occurrence == null || occurrence.targetKind() == SemanticRevision.TargetKind.FACT || !domain.draftLayoutAllowed(revision, selection)) reason = "ENDPOINT_KIND_MISMATCH";
                 else {
                     String capability = occurrence.targetKind() == SemanticRevision.TargetKind.ELEMENT ? element.capability().capabilityId()
                             : occurrence.targetKind() == SemanticRevision.TargetKind.STATE
@@ -164,7 +165,7 @@ final class DraftCapabilityQuery {
                     case "CREATE_CONTEXT" -> "创建子 OPD";
                     case "DELETE_CONTEXT" -> "删除子图";
                     case "UPDATE_LAYOUT_BATCH" -> "批量移动元素";
-                    case "UPDATE_PROPERTY" -> "编辑名称"; case "UPDATE_LAYOUT" -> "移动元素";
+                    case "UPDATE_PROPERTY" -> "编辑基本信息"; case "UPDATE_LAYOUT" -> "移动元素";
                     case "CREATE_FEATURE" -> capability.equals("CAP-FEAT-ATTRIBUTE-001") ? "创建属性" : "创建操作";
                     case "CREATE_STATE" -> "创建状态"; case "UPDATE_STATE" -> "编辑状态";
                     case "STATE_EXPLICIT" -> "显示状态"; case "STATE_SUPPRESS" -> "隐藏状态";
@@ -185,7 +186,10 @@ final class DraftCapabilityQuery {
         else if (type.equals("CREATE_ELEMENT")) { field(fields, "kind", "ENUM", capability.equals("CAP-OBJECT-001") ? "OBJECT" : "PROCESS"); field(fields, "name", "TEXT"); field(fields, "layout", "LAYOUT"); }
         else if (type.equals("CREATE_CONTEXT")) { field(fields, "refinee_element_id", "TEXT"); field(fields, "name", "TEXT"); }
         else if (type.equals("DELETE_CONTEXT")) { field(fields, "context_id", "TEXT"); field(fields, "impact_token", "TEXT"); }
-        else if (type.equals("UPDATE_PROPERTY")) { field(fields, "target_ref", "ENDPOINT"); field(fields, "property_name", "ENUM", "name"); field(fields, "value", "TEXT"); }
+        else if (type.equals("UPDATE_PROPERTY")) { field(fields, "target_ref", "ENDPOINT");
+            if ("STATE".equals(targetKind)) field(fields, "property_name", "ENUM", "remark");
+            else field(fields, "property_name", "ENUM", "name", "remark");
+            field(fields, "value", "TEXT"); }
         else if (type.equals("UPDATE_LAYOUT_BATCH")) { field(fields, "layouts", "LAYOUT"); }
         else if (type.equals("UPDATE_LAYOUT")) { field(fields, "occurrence_id", "TEXT"); field(fields, "layout", "LAYOUT"); }
         else if (type.equals("CREATE_FEATURE")) {

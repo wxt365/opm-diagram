@@ -1,7 +1,19 @@
 import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
 
-const location = "/projects/project.draft.http/models/model.golden.proc/workbench?context=context.sd.root";
+let location: string, projectId: string, modelId: string, objectCellId: string;
+test.beforeEach(async ({ page }) => {
+  await page.goto('/projects'); await page.getByTestId('p01-create-project').click();
+  await page.getByTestId('ov01-project-name').fill(`保存验收 ${Date.now()}`);
+  await page.getByRole('button', { name: '创建并继续', exact: true }).click();
+  await page.getByTestId('p02-create-model').click(); await page.getByTestId('ov02-model-name').fill('隔离保存模型');
+  await page.getByRole('button', { name: '创建并打开工作台', exact: true }).click();
+  await expect(page.getByTestId('hs-save')).toBeEnabled();
+  await edit(page, () => page.getByTestId('p03-tool-object').click());
+  objectCellId = (await page.locator('.x6-node').first().getAttribute('data-cell-id'))!;
+  location = page.url();
+  const parts = new URL(location).pathname.split('/'); projectId = parts[2]!; modelId = parts[4]!;
+});
 async function edit(page: Page, action: () => Promise<void>) {
   const before = await page.getByTestId("hs-draft-identity").innerText();
   await action();
@@ -15,7 +27,6 @@ test("临时 V2 模型编辑、手动去重、10秒自动保存、Pin 与 EXACT 
   await expect(page.getByTestId("hs-save")).toBeEnabled();
   const headUrl = page.url();
   const originalHistory = await page.getByTestId("p03-version-select").locator("option").count();
-  const secondContextNodes = 3;
   let edits = 0, saves = 0;
   page.on("request", request => { if (request.url().endsWith("/draft/commands")) edits++; if (request.url().endsWith("/draft/save")) saves++; });
   await edit(page, () => page.getByTestId("p03-tool-object").click());
@@ -31,7 +42,7 @@ test("临时 V2 模型编辑、手动去重、10秒自动保存、Pin 与 EXACT 
   await expect(page.getByTestId("hs-save-state")).toHaveText("已手动保存");
   expect(await page.getByTestId("p03-version-select").locator("option").count()).toBe(afterSave);
 
-  const object = page.locator('.x6-node[data-cell-id="element.raw.material"]');
+  const object = page.locator(`.x6-node[data-cell-id="${objectCellId}"]`);
   await object.dblclick({ position: { x: 12, y: 12 }, timeout: 10000 });
   await expect(page.getByTestId("p03-name-editor")).toBeVisible();
   const editsBeforeName = edits, savesBeforeName = saves;
@@ -69,9 +80,6 @@ test("临时 V2 模型编辑、手动去重、10秒自动保存、Pin 与 EXACT 
   await page.keyboard.press("Control+s"); expect(edits).toBe(editsBefore);
   await page.getByTestId("p03-return-head").click();
   await expect(page.getByTestId("hs-save")).toBeEnabled();
-  await page.getByTestId("p03-context-context.browser.second").click();
-  await expect(page.locator(".x6-node")).toHaveCount(secondContextNodes);
-  await page.getByTestId("p03-context-context.sd.root").click();
   await expect(page.locator(".x6-node")).toHaveCount(nodeCount);
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.getByTestId("hs-save")).toBeVisible();
@@ -96,10 +104,10 @@ test("真实编辑已commit但响应丢失，刷新以原收据恢复且不重�
   await expect(page.getByTestId("hs-save")).toBeEnabled();
   await expect(page.locator(".x6-node")).toHaveCount(before + 1);
   expect(sent).toBe(1);
-  const pending = await page.evaluate(async () => {
+  const pending = await page.evaluate(async ({ projectId, modelId }) => {
     const { DraftDelivery } = await import("/src/shared/api/draftDelivery.ts");
-    return new DraftDelivery().pending("project.draft.http", "model.golden.proc");
-  });
+    return new DraftDelivery().pending(projectId, modelId);
+  }, { projectId, modelId });
   expect(pending).toHaveLength(0);
 });
 

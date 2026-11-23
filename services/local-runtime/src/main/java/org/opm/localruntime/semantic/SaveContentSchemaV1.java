@@ -13,6 +13,22 @@ final class SaveContentSchemaV1 {
     private static final JsonNode SCHEMA_V2;
     private static final JsonNode SCHEMA_METHOD;
     private static final JsonNode SCHEMA_TRACE;
+    private static final java.util.Map<String, JsonNode> ROUTE_SCHEMAS = loadRouteSchemas();
+    private static java.util.Map<String, JsonNode> loadRouteSchemas() {
+        var schemas = new java.util.HashMap<String, JsonNode>();
+        for (var entry : java.util.Map.of("0.2", "v3", "0.3", "v3-refinement", "0.4", "v3-method", "0.5", "v3-trace", "0.6", "v4", "0.7", "v5").entrySet()) {
+            try (var input = SaveContentSchemaV1.class.getResourceAsStream("/draftsave/save-content-" + entry.getValue() + ".schema.json")) {
+                if (input == null) throw new IllegalStateException("Route save schema missing");
+                schemas.put(entry.getKey(), new ObjectMapper().readTree(input));
+            } catch (Exception exception) { throw new ExceptionInInitializerError(exception); }
+        }
+        return java.util.Map.copyOf(schemas);
+    }
+    static void validateRoutes(JsonNode value, String definition, String revisionVersion) {
+        var schema = ROUTE_SCHEMAS.get(revisionVersion);
+        if (schema == null) invalid("/schema_version");
+        validate(value, schema.required("$defs").required(definition), "", schema.required("$defs"));
+    }
     static {
         try (var input = SaveContentSchemaV1.class.getResourceAsStream("/draftsave/save-content-v1.schema.json")) {
             if (input == null) throw new IllegalStateException("保存内容 Schema 资源缺失");
@@ -71,7 +87,7 @@ final class SaveContentSchemaV1 {
                 }
             }
             case "array" -> {
-                if (!value.isArray() || value.size() < rule.path("minItems").asInt(0)) invalid(pointer);
+                if (!value.isArray() || value.size() < rule.path("minItems").asInt(0) || value.size() > rule.path("maxItems").asInt(Integer.MAX_VALUE)) invalid(pointer);
                 for (int index = 0; index < value.size(); index++) validate(value.get(index), rule.required("items"), child(pointer, String.valueOf(index)), definitions);
                 if (rule.path("uniqueItems").asBoolean()) {
                     var seen = new HashSet<JsonNode>();

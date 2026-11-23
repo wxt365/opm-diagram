@@ -1,5 +1,9 @@
 # Spec: DEV-CANVAS-06 E2E Fault Launcher 实现
 
+> 上游历史参考：本仓库仅迁入 OPM、SQLite 与桌面相关部分；业务建模、PostgreSQL 和内网部署不在范围内。原文状态及验证结果不自动适用于本仓库，实际迁移验证见 README 的迁移策略与本次迁移报告。
+
+> SQLite-only 后继（2026-11-23）：本工作区的存储及 Schema raw pin 由 [选择性迁移规格](opm-selective-source-migration-20261123-task-spec.md)授权适配；活动 Attempt Schema 为 `61440` bytes / `fd063b1fbe2531bbf5832c27177476e2bf5e0449469ac0a11c29e83350afe36e`。本文后续 PostgreSQL fingerprint 和原 clean-source 链均为历史记录，不可消费为本轮发布证据。JAR 内资源缺失或被篡改仍须拒绝。
+
 文档状态：`FROZEN_FOR_IMPLEMENTATION/D01_THREE_STAGE_SOURCE_CLOSURE_APPLIED`
 
 实现状态：`BASELINE_IMPLEMENTED/CONTROLLED_PLAYWRIGHT_NOT_STARTED`
@@ -75,7 +79,7 @@ Build准入：`BLOCKED_BY_FINAL_PRODUCTION_SOURCE_CHAIN_IMPLEMENTATION`
 
 上述bytes已进入base，本2A包不得修改。既有`services/local-runtime/pom.xml`资源映射只允许从`../../docs/contracts/schemas`选择`opm-dev-canvas-06-e2e-attempt-artifact-v02.schema.json`，并以原始bytes写入JAR路径`releaseevidence/schema/opm-dev-canvas-06-e2e-attempt-artifact-v02.schema.json`；后继独立bugfix若需修复，也不得改依赖、插件版本或其他resource。
 
-现行源码的活动 Schema raw SHA-256 固定为 `d8c34923a1342cdffd5eb4e22ddf328969bf3c1f6b6804e7acebb56dd51891d8`，byte_length 为 `61432`，由[合并后修正规格](./opm-integrated-failed-items-bugfix-task-spec.md)升级。原 `3508290bf1d1d5f7d297ea48e69fdb4e1ebaf4f907b936b30cd4b769d6a916b4` 对应历史受控 source，不再作为当前资源的运行常量；历史报告与 source 指纹不回写。实现把现行值写为 `E2EFaultPlanVerifier.EXPECTED_SCHEMA_SHA256` 常量，仍只校验 JAR 内嵌 bytes；Schema bytes 或常量任一变化都必须先升级本规格，不得运行时读取 checkout 补齐。本次身份同步不提升发布 Gate，也不使历史 release evidence 自动适用于新源码。
+该活动Schema在 PostgreSQL 迁移（cf35d11）后的 LF raw bytes 为61474字节，SHA-256固定为`56902afd0e59a64eabb9028782a495b2f0193285552f8cbd7edabbd9f93abfa0`；旧 SQLite 版`3508290b…`仅作历史口径。2026-11-11 按 specs/opm-workbench-remaining-acceptance-bugfix-spec.md 修复迁移后失配的 resource pin，不改变 schema 字段或验证规则。实现把活动值写为`E2EFaultPlanVerifier.EXPECTED_SCHEMA_SHA256`常量；Schema bytes或常量任一变化都必须先升级本规格，不得运行时读取checkout补齐。
 
 ### 4.2 Fault Launcher Java：`10 READ_ONLY_BASELINE`
 

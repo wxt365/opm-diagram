@@ -6,7 +6,7 @@ export const modelingGuide = await readFile(new URL('../skills/opm-modeling-guid
 export const qualityPolicy = JSON.parse(await readFile(new URL('../skills/opm-modeling-guide/references/quality-policy.json', import.meta.url), 'utf8'));
 check(['max_nodes_per_view', 'min_node_gap', 'max_endpoint_span', 'max_report_items'].every(key => Number.isFinite(qualityPolicy[key]) && qualityPolicy[key] > 0)
   && Number.isInteger(qualityPolicy.max_nodes_per_view) && Number.isInteger(qualityPolicy.max_report_items), 'CONFIG_INVALID', '建模质量策略阈值无效。');
-export const modelingGuidance = `当前 OPD 生成指导（${qualityPolicy.guide_version}）：\n${modelingGuide}\n质量策略（建议，不是标准阻断规则）：${JSON.stringify(qualityPolicy)}`;
+export const modelingGuidance = `当前 OPD 生成指导（${qualityPolicy.guide_version}）：\n${modelingGuide}`;
 const transformations = new Set(['001', '002', '003', '006', '007', '008', '009', '010'].map(id => `CAP-ISO-PROC-${id}`));
 const normalizeName = name => (name ?? '').normalize('NFKC').trim().replace(/\s+/g, ' ');
 const box = node => node.layout && ['x', 'y', 'width', 'height'].every(key => Number.isFinite(node.layout[key])) && node.layout.width > 0 && node.layout.height > 0 ? node.layout : null;

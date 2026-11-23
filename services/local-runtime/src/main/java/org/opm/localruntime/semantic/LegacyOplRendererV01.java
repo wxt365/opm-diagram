@@ -93,7 +93,7 @@ public final class LegacyOplRendererV01 {
     private String factSentence(SemanticRevision.Fact fact, Map<String, String> names) {
         List<SemanticRevision.Endpoint> endpoints = fact.endpoints().stream()
                 .sorted(java.util.Comparator.comparingInt(SemanticRevision.Endpoint::ordinal)).toList();
-        String subject = endpoints.isEmpty() ? fact.id() : names.getOrDefault(endpoints.getFirst().targetId(), endpoints.getFirst().targetId());
+        String subject = endpoints.isEmpty() ? fact.id() : names.getOrDefault(endpoints.get(0).targetId(), endpoints.get(0).targetId());
         String object = endpoints.size() < 2 ? fact.id() : names.getOrDefault(endpoints.get(1).targetId(), endpoints.get(1).targetId());
         return subject + " " + verb(fact) + " " + object + ".";
     }
@@ -106,7 +106,7 @@ public final class LegacyOplRendererV01 {
                 || capability.startsWith("CAP-ISO-PROC-009") || capability.startsWith("CAP-ISO-PROC-010")) return "affects";
         if (capability.startsWith("CAP-ISO-PROC-004") || capability.startsWith("CAP-ISO-PROC-006")) return "enables";
         if (capability.startsWith("CAP-ISO-PROC-005") || capability.startsWith("CAP-ISO-PROC-008")) return "instruments";
-        return fact.labels().isEmpty() ? "is related to" : fact.labels().getFirst().text();
+        return fact.labels().isEmpty() ? "is related to" : fact.labels().get(0).text();
     }
 
     private String sha256(byte[] bytes) {

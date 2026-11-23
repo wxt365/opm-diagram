@@ -1,19 +1,43 @@
 import { check, id, sameToken, AssistantError } from './store.mjs';
 
 export class RuntimeClient {
-  constructor(origin, session, request = fetch) { this.origin = origin; this.session = session; this.request = request; }
+  constructor(origin, session, request = fetch, requestOrigin) {
+    this.origin = origin; this.session = session; this.request = request; this.requestOrigin = requestOrigin;
+  }
   async query(scope, operation, body = {}) {
     const path = `/api/v2/projects/${encodeURIComponent(scope.projectId)}/models/${encodeURIComponent(scope.modelId)}/draft/${operation}`;
     const response = await this.request(this.origin + path, { method: 'POST', headers: {
-      'Content-Type': 'application/json', Origin: this.origin, 'X-OPM-Session': this.session,
+      'Content-Type': 'application/json', Origin: this.requestOrigin ?? new URL(this.origin).origin, 'X-OPM-Session': this.session,
     }, body: JSON.stringify({ request_id: `request.assistant.${id()}`, ...body }), signal: AbortSignal.timeout(20000) });
     const data = await response.json();
-    if (!response.ok) throw new AssistantError(data.error?.code ?? data.code ?? 'RUNTIME_FAILED', data.error?.message ?? data.message ?? '模型操作被运行时拒绝。', response.status);
+    if (!response.ok) {
+      const detail = data.error ?? data, reason = detail.reason_code;
+      const message = detail.message ?? '模型操作被运行时拒绝。';
+      const error = new AssistantError(detail.code ?? 'RUNTIME_FAILED', reason ? `${message}（原因：${reason}）` : message, response.status);
+      error.reason_code = reason ?? null; throw error;
+    }
     return data;
   }
   open(scope) { return this.query(scope, 'open', { context_id: scope.contextId }); }
   read(scope, operation, token, extra = {}) { return this.query(scope, operation, { draft_token: token, context_id: scope.contextId, ...extra }); }
+  async modelBackground(scope) {
+    const path = `/api/v1/projects/${encodeURIComponent(scope.projectId)}/models/${encodeURIComponent(scope.modelId)}/workspace-session?request_id=request.assistant.${id()}`;
+    const response = await this.request(this.origin + path, { headers: {
+      Origin: this.requestOrigin ?? new URL(this.origin).origin, 'X-OPM-Session': this.session,
+    }, cache: 'no-store', signal: AbortSignal.timeout(20000) });
+    const result = await response.json();
+    if (!response.ok) {
+      const detail = result.error ?? result;
+      throw new AssistantError(detail.code ?? 'RUNTIME_FAILED', detail.message ?? '模型目标读取失败。', response.status);
+    }
+    const model = result.data?.model;
+    check(model?.model_id === scope.modelId && model?.project_id === scope.projectId, 'SCOPE_MISMATCH', '模型目标响应不属于当前模型。');
+    check(typeof model.name === 'string' && typeof model.description === 'string' && model.description.length <= 4000,
+      'MODEL_BACKGROUND_UNAVAILABLE', '运行时未提供有效的模型目标，请更新并重启后端服务。');
+    return { model_name: model.name, business_goal: model.description };
+  }
   async snapshot(scope) {
+    const background = await this.modelBackground(scope);
     const opened = await this.open(scope), token = opened.draft_token;
     const nav = await this.read(scope, 'navigation', token);
     const contexts = [...new Map([...nav.data.process_tree, ...nav.data.object_forest, ...nav.data.views].map(x => [x.context_id, x])).values()];
@@ -25,7 +49,7 @@ export class RuntimeClient {
       projections.push({ ...context, ...value.data });
     }
     check(Buffer.byteLength(JSON.stringify(projections)) < 1000000, 'MODEL_TOO_LARGE', '模型超出助手上下文读取范围，不能安全修改。');
-    return { token, contexts, projections };
+    return { token, contexts, projections, ...background };
   }
 }
 

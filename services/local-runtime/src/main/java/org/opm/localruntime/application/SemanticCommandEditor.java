@@ -174,6 +174,9 @@ final class SemanticCommandEditor {
     boolean draftLayoutAllowed(SemanticRevision base, String occurrenceId) {
         try {
             var occurrence = base.occurrences().stream().filter(item -> item.id().equals(occurrenceId)).findFirst().orElseThrow(() -> domain("Occurrence 不存在"));
+            if (occurrence.targetKind() == SemanticRevision.TargetKind.FACT)
+                return occurrence.ownership() == SemanticRevision.OccurrenceOwnership.OWNED
+                        && base.facts().stream().anyMatch(fact -> fact.id().equals(occurrence.targetId()));
             var layout = occurrenceLayout(occurrence, base.layouts());
             updateOccurrenceLayout(base, Map.of("occurrence_id", occurrenceId, "layout", Map.of("x", layout.x(), "y", layout.y())),
                     base.elements(), base.features(), base.occurrences(), new ArrayList<>(base.layouts()));

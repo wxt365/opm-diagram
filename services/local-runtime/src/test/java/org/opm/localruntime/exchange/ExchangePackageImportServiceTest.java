@@ -35,6 +35,21 @@ class ExchangePackageImportServiceTest {
     private final ObjectMapper json = new ObjectMapper();
 
     @Test
+    void 无效或符号链接导入目录在打开目录库之前拒绝() throws Exception {
+        Path missing = temporary.resolve("missing");
+        Path outside = Files.createDirectory(temporary.resolve("outside"));
+        Path linked = Files.createSymbolicLink(temporary.resolve("linked"), outside);
+        for (Path storage : List.of(missing, linked)) {
+            var service = new ExchangePackageImportService(storage,
+                    new ProfilePackageAssembler(new FileProfilePackageLoader(repositoryFile("packages/profiles"))),
+                    new org.opm.localruntime.storage.SqliteStore(storage));
+            assertCode("EXCHANGE_PERSISTENCE_FAILED", () -> service.importNewProject(temporary.resolve("unused.opmp")));
+        }
+        assertFalse(Files.exists(missing));
+        assertFalse(Files.exists(outside.resolve("catalog.db")));
+    }
+
+    @Test
     void importsProjectFullIntoNewProjectAndRejectsTheSamePackageDigest() throws Exception {
         Path storage = Files.createDirectory(temporary.resolve("storage"));
         Path packageFile = writeProjectFull();
@@ -64,7 +79,7 @@ class ExchangePackageImportServiceTest {
     }
 
     private ExchangePackageImportService service(Path storage) {
-        return new ExchangePackageImportService(storage, new ProfilePackageAssembler(new FileProfilePackageLoader(repositoryFile("packages/profiles"))));
+        return new ExchangePackageImportService(storage, new ProfilePackageAssembler(new FileProfilePackageLoader(repositoryFile("packages/profiles"))),org.opm.localruntime.storage.StorageStores.tools(storage));
     }
 
     private Path writeProjectFull() throws Exception {
@@ -131,7 +146,7 @@ class ExchangePackageImportServiceTest {
     private void put(ZipOutputStream zip, String path, byte[] raw) throws IOException { ZipEntry entry = new ZipEntry(path); entry.setTime(0L); zip.putNextEntry(entry); zip.write(raw); zip.closeEntry(); }
     private byte[] canonical(JsonNode value) { try { return ExchangeJsonCanonicalizer.canonicalize(json.writeValueAsBytes(value)); } catch (Exception exception) { throw new IllegalStateException(exception); } }
     private String sha256(byte[] raw) { try { return java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(raw)); } catch (Exception exception) { throw new IllegalStateException(exception); } }
-    private void assertDatabase(Path database, String projectId, int baselines) throws Exception { try (var connection = DriverManager.getConnection("jdbc:sqlite:" + database); var project = connection.prepareStatement("SELECT project_id FROM project_metadata"); var revision = connection.prepareStatement("SELECT revision_id FROM revision_document"); var baseline = connection.prepareStatement("SELECT COUNT(*) FROM baseline")) { try (var rows = project.executeQuery()) { assertTrue(rows.next()); assertEquals(projectId, rows.getString(1)); } try (var rows = revision.executeQuery()) { assertTrue(rows.next()); assertEquals("revision.base.golden.proc.001", rows.getString(1)); } try (var rows = baseline.executeQuery()) { assertTrue(rows.next()); assertEquals(baselines, rows.getInt(1)); } } }
+    private void assertDatabase(Path database, String projectId, int baselines) throws Exception { try (var connection = org.opm.localruntime.storage.SqliteTestSupport.connection(database); var project = connection.prepareStatement("SELECT project_id FROM project_metadata"); var revision = connection.prepareStatement("SELECT revision_id FROM revision_document"); var baseline = connection.prepareStatement("SELECT COUNT(*) FROM baseline")) { try (var rows = project.executeQuery()) { assertTrue(rows.next()); assertEquals(projectId, rows.getString(1)); } try (var rows = revision.executeQuery()) { assertTrue(rows.next()); assertEquals("revision.base.golden.proc.001", rows.getString(1)); } try (var rows = baseline.executeQuery()) { assertTrue(rows.next()); assertEquals(baselines, rows.getInt(1)); } } }
     private void assertCode(String code, Runnable action) { assertEquals(code, assertThrows(ExchangeException.class, action::run).code()); }
     private Path repositoryFile(String relative) { Path current = Path.of("").toAbsolutePath(); while (current != null) { Path candidate = current.resolve(relative); if (Files.exists(candidate)) return candidate; current = current.getParent(); } throw new IllegalStateException("Repository file is missing: " + relative); }
 

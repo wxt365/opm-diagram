@@ -27,9 +27,7 @@ class MindmapWorkspaceTest {
     private Path database;
     private MockMvc mvc;
     @BeforeEach void setup() throws Exception { database = create(temporary, true, ignored -> { });
-        org.flywaydb.core.Flyway.configure().dataSource(new org.sqlite.SQLiteDataSource() {{ setUrl("jdbc:sqlite:" + database); }})
-                .locations("classpath:db/migration", "classpath:db/hybrid-save", "classpath:db/checkpoint", "classpath:db/pin", "classpath:db/digestv2")
-                .javaMigrations(new org.opm.localruntime.storage.migration.V7__Model_lifecycle_delete_guards()).mixed(true).load().migrate();
+        org.opm.localruntime.storage.SqliteTestSupport.migrate(database);
         reopen(); }
     private void reopen() {
         var factory = ProjectDatabaseFactory.journaledDrafts(temporary); var loader = new FileProfilePackageLoader(root().resolve("packages/profiles"));
@@ -52,11 +50,10 @@ class MindmapWorkspaceTest {
             save(token, invalid, 400);
         }
         reopen(); assertEquals(saved.get("document"), brain(token).get("document"));
-        // 旧 V3 库升级到 V8 并生成备份；再次打开不会重复迁移。
+        // SQLite baseline 重复打开不丢失独立脑图。
         var factory = ProjectDatabaseFactory.journaledDrafts(temporary);
         assertInstanceOf(org.opm.localruntime.storage.ProjectDatabaseOpenResult.Ready.class, factory.open(PROJECT));
-        try (var connection = DriverManager.getConnection("jdbc:sqlite:" + database); var rows = connection.createStatement().executeQuery("SELECT count(*) FROM flyway_schema_history WHERE version='8' AND success=1")) { rows.next(); assertEquals(1, rows.getInt(1)); }
-        assertTrue(java.nio.file.Files.list(database.getParent()).anyMatch(path -> path.toString().contains("before-migration")));
+        try (var connection = org.opm.localruntime.storage.SqliteTestSupport.connection(database); var rows = connection.createStatement().executeQuery("SELECT count(*) FROM flyway_schema_history WHERE version='1' AND success")) { rows.next(); assertEquals(1, rows.getInt(1)); }
     }
     @Test void conversionSourceAndReceiptCommitAtomicallyAndRetryAfterSourceChanges() throws Exception {
         var token = token(); var data = coffee(token); var document = (ObjectNode) data.get("document").deepCopy();
@@ -76,16 +73,29 @@ class MindmapWorkspaceTest {
         request.put("request_id", "request.retry"); assertEquals(nextToken, call("commands", request, 200).get("result_token"));
         reopen(); assertEquals(1, brain(nextToken).get("conversions").size()); assertEquals("question", brain(nextToken).at("/conversions/0/excluded_ids/0").asText()); assertEquals(1, count(database, "draft_journal"));
     }
+    @Test void undoAndRedoConversionRestoreModelAndActiveSourceTogether() throws Exception {
+        var token = token(); var data = coffee(token);
+        var request = command(token, steps(), "command.convert");
+        request.set("analysis_source", source(data));
+        var applied = call("commands", request, 200).get("result_token");
+        var conversions = brain(applied).path("conversions");
+        assertEquals(1, conversions.size());
+        var undone = restoreConversion(applied, "UNDO");
+        assertEquals(0, brain(undone).path("conversions").size());
+        assertEquals(data.get("document"), brain(undone).get("document"));
+        var redone = restoreConversion(undone, "REDO");
+        assertEquals(conversions, brain(redone).path("conversions"));
+    }
     @Test void staleSourceMissingBindingsAndMappingWriteFailureHaveNoPartialModelWrites() throws Exception {
         var token = token(); var data = coffee(token); var source = source(data); var request = command(token, steps(), "command.rejected");
         request.set("analysis_source", source);
         var malformed = request.deepCopy(); ((com.fasterxml.jackson.databind.node.ArrayNode) malformed.at("/analysis_source/bindings")).remove(4);
         call("commands", malformed, 400); assertEquals(token, token());
-        try (var connection = DriverManager.getConnection("jdbc:sqlite:" + database); var statement = connection.createStatement()) {
-            statement.execute("CREATE TRIGGER fail_mapping BEFORE INSERT ON mindmap_conversion BEGIN SELECT RAISE(ABORT, 'test mapping failure'); END");
+        try (var connection = org.opm.localruntime.storage.SqliteTestSupport.connection(database); var statement = connection.createStatement()) {
+            statement.execute((org.opm.localruntime.storage.SqliteTestSupport.sqlite(connection) ? "CREATE TRIGGER fail_mapping BEFORE INSERT ON mindmap_conversion BEGIN SELECT RAISE(ABORT, 'test mapping failure'); END" : "CREATE FUNCTION fail_mapping_fn() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'test mapping failure'; RETURN NEW; END $$; CREATE TRIGGER fail_mapping BEFORE INSERT ON mindmap_conversion FOR EACH ROW EXECUTE FUNCTION fail_mapping_fn()"));
         }
         call("commands", request, 503); assertEquals(token, token()); assertEquals(0, count(database, "draft_journal")); assertEquals(0, count(database, "draft_receipt"));
-        try (var connection = DriverManager.getConnection("jdbc:sqlite:" + database); var statement = connection.createStatement()) { statement.execute("DROP TRIGGER fail_mapping"); }
+        try (var connection = org.opm.localruntime.storage.SqliteTestSupport.connection(database); var statement = connection.createStatement()) { statement.execute(org.opm.localruntime.storage.SqliteTestSupport.dropTriggerSql(connection, "fail_mapping", "mindmap_conversion")); }
         save(token, (ObjectNode) data.get("document").deepCopy(), 200);
         call("commands", request, 409); assertEquals(token, token()); assertEquals(0, brain(token).get("conversions").size());
     }
@@ -135,6 +145,15 @@ class MindmapWorkspaceTest {
         var request = JSON.createObjectNode().put("request_id", "request.edit").put("command_id", id); request.set("scope", scope); request.set("expected_draft_token", token);
         var auth = request.putObject("authorization"); auth.set("capability_query_id", option.get("capability_query_id")); auth.set("selected_option_id", option.get("option_id"));
         var payload = request.putObject("command").put("command_type", "APPLY_MODEL_PLAN").putObject("payload").put("context_id", CONTEXT); payload.set("steps", steps); return request;
+    }
+    private JsonNode restoreConversion(JsonNode token, String action) throws Exception {
+        String record = "history.EDIT.command.convert";
+        var request = JSON.createObjectNode().put("request_id", "request.restore").put("command_id", "command.restore." + action);
+        request.set("expected_draft_token", token);
+        request.putObject("scope").put("context_id", CONTEXT).putNull("selection_id").put("intent", "RESTORE_OPERATION").putArray("endpoints");
+        request.putObject("authorization").put("capability_query_id", "recovery.latest").put("selected_option_id", record);
+        request.putObject("command").put("command_type", "RESTORE_OPERATION").putObject("payload").put("record_id", record).put("action", action);
+        return call("commands", request, 200).get("result_token");
     }
     private ObjectNode preview(JsonNode token, JsonNode steps) { var request = query(token).put("plan_id", "command.mindmap").putNull("next_scope"); request.set("steps", steps); return request; }
     private ObjectNode query(JsonNode token) { var value = JSON.createObjectNode().put("request_id", "request.query").put("context_id", CONTEXT); value.set("draft_token", token); return value; }

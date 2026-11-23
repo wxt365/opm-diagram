@@ -270,7 +270,7 @@ public final class VisualCommonRuntimeReadyWriter implements ApplicationListener
                 channel.force(true);
             }
             Files.move(temporary, target, StandardCopyOption.ATOMIC_MOVE);
-            try (FileChannel directory = FileChannel.open(parent, StandardOpenOption.READ)) { directory.force(true); }
+            if (!System.getProperty("os.name").startsWith("Windows")) try (FileChannel directory = FileChannel.open(parent, StandardOpenOption.READ)) { directory.force(true); }
         } catch (Exception exception) {
             Files.deleteIfExists(temporary);
             throw failure("GOLDEN_COMMON_UI_SETUP_FAILED", "Cannot atomically write Runtime Ready.", exception);

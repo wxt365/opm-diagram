@@ -27,7 +27,7 @@ public final class RevisionDocumentReaderRouter {
                 throw new SemanticReadException("REVISION_SCHEMA_UNSUPPORTED");
             }
             String version = root.path("schema_version").asText();
-            if (!"0.1".equals(version) && !"0.2".equals(version)) throw new SemanticReadException("REVISION_SCHEMA_UNSUPPORTED");
+            if (!java.util.Set.of("0.1", "0.2", "0.3", "0.4", "0.5", "0.6", "0.7").contains(version)) throw new SemanticReadException("REVISION_SCHEMA_UNSUPPORTED");
             if ("0.1".equals(version) && (root.has("text_trace") || root.has("text_traces") || root.path("text_artifact").has("traces"))) {
                 throw new SemanticReadException("REVISION_SCHEMA_SHAPE_INVALID");
             }

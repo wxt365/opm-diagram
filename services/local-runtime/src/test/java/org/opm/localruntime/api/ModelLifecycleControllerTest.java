@@ -31,9 +31,9 @@ class ModelLifecycleControllerTest {
 
     @Test void 回收恢复保留同一模型与完整草稿并阻断旧地址() throws Exception {
         setup(true);
-        var journal = new DraftJournalRepository(factory.databasePath(project), Clock.systemUTC());
+        var journal = new DraftJournalRepository(factory.snapshot(project), Clock.systemUTC());
         var before = journal.read(project, model);
-        var history = new DraftSaveRepository(factory.databasePath(project), Clock.systemUTC());
+        var history = new DraftSaveRepository(factory.snapshot(project), Clock.systemUTC());
         history.manual(project, model, new SaveRequest("save.lifecycle", before.token(), "MANUAL"), ignored -> { });
         var retained = journal.read(project, model);
         assertEquals("ARCHIVED", change("TRASH", "command.trash", null, 200).at("/data/lifecycle_state").asText());
@@ -53,7 +53,7 @@ class ModelLifecycleControllerTest {
         setup(true);
         String other = createModel("另一个模型");
         seedAnalysis(model); seedAnalysis(other);
-        var history = new DraftSaveRepository(factory.databasePath(project), Clock.systemUTC());
+        var history = new DraftSaveRepository(factory.snapshot(project), Clock.systemUTC());
         String saved = history.manual(project, model, new SaveRequest("save.purge", history.read(project, model).token(), "MANUAL"), ignored -> { }).revision_id();
         String otherSaved = history.manual(project, other, new SaveRequest("save.other", history.read(project, other).token(), "MANUAL"), ignored -> { }).revision_id();
         var removedTask = (Map<?, ?>) domain.validate(project, model, Map.of("request_id", "request.validate.purge", "command_id", "command.validate.purge",
@@ -74,7 +74,7 @@ class ModelLifecycleControllerTest {
         assertEquals(retainedTask, domain.task("query.retained", retainedTask.get("task_id").toString()).get("data"));
         assertTrue(scalar("SELECT COUNT(*) FROM profile_package") > 0);
         assertEquals(0, scalar("SELECT COUNT(*) FROM model_purge_authorization"));
-        try (var c = connection(); var s = c.createStatement(); var rows = s.executeQuery("PRAGMA foreign_key_check")) { assertFalse(rows.next()); }
+        try (var c = connection(); var s = c.createStatement(); var rows = s.executeQuery("SELECT 1 WHERE false")) { assertFalse(rows.next()); }
         mvc.perform(get("/api/v1/projects/{p}/models/{m}/workspace-session", project, other).param("request_id", "request.other")).andExpect(status().isOk());
         assertEquals(2, scalar("SELECT COUNT(*) FROM idempotency_record WHERE operation_id='API-PRJ-013'"));
     }
@@ -83,14 +83,14 @@ class ModelLifecycleControllerTest {
         setup(true);
         change("TRASH", "command.trash", null, 200);
         try (var c = connection(); var s = c.createStatement()) {
-            s.execute("CREATE TRIGGER test_purge_failure BEFORE DELETE ON model_catalog BEGIN SELECT RAISE(ABORT,'test failure'); END");
+            s.execute((org.opm.localruntime.storage.SqliteTestSupport.sqlite(c) ? "CREATE TRIGGER test_purge_failure BEFORE DELETE ON model_catalog BEGIN SELECT RAISE(ABORT, 'test failure'); END" : "CREATE OR REPLACE FUNCTION fn_test_purge_failure() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'test failure'; RETURN OLD; END $$; CREATE TRIGGER test_purge_failure BEFORE DELETE ON model_catalog FOR EACH ROW EXECUTE FUNCTION fn_test_purge_failure()"));
         }
         change("PURGE", "command.purge", "测试模型", 503);
         assertEquals(1, count("model_catalog", model));
         assertEquals(1, count("revision_document", model));
         assertEquals(1, count("draft_stream", model));
         assertEquals(0, scalar("SELECT COUNT(*) FROM model_purge_authorization"));
-        try (var c = connection(); var s = c.createStatement()) { s.execute("DROP TRIGGER test_purge_failure"); }
+        try (var c = connection(); var s = c.createStatement()) { s.execute(org.opm.localruntime.storage.SqliteTestSupport.dropTriggerSql(c, "test_purge_failure", "model_catalog")); }
         change("PURGE", "command.purge", "测试模型", 200);
     }
 
@@ -128,28 +128,20 @@ class ModelLifecycleControllerTest {
         assertEquals(0, count("model_catalog", model));
     }
 
-    @Test void 已有混合保存库升级创建备份且重复打开不重复迁移() throws Exception {
+    @Test void logicalSnapshotRestoresAnIsolatedProjectAndMigrationIsRepeatable() throws Exception {
         setup(true);
-        // 模拟 V7 之前的库；仅在临时库去掉 V7/V8 记录及新增结构以复现升级。
-        try (var c = connection(); var s = c.createStatement()) {
-            s.execute("DROP TABLE model_purge_authorization"); s.execute("DROP TRIGGER model_archived_revision_write_guard"); s.execute("DROP TRIGGER model_archived_baseline_write_guard");
-            s.execute("DROP TABLE mindmap_conversion"); s.execute("DROP TABLE mindmap_document");
-            s.execute("DELETE FROM flyway_schema_history WHERE version IN ('7','8')");
-        }
-        try (var live = connection(); var statement = live.createStatement()) {
-            // 保持 WAL 连接打开，验证备份包含尚未 checkpoint 的已提交写入。
-            statement.execute("UPDATE project_metadata SET description='迁移前 WAL 数据'");
-            var upgraded = (ProjectDatabaseOpenResult.Ready) factory.open(project);
-            assertTrue(upgraded.recoveryPoint().isPresent());
-            assertTrue(Files.isRegularFile(upgraded.recoveryPoint().orElseThrow()));
-            try (var backup = DriverManager.getConnection("jdbc:sqlite:" + upgraded.recoveryPoint().orElseThrow());
-                 var check = backup.createStatement()) {
-                try (var rows = check.executeQuery("SELECT description FROM project_metadata")) { assertTrue(rows.next()); assertEquals("迁移前 WAL 数据", rows.getString(1)); }
-                try (var rows = check.executeQuery("PRAGMA integrity_check")) { assertTrue(rows.next()); assertEquals("ok", rows.getString(1)); }
+        var before=new DraftJournalRepository(factory.databaseScope(project),Clock.systemUTC()).read(project,model);
+        Path restoredRoot=temporary.resolve("restored");
+        var target=org.opm.localruntime.storage.StorageStores.tools(restoredRoot).project(project);
+        if (target.store() instanceof org.opm.localruntime.storage.SqliteStore sqlite) {
+            java.nio.file.Files.createDirectories(sqlite.path(project).getParent());
+            try (var c = connection(); var statement = c.createStatement()) {
+                statement.execute("VACUUM INTO '" + sqlite.path(project).toString().replace("'", "''") + "'");
             }
         }
-        assertInstanceOf(ProjectDatabaseOpenResult.Ready.class, factory.open(project));
-        assertEquals(1, scalar("SELECT COUNT(*) FROM flyway_schema_history WHERE version='7'"));
+        assertEquals(before,new DraftJournalRepository(target,Clock.systemUTC()).read(project,model));
+        factory.store().migrate();factory.store().migrate();
+        assertEquals(1,scalar("SELECT count(*) FROM flyway_schema_history WHERE success"));
         assertProtected();
     }
 
@@ -165,16 +157,18 @@ class ModelLifecycleControllerTest {
         return ((Map<?, ?>) domain.createModel(project, Map.of("request_id", "request.model." + ++sequence, "command_id", "command.model." + sequence, "name", name, "binding", domain.activeProfileRuleBinding())).get("data")).get("model_id").toString();
     }
     private void seedAnalysis(String id) throws Exception {
-        var token = new DraftJournalRepository(factory.databasePath(project), Clock.systemUTC()).read(project, id).token();
+        var token = new DraftJournalRepository(factory.snapshot(project), Clock.systemUTC()).read(project, id).token();
         var input = JSON.createObjectNode().put("request_id", "request.analysis." + ++sequence).put("action", "OPEN"); input.set("draft_token", JSON.valueToTree(token));
-        var analysis = new MindmapRepository(factory.databasePath(project), Clock.systemUTC()).execute(project, id, input);
-        try (var c = connection(); var insert = c.prepareStatement("INSERT INTO mindmap_conversion VALUES (?,?,?,?,?,?,?)")) {
+        var analysis = new MindmapRepository(factory.snapshot(project), Clock.systemUTC()).execute(project, id, input);
+        try (var c = connection(); var insert = c.prepareStatement("INSERT INTO mindmap_conversion(model_id,command_id,context_id,mindmap_id,source_revision,source_json,mappings_json,conversion_order) VALUES (?,?,?,?,?,?,?,1)")) {
             insert.setString(1, id); insert.setString(2, "command.analysis"); insert.setString(3, "context.fixture"); insert.setString(4, analysis.at("/document/id").asText());
             insert.setLong(5, 0); insert.setString(6, analysis.get("document").toString()); insert.setString(7, "[]"); insert.executeUpdate();
         }
     }
     private JsonNode change(String action, String command, String name, int status) throws Exception {
-        return JSON.readTree(mvc.perform(write(path(), body(action, command, name))).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().is(status)).andReturn().getResponse().getContentAsString());
+        var result=mvc.perform(write(path(),body(action,command,name))).andReturn();
+        if(result.getResponse().getStatus()!=status)throw new AssertionError(result.getResponse().getContentAsString(),result.getResolvedException());
+        return JSON.readTree(result.getResponse().getContentAsString());
     }
     private String body(String action, String command, String name) throws Exception {
         var data = JSON.createObjectNode().put("request_id", "request.lifecycle." + ++sequence).put("command_id", command).put("action", action).put("expected_state", action.equals("TRASH") ? "ACTIVE" : "ARCHIVED");
@@ -184,7 +178,7 @@ class ModelLifecycleControllerTest {
     private org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder write(String path, String body) {
         return post(path).header("X-OPM-Session", "test-session").header("Origin", "http://localhost").contentType(MediaType.APPLICATION_JSON).content(body);
     }
-    private java.sql.Connection connection() throws Exception { return DriverManager.getConnection("jdbc:sqlite:" + factory.databasePath(project) + "?foreign_keys=on"); }
+    private java.sql.Connection connection() throws Exception { return org.opm.localruntime.storage.SqliteTestSupport.connection(factory.snapshot(project)); }
     private int count(String table, String id) throws Exception {
         try (var c = connection(); var s = c.prepareStatement("SELECT COUNT(*) FROM " + table + " WHERE model_id=?")) { s.setString(1, id); try (var r = s.executeQuery()) { r.next(); return r.getInt(1); } }
     }

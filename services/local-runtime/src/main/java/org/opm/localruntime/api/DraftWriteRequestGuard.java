@@ -9,11 +9,17 @@ import org.springframework.web.servlet.HandlerInterceptor;
 final class DraftWriteRequestGuard implements HandlerInterceptor {
     private final LocalWriteRequestGuard delegate;
     DraftWriteRequestGuard(LocalSessionToken session) { delegate = new LocalWriteRequestGuard(session); }
+    DraftWriteRequestGuard(LocalSessionToken session, String trustedWebOrigins) {
+        delegate = new LocalWriteRequestGuard(session, trustedWebOrigins);
+    }
+    DraftWriteRequestGuard(LocalSessionToken session, String origins, EmbeddedAccessPolicy access) {
+        delegate = new LocalWriteRequestGuard(session, origins, access);
+    }
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
         try {
             if ("GET".equals(request.getMethod()) && handler instanceof org.springframework.web.method.HandlerMethod method
-                    && method.getBeanType() == DraftSaveController.class) return delegate.validate(request);
+                    && method.getBeanType() == DraftSaveController.class) return delegate.validateRead(request);
             return delegate.preHandle(request, response, handler);
         }
         catch (ApiException exception) { throw new DraftWorkspaceService.Failure("LOCAL_SESSION_INVALID", null); }

@@ -276,7 +276,7 @@ public final class GoldenFamilyRuntimeReadyWriter implements ApplicationListener
                 channel.force(true);
             }
             Files.move(temporary, target, StandardCopyOption.ATOMIC_MOVE);
-            try (FileChannel directory = FileChannel.open(parent, StandardOpenOption.READ)) { directory.force(true); }
+            if (!System.getProperty("os.name").startsWith("Windows")) try (FileChannel directory = FileChannel.open(parent, StandardOpenOption.READ)) { directory.force(true); }
         } catch (Exception exception) {
             Files.deleteIfExists(temporary);
             if (exception instanceof GoldenFixtureMaterializationException materialization) throw materialization;

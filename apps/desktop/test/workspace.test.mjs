@@ -1,0 +1,33 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtemp, mkdir, writeFile, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { backupWorkspace, stageRestore, commitRestore, recoverRestore, lockWorkspace } from '../src/workspace.mjs';
+import { atomicJson, json } from '../src/files.mjs';
+
+test('工作区锁、备份校验、损坏拒绝及原子恢复保留回退数据', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'opm-workspace-')); t.after(() => rm(root, { recursive: true, force: true }));
+  const workspace = join(root, 'workspace'); await mkdir(join(workspace, 'runtime-data'), { recursive: true });
+  await writeFile(join(workspace, 'runtime-data/catalog.db'), 'database-placeholder');
+  await writeFile(join(root, 'credentials.json'), 'secret-outside-workspace');
+  const unlock = await lockWorkspace(root); await assert.rejects(lockWorkspace(root), /另一个客户端/); await unlock();
+  await assert.rejects(backupWorkspace(workspace, workspace, '0.1.0'), /内部/);
+  const backup = await backupWorkspace(workspace, root, '0.1.0');
+  const manifestPath = join(backup, 'manifest.json'), manifest = await json(manifestPath);
+  assert.equal(manifest.files.length, 1); assert.equal(manifest.files[0].path, 'runtime-data/catalog.db');
+  let verified = false;
+  const staging = await stageRestore(backup, root, async path => { verified = true; assert.equal(await readFile(join(path, 'runtime-data/catalog.db'), 'utf8'), 'database-placeholder'); }, '0.1.0');
+  assert.equal(verified, true);
+  await writeFile(join(workspace, 'runtime-data/catalog.db'), 'later-data');
+  const previous = await commitRestore(root, staging);
+  assert.equal(await readFile(join(previous, 'runtime-data/catalog.db'), 'utf8'), 'later-data');
+  assert.equal(await readFile(join(workspace, 'runtime-data/catalog.db'), 'utf8'), 'database-placeholder');
+  await recoverRestore(root);
+  await writeFile(join(backup, 'data/runtime-data/catalog.db'), 'corrupt');
+  await assert.rejects(stageRestore(backup, root, async () => assert.fail('不能校验损坏内容'), '0.1.0'), /损坏/);
+  await atomicJson(manifestPath, { ...manifest, files: [{ ...manifest.files[0], path: '../credentials.json' }] });
+  await assert.rejects(stageRestore(backup, root, async () => {}, '0.1.0'), /清单无效/);
+  await atomicJson(manifestPath, { ...manifest, appVersion: '9.0.0' });
+  await assert.rejects(stageRestore(backup, root, async () => {}, '0.1.0'), /更新版本/);
+});

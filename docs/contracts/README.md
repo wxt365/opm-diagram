@@ -40,9 +40,9 @@ DEV-01 的可加载代表性离线资产位于仓库根 `packages/profiles/<prof
 
 ## SQLite 迁移运行方式
 
-`services/local-runtime` 在构建时将唯一的 V1 来源 `migrations/sqlite/V1__initial_schema.sql` 复制到 classpath `db/migration`，由 Flyway 执行；不在服务资源目录维护第二份 SQL。项目数据库固定为 `opm.storage.root/projects/<project-id>/project.db`，默认 root 为 `runtime-data`。
+2026-11-23 选择性迁移后，活动实现仅支持 SQLite `2.0`。新项目基线为 `services/local-runtime/src/main/resources/db/migration/sqlite/V1__sqlite_storage.sql`，全局配色基线位于相邻 `sqlite-catalog/` 目录。项目数据库固定为 `opm.storage.root/projects/<project-id>/project.db`，默认 root 为 `runtime-data`。
 
-打开项目库时，适配器先校验已应用迁移的状态和 checksum，再为既有库创建恢复点后执行 pending migration。V1 包含 SQLite PRAGMA 与 DDL，Flyway 因此仅在 SQLite 适配器中允许混合语句。迁移失败会创建同目录 `.recovery-required` marker，调用者只能获得 `RECOVERY_REQUIRED` 状态，不能取得可写数据库对象。
+本目录原 SQL 及 Java V6/V7 bytes 保留为旧 V1～V8 历史输入，不能混入新 Flyway 基线。新版在执行 Flyway 前拒绝旧库直接升级，必须按 [SQLite 升级说明](../integration/sqlite-storage-upgrade.md)只读转换到全新目录。以下脑图 V8 段落描述历史 journaled Runtime，不是当前库的直接升级方式。发布工具仅增加存储版本兼容并恢复真实 SQLite 快照/检查，不提升任何 Gate、Candidate 或 Activation。
 
 ## API-EDT 0.2 冻结目标与当前机器输入
 

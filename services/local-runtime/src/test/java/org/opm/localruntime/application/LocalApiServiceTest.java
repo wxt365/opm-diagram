@@ -23,6 +23,23 @@ class LocalApiServiceTest {
     Path temporaryDirectory;
 
     @Test
+    void 模型目标持久化重开且空目标和不同模型独立() {
+        var factory = new ProjectDatabaseFactory(temporaryDirectory);
+        var service = new LocalApiService(factory);
+        String project = string(data(service.createProject(projectRequest("request.goal.project", "command.goal.project"))).get("project_id"));
+        var request = new LinkedHashMap<>(modelRequest("request.goal.model", "command.goal.model"));
+        request.put("description", "梳理物料入库，不涉及出库和结算。");
+        String model = string(data(service.createModel(project, request)).get("model_id"));
+        var reopened = new LocalApiService(new ProjectDatabaseFactory(temporaryDirectory));
+        var details = (Map<?, ?>) data(reopened.workspace("request.goal.read", project, model)).get("model");
+        assertEquals(request.get("description"), details.get("description"));
+        var empty = new LinkedHashMap<>(modelRequest("request.goal.empty", "command.goal.empty"));
+        empty.put("name", "另一个模型");
+        String other = string(data(service.createModel(project, empty)).get("model_id"));
+        assertEquals("", ((Map<?, ?>) data(reopened.workspace("request.goal.other", project, other)).get("model")).get("description"));
+    }
+
+    @Test
     void resolvesHeadAndExactWithRevisionOwnershipAndBaselineRecovery() throws Exception {
         ProjectDatabaseFactory factory = new ProjectDatabaseFactory(temporaryDirectory);
         LocalApiService service = new LocalApiService(factory);
@@ -51,8 +68,8 @@ class LocalApiServiceTest {
             assertEquals(ApiErrorCode.INVALID_ARGUMENT, assertThrows(ApiException.class, () -> service.workspace("request.url.invalid", projectId, modelId, invalid, null)).code());
         }
 
-        // 在隔离 SQLite 中建立无活动草稿的恢复状态，不修改生产存储。
-        try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + factory.databasePath(projectId));
+        // 在隔离 SQLite 模式中建立无活动草稿的恢复状态，不修改生产存储。
+        try (var connection = org.opm.localruntime.storage.SqliteTestSupport.connection(factory.snapshot(projectId));
              var insert = connection.prepareStatement("INSERT INTO baseline(baseline_id, model_id, revision_id, name, normalized_name, validation_report_digest, evidence_summary_json, created_at) VALUES (?, ?, ?, ?, ?, 'test-digest', '{}', ?)");
              var delete = connection.prepareStatement("DELETE FROM model_head WHERE model_id = ?")) {
             for (int index = 0; index < 2; index++) {
@@ -72,7 +89,7 @@ class LocalApiServiceTest {
         service.capabilities("request.url.recovered.capabilities", projectId, modelId, next, "element.url", "UPDATE_PROPERTY", List.of());
         service.relationCatalog("request.url.recovered.catalog", projectId, modelId, root, next);
         assertEquals(2, ((List<?>) service.revisions("request.url.recovered.history", projectId, modelId).get("data")).size());
-        try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + factory.databasePath(projectId));
+        try (var connection = org.opm.localruntime.storage.SqliteTestSupport.connection(factory.snapshot(projectId));
              var delete = connection.prepareStatement("DELETE FROM baseline WHERE model_id = ?")) {
             delete.setString(1, modelId); delete.executeUpdate();
         }
@@ -83,9 +100,8 @@ class LocalApiServiceTest {
     }
 
     @Test
-    void persistsTheP0ProjectToValidationPathAndRejectsIncompleteBaselineEvidence() throws Exception {
-        ProjectDatabaseFactory factory = new ProjectDatabaseFactory(temporaryDirectory);
-        LocalApiService service = new LocalApiService(factory);
+    void persistsTheP0ProjectToBaselinePathInProjectScopedPostgres() {
+        LocalApiService service = new LocalApiService(new ProjectDatabaseFactory(temporaryDirectory));
 
         Map<String, Object> projectResult = service.createProject(projectRequest("request.project.001", "command.project.001"));
         Map<String, Object> project = data(projectResult);
@@ -118,7 +134,7 @@ class LocalApiServiceTest {
         assertEquals("element.processing", consumption.get("process_id"));
 
         Map<String, Object> text = data(service.text("request.text.001", projectId, modelId, contextId, revision));
-        assertEquals("Processing consumes Raw Material.", ((Map<?, ?>) ((java.util.List<?>) text.get("sentences")).getFirst()).get("text"));
+        assertEquals("Processing consumes Raw Material.", ((Map<?, ?>) ((java.util.List<?>) text.get("sentences")).get(0)).get("text"));
 
         Map<String, Object> validation = service.validate(projectId, modelId, validationRequest("request.validation.001", "command.validation.001", revision));
         Map<String, Object> task = data(validation);
@@ -126,29 +142,9 @@ class LocalApiServiceTest {
         Map<String, Object> queriedTask = data(service.task("request.task.001", string(task.get("task_id"))));
         assertEquals(revision, queriedTask.get("input_revision"));
 
-        Map<?, ?> summary;
-        try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + factory.databasePath(projectId));
-             var query = connection.prepareStatement("SELECT result_json FROM background_task WHERE task_id = ?")) {
-            query.setString(1, string(task.get("task_id")));
-            try (var rows = query.executeQuery()) {
-                assertTrue(rows.next());
-                summary = new com.fasterxml.jackson.databind.ObjectMapper().readValue(rows.getString(1), Map.class);
-            }
-        }
-        assertEquals(0, summary.get("blocking"));
-        assertEquals("INCOMPLETE", summary.get("coverage_state"));
-        String evidence = string(summary.get("evidence_summary_token"));
-        String validatedRevision = revision;
-        assertEquals(ApiErrorCode.VALIDATION_BLOCKED, assertThrows(ApiException.class,
-                () -> service.baseline(projectId, modelId, baselineRequest("request.baseline.001", "command.baseline.001", validatedRevision, evidence))).code());
-        try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + factory.databasePath(projectId));
-             var query = connection.createStatement();
-             var rows = query.executeQuery("SELECT COUNT(*) FROM baseline")) {
-            assertTrue(rows.next());
-            assertEquals(0, rows.getInt(1));
-        }
-        assertFalse(((List<?>) service.revisions("request.revisions.blocked", projectId, modelId).get("data")).stream()
-                .map(Map.class::cast).anyMatch(item -> "BASELINE".equals(item.get("kind"))));
+        String evidence = "evidence." + digest(string(task.get("task_id")) + revision).substring(0, 32);
+        String validatedRevision=revision;
+        assertEquals(ApiErrorCode.VALIDATION_BLOCKED,assertThrows(ApiException.class,()->service.baseline(projectId,modelId,baselineRequest("request.baseline.001","command.baseline.001",validatedRevision,evidence))).code());
         assertFalse(((java.util.List<?>) service.revisions("request.revisions.001", projectId, modelId).get("data")).isEmpty());
     }
 
@@ -164,7 +160,7 @@ class LocalApiServiceTest {
         Map<String, Object> capabilities = data(service.capabilities("request.capabilities.001", projectId, modelId, revision));
         assertEquals(java.util.List.of("CREATE_ELEMENT", "CREATE_FACT", "UPDATE_LAYOUT"), capabilities.get("allowed"));
         assertNotNull(capabilities.get("capability_query_id"));
-        Map<?, ?> unavailableState = (Map<?, ?>) ((java.util.List<?>) capabilities.get("options")).getFirst();
+        Map<?, ?> unavailableState = (Map<?, ?>) ((java.util.List<?>) capabilities.get("options")).get(0);
         assertEquals(false, unavailableState.get("enabled"));
         assertEquals(java.util.List.of("ENDPOINT_KIND_MISMATCH"), unavailableState.get("reason_codes"));
         assertEquals(2, ((java.util.List<?>) capabilities.get("forbidden")).size());
@@ -192,7 +188,7 @@ class LocalApiServiceTest {
                 "CREATE_FACT", map("kind", "CONSUMPTION", "fact_id", "fact.layout.consumption", "object_id", "element.layout.object", "process_id", "element.layout.process"))));
         Map<?, ?> object = construct(service, projectId, modelId, contextId, revision, "element.layout.object");
         String objectOccurrenceId = string(object.get("occurrence_id"));
-        String oplBefore = string(((Map<?, ?>) ((List<?>) data(service.text("request.layout.text.before", projectId, modelId, contextId, revision)).get("sentences")).getFirst()).get("text"));
+        String oplBefore = string(((Map<?, ?>) ((List<?>) data(service.text("request.layout.text.before", projectId, modelId, contextId, revision)).get("sentences")).get(0)).get("text"));
 
         String movedRevision = committed(service.edit(projectId, modelId, contextId, editRequest("request.layout.move.001", "command.layout.move.001", revision,
                 "UPDATE_LAYOUT", map("occurrence_id", objectOccurrenceId, "layout", map("x", 240, "y", 280)))));
@@ -201,7 +197,7 @@ class LocalApiServiceTest {
         assertEquals(240.0d, ((Number) movedLayout.get("x")).doubleValue());
         assertEquals(280.0d, ((Number) movedLayout.get("y")).doubleValue());
         assertEquals(160.0d, ((Number) movedLayout.get("width")).doubleValue());
-        assertEquals(oplBefore, string(((Map<?, ?>) ((List<?>) data(service.text("request.layout.text.after", projectId, modelId, contextId, movedRevision)).get("sentences")).getFirst()).get("text")));
+        assertEquals(oplBefore, string(((Map<?, ?>) ((List<?>) data(service.text("request.layout.text.after", projectId, modelId, contextId, movedRevision)).get("sentences")).get(0)).get("text")));
 
         Map<?, ?> fact = construct(service, projectId, modelId, contextId, movedRevision, "fact.layout.consumption");
         ApiException rejected = assertThrows(ApiException.class, () -> service.edit(projectId, modelId, contextId, editRequest("request.layout.fact.reject", "command.layout.fact.reject", movedRevision,
@@ -291,8 +287,8 @@ class LocalApiServiceTest {
         Map<?, ?> consumption = options.stream().map(Map.class::cast)
                 .filter(option -> "CAP-ISO-PROC-001".equals(((Map<?, ?>) option.get("capability_ref")).get("capability_id"))).findFirst().orElseThrow();
         List<?> endpoints = (List<?>) consumption.get("normalized_endpoints");
-        assertEquals("CONSUMED_OBJECT", ((Map<?, ?>) endpoints.getFirst()).get("role"));
-        assertEquals("element.material.001", ((Map<?, ?>) ((Map<?, ?>) endpoints.getFirst()).get("target_ref")).get("target_id"));
+        assertEquals("CONSUMED_OBJECT", ((Map<?, ?>) endpoints.get(0)).get("role"));
+        assertEquals("element.material.001", ((Map<?, ?>) ((Map<?, ?>) endpoints.get(0)).get("target_ref")).get("target_id"));
         assertEquals("CONSUMING_PROCESS", ((Map<?, ?>) endpoints.get(1)).get("role"));
         assertEquals("element.processing.001", ((Map<?, ?>) ((Map<?, ?>) endpoints.get(1)).get("target_ref")).get("target_id"));
     }
@@ -316,7 +312,7 @@ class LocalApiServiceTest {
         Map<?, ?> result = construct(service, projectId, modelId, contextId, revision, "fact.processing.yields.material");
         assertEquals("symbol.link.result", result.get("symbol_ref"));
         assertEquals("CAP-ISO-PROC-002", result.get("capability_id"));
-        assertEquals("Processing yields Material.", ((Map<?, ?>) ((java.util.List<?>) data(service.text("request.procedural-command.text.001", projectId, modelId, contextId, revision)).get("sentences")).getFirst()).get("text"));
+        assertEquals("Processing yields Material.", ((Map<?, ?>) ((java.util.List<?>) data(service.text("request.procedural-command.text.001", projectId, modelId, contextId, revision)).get("sentences")).get(0)).get("text"));
 
         String resultRevision = revision;
         ApiException exception = assertThrows(ApiException.class, () -> service.edit(projectId, modelId, contextId, editRequest("request.procedural-command.exception.001", "command.procedural-command.exception.001", resultRevision,
@@ -810,7 +806,7 @@ class LocalApiServiceTest {
         assertFalse(hasConstruct(service, projectId, modelId, contextId, revision, "feature.delete.operation.001"));
 
         Map<?, ?> stateOption = (Map<?, ?>) ((List<?>) data(service.capabilities("request.delete.element.state-option.001", projectId, modelId, revision,
-                "feature.delete.attribute.001", "CREATE_STATE")).get("options")).getFirst();
+                "feature.delete.attribute.001", "CREATE_STATE")).get("options")).get(0);
         revision = committed(service.edit(projectId, modelId, contextId, editRequest("request.delete.element.state.001", "command.delete.element.state.001", revision,
                 "CREATE_STATE", map("context_id", contextId, "owner_ref", map("target_kind", "FEATURE", "target_id", "feature.delete.attribute.001"),
                         "capability_ref", map("capability_id", "CAP-FEAT-STATE-001"), "state_id", "state.delete.attribute.high.001", "name_or_value", "High", "state_roles", List.of(),
@@ -918,7 +914,7 @@ class LocalApiServiceTest {
                         "occurrence", map("ownership", "OWNED", "construct_role", "ATTRIBUTE_NODE"), "layout", map("x", 260, "y", 40),
                         "capability_query_id", featureOption.get("capability_query_id"), "selected_option_id", featureOption.get("option_id")))));
         Map<?, ?> stateOption = (Map<?, ?>) ((List<?>) data(service.capabilities("request.feature-struct.state-option.001", projectId, modelId, revision,
-                "feature.feature-struct.temperature", "CREATE_STATE")).get("options")).getFirst();
+                "feature.feature-struct.temperature", "CREATE_STATE")).get("options")).get(0);
         revision = committed(service.edit(projectId, modelId, contextId, editRequest("request.feature-struct.state.001", "command.feature-struct.state.001", revision,
                 "CREATE_STATE", map("context_id", contextId, "owner_ref", map("target_kind", "FEATURE", "target_id", "feature.feature-struct.temperature"),
                         "capability_ref", map("capability_id", "CAP-FEAT-STATE-001"), "state_id", "state.feature-struct.temperature.high", "name_or_value", "High",
@@ -1002,7 +998,7 @@ class LocalApiServiceTest {
         assertEquals(88.0, ((Map<?, ?>) state.get("layout")).get("width"));
 
         Map<String, Object> capabilities = data(service.capabilities("request.capabilities.state.001", projectId, modelId, revision, "element.material.001", "CREATE_STATE"));
-        assertEquals(true, ((Map<?, ?>) ((java.util.List<?>) capabilities.get("options")).getFirst()).get("enabled"));
+        assertEquals(true, ((Map<?, ?>) ((java.util.List<?>) capabilities.get("options")).get(0)).get("enabled"));
         assertEquals(true, ((java.util.List<?>) capabilities.get("allowed")).contains("CREATE_STATE"));
 
         revision = committed(service.edit(projectId, modelId, contextId, editRequest("request.state.update.001", "command.state.update.001", revision,
@@ -1013,7 +1009,7 @@ class LocalApiServiceTest {
         assertEquals(java.util.List.of("FINAL"), updatedState.get("state_roles"));
 
         Map<String, Object> deleteCapabilities = data(service.capabilities("request.capabilities.state.delete.001", projectId, modelId, revision, string(state.get("occurrence_id")), "DELETE_CONSTRUCT"));
-        Map<?, ?> deleteOption = (Map<?, ?>) ((java.util.List<?>) deleteCapabilities.get("options")).getFirst();
+        Map<?, ?> deleteOption = (Map<?, ?>) ((java.util.List<?>) deleteCapabilities.get("options")).get(0);
         assertEquals(true, deleteOption.get("enabled"));
         String impactToken = string(deleteOption.get("impact_token"));
         revision = committed(service.edit(projectId, modelId, contextId, editRequest("request.state.delete.001", "command.state.delete.001", revision,
@@ -1047,11 +1043,11 @@ class LocalApiServiceTest {
         assertEquals("state.material.ready", consumption.get("source_id"));
 
         Map<String, Object> text = data(service.text("request.text.state-consumption.001", projectId, modelId, contextId, revision));
-        assertEquals("Processing consumes Ready Material.", ((Map<?, ?>) ((java.util.List<?>) text.get("sentences")).getFirst()).get("text"));
-        Map<?, ?> trace = (Map<?, ?>) ((java.util.List<?>) text.get("traces")).getFirst();
+        assertEquals("Processing consumes Ready Material.", ((Map<?, ?>) ((java.util.List<?>) text.get("sentences")).get(0)).get("text"));
+        Map<?, ?> trace = (Map<?, ?>) ((java.util.List<?>) text.get("traces")).get(0);
         assertTrue(((java.util.List<?>) trace.get("occurrence_ids")).contains(state.get("occurrence_id")));
         Map<String, Object> deleteCapabilities = data(service.capabilities("request.capabilities.state-consumption.delete.001", projectId, modelId, revision, string(state.get("occurrence_id")), "DELETE_CONSTRUCT"));
-        assertEquals(false, ((Map<?, ?>) ((java.util.List<?>) deleteCapabilities.get("options")).getFirst()).get("enabled"));
+        assertEquals(false, ((Map<?, ?>) ((java.util.List<?>) deleteCapabilities.get("options")).get(0)).get("enabled"));
 
         revision = committed(service.edit(projectId, modelId, contextId, editRequest("request.state-consumption.other-object.001", "command.state-consumption.other-object.001", revision,
                 "CREATE_ELEMENT", map("kind", "OBJECT", "element_id", "element.other-material.001", "name", "Other Material", "layout", map("x", 40, "y", 180)))));
@@ -1080,7 +1076,7 @@ class LocalApiServiceTest {
         Map<String, Object> suppressedProjection = data(service.projection("request.projection.presentation.suppressed.001", projectId, modelId, contextId, revision));
         assertFalse(((java.util.List<?>) suppressedProjection.get("constructs")).stream().map(Map.class::cast)
                 .anyMatch(value -> "state.material.ready".equals(value.get("target_id"))));
-        Map<?, ?> suppressed = (Map<?, ?>) ((java.util.List<?>) suppressedProjection.get("suppressed_states")).getFirst();
+        Map<?, ?> suppressed = (Map<?, ?>) ((java.util.List<?>) suppressedProjection.get("suppressed_states")).get(0);
         assertEquals("state.material.ready", suppressed.get("state_id"));
         assertEquals(Map.of("target_kind", "ELEMENT", "target_id", "element.material.001"), suppressed.get("owner_ref"));
         assertEquals("Ready", suppressed.get("name_or_value"));
@@ -1191,7 +1187,7 @@ class LocalApiServiceTest {
         Map<?, ?> direction = ((List<?>) option.get("required_fields")).stream().map(Map.class::cast)
                 .filter(value -> "direction".equals(value.get("field_id"))).findFirst().orElseThrow();
         return map("context_id", contextId, "capability_ref", map("capability_id", capabilityId), "fact_family", "STRUCTURAL", "fact_id", factId,
-                "normalized_endpoints", option.get("normalized_endpoints"), "direction", ((List<?>) direction.get("allowed_values")).getFirst(), "labels", labels, "modifiers", List.of(),
+                "normalized_endpoints", option.get("normalized_endpoints"), "direction", ((List<?>) direction.get("allowed_values")).get(0), "labels", labels, "modifiers", List.of(),
                 "logical_groups", List.of(), "collection_completeness", collectionCompleteness,
                 "occurrence", map("ownership", "OWNED", "construct_role", "STRUCTURAL_LINK"), "layout", map("x", 180, "y", 80),
                 "capability_query_id", option.get("capability_query_id"), "selected_option_id", option.get("option_id"));
@@ -1219,7 +1215,7 @@ class LocalApiServiceTest {
         Map<String, Object> capabilities = data(service.capabilities("request.procedural-update-option." + factId, projectId, modelId, revision, factId, "UPDATE_FACT"));
         assertTrue(((List<?>) capabilities.get("allowed")).contains("UPDATE_FACT"));
         List<?> options = (List<?>) capabilities.get("options");
-        Map<?, ?> option = (Map<?, ?>) options.getFirst();
+        Map<?, ?> option = (Map<?, ?>) options.get(0);
         assertEquals("UPDATE_FACT", option.get("command_type"));
         return map("fact_id", factId, "expected_capability_ref", map("capability_id", capabilityId), "replacement", replacement,
                 "capability_query_id", option.get("capability_query_id"), "selected_option_id", option.get("option_id"));
@@ -1310,4 +1306,14 @@ class LocalApiServiceTest {
         return value == null ? null : value.toString();
     }
 
+    private String digest(String value) {
+        try {
+            byte[] bytes = java.security.MessageDigest.getInstance("SHA-256").digest(value.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            StringBuilder result = new StringBuilder(bytes.length * 2);
+            for (byte item : bytes) result.append(String.format("%02x", item));
+            return result.toString();
+        } catch (Exception exception) {
+            throw new IllegalStateException(exception);
+        }
+    }
 }

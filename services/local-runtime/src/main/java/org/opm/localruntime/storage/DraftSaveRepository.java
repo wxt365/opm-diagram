@@ -25,12 +25,15 @@ public final class DraftSaveRepository {
     private final Clock clock;
     private final Consumer<String> stage;
     public record Checkpoint(String checkpointId, DraftToken capturedToken) { }
-    public DraftSaveRepository(Path database, Clock clock) { this(database, clock, ignored -> { }); }
-    DraftSaveRepository(Path database, Clock clock, Consumer<String> stage) {
+    public DraftSaveRepository(ProjectScope database, Clock clock) { this(database, clock, ignored -> { }); }
+    public DraftSaveRepository(Path snapshot, Clock clock) { this(SqliteSnapshots.scope(snapshot), clock); }
+    DraftSaveRepository(Path snapshot, Clock clock, Consumer<String> stage) { this(SqliteSnapshots.scope(snapshot), clock, stage); }
+    DraftSaveRepository(ProjectScope database, Clock clock, Consumer<String> stage) {
         this.journal = new DraftJournalRepository(database, clock); this.clock = Objects.requireNonNull(clock); this.stage = Objects.requireNonNull(stage);
     }
 
     public Snapshot read(String project, String model) { return journal.read(project, model); }
+    public StateSnapshot readState(String project, String model) { return journal.readState(project, model); }
 
     public Snapshot captured(String project, String model, DraftToken target) {
         return journal.transaction(false, connection -> {
@@ -70,7 +73,7 @@ public final class DraftSaveRepository {
             if (!unchanged) revision = storeHistory(connection, model, captured, "MANUAL");
             stage.accept("HISTORY"); advance(connection, model, head, captured, checkpoint); stage.accept("STREAM");
             var result = new SaveResult(request.save_id(), unchanged ? "UNCHANGED" : "SAVED", captured.token(), checkpoint, revision, head.token());
-            update(connection, "INSERT INTO draft_receipt VALUES (?,'SAVE',?,?,?,?)", model, request.save_id(), digest, JSON.writeValueAsString(result), TIME.format(clock.instant()));
+            update(connection, "INSERT INTO draft_receipt(model_id,operation,idempotency_id,request_digest,result_json,created_at,receipt_order) VALUES (?,'SAVE',?,?,?,?,?)", model, request.save_id(), digest, JSON.writeValueAsString(result), TIME.format(clock.instant()), JdbcDialect.nextOrder(connection, "draft_receipt"));
             stage.accept("RECEIPT"); verifyUnchangedHead(connection, model, head); stage.accept("VERIFIED"); return result;
         });
     }
@@ -80,9 +83,7 @@ public final class DraftSaveRepository {
         String digest = DraftCapabilityIdentity.pin(project, model, JSON.valueToTree(request));
         return journal.transaction(true, connection -> {
             scope(connection, project, model); require(hasOverlayTable(connection), "DRAFT_RECOVERY_REQUIRED");
-            try (var statement = connection.createStatement(); var rows = statement.executeQuery("SELECT sql FROM sqlite_master WHERE type='table' AND name='draft_retention'")) {
-                require(rows.next() && rows.getString(1).contains("CONSTRAINT draft_retention_nullable_seq_v5"), "DRAFT_RECOVERY_REQUIRED");
-            }
+            require(ProjectConnectionFactory.hasTable(connection, "draft_retention"), "DRAFT_RECOVERY_REQUIRED");
             try (var statement = connection.prepareStatement("SELECT request_digest,result_json FROM draft_receipt WHERE model_id=? AND operation='PIN' AND idempotency_id=?")) {
                 statement.setString(1, model); statement.setString(2, request.pin_id());
                 try (var rows = statement.executeQuery()) {
@@ -107,10 +108,10 @@ public final class DraftSaveRepository {
             }
             if (revision == null) revision = storeHistory(connection, model, captured, request.purpose());
             stage.accept("HISTORY");
-            update(connection, "INSERT INTO draft_retention VALUES (?,?,?,?,NULL,?,NULL)", model, captured.token().draft_id(), "retention.pin." + digest, request.purpose(), revision);
+            update(connection, "INSERT INTO draft_retention(model_id,draft_id,retention_id,kind,checkpoint_id,revision_id,min_edit_seq) VALUES (?,?,?,?,NULL,?,NULL)", model, captured.token().draft_id(), "retention.pin." + digest, request.purpose(), revision);
             stage.accept("RETENTION"); advance(connection, model, head, captured, checkpoint); stage.accept("STREAM");
             var result = new PinResult(request.pin_id(), revision, captured.token());
-            update(connection, "INSERT INTO draft_receipt VALUES (?,'PIN',?,?,?,?)", model, request.pin_id(), digest, JSON.writeValueAsString(result), TIME.format(clock.instant()));
+            update(connection, "INSERT INTO draft_receipt(model_id,operation,idempotency_id,request_digest,result_json,created_at,receipt_order) VALUES (?,'PIN',?,?,?,?,?)", model, request.pin_id(), digest, JSON.writeValueAsString(result), TIME.format(clock.instant()), JdbcDialect.nextOrder(connection, "draft_receipt"));
             stage.accept("RECEIPT"); verifyUnchangedHead(connection, model, head); verifyPin(connection, project, model, request, digest, result);
             stage.accept("VERIFIED"); return result;
         });
@@ -124,7 +125,7 @@ public final class DraftSaveRepository {
         long legacySequence = DraftHistoryRepository.legacySequence(connection, model);
         require(legacySequence > 0 && sequence > 0 && sequence <= Integer.MAX_VALUE - legacySequence, "DRAFT_CONFLICT");
         String revision = id("revision");
-        update(connection, "INSERT INTO draft_savepoint VALUES (?,?,?,?,?,?,?,?)", revision, model, captured.token().draft_id(),
+        update(connection, "INSERT INTO draft_savepoint(revision_id,model_id,draft_id,captured_seq,history_sequence,purpose,content_digest,created_at) VALUES (?,?,?,?,?,?,?,?)", revision, model, captured.token().draft_id(),
                 captured.token().edit_seq(), sequence, purpose, captured.contentDigest(), TIME.format(clock.instant()));
         return revision;
     }
@@ -171,7 +172,7 @@ public final class DraftSaveRepository {
             statement.setString(1, model); statement.setString(2, captured.contentDigest());
             try (var rows = statement.executeQuery()) {
                 if (rows.next()) {
-                    require(SaveContentDigestV1.version(document).equals(rows.getString("digest_version")) && HybridSavePreparation.hash(rows.getString("artifact_json")).equals(rows.getString("artifact_digest")), "DRAFT_RECOVERY_REQUIRED");
+                    require(SaveContentDigestV1.version(document).equals(rows.getString("digest_version")) && StorageDigests.hash(rows.getString("artifact_json")).equals(rows.getString("artifact_digest")), "DRAFT_RECOVERY_REQUIRED");
                     stored = new SaveContentDigestV1.Parts((ObjectNode) DraftJsonDelta.read(rows.getString("model_json")), (ObjectNode) DraftJsonDelta.read(rows.getString("artifact_json")));
                     require(SaveContentDigestV1.sha256(SaveContentDigestV1.join(stored)).equals(captured.contentDigest()), "DRAFT_RECOVERY_REQUIRED");
                 }
@@ -179,8 +180,8 @@ public final class DraftSaveRepository {
         }
         if (stored == null) {
             stored = parts; String metadata = parts.metadata().toString();
-            update(connection, "INSERT INTO draft_content VALUES (?,?,?,?,?,?)", model, captured.contentDigest(),
-                    SaveContentDigestV1.version(document), parts.content().toString(), metadata, HybridSavePreparation.hash(metadata));
+            update(connection, "INSERT INTO draft_content(model_id,content_digest,digest_version,model_json,artifact_json,artifact_digest) VALUES (?,?,?,?,?,?)", model, captured.contentDigest(),
+                    SaveContentDigestV1.version(document), parts.content().toString(), metadata, StorageDigests.hash(metadata));
         }
         stage.accept("CONTENT");
         String checkpoint = null;
@@ -196,9 +197,9 @@ public final class DraftSaveRepository {
         }
         if (checkpoint == null) {
             checkpoint = id("checkpoint");
-            update(connection, "INSERT INTO draft_checkpoint VALUES (?,?,?,?,?,?)", model, captured.token().draft_id(), checkpoint,
+            update(connection, "INSERT INTO draft_checkpoint(model_id,draft_id,checkpoint_id,covered_seq,content_digest,created_at) VALUES (?,?,?,?,?,?)", model, captured.token().draft_id(), checkpoint,
                     captured.token().edit_seq(), captured.contentDigest(), TIME.format(clock.instant()));
-            update(connection, "INSERT INTO draft_checkpoint_overlay VALUES (?,?,?,?)", checkpoint,
+            update(connection, "INSERT INTO draft_checkpoint_overlay(checkpoint_id,content_delta_json,artifact_delta_json,document_digest) VALUES (?,?,?,?)", checkpoint,
                     DraftJsonDelta.between(stored.content(), parts.content()).toString(), DraftJsonDelta.between(stored.metadata(), parts.metadata()).toString(), DraftJsonDelta.digest(document));
         }
         stage.accept("CHECKPOINT"); return checkpoint;

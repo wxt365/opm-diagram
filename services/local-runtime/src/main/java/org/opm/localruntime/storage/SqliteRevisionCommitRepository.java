@@ -36,37 +36,38 @@ import java.util.Objects;
 import java.util.Optional;
 
 public final class SqliteRevisionCommitRepository implements RevisionCommitRepository {
+    public SqliteRevisionCommitRepository(java.nio.file.Path snapshot) { this(SqliteSnapshots.scope(snapshot)); }
 
     private static final String OPERATION_ID = "API-EDT-002";
 
     private final DataSource dataSource;
     private final SemanticRevisionJsonWriter revisionWriter;
     private final ObjectMapper objectMapper;
-    private final RecoverySqliteFaultPort recoveryFaultPort;
+    private final RecoveryPersistenceFaultPort recoveryFaultPort;
     private final E2EFaultPort e2eFaultPort;
     private final VisualCommonCommitFaultPort visualCommonCommitFaultPort;
 
-    public SqliteRevisionCommitRepository(Path databasePath) {
-        this(SqliteConnectionFactory.create(databasePath), new SemanticRevisionJsonWriter(), new ObjectMapper(), RecoverySqliteFaultPort.NOOP, E2EFaultPort.NOOP, VisualCommonCommitFaultPort.NOOP);
+    public SqliteRevisionCommitRepository(ProjectScope databasePath) {
+        this(ProjectConnectionFactory.create(databasePath), new SemanticRevisionJsonWriter(), new ObjectMapper(), RecoveryPersistenceFaultPort.NOOP, E2EFaultPort.NOOP, VisualCommonCommitFaultPort.NOOP);
     }
 
-    public SqliteRevisionCommitRepository(Path databasePath, E2EFaultPort e2eFaultPort) {
-        this(SqliteConnectionFactory.create(databasePath), new SemanticRevisionJsonWriter(), new ObjectMapper(), RecoverySqliteFaultPort.NOOP, e2eFaultPort, VisualCommonCommitFaultPort.NOOP);
+    public SqliteRevisionCommitRepository(ProjectScope databasePath, E2EFaultPort e2eFaultPort) {
+        this(ProjectConnectionFactory.create(databasePath), new SemanticRevisionJsonWriter(), new ObjectMapper(), RecoveryPersistenceFaultPort.NOOP, e2eFaultPort, VisualCommonCommitFaultPort.NOOP);
     }
 
-    public SqliteRevisionCommitRepository(Path databasePath, E2EFaultPort e2eFaultPort, VisualCommonCommitFaultPort visualCommonCommitFaultPort) {
-        this(SqliteConnectionFactory.create(databasePath), new SemanticRevisionJsonWriter(), new ObjectMapper(), RecoverySqliteFaultPort.NOOP, e2eFaultPort, visualCommonCommitFaultPort);
+    public SqliteRevisionCommitRepository(ProjectScope databasePath, E2EFaultPort e2eFaultPort, VisualCommonCommitFaultPort visualCommonCommitFaultPort) {
+        this(ProjectConnectionFactory.create(databasePath), new SemanticRevisionJsonWriter(), new ObjectMapper(), RecoveryPersistenceFaultPort.NOOP, e2eFaultPort, visualCommonCommitFaultPort);
     }
 
-    public SqliteRevisionCommitRepository(DataSource dataSource, RecoverySqliteFaultPort faultPort) {
+    public SqliteRevisionCommitRepository(DataSource dataSource, RecoveryPersistenceFaultPort faultPort) {
         this(dataSource, new SemanticRevisionJsonWriter(), new ObjectMapper(), faultPort, E2EFaultPort.NOOP, VisualCommonCommitFaultPort.NOOP);
     }
 
-    public SqliteRevisionCommitRepository(DataSource dataSource, RecoverySqliteFaultPort recoveryFaultPort, E2EFaultPort e2eFaultPort) {
+    public SqliteRevisionCommitRepository(DataSource dataSource, RecoveryPersistenceFaultPort recoveryFaultPort, E2EFaultPort e2eFaultPort) {
         this(dataSource, new SemanticRevisionJsonWriter(), new ObjectMapper(), recoveryFaultPort, e2eFaultPort, VisualCommonCommitFaultPort.NOOP);
     }
 
-    public SqliteRevisionCommitRepository(DataSource dataSource, RecoverySqliteFaultPort recoveryFaultPort,
+    public SqliteRevisionCommitRepository(DataSource dataSource, RecoveryPersistenceFaultPort recoveryFaultPort,
                                           E2EFaultPort e2eFaultPort, VisualCommonCommitFaultPort visualCommonCommitFaultPort) {
         this(dataSource, new SemanticRevisionJsonWriter(), new ObjectMapper(), recoveryFaultPort, e2eFaultPort, visualCommonCommitFaultPort);
     }
@@ -75,7 +76,7 @@ public final class SqliteRevisionCommitRepository implements RevisionCommitRepos
             DataSource dataSource,
             SemanticRevisionJsonWriter revisionWriter,
             ObjectMapper objectMapper,
-            RecoverySqliteFaultPort recoveryFaultPort,
+            RecoveryPersistenceFaultPort recoveryFaultPort,
             E2EFaultPort e2eFaultPort,
             VisualCommonCommitFaultPort visualCommonCommitFaultPort) {
         this.dataSource = Objects.requireNonNull(dataSource, "dataSource must not be null");
@@ -135,7 +136,7 @@ public final class SqliteRevisionCommitRepository implements RevisionCommitRepos
     public CommitResult.Committed commit(RevisionCommitBundle bundle, E2EFaultContext context) {
         Objects.requireNonNull(context, "context must not be null");
         try (Connection connection = dataSource.getConnection()) {
-            connection.setAutoCommit(false);
+            connection.setAutoCommit(false); ProjectConnectionFactory.lockProject(connection);
             try {
                 Optional<Receipt> existing = receipt(connection, bundle);
                 if (existing.isPresent()) {
@@ -157,19 +158,19 @@ public final class SqliteRevisionCommitRepository implements RevisionCommitRepos
                         bundle.command().commandId(), bundle.command().projectId(), bundle.command().modelId(),
                         bundle.command().baseRevisionId(), bundle.revision().revisionId(), bundle.revision().revisionSequence()));
                 writeRevision(connection, bundle);
-                reach(RecoverySqliteStage.AFTER_REVISION_INSERT, bundle);
+                reach(RecoveryPersistenceStage.AFTER_REVISION_INSERT, bundle);
                 writeParent(connection, bundle);
-                reach(RecoverySqliteStage.AFTER_PARENT_INSERT, bundle);
+                reach(RecoveryPersistenceStage.AFTER_PARENT_INSERT, bundle);
                 writeTraces(connection, bundle);
-                reach(RecoverySqliteStage.AFTER_TRACE_INSERT, bundle);
+                reach(RecoveryPersistenceStage.AFTER_TRACE_INSERT, bundle);
                 writeFindings(connection, bundle);
-                reach(RecoverySqliteStage.AFTER_FINDING_INSERT, bundle);
-                reach(RecoverySqliteStage.BEFORE_HEAD_UPDATE, bundle);
+                reach(RecoveryPersistenceStage.AFTER_FINDING_INSERT, bundle);
+                reach(RecoveryPersistenceStage.BEFORE_HEAD_UPDATE, bundle);
                 updateHead(connection, bundle);
                 writeOperation(connection, bundle);
-                reach(RecoverySqliteStage.AFTER_OPERATION_INSERT, bundle);
+                reach(RecoveryPersistenceStage.AFTER_OPERATION_INSERT, bundle);
                 writeReceipt(connection, bundle);
-                reach(RecoverySqliteStage.AFTER_RECEIPT_INSERT, bundle);
+                reach(RecoveryPersistenceStage.AFTER_RECEIPT_INSERT, bundle);
                 connection.commit();
                 return new CommitResult.Committed(bundle.revision().revisionId(), traceIds(bundle), bundle.validation());
             } catch (CommitPersistenceException exception) {
@@ -429,7 +430,7 @@ public final class SqliteRevisionCommitRepository implements RevisionCommitRepos
         return bundle.text().traces().stream().map(OplTextTrace::traceId).toList();
     }
 
-    private void reach(RecoverySqliteStage stage, RevisionCommitBundle bundle) throws IOException {
+    private void reach(RecoveryPersistenceStage stage, RevisionCommitBundle bundle) throws IOException {
         recoveryFaultPort.reach(stage, new RecoveryFaultContext(
                 bundle.command().projectId(),
                 bundle.command().modelId(),

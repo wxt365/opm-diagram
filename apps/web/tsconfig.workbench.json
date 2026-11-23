@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.app.json",
+  "include": ["src/env.d.ts", "src/workbench/index.ts", "src/workbench/localRuntimeServices.ts"],
+  "compilerOptions": {
+    "composite": false,
+    "noEmit": false,
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "rootDir": "src",
+    "outDir": "dist-workbench/types"
+  }
+}

@@ -1,3 +1,4 @@
+import { localLayout } from './helpers/local-layout';
 import { chooseViewportAction } from "./viewport-controls";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
@@ -20,7 +21,7 @@ test("真实画布适应、选择、缩放、平移、预览恢复、应用和�
   const workbenchUrl = page.url(), modelId = new URL(workbenchUrl).pathname.split("/models/")[1]!.split("/")[0]!;
   const writes: string[] = []; page.on("request", request => { if (/\/draft\/(commands|save|pin)$/.test(new URL(request.url()).pathname)) writes.push(request.url()); });
   try {
-    await chooseViewportAction(page, "fit"); await expect(page.getByTestId("p03-zoom-output")).toHaveValue("100%");
+    await chooseViewportAction(page, "fit"); await expect(page.getByTestId("p03-zoom-output").filter({ visible: true })).toHaveValue("100%");
     await edit(page, () => page.getByTestId("p03-tool-object").click());
     const owner = node(page, "Object 1"), state = node(page, "State 1");
     await owner.click({ position: { x: 20, y: 14 } }); await edit(page, () => page.getByTestId("p03-tool-state").click());
@@ -36,17 +37,17 @@ test("真实画布适应、选择、缩放、平移、预览恢复、应用和�
     await page.getByTestId("p03-tool-select").click();
     await page.getByRole("button", { name: "收起底部面板 / Collapse bottom panel", exact: true }).click();
     // 缩小后真实拖动，把模型延伸到原视口外。
-    for (let index = 0; index < 8; index++) await page.getByTestId("p03-zoom-out").click();
-    await expect(page.getByTestId("p03-zoom-output")).toHaveValue("20%");
-    await edit(page, () => drag(page, output, 350, 180));
+    for (let index = 0; index < 8; index++) await page.getByTestId("p03-zoom-out").filter({ visible: true }).click();
+    await expect(page.getByTestId("p03-zoom-output").filter({ visible: true })).toHaveValue("20%");
+    await localLayout(page, () => drag(page, output, 350, 180));
     const beforeFitCount = writes.length, identity = await page.getByTestId("hs-draft-identity").innerText();
     await fit(page); const fitZoom = await zoom(page); expect(fitZoom).toBeLessThan(100);
     expect(writes).toHaveLength(beforeFitCount); expect(await page.getByTestId("hs-draft-identity").innerText()).toBe(identity);
     const fitted = await viewport(page); await output.click({ position: { x: 4, y: 4 } }); expect(await viewport(page)).toEqual(fitted);
     await expect(state).toBeVisible();
     await page.screenshot({ path: info.outputPath("fit-desktop.png") });
-    await page.getByTestId("p03-zoom-in").click(); await expect.poll(() => zoom(page)).toBeCloseTo(fitZoom + 10, 2);
-    await chooseViewportAction(page, "reset"); await expect(page.getByTestId("p03-zoom-output")).toHaveValue("100%");
+    await page.getByTestId("p03-zoom-in").filter({ visible: true }).click(); await expect.poll(() => zoom(page)).toBeCloseTo(fitZoom + 10, 2);
+    await chooseViewportAction(page, "reset"); await expect(page.getByTestId("p03-zoom-output").filter({ visible: true })).toHaveValue("100%");
     await fit(page); await page.getByTestId("p03-tool-pan").click();
     const frame = (await page.locator(".canvas-frame").boundingBox())!;
     await page.mouse.move(frame.x + 10, frame.y + 10); await page.mouse.down();
@@ -56,17 +57,19 @@ test("真实画布适应、选择、缩放、平移、预览恢复、应用和�
     await preview(page); await fit(page); await page.getByTestId("opd-auto-direction").selectOption("down"); await contained(page);
     await page.keyboard.press("Escape"); await expect(page.getByTestId("opd-auto-preview")).not.toBeVisible();
     await expect.poll(() => viewport(page)).toEqual(beforePreview); expect(writes).toHaveLength(count);
-    // 服务端拒绝时还原原视口，待确认队列仍由既有入口恢复。
+    // 保存被拒绝时保留已经确认的本地布局/视口，待确认队列沿既有入口恢复。
     await preview(page); await page.getByTestId("opd-auto-direction").selectOption("down"); await fit(page);
     await page.route(`**/models/${modelId}/draft/commands`, route => route.fulfill({ status: 422, contentType: "application/json",
       body: JSON.stringify({ code: "DRAFT_EDIT_REJECTED", message: "视口失败恢复验证", retryable: false, reason_code: null }) }), { times: 1 });
-    await page.getByTestId("opd-auto-apply").click(); await expect(page.getByTestId("p03-command-feedback")).toContainText("视口失败恢复验证");
-    await expect(page.getByTestId("opd-auto-preview")).not.toBeVisible(); await expect.poll(() => viewport(page)).toEqual(beforePreview);
+    await localLayout(page, () => page.getByTestId("opd-auto-apply").click());
+    const failedView = await viewport(page);
+    await page.getByTestId("hs-save").click(); await expect(page.getByTestId("p03-command-feedback")).toContainText("视口失败恢复验证");
+    await expect(page.getByTestId("opd-auto-preview")).not.toBeVisible(); await expect.poll(() => viewport(page)).toEqual(failedView);
     await page.getByTestId("hs-retry-delivery").click(); await expect(page.getByTestId("hs-save")).toBeEnabled();
     const applyCount = writes.length;
     await preview(page); await fit(page); const previewView = await viewport(page);
-    await edit(page, () => page.getByTestId("opd-auto-apply").click()); await expect(page.getByTestId("opd-auto-preview")).not.toBeVisible();
-    await expect.poll(() => viewport(page)).toEqual(previewView); expect(writes).toHaveLength(applyCount + 1);
+    await localLayout(page, () => page.getByTestId("opd-auto-apply").click()); await expect(page.getByTestId("opd-auto-preview")).not.toBeVisible();
+    await expect.poll(() => viewport(page)).toEqual(previewView); expect(writes).toHaveLength(applyCount);
     // 从桌面切到窄屏，适应模式应按外层可见宽度重新计算。
     await page.setViewportSize({ width: 390, height: 844 }); await contained(page); await fit(page);
     await page.getByTestId("p03-canvas").scrollIntoViewIfNeeded(); await page.screenshot({ path: info.outputPath("fit-mobile.png") });
@@ -134,7 +137,7 @@ async function connect(page: Page, from: Locator, to: Locator) {
 async function preview(page: Page) {
   await page.getByTestId("opd-layout-menu-toggle").click(); await page.getByTestId("opd-layout-auto").click(); await expect(page.getByTestId("opd-auto-preview")).toBeVisible();
 }
-async function zoom(page: Page) { return parseFloat(await page.getByTestId("p03-zoom-output").inputValue()); }
+async function zoom(page: Page) { return parseFloat(await page.getByTestId("p03-zoom-output").filter({ visible: true }).inputValue()); }
 async function viewport(page: Page) {
   return page.locator(".x6-graph-svg-viewport").evaluate(element => {
     const matrix = (element as SVGGElement).transform.baseVal.consolidate()!.matrix;

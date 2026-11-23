@@ -15,12 +15,12 @@ final class DraftOperationDescription {
         String type = input.at("/command/command_type").asText();
         String context = input.at("/scope/context_id").asText();
         String action = switch (type) {
-            case "APPLY_MODEL_PLAN" -> "确认智能建模方案";
+            case "APPLY_MODEL_PLAN" -> "智能建模";
             case "CREATE_ELEMENT" -> input.at("/command/payload/kind").asText().equals("OBJECT") ? "创建对象" : "创建过程";
             case "CREATE_FEATURE" -> input.at("/command/payload/feature_kind").asText().equals("ATTRIBUTE") ? "创建属性" : "创建操作";
             case "CREATE_STATE" -> "创建状态";
             case "UPDATE_STATE" -> "修改状态";
-            case "UPDATE_PROPERTY" -> "修改名称";
+            case "UPDATE_PROPERTY" -> input.at("/command/payload/property_name").asText().equals("remark") ? "修改备注" : "修改名称";
             case "UPDATE_LAYOUT" -> "移动或调整元素";
             case "UPDATE_LAYOUT_BATCH" -> input.at("/command/payload/layouts").size() == 1 ? "移动或调整元素" : "调整多个元素布局";
             case "CREATE_ARCHITECTURE_LINK" -> "添加架构关联";
@@ -49,7 +49,7 @@ final class DraftOperationDescription {
             if (names.size() == 3) break;
         }
         String title = action + (names.isEmpty() ? "" : "：" + String.join("、", names));
-        if (type.equals("UPDATE_PROPERTY")) {
+        if (type.equals("UPDATE_PROPERTY") && input.at("/command/payload/property_name").asText().equals("name")) {
             String previous = name(before, input.at("/command/payload/target_ref/target_id").asText());
             if (previous != null) title = "修改名称：" + previous + " → " + input.at("/command/payload/value").asText();
         }

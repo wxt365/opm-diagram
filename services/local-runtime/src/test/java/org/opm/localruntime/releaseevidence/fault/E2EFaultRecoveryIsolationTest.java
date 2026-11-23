@@ -17,8 +17,8 @@ import org.opm.localruntime.storage.ProjectDatabaseFactory;
 import org.opm.localruntime.storage.ProjectDatabaseOpenResult;
 import org.opm.localruntime.storage.SqliteRevisionCommitRepository;
 import org.opm.localruntime.text.OplGrammar;
-import org.sqlite.SQLiteConfig;
-import org.sqlite.SQLiteDataSource;
+
+
 
 import java.io.ByteArrayInputStream;
 import java.nio.file.Files;
@@ -121,7 +121,7 @@ class E2EFaultRecoveryIsolationTest {
     private Path initializedDatabase(String name) throws Exception {
         ProjectDatabaseOpenResult.Ready ready = assertInstanceOf(ProjectDatabaseOpenResult.Ready.class,
                 new ProjectDatabaseFactory(temporaryDirectory.resolve(name)).open("project.demo"));
-        try (Connection connection = raw(ready.database().databasePath())) {
+        try (Connection connection = raw(ready.database().snapshot())) {
             SemanticRevision revision = base();
             execute(connection, "INSERT INTO project_metadata(project_id, name, normalized_name, status, default_profile_id, default_profile_version, created_at, updated_at) VALUES ('project.demo', 'Demo', 'demo', 'ACTIVE', 'profile.iso19450.2024.draft', '0.1.0', '2026-07-28T00:00:00Z', '2026-07-28T00:00:00Z')");
             execute(connection, "INSERT INTO model_catalog(model_id, project_id, name, normalized_name, status, profile_binding_json, created_at, updated_at) VALUES ('model.demo.processing', 'project.demo', 'Processing', 'processing', 'ACTIVE', '{}', '2026-07-28T00:00:00Z', '2026-07-28T00:00:00Z')");
@@ -138,7 +138,7 @@ class E2EFaultRecoveryIsolationTest {
             }
             execute(connection, "INSERT INTO model_head(model_id, draft_head_revision_id, head_sequence, updated_at) VALUES ('model.demo.processing', 'revision.demo.0001', 1, '2026-07-28T00:00:00Z')");
         }
-        return ready.database().databasePath();
+        return ready.database().snapshot();
     }
 
     private CandidateRevisionCommand command(SemanticRevision base, String commandId) {
@@ -173,17 +173,12 @@ class E2EFaultRecoveryIsolationTest {
     }
 
     private Connection raw(Path database) throws Exception {
-        Connection connection = DriverManager.getConnection("jdbc:sqlite:" + database.toAbsolutePath() + "?foreign_keys=on");
-        try (Statement statement = connection.createStatement()) { statement.execute("PRAGMA foreign_keys = ON"); }
+        Connection connection = org.opm.localruntime.storage.SqliteTestSupport.connection(database);
+        try (Statement statement = connection.createStatement()) { statement.execute("SELECT 1"); }
         return connection;
     }
 
-    private SQLiteDataSource dataSource(Path database) {
-        SQLiteConfig config = new SQLiteConfig();
-        config.enforceForeignKeys(true);
-        SQLiteDataSource dataSource = new SQLiteDataSource(config);
-        dataSource.setUrl("jdbc:sqlite:" + database.toAbsolutePath());
-        return dataSource;
+    private javax.sql.DataSource dataSource(Path database) {return org.opm.localruntime.storage.SqliteTestSupport.create(database);
     }
 
     private void execute(Connection connection, String sql) throws Exception {

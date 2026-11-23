@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OPM 工作台独立接入示例</title>
+  <link rel="stylesheet" href="../dist-workbench/style.css">
+  <script type="importmap">{"imports":{"vue":"/node_modules/vue/dist/vue.runtime.esm-browser.prod.js"}}</script>
+  <style>
+    body { margin: 16px; font: 14px Arial, sans-serif; }
+    .button { background: rgb(237, 119, 155); padding: 8px; border: 0; }
+    .examples { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+    .canvas-container { height: 680px; border: 1px solid #ccc; }
+    output { display: block; min-height: 24px; margin: 8px 0; }
+  </style>
+</head>
+<body>
+  <h1>宿主页面：直接引用 OPM 工作台</h1>
+  <button id="replace" class="button">替换第一实例的数据</button>
+  <button id="destroy" class="button">销毁第一实例</button>
+  <output id="selection">尚未选择</output>
+  <div class="examples"><div id="first" class="canvas-container"></div><div id="second" class="canvas-container"></div></div>
+  <script type="module">
+    import { init } from '../dist-workbench/index.js';
+    function snapshot(label) {
+      return { diagrams: [
+        { id: 'root', label: 'SD', kind: 'SYSTEM_DIAGRAM', depth: 0, nodes: [
+          { id: 'object', occurrenceId: 'occ.object', label, kind: 'object', x: 60, y: 80,
+            valueDomain: '', visibility: 'public', multiplicity: '1', architectureLayer: '功能', occurrenceRole: 'owned' },
+          { id: 'process', occurrenceId: 'occ.process', label: '加工过程', kind: 'process', x: 340, y: 80,
+            valueDomain: '', visibility: 'public', multiplicity: '1', architectureLayer: '功能', occurrenceRole: 'owned' },
+        ], relations: [], textLines: [{ id: 'sentence', text: label, factIds: [], occurrenceIds: ['occ.object'] }] },
+        { id: 'child', label: '细化子图', kind: 'PROCESS_REFINEMENT', parentId: 'root', refineeId: 'process', depth: 1, nodes: [], relations: [] },
+      ] };
+    }
+    const first = init(document.getElementById('first'), { context: { project: { name: '外部项目' }, model: { name: '第一模型' } }, data: snapshot('原料 A') });
+    const second = init(document.getElementById('second'), { context: { project: { name: '宿主项目' }, model: { name: '第二模型' }, profileLabel: 'profile.test 0.2.0' }, data: snapshot('原料 B'), showHeader: true });
+    first.on('selectionChange', ids => { document.getElementById('selection').textContent = `第一实例：${ids.join(',')}`; });
+    second.on('selectionChange', ids => { document.getElementById('selection').textContent = `第二实例：${ids.join(',')}`; });
+    document.getElementById('replace').onclick = () => first.setData(snapshot('替换后的原料'));
+    document.getElementById('destroy').onclick = () => first.dispose();
+    window.workbenchExample = { first, second, init };
+  </script>
+</body>
+</html>

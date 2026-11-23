@@ -92,9 +92,24 @@ test("真实画布错误关系：全模型校验、跨图定位、失败重试�
     await row.click(); await page.getByTestId("p03-finding-locate").click();
     // 在画布中删除错误关系，再用同一对象的两种状态建立正确关系。
     const edge = page.locator('.x6-edge path[data-opm-finding-highlight="true"]').first();
-    await edge.click({ button: "right", force: true });
+    const relationOccurrence = await edge.getAttribute("data-opm-capture-cell-id");
+    expect(relationOccurrence).toBeTruthy();
+    const point = await edge.evaluate(element => {
+      const path = element as SVGPathElement, length = path.getTotalLength();
+      for (let fraction = 0.1; fraction < 0.95; fraction += 0.05) {
+        const local = path.getPointAtLength(length * fraction);
+        const screen = new DOMPoint(local.x, local.y).matrixTransform(path.getScreenCTM()!);
+        const hit = document.elementFromPoint(screen.x, screen.y);
+        if (hit?.closest(".x6-edge") === path.closest(".x6-edge")) return { x: screen.x, y: screen.y };
+      }
+      throw new Error("错误关系没有可命中的线段");
+    });
+    await page.mouse.click(point.x, point.y, { button: "right" });
+    await page.getByTestId("p03-route-menu").getByRole("button", { name: "关系操作…", exact: true }).click();
     await expect(page.getByTestId("p03-construct-actions-menu")).toBeVisible();
-    await edit(page, () => page.getByTestId("p03-construct-delete-action").filter({ hasText: "删除" }).first().click());
+    const deletion = page.getByTestId("p03-construct-delete-action").filter({ hasText: "删除关系" });
+    await expect(deletion).toBeEnabled();
+    await edit(page, () => deletion.click());
     await expect(page.getByTestId("p03-validation-status")).toContainText("需重新校验");
     await expect(page.locator('[data-opm-finding-highlighted="true"]')).toHaveCount(0);
     await state(page, "Object 1", "烘焙完成");

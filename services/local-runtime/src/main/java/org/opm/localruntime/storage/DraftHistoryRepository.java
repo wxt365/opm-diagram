@@ -29,7 +29,7 @@ public final class DraftHistoryRepository {
                 if (!rows.next()) return Optional.empty();
                 try {
                     String metadata = rows.getString("artifact_json");
-                    require(metadata != null && HybridSavePreparation.hash(metadata).equals(rows.getString("artifact_digest")), "DRAFT_RECOVERY_REQUIRED");
+                    require(metadata != null && StorageDigests.hash(metadata).equals(rows.getString("artifact_digest")), "DRAFT_RECOVERY_REQUIRED");
                     var document = SaveContentDigestV1.join(new SaveContentDigestV1.Parts(
                             (ObjectNode) DraftJsonDelta.read(rows.getString("model_json")), (ObjectNode) DraftJsonDelta.read(metadata)));
                     require(SaveContentDigestV1.version(document).equals(rows.getString("digest_version"))
@@ -69,6 +69,6 @@ public final class DraftHistoryRepository {
         return (int) (legacy + saved);
     }
     private static boolean available(Connection connection) throws SQLException {
-        try (var statement = connection.createStatement(); var rows = statement.executeQuery("SELECT 1 FROM sqlite_master WHERE type='table' AND name='draft_savepoint'")) { return rows.next(); }
+        return ProjectConnectionFactory.hasTable(connection, "draft_savepoint");
     }
 }

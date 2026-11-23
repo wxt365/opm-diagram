@@ -1,8 +1,6 @@
 import { expect, test, type Page, type Locator } from "@playwright/test";
 
 test("中文节点改名支持Enter和点击画布提交，保持OPL、刷新与无边框样式一致", async ({ page }) => {
-  // 桌面改名路径需要节点中心位于可交互画布内，避免命中底部面板。
-  await page.setViewportSize({ width: 1600, height: 1000 });
   const pageErrors: string[] = [];
   page.on("pageerror", error => pageErrors.push(error.message));
   await page.goto("/projects");
@@ -59,7 +57,7 @@ test("中文节点改名支持Enter和点击画布提交，保持OPL、刷新与
   await expect(process).toContainText("研磨");
   await expect(page.getByTestId("p03-opl-sentence").filter({ hasText: "研磨" }).first()).toBeVisible();
 
-  await page.getByTestId("p03-zoom-in").click();
+  await page.getByTestId("p03-zoom-in").filter({ visible: true }).click();
   input = await open(page, process); await expectBorderless(input);
   const field = await input.boundingBox(), shape = await process.boundingBox();
   expect(Math.abs(field!.x + field!.width / 2 - shape!.x - shape!.width / 2)).toBeLessThan(2);

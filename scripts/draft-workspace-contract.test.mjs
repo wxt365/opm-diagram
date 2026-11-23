@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import SwaggerParser from '@apidevtools/swagger-parser';
@@ -9,6 +10,42 @@ import { canonicalizeJcs } from './canvas06-rfc8785.mjs';
 import { binary64Hex } from './canvas06-projection-digest-v01.mjs';
 
 const vectors = JSON.parse(readFileSync(new URL('../tests/fixtures/hybrid-save/draft-workspace-v02-vectors.json', import.meta.url)));
+
+test('恢复状态查询必须携带 token，响应不能分页或夹带更多历史', () => {
+  const draft_token = vectors.commands[0].expected_draft_token;
+  validateDraftWorkspace('RecoveryStateRequest', { request_id: 'request.recovery', draft_token });
+  assert.throws(() => validateDraftWorkspace('RecoveryStateRequest', { request_id: 'request.recovery' }));
+  const response = { meta: { request_id: 'request.recovery', project_id: 'project.test', model_id: 'model.test', draft_token }, data: { items: [], next_before: null } };
+  validateDraftWorkspace('RecoveryStateResult', response);
+  assert.throws(() => validateDraftWorkspace('RecoveryStateResult', { ...response, data: { items: [], next_before: 'cursor' } }));
+});
+
+test('恢复命令只能指定历史记录和撤销或重做方向，不能提交任意文档', () => {
+  const request = structuredClone(vectors.commands[0]);
+  request.scope = { context_id: 'context.root', selection_id: null, intent: 'RESTORE_OPERATION', endpoints: [] };
+  request.command = { command_type: 'RESTORE_OPERATION', payload: { record_id: 'history.EDIT.latest', action: 'UNDO' } };
+  validateDraftWorkspace('DraftEditRequest', request);
+  request.command.payload.action = 'REDO'; validateDraftWorkspace('DraftEditRequest', request);
+  for (const payload of [{ record_id: 'history.EDIT.latest', action: 'RESTORE' }, { action: 'UNDO' },
+    { record_id: 'history.EDIT.latest', action: 'UNDO', document: {} }]) {
+    assert.throws(() => validateDraftWorkspace('DraftEditRequest', { ...request, command: { ...request.command, payload } }));
+  }
+});
+
+test('最终预览的可选 OPL 复用封闭文本契约，旧响应和空文本仍可解码', () => {
+  const result = { meta: { request_id: 'request.plan', context_id: 'context.root', draft_token: vectors.commands[0].expected_draft_token },
+    data: { context_id: 'context.root', constructs: [], suppressed_states: [] }, capabilities: null, findings: null };
+  validateDraftWorkspace('DraftModelPlanPreviewResult', result);
+  validateDraftWorkspace('DraftModelPlanPreviewResult', { ...result, text: null });
+  const text = { artifact_id: 'artifact.preview', modality: 'OPL', sentences: [{ sentence_id: 'sentence.1', text: '平台文本', ordinal: 0 }],
+    traces: [{ sentence_id: 'sentence.1', fact_ids: ['fact.1'], occurrence_ids: ['occurrence.1'] }] };
+  validateDraftWorkspace('DraftModelPlanPreviewResult', { ...result, text });
+  for (const mutate of [value => value.traces[0].target_ids = ['forged'], value => delete value.traces,
+    value => value.sentences[0].text = 123, value => value.modality = 'CHAT']) {
+    const invalid = structuredClone(text); mutate(invalid);
+    assert.throws(() => validateDraftWorkspace('DraftModelPlanPreviewResult', { ...result, text: invalid }));
+  }
+});
 
 test('脑图资料与来源守卫契约拒绝未知版本、超量和夹带字段', () => {
   const document = { format_version: 1, id: 'mindmap.test', revision: 0, root_id: 'root', nodes: [{ id: 'root', parent_id: null, order: 0, label: '模型分析', note: '', kind: 'TOPIC', owner_id: null, entity_ref: null, target_id: null, collapsed: false }], relations: [] };
@@ -133,10 +170,11 @@ test('可选字段存在性、嵌套缺字段与非法 Unicode 不被规范化�
   assert.notEqual(draftEditRequestDigest(vectors.project_id, vectors.model_id, raw), draftEditRequestDigest(vectors.project_id, vectors.model_id, withWidth));
 });
 
-test('生成文件一致，十三条独立路径均引用封闭 Schema 并复用本地 session', async () => {
-  execFileSync(process.execPath, [new URL('./generate-draft-workspace-contract.mjs', import.meta.url).pathname, '--check']);
-  const api = await SwaggerParser.validate(new URL('../docs/contracts/openapi/opm-draft-workspace-v02.json', import.meta.url).pathname);
-  assert.equal(Object.keys(api.paths).length, 13);
+test('生成文件一致，独立查询路径均引用封闭 Schema 并复用本地 session', async () => {
+  execFileSync(process.execPath, [fileURLToPath(new URL('./generate-draft-workspace-contract.mjs', import.meta.url)), '--check']);
+  const api = await SwaggerParser.validate(fileURLToPath(new URL('../docs/contracts/openapi/opm-draft-workspace-v02.json', import.meta.url)));
+  assert.equal(Object.keys(api.paths).length, 16);
+  assert.ok(api.paths['/projects/{project_id}/models/{model_id}/draft/recovery-state']);
   assert.equal(api.components.securitySchemes.localSession.name, 'X-OPM-Session');
   assert.match(api.info.title, /草稿编辑、查询与模型操作历史/);
   for (const item of Object.values(api.paths)) {

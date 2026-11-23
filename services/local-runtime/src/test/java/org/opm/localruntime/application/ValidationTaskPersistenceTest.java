@@ -62,12 +62,12 @@ class ValidationTaskPersistenceTest {
         var repository = new DraftSaveRepository(database, Clock.systemUTC());
         String revision = repository.manual(PROJECT, MODEL, new SaveRequest("save.validation", repository.read(PROJECT, MODEL).token(), "MANUAL"), ignored -> { }).revision_id();
         try (var connection = connection(database); var statement = connection.createStatement()) {
-            statement.execute("CREATE TRIGGER test_validation_failure BEFORE INSERT ON operation_record WHEN NEW.operation_id='API-VAL-001' BEGIN SELECT RAISE(ABORT,'test failure'); END");
+            statement.execute((org.opm.localruntime.storage.SqliteTestSupport.sqlite(connection) ? "CREATE TRIGGER test_validation_failure BEFORE INSERT ON operation_record WHEN NEW.operation_id='API-VAL-001' BEGIN SELECT RAISE(ABORT, 'test failure'); END" : "CREATE OR REPLACE FUNCTION fn_test_validation_failure() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.operation_id='API-VAL-001' THEN RAISE EXCEPTION 'test failure'; END IF; RETURN NEW; END $$; CREATE TRIGGER test_validation_failure BEFORE INSERT ON operation_record FOR EACH ROW EXECUTE FUNCTION fn_test_validation_failure()"));
         }
         assertThrows(ApiException.class, () -> service().validate(PROJECT, MODEL, request(revision)));
         assertEquals(0, scalar(database, "SELECT COUNT(*) FROM background_task"));
         assertEquals(0, scalar(database, "SELECT COUNT(*) FROM idempotency_record WHERE operation_id='API-VAL-001'"));
-        try (var connection = connection(database); var statement = connection.createStatement()) { statement.execute("DROP TRIGGER test_validation_failure"); }
+        try (var connection = connection(database); var statement = connection.createStatement()) { statement.execute(org.opm.localruntime.storage.SqliteTestSupport.dropTriggerSql(connection, "test_validation_failure", "operation_record")); }
         assertEquals("COMPLETED", data(service().validate(PROJECT, MODEL, request(revision))).get("state"));
     }
 
@@ -105,11 +105,7 @@ class ValidationTaskPersistenceTest {
 
     private Path database(java.util.function.Consumer<com.fasterxml.jackson.databind.node.ObjectNode> arrange) throws Exception {
         Path database = create(storage, true, arrange);
-        org.flywaydb.core.Flyway.configure().dataSource("jdbc:sqlite:" + database, "", "").locations(
-                "filesystem:" + root().resolve("docs/contracts/migrations/sqlite"),
-                "filesystem:" + root().resolve("docs/contracts/migrations/sqlite-checkpoint"),
-                "filesystem:" + root().resolve("docs/contracts/migrations/sqlite-pin"), "classpath:db/digestv2")
-                .target("6").mixed(true).load().migrate();
+        org.opm.localruntime.storage.SqliteTestSupport.migrate(database);
         return database;
     }
     private LocalApiService service() { return new LocalApiService(new ProjectDatabaseFactory(storage), new FileProfilePackageLoader(root().resolve("packages/profiles"))); }
@@ -118,7 +114,7 @@ class ValidationTaskPersistenceTest {
                 "binding", Map.of("profile_id", "profile.iso19450.2024.draft", "profile_version", "0.2.0", "rule_set_id", "rules.iso19450.2024.draft", "rule_version", "0.1.0")));
     }
     @SuppressWarnings("unchecked") private Map<String, Object> data(Map<String, Object> response) { return (Map<String, Object>) response.get("data"); }
-    private Connection connection(Path database) throws Exception { return java.sql.DriverManager.getConnection("jdbc:sqlite:" + database + "?foreign_keys=on"); }
+    private Connection connection(Path database) throws Exception { return org.opm.localruntime.storage.SqliteTestSupport.connection(database); }
     private long scalar(Path database, String sql) throws Exception {
         try (var connection = connection(database); var statement = connection.createStatement(); var rows = statement.executeQuery(sql)) { rows.next(); return rows.getLong(1); }
     }

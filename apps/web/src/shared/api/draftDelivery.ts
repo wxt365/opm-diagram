@@ -5,6 +5,7 @@ import { IndexedDbDraftPendingStore } from "./draftPendingStore";
 import type { DraftLane, DraftPendingEntry, DraftPendingStore } from "./draftPendingStore";
 import { draftRawJson, draftRequestCanonical, draftSha256, mutationId, mutationToken, sameDraftToken, validDraftId, validDraftToken } from "./draftRequestIdentity";
 import type { DraftMutation } from "./draftRequestIdentity";
+import { randomUuid } from "@/shared/platform/browserCrypto";
 
 type DeliveryApi = Pick<typeof localRuntimeApi, "draftQuery" | "draftMutation">;
 export type DraftDeliveryResult = DraftEditResult | SaveResult | PinResult;
@@ -126,6 +127,6 @@ function validSummary(value: DraftEditResult["validation_summary"]): boolean {
 function covers(head: DraftToken, base: DraftToken): boolean {
   return head.draft_id === base.draft_id && head.binding_digest === base.binding_digest && head.edit_seq >= base.edit_seq;
 }
-function requestId(): string { return `request.delivery.${crypto.randomUUID().replaceAll("-", "")}`; }
+function requestId(): string { return `request.delivery.${randomUuid().replaceAll("-", "")}`; }
 function invalidInput(): never { throw new LocalRuntimeApiError("INPUT_INVALID", "草稿请求身份或结构无效。"); }
 function invalidResponse(): never { throw new LocalRuntimeApiError("DRAFT_RESPONSE_INVALID", "草稿响应身份或内容不一致，待确认输入已保留。"); }

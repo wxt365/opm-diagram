@@ -15,16 +15,12 @@ class DraftBrowserFixtureTest {
         String configured = System.getProperty("opm.browser.fixture.root");
         Path storage = configured == null ? temporary.resolve("browser") : Path.of(configured).toAbsolutePath().normalize();
         if (configured != null) {
-            assertTrue(storage.startsWith(Path.of("/private/tmp")), "只允许独立临时目录");
+            assertTrue(storage.startsWith(Path.of(System.getProperty("java.io.tmpdir")).toAbsolutePath().normalize()) || storage.startsWith(Path.of("/private/tmp")), "只允许独立临时目录");
             assertTrue(storage.getFileName().toString().startsWith("opm-hs03b-"));
             assertFalse(Files.exists(storage), "禁止覆盖既有测试或用户数据");
         }
         Path db = create(storage, true, document -> addOwnedContext(document, "context.browser.second", "MODEL_VIEW"));
-        Flyway.configure().dataSource(SqliteConnectionFactory.create(db)).locations(
-                "filesystem:" + root().resolve("docs/contracts/migrations/sqlite"),
-                "filesystem:" + root().resolve("docs/contracts/migrations/sqlite-checkpoint"),
-                "filesystem:" + root().resolve("docs/contracts/migrations/sqlite-pin"))
-                .target("5").mixed(true).load().migrate();
+        org.opm.localruntime.storage.SqliteTestSupport.migrate(db);
         assertEquals(1, count(db, "revision_document"));
         assertEquals(0, count(db, "draft_savepoint"));
         assertEquals(0, count(db, "draft_journal"));

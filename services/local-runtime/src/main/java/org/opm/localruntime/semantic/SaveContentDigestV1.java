@@ -21,7 +21,7 @@ public final class SaveContentDigestV1 {
             .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION).build();
     private static final Set<String> CONTENT_KEYS = Set.copyOf(SaveContentSchemaV1.keys(SaveContentSchemaV1.definition("Content").required("properties")));
     private static final Set<String> CONTENT_KEYS_V2 = Set.copyOf(SaveContentSchemaV1.keys(SaveContentSchemaV1.definitionV2("Content").required("properties")));
-    private static final Pattern GEOMETRY = Pattern.compile("^/layouts/[0-9]+/(?:x|y|width|height|route_points/[0-9]+/(?:x|y))$");
+    private static final Pattern GEOMETRY = Pattern.compile("^/layouts/[0-9]+/(?:x|y|width|height|(?:route_points/[0-9]+|edge_routes/[0-9]+/points/[0-9]+)/(?:x|y))$");
     private static final double MAX_INTEGER = 9_007_199_254_740_991d;
 
     private SaveContentDigestV1() { }
@@ -97,15 +97,18 @@ public final class SaveContentDigestV1 {
             ObjectNode layout = (ObjectNode) item;
             for (String key : new String[]{"x", "y", "width", "height"}) encode(layout, key);
             for (JsonNode point : layout.path("route_points")) for (String key : new String[]{"x", "y"}) encode((ObjectNode) point, key);
+            for (JsonNode route : layout.path("edge_routes")) for (JsonNode point : route.path("points"))
+                for (String key : new String[]{"x", "y"}) encode((ObjectNode) point, key);
         }
         normalizeIntegers(content);
         ObjectNode result = JSON.createObjectNode();
         result.put("schema_id", "OPM-SAVE-CONTENT-DIGEST");
         boolean v2 = v2(document);
-        result.put("schema_version", v2 ? "2" : "1");
+        result.put("schema_version", appearance(document) ? "5" : remarks(document) ? "4" : routed(document) ? "3" : v2 ? "2" : "1");
         result.put("float_encoding", "IEEE754_BINARY64_BE_HEX");
         result.set("content", content);
-        if ("0.5".equals(document.path("schema_version").asText())) SaveContentSchemaV1.validateTrace(result, "Preimage");
+        if (appearance(document) || remarks(document) || routed(document)) SaveContentSchemaV1.validateRoutes(result, "Preimage", document.path("schema_version").asText());
+        else if ("0.5".equals(document.path("schema_version").asText())) SaveContentSchemaV1.validateTrace(result, "Preimage");
         else if ("0.4".equals(document.path("schema_version").asText())) SaveContentSchemaV1.validateMethod(result, "Preimage");
         else if (v2) SaveContentSchemaV1.validateV2(result, "Preimage");
         else SaveContentSchemaV1.validate(result, "Preimage");
@@ -139,7 +142,8 @@ public final class SaveContentDigestV1 {
     private static void validate(JsonNode value) {
         if (value == null) throw new Invalid("SAVE_CONTENT_INPUT_INVALID", "");
         scan(value, "", Collections.newSetFromMap(new IdentityHashMap<>()));
-        if ("0.5".equals(value.path("schema_version").asText())) SaveContentSchemaV1.validateTrace(value, "Document");
+        if (appearance(value) || remarks(value) || routed(value)) SaveContentSchemaV1.validateRoutes(value, "Document", value.path("schema_version").asText());
+        else if ("0.5".equals(value.path("schema_version").asText())) SaveContentSchemaV1.validateTrace(value, "Document");
         else if ("0.4".equals(value.path("schema_version").asText())) SaveContentSchemaV1.validateMethod(value, "Document");
         else if ("0.3".equals(value.path("schema_version").asText())) SaveContentSchemaV1.validateV2(value, "Document");
         else SaveContentSchemaV1.validate(value, "Document");
@@ -148,10 +152,17 @@ public final class SaveContentDigestV1 {
 
     public static String version(JsonNode document) {
         validate(document);
-        return v2(document) ? "SaveContentDigest/2" : "SaveContentDigest/1";
+        return appearance(document) ? "SaveContentDigest/5" : remarks(document) ? "SaveContentDigest/4" : routed(document) ? "SaveContentDigest/3" : v2(document) ? "SaveContentDigest/2" : "SaveContentDigest/1";
     }
 
-    private static boolean v2(JsonNode document) { return Set.of("0.3", "0.4", "0.5").contains(document.path("schema_version").asText()); }
+    private static boolean routed(JsonNode document) {
+        for (var layout : document.path("layouts")) if (layout.has("edge_routes")) return true;
+        return false;
+    }
+
+    private static boolean remarks(JsonNode document) { return "0.6".equals(document.path("schema_version").asText()); }
+    private static boolean appearance(JsonNode document) { return "0.7".equals(document.path("schema_version").asText()); }
+    private static boolean v2(JsonNode document) { return Set.of("0.3", "0.4", "0.5", "0.6", "0.7").contains(document.path("schema_version").asText()); }
 
     private static Set<String> contentKeys(JsonNode document) {
         return v2(document) ? CONTENT_KEYS_V2 : CONTENT_KEYS;

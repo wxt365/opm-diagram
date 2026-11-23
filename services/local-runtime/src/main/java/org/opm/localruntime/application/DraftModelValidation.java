@@ -56,7 +56,7 @@ final class DraftModelValidation {
         if (!List.of("CAP-ISO-PROC-008", "CAP-ISO-PROC-009", "CAP-ISO-PROC-010").contains(capability)) return true;
         var endpoints = fact.endpoints().stream().sorted(Comparator.comparingInt(SemanticRevision.Endpoint::ordinal)).toList();
         if (endpoints.size() != 3) return true; // 端点数量交给现有生成规则报告。
-        return owner(revision, endpoints.getFirst()).equals(owner(revision, endpoints.getLast()));
+        return owner(revision, endpoints.get(0)).equals(owner(revision, endpoints.get(endpoints.size() - 1)));
     }
 
     private static String owner(SemanticRevision revision, SemanticRevision.Endpoint endpoint) {

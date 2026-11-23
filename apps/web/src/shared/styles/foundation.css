@@ -9,6 +9,44 @@
   box-sizing: border-box;
 }
 
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track,
+*::-webkit-scrollbar-corner {
+  background: #f1f1f1;
+}
+
+*::-webkit-scrollbar-thumb {
+  min-height: 24px;
+  border: 1px solid #f1f1f1;
+  border-radius: 4px;
+  background: #bcbcbc;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: #999999;
+}
+
+*::-webkit-scrollbar-thumb:active {
+  background: #858585;
+}
+
+*::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+@supports not selector(::-webkit-scrollbar) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #bcbcbc #f1f1f1;
+  }
+}
+
 html,
 body,
 #app {

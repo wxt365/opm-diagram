@@ -3,18 +3,13 @@ import type { Graph } from "@antv/x6";
 type Box = { x: number; y: number; width: number; height: number };
 export type CanvasViewport = { zoom: number; tx: number; ty: number; fitted: boolean; paddingTop: number; scrollLeft: number; scrollTop: number };
 
-export function fittedViewport(content: Box, viewport: Box, topPadding = 32) {
-  if (!content.width || !content.height || viewport.width <= 64 || viewport.height <= topPadding + 32) return null;
-  const ratio = Math.min(1, (viewport.width - 64) / content.width, (viewport.height - topPadding - 32) / content.height);
-  // 向下取整，避免显示百分比回传后把内容放大到边界外。
-  const zoom = Math.max(0.01, Math.floor(ratio * 10000 + 1e-9) / 100), scale = zoom / 100;
-  return { zoom, tx: viewport.x + viewport.width / 2 - (content.x + content.width / 2) * scale,
-    ty: viewport.y + topPadding + (viewport.height - topPadding - 32) / 2 - (content.y + content.height / 2) * scale };
-}
+export { fittedViewport } from "@/shared/canvas/viewport";
+import { fittedViewport } from "@/shared/canvas/viewport";
 
 export function createCanvasViewport(getGraph: () => Graph | undefined, getElement: () => HTMLElement | undefined,
   onZoom: (zoom: number) => void, topPadding: () => number) {
   let fitted = false, changing = false, frameId = 0, paddingTop = 32;
+  let presentationObserver: MutationObserver | undefined;
   const frame = () => getElement()?.parentElement?.parentElement;
   function visibleArea(): Box {
     const element = getElement()?.getBoundingClientRect(), outer = frame()?.getBoundingClientRect();
@@ -35,7 +30,9 @@ export function createCanvasViewport(getGraph: () => Graph | undefined, getEleme
     const content = graph.getContentArea({ useCellGeometry: false });
     if (!content.width || !content.height) { change(100, 0, 0); return; }
     const result = fittedViewport(content, visibleArea(), paddingTop);
-    if (result) change(result.zoom, result.tx, result.ty);
+    if (result && (Math.abs(graph.scale().sx * 100 - result.zoom) > 1e-7
+      || Math.abs(graph.translate().tx - result.tx) > 1e-7 || Math.abs(graph.translate().ty - result.ty) > 1e-7))
+      change(result.zoom, result.tx, result.ty);
   }
   function scheduleFit() {
     if (!fitted || frameId) return;
@@ -49,6 +46,16 @@ export function createCanvasViewport(getGraph: () => Graph | undefined, getEleme
     graph.zoomTo(zoom / 100, { center: { x: area.x + area.width / 2, y: area.y + area.height / 2 } });
   }
   function resetZoom() { fitted = false; setZoom(100); onZoom(100); }
+  function getElementPosition() {
+    const graph = getGraph(), area = visibleArea();
+    if (!graph || !area.width || !area.height) return;
+    const { sx, sy } = graph.scale(), { tx, ty } = graph.translate();
+    if (sx <= 0 || sy <= 0) return;
+    fitted = false;
+    cancelAnimationFrame(frameId); frameId = 0;
+    return { x: (area.x + area.width / 2 - tx) / sx - 80,
+      y: (area.y + area.height / 2 - ty) / sy - 36 };
+  }
   function captureViewport(): CanvasViewport | undefined {
     const graph = getGraph(), outer = frame(); if (!graph) return;
     return { zoom: graph.scale().sx * 100, ...graph.translate(), fitted, paddingTop,
@@ -62,6 +69,17 @@ export function createCanvasViewport(getGraph: () => Graph | undefined, getEleme
     change(viewport.zoom, viewport.tx, viewport.ty);
   }
   function viewportChanged() { if (!changing) fitted = false; }
-  function dispose() { cancelAnimationFrame(frameId); }
-  return { fitToView, setZoom, resetZoom, captureViewport, restoreViewport, viewportChanged, scheduleFit, dispose };
+  function observePresentation() {
+    presentationObserver?.disconnect();
+    const stage = getElement()?.querySelector('.x6-graph-svg-stage');
+    if (!stage || typeof MutationObserver === 'undefined') return;
+    // X6 incremental resize/translation does not emit render:done. Fit after the
+    // SVG updates too; ignore the viewport's own stage transform to avoid a loop.
+    presentationObserver = new MutationObserver(records => {
+      if (records.some(record => record.target !== stage || record.type !== 'attributes' || record.attributeName !== 'transform')) scheduleFit();
+    });
+    presentationObserver.observe(stage, { childList: true, subtree: true, attributes: true, characterData: true });
+  }
+  function dispose() { cancelAnimationFrame(frameId); presentationObserver?.disconnect(); }
+  return { fitToView, setZoom, resetZoom, getElementPosition, captureViewport, restoreViewport, viewportChanged, scheduleFit, observePresentation, dispose };
 }

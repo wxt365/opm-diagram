@@ -7,6 +7,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.Map;
 import java.util.Set;
@@ -17,15 +18,23 @@ class LocalRuntimeBootstrapController {
     private static final Set<String> ALLOWED_HOSTS = Set.of("127.0.0.1", "localhost");
     private final LocalSessionToken sessionToken;
     private final LocalApiService localApiService;
+    private final EmbeddedAccessPolicy access;
 
     LocalRuntimeBootstrapController(LocalSessionToken sessionToken, LocalApiService localApiService) {
+        this(sessionToken, localApiService, null);
+    }
+
+    @Autowired
+    LocalRuntimeBootstrapController(LocalSessionToken sessionToken, LocalApiService localApiService, EmbeddedAccessPolicy access) {
         this.sessionToken = sessionToken;
         this.localApiService = localApiService;
+        this.access = access;
     }
 
     @GetMapping(value = "/opm-bootstrap.js", produces = "application/javascript")
     ResponseEntity<String> bootstrap(HttpServletRequest request) {
-        if (!ALLOWED_HOSTS.contains(request.getServerName())) {
+        if (!ALLOWED_HOSTS.contains(request.getServerName())
+                || access != null && access.remoteEnabled() && !EmbeddedAccessPolicy.isLoopback(request.getRemoteAddr())) {
             return ResponseEntity.status(403).build();
         }
         return ResponseEntity.ok()

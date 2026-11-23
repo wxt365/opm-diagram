@@ -32,12 +32,61 @@ class OplTextGenerationServiceTest {
 
     private final OplTextGenerationService service = new OplTextGenerationService();
 
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {
+            "g-opl-struct-005-aggregation-object-fan-1-complete-pass.json",
+            "g-opl-struct-007-generalization-object-fan-1-complete-pass.json",
+            "g-opl-struct-008-classification-object-fan-1-pass.json"
+    })
+    void fundamentalStructuralRelationsRetainAttributeEndpoints(String fixtureName) {
+        var revision = new SemanticRevisionReader().read(findFromRepository(
+                "packages/profiles/profile.iso19450.2024.draft/0.2.0/golden/fixtures/" + fixtureName));
+        var fact = revision.facts().get(0);
+        var owner = revision.elements().get(0);
+        var elements = new java.util.LinkedHashMap<String, SemanticRevision.Element>();
+        revision.elements().forEach(item -> elements.put(item.id(), item));
+        for (int ordinal = 0; ordinal < fact.endpoints().size(); ordinal++) {
+            var endpoint = fact.endpoints().get(ordinal);
+            var feature = new SemanticRevision.Feature(endpoint.targetId(), owner.id(), SemanticRevision.FeatureKind.ATTRIBUTE,
+                    owner.capability(), new SemanticRevision.QualifiedName(owner.name().namespace(), "Attribute"), owner.source(), owner.normalization());
+            var endpoints = new ArrayList<>(fact.endpoints());
+            endpoints.set(ordinal, new SemanticRevision.Endpoint(endpoint.id(), endpoint.role(), SemanticRevision.TargetKind.FEATURE,
+                    feature.id(), endpoint.ordinal(), endpoint.stateQualificationId()));
+            var withFeature = new SemanticRevision.Fact(fact.id(), fact.family(), fact.capability(), endpoints, fact.direction(),
+                    fact.modifiers(), fact.labels(), fact.collectionCompleteness(), fact.source(), fact.normalization());
+            var sentences = OplStructuralSentenceGenerator.structuralSentences(withFeature, elements,
+                    java.util.Map.of(feature.id(), feature), java.util.Map.of(), revision.profileBinding().profile());
+            assertTrue(sentences.get(0).text().contains("Attribute"));
+            var operation = new SemanticRevision.Feature(feature.id(), owner.id(), SemanticRevision.FeatureKind.OPERATION,
+                    owner.capability(), feature.name(), owner.source(), owner.normalization());
+            assertEquals(OplGenerationCode.ENDPOINT_KIND_MISMATCH, assertThrows(OplGenerationException.class,
+                    () -> OplStructuralSentenceGenerator.structuralSentences(withFeature, elements,
+                            java.util.Map.of(operation.id(), operation), java.util.Map.of(), revision.profileBinding().profile())).code());
+        }
+    }
+
+    @Test void taggedStructuralLinksRetainAttributeEndpointsAndRejectCrossKindOperations() {
+        var revision=new SemanticRevisionReader().read(findFromRepository("packages/profiles/profile.iso19450.2024.draft/0.2.0/golden/fixtures/g-opl-struct-001-unidirectional-object-tagged-pass.json"));
+        var fact=revision.facts().get(0);var endpoint=fact.endpoints().get(1);
+        var owner=revision.elements().get(0);
+        var elements=new java.util.LinkedHashMap<String,SemanticRevision.Element>();revision.elements().forEach(item->elements.put(item.id(),item));
+        var feature=new SemanticRevision.Feature(endpoint.targetId(),owner.id(),SemanticRevision.FeatureKind.ATTRIBUTE,
+                owner.capability(),new SemanticRevision.QualifiedName(owner.name().namespace(),"Attribute"),owner.source(),owner.normalization());
+        var endpoints=new ArrayList<>(fact.endpoints());
+        endpoints.set(1,new SemanticRevision.Endpoint(endpoint.id(),endpoint.role(),SemanticRevision.TargetKind.FEATURE,feature.id(),endpoint.ordinal(),endpoint.stateQualificationId()));
+        var withFeature=new SemanticRevision.Fact(fact.id(),fact.family(),fact.capability(),endpoints,fact.direction(),fact.modifiers(),fact.labels(),fact.collectionCompleteness(),fact.source(),fact.normalization());
+        var sentences=OplStructuralSentenceGenerator.structuralSentences(withFeature,elements,java.util.Map.of(feature.id(),feature),java.util.Map.of(),revision.profileBinding().profile());
+        assertTrue(sentences.get(0).text().contains("Attribute"));
+        var operation=new SemanticRevision.Feature(feature.id(),owner.id(),SemanticRevision.FeatureKind.OPERATION,owner.capability(),feature.name(),owner.source(),owner.normalization());
+        assertEquals(OplGenerationCode.ENDPOINT_KIND_MISMATCH,assertThrows(OplGenerationException.class,()->OplStructuralSentenceGenerator.structuralSentences(withFeature,elements,java.util.Map.of(operation.id(),operation),java.util.Map.of(),revision.profileBinding().profile())).code());
+    }
+
     @Test
     void generatesGoldenConsumptionWithStateAndCompleteTrace() {
         OplGenerationResult result = service.generate(fixture(), "context.sd.root", grammarWithConsumptionTemplates(fixture()));
 
-        OplSentence sentence = result.artifact().paragraphs().getFirst().sentences().getFirst();
-        OplTextTrace trace = result.traces().getFirst();
+        OplSentence sentence = result.artifact().paragraphs().get(0).sentences().get(0);
+        OplTextTrace trace = result.traces().get(0);
         assertEquals("Processing consumes available Raw Material.", sentence.text());
         assertEquals(List.of("opl.consumption.state.v1"), sentence.generationRuleIds());
         assertEquals(List.of("fact.processing.consumes.raw"), trace.factIds());
@@ -67,7 +116,7 @@ class OplTextGenerationServiceTest {
                 revision.profileBinding().textGrammar());
 
         OplGenerationResult result = service.generate(revision, revision.rootContextId(), grammar);
-        OplTextTrace forward = result.traces().getFirst();
+        OplTextTrace forward = result.traces().get(0);
         OplTextTrace reverse = result.traces().get(1);
 
         assertTrue(forward.sourceRefs().stream().anyMatch(ref -> ref.sourceKind() == OplToken.SourceKind.ENDPOINT
@@ -83,7 +132,7 @@ class OplTextGenerationServiceTest {
     @Test
     void emitsContiguousUtf8TokensAndClosedTraceSources() {
         OplGenerationResult result = service.generate(fixture(), "context.sd.root", grammarWithConsumptionTemplates(fixture()));
-        OplSentence sentence = result.artifact().paragraphs().getFirst().sentences().getFirst();
+        OplSentence sentence = result.artifact().paragraphs().get(0).sentences().get(0);
         int expectedStart = 0;
         for (int ordinal = 0; ordinal < sentence.tokens().size(); ordinal++) {
             OplToken token = sentence.tokens().get(ordinal);
@@ -99,7 +148,7 @@ class OplTextGenerationServiceTest {
         assertTrue(sentence.tokens().stream().anyMatch(token -> token.kind() == OplToken.Kind.ENTITY));
         assertTrue(sentence.tokens().stream().anyMatch(token -> token.kind() == OplToken.Kind.STATE));
 
-        Set<OplToken.SourceKind> traceKinds = result.traces().getFirst().sourceRefs().stream()
+        Set<OplToken.SourceKind> traceKinds = result.traces().get(0).sourceRefs().stream()
                 .map(OplToken.SourceRef::sourceKind).collect(java.util.stream.Collectors.toSet());
         assertTrue(traceKinds.containsAll(Set.of(OplToken.SourceKind.FACT, OplToken.SourceKind.TEMPLATE,
                 OplToken.SourceKind.GRAMMAR, OplToken.SourceKind.RULE, OplToken.SourceKind.CAPABILITY)));
@@ -115,7 +164,7 @@ class OplTextGenerationServiceTest {
                 List.of("opl.consumption.v1"), List.of("fact.processing.consumes.raw"));
 
         assertEquals(7, sentence.text().getBytes(java.nio.charset.StandardCharsets.UTF_8).length);
-        assertEquals(6, sentence.tokens().getFirst().endUtf8Byte());
+        assertEquals(6, sentence.tokens().get(0).endUtf8Byte());
     }
 
     @Test
@@ -129,8 +178,8 @@ class OplTextGenerationServiceTest {
     @MethodSource("legacyTokenKinds")
     void rejectsLegacyTokenKindsForAnActiveTrace(OplToken.Kind legacyKind) {
         ActiveTraceFixture fixture = activeTraceFixture();
-        OplSentence source = fixture.artifact().paragraphs().getFirst().sentences().getFirst();
-        OplToken original = source.tokens().getFirst();
+        OplSentence source = fixture.artifact().paragraphs().get(0).sentences().get(0);
+        OplToken original = source.tokens().get(0);
         OplToken legacy = new OplToken(original.tokenId(), original.sentenceId(), original.ordinal(), original.text(), legacyKind,
                 original.startUtf8Byte(), original.endUtf8Byte(), original.sourceRefs());
         OplSentence mutated = new OplSentence(source.sentenceId(), source.text(), source.ordinal(), List.of(legacy, source.tokens().get(1)),
@@ -158,7 +207,7 @@ class OplTextGenerationServiceTest {
     @Test
     void rejectsActiveTokenWithDuplicateSourceReference() {
         ActiveTraceFixture fixture = activeTraceFixture();
-        OplTextArtifact artifact = artifactWithFirstTokenSources(fixture, refs -> appendSourceRef(refs, refs.getFirst()));
+        OplTextArtifact artifact = artifactWithFirstTokenSources(fixture, refs -> appendSourceRef(refs, refs.get(0)));
 
         OplGenerationException exception = assertThrows(OplGenerationException.class,
                 () -> service.validateTrace(artifact, List.of(fixture.trace()), fixture.bindingDigest(), true));
@@ -225,8 +274,8 @@ class OplTextGenerationServiceTest {
     void rejectsAnActiveTraceWithDuplicateTokenRanges() {
         ActiveTraceFixture fixture = activeTraceFixture();
         List<OplTextTrace.TokenRange> ranges = List.of(
-                fixture.trace().tokenRanges().getFirst(),
-                fixture.trace().tokenRanges().getFirst());
+                fixture.trace().tokenRanges().get(0),
+                fixture.trace().tokenRanges().get(0));
         OplTextTrace trace = copyTrace(fixture.trace(), ranges, fixture.trace().sourceRefs());
 
         OplGenerationException exception = assertThrows(OplGenerationException.class,
@@ -284,9 +333,9 @@ class OplTextGenerationServiceTest {
     @Test
     void rejectsActiveControlTraceWhoseRuleOrderIsReversed() {
         ActiveGenerationFixture fixture = activeGenerationFixture("g-opl-ctrl-001-consumption-pass.json");
-        OplTextTrace source = fixture.generated().traces().getFirst();
+        OplTextTrace source = fixture.generated().traces().get(0);
         OplTextTrace trace = new OplTextTrace(source.traceId(), source.contextId(), source.factIds(), source.inputElementIds(),
-                source.occurrenceIds(), source.sentenceIds(), List.of(source.ruleIds().get(1), source.ruleIds().getFirst()),
+                source.occurrenceIds(), source.sentenceIds(), List.of(source.ruleIds().get(1), source.ruleIds().get(0)),
                 source.bindingDigest(), source.tokenRanges(), source.sourceRefs());
 
         OplGenerationException exception = assertThrows(OplGenerationException.class,
@@ -298,7 +347,7 @@ class OplTextGenerationServiceTest {
     @Test
     void rejectsActiveTraceWhoseBindingDigestDoesNotMatchTheRevision() {
         ActiveGenerationFixture fixture = activeGenerationFixture("g-opl-proc-001-consumption-object-pass.json");
-        OplTextTrace source = fixture.generated().traces().getFirst();
+        OplTextTrace source = fixture.generated().traces().get(0);
         OplTextTrace trace = new OplTextTrace(source.traceId(), source.contextId(), source.factIds(), source.inputElementIds(),
                 source.occurrenceIds(), source.sentenceIds(), source.ruleIds(), "b".repeat(64), source.tokenRanges(), source.sourceRefs());
 
@@ -400,7 +449,7 @@ class OplTextGenerationServiceTest {
     @Test
     void emitsBidirectionalTraceSourcesInSentenceSlotSemanticOrder() {
         ActiveGenerationFixture fixture = activeGenerationFixture("g-opl-struct-003-bidirectional-object-tagged-pass.json");
-        OplTextTrace forward = fixture.generated().traces().getFirst();
+        OplTextTrace forward = fixture.generated().traces().get(0);
         OplTextTrace reverse = fixture.generated().traces().get(1);
 
         assertEquals(List.of(0, 1), endpointOrdinals(forward));
@@ -437,7 +486,7 @@ class OplTextGenerationServiceTest {
     @Test
     void rejectsActiveBidirectionalTraceWhoseEndpointCatalogOrderIsReversed() {
         ActiveGenerationFixture fixture = activeGenerationFixture("g-opl-struct-003-bidirectional-object-tagged-pass.json");
-        OplTextTrace source = fixture.generated().traces().getFirst();
+        OplTextTrace source = fixture.generated().traces().get(0);
         OplTextTrace trace = copyTrace(source, source.tokenRanges(), swapFirstTwoEndpoints(source.sourceRefs()));
 
         OplGenerationException exception = assertThrows(OplGenerationException.class,
@@ -449,7 +498,7 @@ class OplTextGenerationServiceTest {
     @Test
     void emitsStructuralListSeparatorsWithOnlyTheirAdjacentEndpoints() {
         ActiveGenerationFixture fixture = activeGenerationFixture("g-opl-struct-005-aggregation-object-fan-2-complete-pass.json");
-        OplToken separator = fixture.generated().artifact().paragraphs().getFirst().sentences().getFirst().tokens().stream()
+        OplToken separator = fixture.generated().artifact().paragraphs().get(0).sentences().get(0).tokens().stream()
                 .filter(token -> token.kind() == OplToken.Kind.LIST_SEPARATOR).findFirst().orElseThrow();
 
         assertEquals(List.of(1, 2), tokenEndpointOrdinals(separator));
@@ -458,7 +507,7 @@ class OplTextGenerationServiceTest {
     @Test
     void emitsLocalSourcesForWhitespaceAndStructuralEntityTokens() {
         ActiveGenerationFixture fixture = activeGenerationFixture("g-opl-struct-005-aggregation-object-fan-2-complete-pass.json");
-        List<OplToken> tokens = fixture.generated().artifact().paragraphs().getFirst().sentences().getFirst().tokens();
+        List<OplToken> tokens = fixture.generated().artifact().paragraphs().get(0).sentences().get(0).tokens();
         OplToken whitespace = tokens.stream().filter(token -> token.kind() == OplToken.Kind.WHITESPACE).findFirst().orElseThrow();
         OplToken partOne = tokens.stream().filter(token -> "Object Part 1".equals(token.text())).findFirst().orElseThrow();
 
@@ -470,7 +519,7 @@ class OplTextGenerationServiceTest {
     @Test
     void emitsIncompleteStructuralListTailWithLastEndpointAndCompletenessOnly() {
         ActiveGenerationFixture fixture = activeGenerationFixture("g-opl-struct-005-aggregation-object-fan-2-incomplete-pass.json");
-        OplToken separator = fixture.generated().artifact().paragraphs().getFirst().sentences().getFirst().tokens().stream()
+        OplToken separator = fixture.generated().artifact().paragraphs().get(0).sentences().get(0).tokens().stream()
                 .filter(token -> token.kind() == OplToken.Kind.LIST_SEPARATOR).reduce((first, second) -> second).orElseThrow();
 
         assertEquals(List.of(2), tokenEndpointOrdinals(separator));
@@ -482,10 +531,10 @@ class OplTextGenerationServiceTest {
     void doesNotEmitCompletenessSourcesForCompleteStructuralLists() {
         ActiveGenerationFixture fixture = activeGenerationFixture("g-opl-struct-005-aggregation-object-fan-2-complete-pass.json");
 
-        assertFalse(fixture.generated().artifact().paragraphs().getFirst().sentences().getFirst().tokens().stream()
+        assertFalse(fixture.generated().artifact().paragraphs().get(0).sentences().get(0).tokens().stream()
                 .flatMap(token -> token.sourceRefs().stream())
                 .anyMatch(ref -> ref.sourceKind() == OplToken.SourceKind.FACT && "collection_completeness".equals(ref.fieldPath())));
-        assertFalse(fixture.generated().traces().getFirst().sourceRefs().stream()
+        assertFalse(fixture.generated().traces().get(0).sourceRefs().stream()
                 .anyMatch(ref -> ref.sourceKind() == OplToken.SourceKind.FACT && "collection_completeness".equals(ref.fieldPath())));
     }
 
@@ -541,8 +590,8 @@ class OplTextGenerationServiceTest {
     @Test
     void rejectsActiveTraceWithAnUnfoundedButWellFormedCatalogSource() {
         ActiveGenerationFixture fixture = activeGenerationFixture("g-opl-proc-001-consumption-object-pass.json");
-        OplTextTrace source = fixture.generated().traces().getFirst();
-        OplToken.SourceRef extra = new OplToken.SourceRef(OplToken.SourceKind.FACT, source.factIds().getFirst(), "source.source_kind", null, "SINGLE");
+        OplTextTrace source = fixture.generated().traces().get(0);
+        OplToken.SourceRef extra = new OplToken.SourceRef(OplToken.SourceKind.FACT, source.factIds().get(0), "source.source_kind", null, "SINGLE");
         OplTextTrace trace = copyTrace(source, source.tokenRanges(), appendSourceRef(source.sourceRefs(), extra));
 
         OplGenerationException exception = assertThrows(OplGenerationException.class,
@@ -554,7 +603,7 @@ class OplTextGenerationServiceTest {
     @Test
     void emitsStructuralListCommaWithOnlyItsAdjacentEndpoints() {
         ActiveGenerationFixture fixture = activeGenerationFixture("g-opl-struct-005-aggregation-object-fan-3-complete-pass.json");
-        OplToken comma = fixture.generated().artifact().paragraphs().getFirst().sentences().getFirst().tokens().stream()
+        OplToken comma = fixture.generated().artifact().paragraphs().get(0).sentences().get(0).tokens().stream()
                 .filter(token -> token.kind() == OplToken.Kind.PUNCTUATION && ",".equals(token.text())).findFirst().orElseThrow();
 
         assertEquals(List.of(1, 2), tokenEndpointOrdinals(comma));
@@ -563,7 +612,7 @@ class OplTextGenerationServiceTest {
     @Test
     void emitsMixedGroupSeparatorWithBoundaryEndpoints() {
         ActiveGenerationFixture fixture = activeGenerationFixture("g-opl-struct-006-characterization-object-mixed-a1-o2-complete-pass.json");
-        OplToken separator = fixture.generated().artifact().paragraphs().getFirst().sentences().getFirst().tokens().stream()
+        OplToken separator = fixture.generated().artifact().paragraphs().get(0).sentences().get(0).tokens().stream()
                 .filter(token -> token.kind() == OplToken.Kind.LIST_SEPARATOR && "as well as".equals(token.text())).findFirst().orElseThrow();
 
         assertEquals(List.of(1, 2), tokenEndpointOrdinals(separator));
@@ -572,19 +621,19 @@ class OplTextGenerationServiceTest {
     @Test
     void emitsDurationKeywordWithItsModifierSourceAndTokenRange() {
         ActiveGenerationFixture fixture = activeGenerationFixture("g-opl-proc-015-overtime-duration-pass.json");
-        OplSentence sentence = fixture.generated().artifact().paragraphs().getFirst().sentences().getFirst();
+        OplSentence sentence = fixture.generated().artifact().paragraphs().get(0).sentences().get(0);
         OplToken duration = sentence.tokens().stream().filter(token -> "PT2H".equals(token.text())).findFirst().orElseThrow();
 
         assertTrue(duration.sourceRefs().stream().anyMatch(ref -> ref.sourceKind() == OplToken.SourceKind.MODIFIER
                 && "duration".equals(ref.stableId()) && "value".equals(ref.fieldPath())));
-        assertTrue(fixture.generated().traces().getFirst().tokenRanges().stream().anyMatch(range -> "duration".equals(range.inputId())
+        assertTrue(fixture.generated().traces().get(0).tokenRanges().stream().anyMatch(range -> "duration".equals(range.inputId())
                 && range.startUtf8Byte() == duration.startUtf8Byte() && range.endUtf8Byte() == duration.endUtf8Byte()));
     }
 
     @Test
     void emitsSelfInvocationKeywordWithItsFactEndpointAndRuleSources() {
         ActiveGenerationFixture fixture = activeGenerationFixture("g-opl-proc-014-self-invocation-same-process-pass.json");
-        OplToken itself = fixture.generated().artifact().paragraphs().getFirst().sentences().getFirst().tokens().stream()
+        OplToken itself = fixture.generated().artifact().paragraphs().get(0).sentences().get(0).tokens().stream()
                 .filter(token -> "itself".equals(token.text())).findFirst().orElseThrow();
 
         assertTrue(itself.sourceRefs().stream().anyMatch(ref -> ref.sourceKind() == OplToken.SourceKind.FACT));
@@ -595,9 +644,9 @@ class OplTextGenerationServiceTest {
     @Test
     void generatesGoldenConsumptionWithoutState() {
         SemanticRevision revision = fixture();
-        SemanticRevision.Fact original = revision.facts().getFirst();
+        SemanticRevision.Fact original = revision.facts().get(0);
         List<SemanticRevision.Endpoint> endpoints = new ArrayList<>(original.endpoints());
-        SemanticRevision.Endpoint consumed = endpoints.getFirst();
+        SemanticRevision.Endpoint consumed = endpoints.get(0);
         endpoints.set(0, new SemanticRevision.Endpoint(
                 consumed.id(), consumed.role(), consumed.targetKind(), consumed.targetId(), consumed.ordinal(), null));
         SemanticRevision.Fact fact = new SemanticRevision.Fact(
@@ -606,14 +655,14 @@ class OplTextGenerationServiceTest {
 
         OplGenerationResult result = service.generate(withoutState, "context.sd.root", grammarWithConsumptionTemplates(withoutState));
 
-        assertEquals("Processing consumes Raw Material.", result.artifact().paragraphs().getFirst().sentences().getFirst().text());
-        assertEquals(List.of("opl.consumption.v1"), result.artifact().paragraphs().getFirst().sentences().getFirst().generationRuleIds());
+        assertEquals("Processing consumes Raw Material.", result.artifact().paragraphs().get(0).sentences().get(0).text());
+        assertEquals(List.of("opl.consumption.v1"), result.artifact().paragraphs().get(0).sentences().get(0).generationRuleIds());
     }
 
     @Test
     void replacesBaseConsumptionWithTheFrozenTransformingEventSentence() {
         SemanticRevision revision = fixture();
-        SemanticRevision.Fact source = revision.facts().getFirst();
+        SemanticRevision.Fact source = revision.facts().get(0);
         SemanticRevision.Fact controlled = new SemanticRevision.Fact(
                 source.id(), source.family(), new SemanticRevision.CapabilityReference(
                 "CAP-ISO-PROC-001", source.capability().profileId(), source.capability().profileVersion()),
@@ -627,14 +676,14 @@ class OplTextGenerationServiceTest {
         OplGenerationResult result = service.generate(candidate, "context.sd.root", grammar);
 
         assertEquals("Raw Material initiates Processing, which consumes Raw Material.",
-                result.artifact().paragraphs().getFirst().sentences().getFirst().text());
+                result.artifact().paragraphs().get(0).sentences().get(0).text());
         assertEquals(List.of("opl.control.event.transforming.consumption.v1"),
-                result.artifact().paragraphs().getFirst().sentences().getFirst().generationRuleIds());
-        assertTrue(result.traces().getFirst().sourceRefs().stream().anyMatch(ref -> ref.sourceKind() == OplToken.SourceKind.MODIFIER
+                result.artifact().paragraphs().get(0).sentences().get(0).generationRuleIds());
+        assertTrue(result.traces().get(0).sourceRefs().stream().anyMatch(ref -> ref.sourceKind() == OplToken.SourceKind.MODIFIER
                 && "control.capability".equals(ref.stableId()) && "value".equals(ref.fieldPath())));
-        assertTrue(result.traces().getFirst().sourceRefs().stream().anyMatch(ref -> ref.sourceKind() == OplToken.SourceKind.MODIFIER
+        assertTrue(result.traces().get(0).sourceRefs().stream().anyMatch(ref -> ref.sourceKind() == OplToken.SourceKind.MODIFIER
                 && "control.segment".equals(ref.stableId()) && "value".equals(ref.fieldPath())));
-        assertTrue(result.traces().getFirst().sourceRefs().stream().anyMatch(ref -> ref.sourceKind() == OplToken.SourceKind.CAPABILITY
+        assertTrue(result.traces().get(0).sourceRefs().stream().anyMatch(ref -> ref.sourceKind() == OplToken.SourceKind.CAPABILITY
                 && "CAP-ISO-CTRL-001".equals(ref.stableId()) && "modifiers[modifier_id=control.capability].value".equals(ref.fieldPath())));
     }
 
@@ -648,20 +697,20 @@ class OplTextGenerationServiceTest {
 
         OplGenerationResult result = service.generate(candidate, "context.sd.root", grammar);
 
-        OplSentence sentence = result.artifact().paragraphs().getFirst().sentences().getFirst();
+        OplSentence sentence = result.artifact().paragraphs().get(0).sentences().get(0);
         assertEquals(expectedText, sentence.text());
         assertEquals(List.of(templateId), sentence.generationRuleIds());
         assertEquals(List.of(fact.id()), sentence.inputFactIds());
-        assertTrue(result.traces().getFirst().sourceRefs().stream().anyMatch(ref -> ref.sourceKind() == OplToken.SourceKind.MODIFIER
+        assertTrue(result.traces().get(0).sourceRefs().stream().anyMatch(ref -> ref.sourceKind() == OplToken.SourceKind.MODIFIER
                 && "value".equals(ref.fieldPath())));
-        assertTrue(result.traces().getFirst().sourceRefs().stream().anyMatch(ref -> ref.sourceKind() == OplToken.SourceKind.CAPABILITY
+        assertTrue(result.traces().get(0).sourceRefs().stream().anyMatch(ref -> ref.sourceKind() == OplToken.SourceKind.CAPABILITY
                 && controlCapability.equals(ref.stableId())));
     }
 
     @Test
     void preservesLegacyProceduralTextWhenAControlTemplateIsNotPublished() {
         SemanticRevision revision = fixture();
-        SemanticRevision.Fact source = revision.facts().getFirst();
+        SemanticRevision.Fact source = revision.facts().get(0);
         SemanticRevision.Fact controlled = new SemanticRevision.Fact(
                 source.id(), source.family(), source.capability(), source.endpoints(), source.direction(), List.of(
                 new SemanticRevision.Modifier("control.capability", "CAP-ISO-CTRL-001"),
@@ -673,9 +722,9 @@ class OplTextGenerationServiceTest {
                 grammarWithConsumptionTemplates(revision));
 
         assertEquals("Processing consumes available Raw Material.",
-                result.artifact().paragraphs().getFirst().sentences().getFirst().text());
+                result.artifact().paragraphs().get(0).sentences().get(0).text());
         assertEquals(List.of("opl.consumption.state.v1"),
-                result.artifact().paragraphs().getFirst().sentences().getFirst().generationRuleIds());
+                result.artifact().paragraphs().get(0).sentences().get(0).generationRuleIds());
     }
 
     @ParameterizedTest(name = "{0}")
@@ -691,7 +740,7 @@ class OplTextGenerationServiceTest {
 
         OplGenerationResult result = service.generate(candidate, candidate.rootContextId(), grammar);
 
-        OplSentence sentence = result.artifact().paragraphs().getFirst().sentences().getFirst();
+        OplSentence sentence = result.artifact().paragraphs().get(0).sentences().get(0);
         assertEquals(expectedText, sentence.text());
         assertEquals(List.of(templateId), sentence.generationRuleIds());
         assertEquals(List.of(fact.id()), sentence.inputFactIds());
@@ -700,7 +749,7 @@ class OplTextGenerationServiceTest {
     @Test
     void rejectsMissingExceptionDurationWithStableInvalidArgument() {
         SemanticRevision revision = fixture();
-        SemanticRevision.Fact source = revision.facts().getFirst();
+        SemanticRevision.Fact source = revision.facts().get(0);
         SemanticRevision.Fact invalid = new SemanticRevision.Fact(
                 "fact.exception.duration.missing", SemanticRevision.FactFamily.PROFILE_FACT,
                 new SemanticRevision.CapabilityReference("CAP-ISO-PROC-015", source.capability().profileId(), source.capability().profileVersion()),
@@ -723,7 +772,7 @@ class OplTextGenerationServiceTest {
             String templateId,
             List<SemanticRevision.Endpoint> endpoints) {
         SemanticRevision revision = fixture();
-        SemanticRevision.Fact source = revision.facts().getFirst();
+        SemanticRevision.Fact source = revision.facts().get(0);
         SemanticRevision.Fact invalid = new SemanticRevision.Fact(
                 source.id(), source.family(),
                 new SemanticRevision.CapabilityReference(capabilityId, source.capability().profileId(), source.capability().profileVersion()),
@@ -740,7 +789,7 @@ class OplTextGenerationServiceTest {
     @Test
     void rejectsSelfInvocationAcrossDifferentProcesses() {
         SemanticRevision revision = fixture();
-        SemanticRevision.Fact source = revision.facts().getFirst();
+        SemanticRevision.Fact source = revision.facts().get(0);
         SemanticRevision.Element process = revision.elements().stream()
                 .filter(element -> element.id().equals("element.processing")).findFirst().orElseThrow();
         SemanticRevision.Element differentProcess = new SemanticRevision.Element(
@@ -772,7 +821,7 @@ class OplTextGenerationServiceTest {
             String baseCapability,
             List<SemanticRevision.Modifier> modifiers) {
         SemanticRevision revision = fixture();
-        SemanticRevision.Fact source = revision.facts().getFirst();
+        SemanticRevision.Fact source = revision.facts().get(0);
         SemanticRevision.Fact invalid = new SemanticRevision.Fact(
                 source.id(), source.family(), new SemanticRevision.CapabilityReference(
                 baseCapability, source.capability().profileId(), source.capability().profileVersion()),
@@ -788,7 +837,7 @@ class OplTextGenerationServiceTest {
     @Test
     void rejectsAnIndependentControlFact() {
         SemanticRevision revision = fixture();
-        SemanticRevision.Fact source = revision.facts().getFirst();
+        SemanticRevision.Fact source = revision.facts().get(0);
         SemanticRevision.Fact invalid = new SemanticRevision.Fact(
                 "fact.invalid.independent.control", SemanticRevision.FactFamily.CONTROL,
                 new SemanticRevision.CapabilityReference("CAP-ISO-CTRL-001", source.capability().profileId(), source.capability().profileVersion()),
@@ -814,13 +863,13 @@ class OplTextGenerationServiceTest {
             List<String> expectedTemplates,
             List<String> expectedSlots) {
         SemanticRevision revision = fixture();
-        SemanticRevision.Fact source = revision.facts().getFirst();
+        SemanticRevision.Fact source = revision.facts().get(0);
         OplGenerationResult result = binaryStructuralResult(revision, source, caseId, capabilityId, sourceId, targetId, targetName, direction, labels);
 
         assertEquals(expectedSentences,
-                result.artifact().paragraphs().getFirst().sentences().stream().map(OplSentence::text).toList());
+                result.artifact().paragraphs().get(0).sentences().stream().map(OplSentence::text).toList());
         assertEquals(expectedTemplates,
-                result.artifact().paragraphs().getFirst().sentences().stream().map(OplSentence::generationRuleIds).map(List::getFirst).toList());
+                result.artifact().paragraphs().get(0).sentences().stream().map(OplSentence::generationRuleIds).map(ruleOrFactIds -> ruleOrFactIds.get(0)).toList());
         assertEquals(expectedSentences.size(), result.traces().size());
         for (int index = 0; index < result.traces().size(); index++) {
             OplTextTrace trace = result.traces().get(index);
@@ -833,7 +882,7 @@ class OplTextGenerationServiceTest {
     @Test
     void rejectsTaggedStructuralRelationsBetweenObjectAndProcess() {
         SemanticRevision revision = fixture();
-        SemanticRevision.Fact source = revision.facts().getFirst();
+        SemanticRevision.Fact source = revision.facts().get(0);
         SemanticRevision.Fact structural = new SemanticRevision.Fact(
                 "fact.structural.mixed", SemanticRevision.FactFamily.STRUCTURAL,
                 new SemanticRevision.CapabilityReference("CAP-ISO-STRUCT-001", source.capability().profileId(), source.capability().profileVersion()),
@@ -855,7 +904,7 @@ class OplTextGenerationServiceTest {
     @Test
     void generatesFrozenAggregationListsForOneTwoAndThreeMembers() {
         SemanticRevision revision = fixture();
-        SemanticRevision.Fact source = revision.facts().getFirst();
+        SemanticRevision.Fact source = revision.facts().get(0);
         List<SemanticRevision.Element> elements = new ArrayList<>(revision.elements());
         elements.add(structuralObject(source, "element.part.one", "Part One"));
         elements.add(structuralObject(source, "element.part.two", "Part Two"));
@@ -872,7 +921,7 @@ class OplTextGenerationServiceTest {
     @Test
     void generatesFrozenCharacterizationAttributeOperationAndMixedVariants() {
         SemanticRevision revision = fixture();
-        SemanticRevision.Fact source = revision.facts().getFirst();
+        SemanticRevision.Fact source = revision.facts().get(0);
         SemanticRevision.Feature temperature = new SemanticRevision.Feature("feature.raw.temperature", "element.raw.material", SemanticRevision.FeatureKind.ATTRIBUTE,
                 source.capability(), new SemanticRevision.QualifiedName("urn:opm:test", "temperature"), source.source(), source.normalization());
         SemanticRevision.Feature calibrate = new SemanticRevision.Feature("feature.raw.calibrate", "element.raw.material", SemanticRevision.FeatureKind.OPERATION,
@@ -895,7 +944,7 @@ class OplTextGenerationServiceTest {
     @Test
     void generatesExplicitExhibitionOnlyForTheFrozenProductionTuple() {
         SemanticRevision revision = fixture();
-        SemanticRevision.Fact source = revision.facts().getFirst();
+        SemanticRevision.Fact source = revision.facts().get(0);
         SemanticRevision.Feature temperature = new SemanticRevision.Feature("feature.raw.temperature", "element.raw.material", SemanticRevision.FeatureKind.ATTRIBUTE,
                 source.capability(), new SemanticRevision.QualifiedName("urn:opm:test", "temperature"), source.source(), source.normalization());
         SemanticRevision.Feature calibrate = new SemanticRevision.Feature("feature.raw.calibrate", "element.raw.material", SemanticRevision.FeatureKind.OPERATION,
@@ -903,16 +952,16 @@ class OplTextGenerationServiceTest {
 
         OplGenerationResult result = exhibitionResult(revision, source, "fact.exhibition.object", "element.raw.material", List.of(temperature, calibrate));
 
-        assertEquals("temperature of Raw Material is calibrate.", result.artifact().paragraphs().getFirst().sentences().getFirst().text());
-        assertEquals(List.of("opl.structural.exhibition.v1"), result.artifact().paragraphs().getFirst().sentences().getFirst().generationRuleIds());
-        assertTrue(result.traces().getFirst().sourceRefs().stream().anyMatch(ref -> "source.source_kind".equals(ref.fieldPath())));
-        assertTrue(result.traces().getFirst().sourceRefs().stream().anyMatch(ref -> "source.source_entity_id".equals(ref.fieldPath())));
+        assertEquals("temperature of Raw Material is calibrate.", result.artifact().paragraphs().get(0).sentences().get(0).text());
+        assertEquals(List.of("opl.structural.exhibition.v1"), result.artifact().paragraphs().get(0).sentences().get(0).generationRuleIds());
+        assertTrue(result.traces().get(0).sourceRefs().stream().anyMatch(ref -> "source.source_kind".equals(ref.fieldPath())));
+        assertTrue(result.traces().get(0).sourceRefs().stream().anyMatch(ref -> "source.source_entity_id".equals(ref.fieldPath())));
     }
 
     @Test
     void ordersMixedCharacterizationByExhibitorThingKind() {
         SemanticRevision revision = fixture();
-        SemanticRevision.Fact source = revision.facts().getFirst();
+        SemanticRevision.Fact source = revision.facts().get(0);
         SemanticRevision.Feature attribute = new SemanticRevision.Feature("feature.processing.priority", "element.processing", SemanticRevision.FeatureKind.ATTRIBUTE,
                 source.capability(), new SemanticRevision.QualifiedName("urn:opm:test", "priority"), source.source(), source.normalization());
         SemanticRevision.Feature operation = new SemanticRevision.Feature("feature.processing.calibrate", "element.processing", SemanticRevision.FeatureKind.OPERATION,
@@ -926,7 +975,7 @@ class OplTextGenerationServiceTest {
     @Test
     void generatesFrozenGeneralizationObjectProcessAndCompletenessVariants() {
         SemanticRevision revision = fixture();
-        SemanticRevision.Fact source = revision.facts().getFirst();
+        SemanticRevision.Fact source = revision.facts().get(0);
         List<SemanticRevision.Element> elements = new ArrayList<>(revision.elements());
         elements.add(structuralObject(source, "element.special.one", "Special Material"));
         elements.add(structuralObject(source, "element.special.two", "Refined Material"));
@@ -947,7 +996,7 @@ class OplTextGenerationServiceTest {
     @Test
     void generatesStateCharacterizationOnlyForAnObjectsOwnedAttributeValueState() {
         SemanticRevision revision = fixture();
-        SemanticRevision.Fact source = revision.facts().getFirst();
+        SemanticRevision.Fact source = revision.facts().get(0);
         SemanticRevision.Feature attribute = new SemanticRevision.Feature("feature.raw.temperature", "element.raw.material", SemanticRevision.FeatureKind.ATTRIBUTE,
                 source.capability(), new SemanticRevision.QualifiedName("urn:opm:test", "temperature"), source.source(), source.normalization());
         SemanticRevision.State valueState = new SemanticRevision.State("state.raw.temperature.high", SemanticRevision.TargetKind.FEATURE, attribute.id(), source.capability(),
@@ -956,9 +1005,9 @@ class OplTextGenerationServiceTest {
 
         OplGenerationResult result = stateCharacterizationResult(revision, valid, List.of(attribute), List.of(valueState));
 
-        assertEquals("Raw Material exhibits high temperature.", result.artifact().paragraphs().getFirst().sentences().getFirst().text());
-        assertEquals(List.of("opl.structural.characterization.state.v1"), result.artifact().paragraphs().getFirst().sentences().getFirst().generationRuleIds());
-        assertTrue(result.traces().getFirst().inputElementIds().contains("element.raw.material"));
+        assertEquals("Raw Material exhibits high temperature.", result.artifact().paragraphs().get(0).sentences().get(0).text());
+        assertEquals(List.of("opl.structural.characterization.state.v1"), result.artifact().paragraphs().get(0).sentences().get(0).generationRuleIds());
+        assertTrue(result.traces().get(0).inputElementIds().contains("element.raw.material"));
         assertThrows(OplGenerationException.class, () -> stateCharacterizationResult(revision,
                 stateCharacterizationFact(source, "fact.state.characterization.process", SemanticRevision.TargetKind.ELEMENT, "element.processing", valueState.id()),
                 List.of(attribute), List.of(valueState)));
@@ -990,9 +1039,9 @@ class OplTextGenerationServiceTest {
             List<String> expectedSlots) {
         OplGenerationResult result = stateTaggedResult(fixture(), caseId, direction, sourceKind, sourceId, targetKind, targetId, labels);
 
-        assertEquals(expectedSentences, result.artifact().paragraphs().getFirst().sentences().stream().map(OplSentence::text).toList());
-        assertEquals(expectedTemplates, result.artifact().paragraphs().getFirst().sentences().stream()
-                .map(OplSentence::generationRuleIds).map(List::getFirst).toList());
+        assertEquals(expectedSentences, result.artifact().paragraphs().get(0).sentences().stream().map(OplSentence::text).toList());
+        assertEquals(expectedTemplates, result.artifact().paragraphs().get(0).sentences().stream()
+                .map(OplSentence::generationRuleIds).map(ruleOrFactIds -> ruleOrFactIds.get(0)).toList());
         for (int index = 0; index < result.traces().size(); index++) {
             String expectedSlot = expectedSlots.get(index);
             assertTrue(result.traces().get(index).sourceRefs().stream().anyMatch(ref -> expectedSlot.equals(ref.sentenceSlot())));
@@ -1009,7 +1058,7 @@ class OplTextGenerationServiceTest {
     @Test
     void generatesFrozenClassificationSingleAndMultipleInstancesAndRejectsCompleteness() {
         SemanticRevision revision = fixture();
-        SemanticRevision.Fact source = revision.facts().getFirst();
+        SemanticRevision.Fact source = revision.facts().get(0);
         List<SemanticRevision.Element> elements = new ArrayList<>(revision.elements());
         elements.add(structuralObject(source, "element.instance.one", "Instance One"));
         elements.add(structuralObject(source, "element.instance.two", "Instance Two"));
@@ -1025,7 +1074,7 @@ class OplTextGenerationServiceTest {
     @Test
     void omitsStructuralTextForTheLegacyGrammar() {
         SemanticRevision revision = fixture();
-        SemanticRevision.Fact source = revision.facts().getFirst();
+        SemanticRevision.Fact source = revision.facts().get(0);
         SemanticRevision.Fact structural = new SemanticRevision.Fact(
                 "fact.structural.unidirectional", SemanticRevision.FactFamily.STRUCTURAL,
                 new SemanticRevision.CapabilityReference("CAP-ISO-STRUCT-002", source.capability().profileId(), source.capability().profileVersion()),
@@ -1033,7 +1082,7 @@ class OplTextGenerationServiceTest {
                         new SemanticRevision.Endpoint("endpoint.structural.source", "STRUCTURAL_SOURCE", SemanticRevision.TargetKind.ELEMENT, "element.raw.material", 0, null),
                         new SemanticRevision.Endpoint("endpoint.structural.target", "STRUCTURAL_TARGET", SemanticRevision.TargetKind.ELEMENT, "element.processing", 1, null)),
                 SemanticRevision.Direction.DIRECTED, source.source(), source.normalization());
-        SemanticRevision.Context root = revision.contexts().getFirst();
+        SemanticRevision.Context root = revision.contexts().get(0);
         SemanticRevision.Context expandedRoot = new SemanticRevision.Context(root.id(), root.kind(), root.capability(), root.name(),
                 List.of("occurrence.raw.material", "occurrence.processing", "occurrence.structural"), root.source());
         List<SemanticRevision.Occurrence> occurrences = new ArrayList<>(revision.occurrences().stream()
@@ -1046,7 +1095,7 @@ class OplTextGenerationServiceTest {
                 "context.sd.root",
                 grammarWithConsumptionTemplates(revision));
 
-        assertTrue(result.artifact().paragraphs().getFirst().sentences().isEmpty());
+        assertTrue(result.artifact().paragraphs().get(0).sentences().isEmpty());
         assertTrue(result.traces().isEmpty());
     }
 
@@ -1057,7 +1106,7 @@ class OplTextGenerationServiceTest {
 
         OplGenerationResult result = service.generate(withoutFacts, "context.sd.root", grammarWithConsumptionTemplates(withoutFacts));
 
-        assertTrue(result.artifact().paragraphs().getFirst().sentences().isEmpty());
+        assertTrue(result.artifact().paragraphs().get(0).sentences().isEmpty());
         assertTrue(result.traces().isEmpty());
     }
 
@@ -1092,7 +1141,7 @@ class OplTextGenerationServiceTest {
     @Test
     void rejectsRefinementThatBorrowsAnotherContextsOccurrenceIds() {
         SemanticRevision revision = fixture();
-        SemanticRevision.Context root = revision.contexts().getFirst();
+        SemanticRevision.Context root = revision.contexts().get(0);
         SemanticRevision.Context refinement = new SemanticRevision.Context(
                 "context.refinement", SemanticRevision.ContextKind.PROCESS_REFINEMENT, root.capability(), root.name(),
                 root.occurrenceIds(), root.source());
@@ -1107,7 +1156,7 @@ class OplTextGenerationServiceTest {
     @Test
     void rejectsUnknownCapability() {
         SemanticRevision revision = fixture();
-        SemanticRevision.Fact original = revision.facts().getFirst();
+        SemanticRevision.Fact original = revision.facts().get(0);
         SemanticRevision.Fact unsupported = new SemanticRevision.Fact(
                 original.id(), original.family(), new SemanticRevision.CapabilityReference(
                 "CAP-UNSUPPORTED-001", original.capability().profileId(), original.capability().profileVersion()),
@@ -1123,13 +1172,13 @@ class OplTextGenerationServiceTest {
     @Test
     void rejectsStateQualificationOwnedByAnotherElement() {
         SemanticRevision revision = fixture();
-        SemanticRevision.State originalState = revision.states().getFirst();
+        SemanticRevision.State originalState = revision.states().get(0);
         SemanticRevision.State mismatchedState = new SemanticRevision.State(
                 "state.processing.invalid", "element.processing", originalState.capability(), originalState.name(),
                 originalState.roles(), originalState.source(), originalState.normalization());
-        SemanticRevision.Fact originalFact = revision.facts().getFirst();
+        SemanticRevision.Fact originalFact = revision.facts().get(0);
         List<SemanticRevision.Endpoint> endpoints = new ArrayList<>(originalFact.endpoints());
-        SemanticRevision.Endpoint consumed = endpoints.getFirst();
+        SemanticRevision.Endpoint consumed = endpoints.get(0);
         endpoints.set(0, new SemanticRevision.Endpoint(
                 consumed.id(), consumed.role(), consumed.targetKind(), consumed.targetId(), consumed.ordinal(), mismatchedState.id()));
         SemanticRevision.Fact mismatchedFact = new SemanticRevision.Fact(
@@ -1149,11 +1198,11 @@ class OplTextGenerationServiceTest {
     @Test
     void ordersConsumptionPlansByFactStableIdAfterGrammarPrecedenceAndProcess() {
         SemanticRevision revision = fixture();
-        SemanticRevision.Fact original = revision.facts().getFirst();
+        SemanticRevision.Fact original = revision.facts().get(0);
         SemanticRevision.Fact laterFact = new SemanticRevision.Fact(
                 "fact.zzz.consumes.raw", original.family(), original.capability(), original.endpoints(),
                 original.direction(), original.source(), original.normalization());
-        SemanticRevision.Context root = revision.contexts().getFirst();
+        SemanticRevision.Context root = revision.contexts().get(0);
         SemanticRevision.Context expandedRoot = new SemanticRevision.Context(
                 root.id(), root.kind(), root.capability(), root.name(),
                 List.of("occurrence.zzz.consumption", "occurrence.consumption", "occurrence.processing", "occurrence.raw.material", "occurrence.raw.available"),
@@ -1165,7 +1214,7 @@ class OplTextGenerationServiceTest {
         SemanticRevision expanded = copy(revision, List.of(laterFact, original), List.of(expandedRoot), occurrences);
 
         List<String> factIds = service.generate(expanded, "context.sd.root", grammarWithConsumptionTemplates(expanded))
-                .artifact().paragraphs().getFirst().sentences().stream().map(OplSentence::inputFactIds).map(List::getFirst).toList();
+                .artifact().paragraphs().get(0).sentences().stream().map(OplSentence::inputFactIds).map(ruleOrFactIds -> ruleOrFactIds.get(0)).toList();
 
         assertEquals(List.of("fact.processing.consumes.raw", "fact.zzz.consumes.raw"), factIds);
     }
@@ -1176,7 +1225,7 @@ class OplTextGenerationServiceTest {
         List<SemanticRevision.Occurrence> occurrences = revision.occurrences().stream()
                 .filter(occurrence -> !occurrence.id().equals("occurrence.processing"))
                 .toList();
-        SemanticRevision.Context root = revision.contexts().getFirst();
+        SemanticRevision.Context root = revision.contexts().get(0);
         SemanticRevision.Context incompleteRoot = new SemanticRevision.Context(
                 root.id(), root.kind(), root.capability(), root.name(),
                 root.occurrenceIds().stream().filter(id -> !id.equals("occurrence.processing")).toList(), root.source());
@@ -1201,7 +1250,7 @@ class OplTextGenerationServiceTest {
         OplGenerationResult result = service.generate(fixture(), "context.sd.root", grammarWithConsumptionTemplates(fixture()));
         assertThrows(UnsupportedOperationException.class, () -> result.traces().clear());
         assertThrows(UnsupportedOperationException.class, () -> result.artifact().paragraphs().clear());
-        assertThrows(UnsupportedOperationException.class, () -> result.traces().getFirst().tokenRanges().clear());
+        assertThrows(UnsupportedOperationException.class, () -> result.traces().get(0).tokenRanges().clear());
     }
 
     private static Stream<Arguments> controlCases() {
@@ -1402,7 +1451,7 @@ class OplTextGenerationServiceTest {
             SemanticRevision.FactFamily family,
             List<SemanticRevision.Endpoint> endpoints,
             List<SemanticRevision.Modifier> modifiers) {
-        SemanticRevision.Fact source = revision.facts().getFirst();
+        SemanticRevision.Fact source = revision.facts().get(0);
         SemanticRevision.Fact fact = new SemanticRevision.Fact("fact.canonical." + caseId.toLowerCase(), family,
                 new SemanticRevision.CapabilityReference(capabilityId, source.capability().profileId(), source.capability().profileVersion()),
                 endpoints, SemanticRevision.Direction.DIRECTED, modifiers, source.source(), source.normalization());
@@ -1420,7 +1469,7 @@ class OplTextGenerationServiceTest {
     }
 
     private SemanticRevision.Fact controlFact(SemanticRevision revision, String controlCapability, String baseCapability) {
-        SemanticRevision.Fact source = revision.facts().getFirst();
+        SemanticRevision.Fact source = revision.facts().get(0);
         List<SemanticRevision.Endpoint> endpoints = switch (baseCapability) {
             case "CAP-ISO-PROC-001" -> endpoints("CONSUMED_OBJECT", "element.raw.material", "CONSUMING_PROCESS", "element.processing");
             case "CAP-ISO-PROC-003" -> List.of(endpoint("AFFECTEE", "element.raw.material", 0), endpoint("AFFECTING_PROCESS", "element.processing", 1), endpoint("AFFECTED", "element.raw.material", 2));
@@ -1454,7 +1503,7 @@ class OplTextGenerationServiceTest {
     }
 
     private SemanticRevision revisionWithFactOccurrence(SemanticRevision revision, SemanticRevision.Fact fact) {
-        SemanticRevision.Context root = revision.contexts().getFirst();
+        SemanticRevision.Context root = revision.contexts().get(0);
         String occurrenceId = "occurrence.control." + fact.id();
         List<String> occurrenceIds = new ArrayList<>(root.occurrenceIds());
         occurrenceIds.add(occurrenceId);
@@ -1485,7 +1534,7 @@ class OplTextGenerationServiceTest {
                         new SemanticRevision.Endpoint("endpoint." + caseId + ".source", "STRUCTURAL_SOURCE", SemanticRevision.TargetKind.ELEMENT, sourceId, 0, null),
                         new SemanticRevision.Endpoint("endpoint." + caseId + ".target", "STRUCTURAL_TARGET", SemanticRevision.TargetKind.ELEMENT, targetId, 1, null)),
                 direction, List.of(), labels, SemanticRevision.CollectionCompleteness.NOT_APPLICABLE, source.source(), source.normalization());
-        SemanticRevision.Context root = revision.contexts().getFirst();
+        SemanticRevision.Context root = revision.contexts().get(0);
         String factOccurrenceId = "occurrence." + factId;
         String targetOccurrenceId = "occurrence." + targetId;
         SemanticRevision.Context expandedRoot = new SemanticRevision.Context(root.id(), root.kind(), root.capability(), root.name(),
@@ -1534,7 +1583,7 @@ class OplTextGenerationServiceTest {
         SemanticRevision.Fact aggregation = new SemanticRevision.Fact(factId, SemanticRevision.FactFamily.STRUCTURAL,
                 new SemanticRevision.CapabilityReference("CAP-ISO-STRUCT-005", source.capability().profileId(), source.capability().profileVersion()),
                 endpoints, SemanticRevision.Direction.DIRECTED, List.of(), List.of(), completeness, source.source(), source.normalization());
-        SemanticRevision.Context root = revision.contexts().getFirst();
+        SemanticRevision.Context root = revision.contexts().get(0);
         String occurrenceId = "occurrence." + factId;
         List<String> occurrenceIds = append(root.occurrenceIds(), occurrenceId);
         List<SemanticRevision.Occurrence> occurrences = appendOccurrence(revision.occurrences(), new SemanticRevision.Occurrence(occurrenceId, root.id(), SemanticRevision.TargetKind.FACT,
@@ -1554,7 +1603,7 @@ class OplTextGenerationServiceTest {
         OplGrammar grammar = new OplGrammar(binding(candidate), List.of(
                 new OplGrammar.Template("opl.structural.aggregation.complete.v1", "CAP-ISO-STRUCT-005", 200, "SINGLE", "{Whole} consists of {part-list}."),
                 new OplGrammar.Template("opl.structural.aggregation.incomplete.v1", "CAP-ISO-STRUCT-005", 200, "SINGLE", "{Whole} consists of {known-part-list} and at least one other part.")));
-        return service.generate(candidate, root.id(), grammar).artifact().paragraphs().getFirst().sentences().getFirst().text();
+        return service.generate(candidate, root.id(), grammar).artifact().paragraphs().get(0).sentences().get(0).text();
     }
 
     private String characterizationText(
@@ -1584,7 +1633,7 @@ class OplTextGenerationServiceTest {
         SemanticRevision.Fact characterization = new SemanticRevision.Fact(factId, SemanticRevision.FactFamily.STRUCTURAL,
                 new SemanticRevision.CapabilityReference("CAP-ISO-STRUCT-006", source.capability().profileId(), source.capability().profileVersion()),
                 endpoints, SemanticRevision.Direction.DIRECTED, List.of(), List.of(), completeness, source.source(), source.normalization());
-        SemanticRevision.Context root = revision.contexts().getFirst();
+        SemanticRevision.Context root = revision.contexts().get(0);
         String factOccurrenceId = "occurrence." + factId;
         List<String> occurrenceIds = append(root.occurrenceIds(), factOccurrenceId);
         List<SemanticRevision.Occurrence> occurrences = appendOccurrence(revision.occurrences(), new SemanticRevision.Occurrence(factOccurrenceId, root.id(), SemanticRevision.TargetKind.FACT,
@@ -1604,7 +1653,7 @@ class OplTextGenerationServiceTest {
                 new OplGrammar.Template("opl.structural.characterization.incomplete.v1", "CAP-ISO-STRUCT-006", 200, "SINGLE", "{Exhibitor} exhibits {feature-list}, and at least one other {feature-kind}."),
                 new OplGrammar.Template("opl.structural.characterization.mixed.complete.v1", "CAP-ISO-STRUCT-006", 200, "SINGLE", "{Exhibitor} exhibits {attribute-list}, as well as {operator-list}."),
                 new OplGrammar.Template("opl.structural.characterization.mixed.incomplete.v1", "CAP-ISO-STRUCT-006", 200, "SINGLE", "{Exhibitor} exhibits {attribute-list}, and at least one other attribute, as well as {operator-list}, and at least one other operator.")));
-        return service.generate(candidate, root.id(), grammar).artifact().paragraphs().getFirst().sentences().getFirst().text();
+        return service.generate(candidate, root.id(), grammar).artifact().paragraphs().get(0).sentences().get(0).text();
     }
 
     private OplGenerationResult exhibitionResult(
@@ -1625,7 +1674,7 @@ class OplTextGenerationServiceTest {
                 new SemanticRevision.CapabilityReference("CAP-ISO-STRUCT-006", source.capability().profileId(), source.capability().profileVersion()),
                 endpoints, SemanticRevision.Direction.DIRECTED, List.of(), List.of(), SemanticRevision.CollectionCompleteness.COMPLETE,
                 production, source.normalization());
-        SemanticRevision.Context root = revision.contexts().getFirst();
+        SemanticRevision.Context root = revision.contexts().get(0);
         String factOccurrenceId = "occurrence." + factId;
         List<String> occurrenceIds = append(root.occurrenceIds(), factOccurrenceId);
         List<SemanticRevision.Occurrence> occurrences = appendOccurrence(revision.occurrences(), new SemanticRevision.Occurrence(factOccurrenceId, root.id(), SemanticRevision.TargetKind.FACT,
@@ -1662,7 +1711,7 @@ class OplTextGenerationServiceTest {
         SemanticRevision.Fact generalization = new SemanticRevision.Fact(factId, SemanticRevision.FactFamily.STRUCTURAL,
                 new SemanticRevision.CapabilityReference("CAP-ISO-STRUCT-007", source.capability().profileId(), source.capability().profileVersion()),
                 endpoints, SemanticRevision.Direction.DIRECTED, List.of(), List.of(), completeness, source.source(), source.normalization());
-        SemanticRevision.Context root = revision.contexts().getFirst();
+        SemanticRevision.Context root = revision.contexts().get(0);
         String factOccurrenceId = "occurrence." + factId;
         List<String> occurrenceIds = append(root.occurrenceIds(), factOccurrenceId);
         List<SemanticRevision.Occurrence> occurrences = appendOccurrence(revision.occurrences(), new SemanticRevision.Occurrence(factOccurrenceId, root.id(), SemanticRevision.TargetKind.FACT,
@@ -1684,7 +1733,7 @@ class OplTextGenerationServiceTest {
                 new OplGrammar.Template("opl.structural.generalization.process.single.v1", "CAP-ISO-STRUCT-007", 200, "SINGLE", "{SpecialProcess} is {GeneralProcess}."),
                 new OplGrammar.Template("opl.structural.generalization.multiple.v1", "CAP-ISO-STRUCT-007", 200, "SINGLE", "{specialization-list} are {General}."),
                 new OplGrammar.Template("opl.structural.generalization.incomplete.v1", "CAP-ISO-STRUCT-007", 200, "SINGLE", "{specialization-list} and other specializations are {General}.")));
-        return service.generate(candidate, root.id(), grammar).artifact().paragraphs().getFirst().sentences().getFirst().text();
+        return service.generate(candidate, root.id(), grammar).artifact().paragraphs().get(0).sentences().get(0).text();
     }
 
     private SemanticRevision.Fact stateCharacterizationFact(
@@ -1707,7 +1756,7 @@ class OplTextGenerationServiceTest {
             SemanticRevision.Fact fact,
             List<SemanticRevision.Feature> features,
             List<SemanticRevision.State> states) {
-        SemanticRevision.Context root = revision.contexts().getFirst();
+        SemanticRevision.Context root = revision.contexts().get(0);
         String factOccurrenceId = "occurrence." + fact.id();
         String stateOccurrenceId = "occurrence." + fact.endpoints().get(1).targetId();
         SemanticRevision.Context expandedRoot = new SemanticRevision.Context(root.id(), root.kind(), root.capability(), root.name(),
@@ -1734,7 +1783,7 @@ class OplTextGenerationServiceTest {
             SemanticRevision.TargetKind targetKind,
             String targetId,
             List<SemanticRevision.Label> labels) {
-        SemanticRevision.Fact source = revision.facts().getFirst();
+        SemanticRevision.Fact source = revision.facts().get(0);
         SemanticRevision.Element raw = revision.elements().stream().filter(element -> "element.raw.material".equals(element.id())).findFirst().orElseThrow();
         SemanticRevision.Element refined = new SemanticRevision.Element("element.refined.material", SemanticRevision.CoreKind.OBJECT, raw.capability(),
                 new SemanticRevision.QualifiedName(raw.name().namespace(), "Refined Material"), List.of("state.refined.ready"), source.source(), source.normalization());
@@ -1747,7 +1796,7 @@ class OplTextGenerationServiceTest {
                         new SemanticRevision.Endpoint(factId + ".source", "STATE_TAGGED_SOURCE", sourceKind, sourceId, 0, null),
                         new SemanticRevision.Endpoint(factId + ".target", "STATE_TAGGED_TARGET", targetKind, targetId, 1, null)),
                 direction, List.of(), labels, SemanticRevision.CollectionCompleteness.NOT_APPLICABLE, source.source(), source.normalization());
-        SemanticRevision.Context root = revision.contexts().getFirst();
+        SemanticRevision.Context root = revision.contexts().get(0);
         String factOccurrenceId = "occurrence." + factId;
         SemanticRevision.Context expandedRoot = new SemanticRevision.Context(root.id(), root.kind(), root.capability(), root.name(),
                 append(append(append(root.occurrenceIds(), "occurrence.refined.material"), "occurrence.refined.ready"), factOccurrenceId), root.source());
@@ -1791,7 +1840,7 @@ class OplTextGenerationServiceTest {
         SemanticRevision.Fact classification = new SemanticRevision.Fact(factId, SemanticRevision.FactFamily.STRUCTURAL,
                 new SemanticRevision.CapabilityReference("CAP-ISO-STRUCT-008", source.capability().profileId(), source.capability().profileVersion()),
                 endpoints, SemanticRevision.Direction.DIRECTED, List.of(), List.of(), completeness, source.source(), source.normalization());
-        SemanticRevision.Context root = revision.contexts().getFirst();
+        SemanticRevision.Context root = revision.contexts().get(0);
         String factOccurrenceId = "occurrence." + factId;
         List<String> occurrenceIds = append(root.occurrenceIds(), factOccurrenceId);
         List<SemanticRevision.Occurrence> occurrences = appendOccurrence(revision.occurrences(), new SemanticRevision.Occurrence(factOccurrenceId, root.id(), SemanticRevision.TargetKind.FACT,
@@ -1809,11 +1858,11 @@ class OplTextGenerationServiceTest {
         OplGrammar grammar = new OplGrammar(binding(candidate), List.of(
                 new OplGrammar.Template("opl.structural.classification.single.v1", "CAP-ISO-STRUCT-008", 200, "SINGLE", "{Instance} is an instance of {Class}."),
                 new OplGrammar.Template("opl.structural.classification.multiple.v1", "CAP-ISO-STRUCT-008", 200, "SINGLE", "{instance-list} are instances of {Class}.")));
-        return service.generate(candidate, root.id(), grammar).artifact().paragraphs().getFirst().sentences().getFirst().text();
+        return service.generate(candidate, root.id(), grammar).artifact().paragraphs().get(0).sentences().get(0).text();
     }
 
     private SemanticRevision.Element structuralObject(SemanticRevision.Fact source, String id, String name) {
-        SemanticRevision.Element original = fixture().elements().getFirst();
+        SemanticRevision.Element original = fixture().elements().get(0);
         return new SemanticRevision.Element(id, SemanticRevision.CoreKind.OBJECT, original.capability(),
                 new SemanticRevision.QualifiedName(original.name().namespace(), name), List.of(), source.source(), source.normalization());
     }
@@ -1937,15 +1986,15 @@ class OplTextGenerationServiceTest {
         for (int index = 0; index < result.size(); index++) {
             if (result.get(index).sourceKind() == OplToken.SourceKind.ENDPOINT) endpointIndexes.add(index);
         }
-        java.util.Collections.swap(result, endpointIndexes.getFirst(), endpointIndexes.get(1));
+        java.util.Collections.swap(result, endpointIndexes.get(0), endpointIndexes.get(1));
         return result;
     }
 
     private static OplTextArtifact artifactWithFirstTokenSources(
             ActiveTraceFixture fixture,
             UnaryOperator<List<OplToken.SourceRef>> sourceRefs) {
-        OplSentence source = fixture.artifact().paragraphs().getFirst().sentences().getFirst();
-        OplToken first = source.tokens().getFirst();
+        OplSentence source = fixture.artifact().paragraphs().get(0).sentences().get(0);
+        OplToken first = source.tokens().get(0);
         OplToken replacement = new OplToken(first.tokenId(), first.sentenceId(), first.ordinal(), first.text(), first.kind(),
                 first.startUtf8Byte(), first.endUtf8Byte(), sourceRefs.apply(first.sourceRefs()));
         OplSentence sentence = new OplSentence(source.sentenceId(), source.text(), source.ordinal(), List.of(replacement, source.tokens().get(1)),
@@ -1961,8 +2010,8 @@ class OplTextGenerationServiceTest {
 
     private static Stream<Arguments> invalidActiveTraceInputs() {
         ActiveTraceFixture fixture = activeTraceFixture();
-        OplSentence source = fixture.artifact().paragraphs().getFirst().sentences().getFirst();
-        OplToken first = source.tokens().getFirst();
+        OplSentence source = fixture.artifact().paragraphs().get(0).sentences().get(0);
+        OplToken first = source.tokens().get(0);
         OplToken period = source.tokens().get(1);
 
         OplSentence ordinalGap = new OplSentence(source.sentenceId(), source.text(), source.ordinal(), List.of(
@@ -2064,7 +2113,7 @@ class OplTextGenerationServiceTest {
         OplTextArtifact artifact = new OplTextArtifact(generated.artifact().artifactId(), generated.artifact().inputRevisionId(),
                 generated.artifact().grammarBinding(), generated.artifact().contextId(), paragraphs, generated.artifact().artifactDigest());
         List<OplTextTrace> traces = generated.traces().stream().map(trace -> {
-            OplSentence sentence = sentences.get(trace.sentenceIds().getFirst());
+            OplSentence sentence = sentences.get(trace.sentenceIds().get(0));
             List<OplToken.SourceRef> sourceRefs = new ArrayList<>();
             sentence.tokens().forEach(token -> sourceRefs.addAll(token.sourceRefs()));
             return new OplTextTrace(trace.traceId(), trace.contextId(), trace.factIds(), trace.inputElementIds(), trace.occurrenceIds(),
@@ -2107,7 +2156,7 @@ class OplTextGenerationServiceTest {
         OplTextArtifact artifact = new OplTextArtifact(generated.artifact().artifactId(), generated.artifact().inputRevisionId(),
                 generated.artifact().grammarBinding(), generated.artifact().contextId(), paragraphs, generated.artifact().artifactDigest());
         List<OplTextTrace> traces = generated.traces().stream().map(trace -> {
-            OplSentence sentence = sentences.get(trace.sentenceIds().getFirst());
+            OplSentence sentence = sentences.get(trace.sentenceIds().get(0));
             List<OplToken.SourceRef> sourceRefs = new ArrayList<>();
             sentence.tokens().forEach(token -> sourceRefs.addAll(token.sourceRefs()));
             return new OplTextTrace(trace.traceId(), trace.contextId(), trace.factIds(), trace.inputElementIds(), trace.occurrenceIds(),

@@ -1,0 +1,19 @@
+# OPD relation route layouts
+
+`layout.edge_routes` is optional on FACT occurrence layouts in revision documents and draft projections. `UPDATE_LAYOUT_BATCH` accepts it on owned FACT occurrences in the authorized current context. `UPDATE_LAYOUT` remains node-only. Existing node geometry and legacy layout extensions are preserved.
+
+```json
+{"occurrence_id":"occurrence.fact","layout":{"x":0,"y":0,"width":2,"height":2,"edge_routes":[{"segment":"main","style":"ROUNDED","mode":"MANUAL","points":[{"x":260,"y":120},{"x":260,"y":360}]}]}}
+```
+
+`style`: `STRAIGHT`, `ROUNDED`, `CURVE`. `mode`: `AUTO` (empty points) or `MANUAL`. Points are intermediate control points in graph coordinates, excluding semantic endpoints. There are at most 64 unique segments per occurrence and 128 finite points per segment. `[]` resets all saved routes. `main` identifies a binary relation; `input` and `output` identify effect segments. Structural fan segments use `root` and stable `part.<render-index>` keys so ID remapping does not invalidate paths. Invocation lightning and self-invocation loops retain fixed OPM geometry and do not offer path controls.
+
+Draft commands use the existing capability query/token/journal/save flow. The runtime serializes optional routes in the existing JSON content without new tables. Route-bearing documents use SaveContentDigest/3: point coordinates are encoded as binary64 in the preimage, with schema_version 3. Existing documents retain their frozen Digest/1 or /2 bytes. V2__edge_route_digest.sql only expands draft_content's digest_version check to accept /3. Reopening the backend applies this migration through the existing Flyway flow. Revision reader/writer and EXACT projections carry routes through history and native package exchange. Generate/check with `node scripts/generate-draft-workspace-contract.mjs [--check]` followed by `node scripts/generate-route-layout-contract.mjs [--check]`. Rollback to an older backend requires removing saved routes using the new backend first; existing documents without routes require no conversion.
+
+In the canvas, select a relation to show bend handles and the path toolbar. Drag handles, drag on the selected path to add a point, double-click a handle to delete it, or use the context menu. The context menu also retains access to relation operations. The toolbar switches style or restores automatic rounded routing. Changes participate in undo/redo and are persisted by Save; failed saves retain pending changes. Readonly views and layout previews disable editing.
+
+Automatic rounded routes avoid node bounding boxes and use separate lanes for parallel links and long shared-target links. State owners and the current refinement envelope are excluded when they contain an endpoint. Manually routed points remain fixed when one endpoint moves, and translate when both segment endpoints move together. Automatic layout preserves manual paths, excludes the refinement parent from topological ordering, and requires preview confirmation. Opening an old diagram only fits the derived refinement envelope around existing content; it does not reorder children.
+
+For structural fans, manual interiors translate when the complete endpoint group moves together; partial group movement keeps them fixed because the shared junction also depends on the other members.
+
+Browser verification: prepare an isolated database with `DraftBrowserFixtureTest` and `-Dopm.browser.fixture.root=<new system-temp path named opm-hs03b-*>`, run its runtime on port 17851 with `--opm.storage.isolated-tools=true`, start the host on localhost:3000 with the updated package, then run `node tests/e2e/workbench-route-layout.mjs`. The script only binds to `project.draft.http/model.golden.proc` on the isolated runtime, and checks editing, history, save/reopen and readonly controls. It does not use the user's model.

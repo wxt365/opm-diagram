@@ -10,7 +10,6 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-
 class OplGoldenReplayDatabaseInitializerTest {
 
     @Test
@@ -22,7 +21,7 @@ class OplGoldenReplayDatabaseInitializerTest {
         Path database = initializer.initialize(workRoot, base, fixture);
         initializer.initialize(workRoot, base, fixture);
 
-        try (Connection connection = DriverManager.getConnection("jdbc:sqlite:" + database.toAbsolutePath())) {
+        try (Connection connection = org.opm.localruntime.storage.SqliteTestSupport.connection(database)) {
             assertEquals(1, integer(connection, "SELECT COUNT(*) FROM revision_document"));
             assertEquals(base.revisionId(), text(connection, "SELECT draft_head_revision_id FROM model_head"));
             assertEquals(base.revisionSequence(), integer(connection, "SELECT head_sequence FROM model_head"));

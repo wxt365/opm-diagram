@@ -2,6 +2,8 @@
 
 更新时间：2026-09-11
 
+2026-11-23 实现增量：[OPM、SQLite 与桌面选择性迁移报告](reports/opm-selective-source-migration-20261123-report.md)、[SQLite 旧库转换说明](integration/sqlite-storage-upgrade.md)、[迁移规格](../specs/opm-selective-source-migration-20261123-task-spec.md)。以下设计冻结与发布状态为原历史基线，本次迁移不将其提升为发布验证通过；当前使用方式以根 README 为准。
+
 ## 1. 文档目的
 
 本文档是 OPM 单机建模工具需求、标准、架构和后续开发准备材料的统一入口。

@@ -33,20 +33,32 @@ public final class OpdTransferService {
         this.domain = domain; this.databases = databases; this.profiles = new ProfilePackageAssembler(loader);
     }
     public ObjectNode exportJson(String project, String model, Map<String, Object> request) {
+        return exportJson(project, model, request, false);
+    }
+    /** Complete immutable revision for host governance; never slice to the active OPD. */
+    public ObjectNode exportModelJson(String project, String model, Map<String, Object> request) {
+        if (!Set.of("request_id", "revision_id").equals(request.keySet())) OpdJsonPackage.invalid("完整模型导出需要固定版本");
+        return exportJson(project, model, request, true);
+    }
+    private ObjectNode exportJson(String project, String model, Map<String, Object> request, boolean fullModel) {
         stableId(project); stableId(model); stableId(required(request, "request_id"));
         if (!Set.of("request_id", "context_id", "draft_token", "revision_id").containsAll(request.keySet())
                 || request.containsKey("draft_token") == request.containsKey("revision_id")) OpdJsonPackage.invalid("请选择草稿或固定版本");
-        String context = required(request, "context_id"); stableId(context); domain.requireActiveModel(project, model);
+        String context = fullModel ? null : required(request, "context_id");
+        if (context != null) stableId(context);
+        domain.requireActiveModel(project, model);
         ObjectNode document;
         if (request.containsKey("draft_token")) {
-            var snapshot = new DraftJournalRepository(databases.databasePath(project), Clock.systemUTC()).read(project, model);
+            var snapshot = new DraftJournalRepository(databases.databaseScope(project), Clock.systemUTC()).read(project, model);
             // JSON 整数不区分 Java 的 int/long，但仍拒绝小数及额外字段。
             if (!JSON.valueToTree(snapshot.token()).equals((left, right) -> left.isIntegralNumber() && right.isIntegralNumber()
                     ? left.bigIntegerValue().compareTo(right.bigIntegerValue()) : left.equals(right) ? 0 : 1, JSON.valueToTree(request.get("draft_token"))))
                 throw new ApiException(ApiErrorCode.REVISION_CONFLICT, 409, false, "草稿已变化，请刷新后重新导出");
             document = SaveContentDigestV1.read(snapshot.documentJson());
         } else { String revision = required(request, "revision_id"); stableId(revision); document = domain.transferDocument(project, model, revision); }
-        var sliced = OpdJsonPackage.slice(document, context);
+        if (fullModel) context = document.path("model_header").path("root_context_id").asText();
+        var sliced = fullModel ? document.deepCopy() : OpdJsonPackage.slice(document, context);
+        OpdJsonPackage.clearEvidence(sliced);
         var semantic = OpdJsonPackage.validate(sliced);
         var generated = text.generate(semantic, context, profiles.assemble(semantic.profileBinding())); DraftTextMetadataWriter.write(sliced, generated);
         var result = JSON.createObjectNode().put("format", "OPM-OPD-JSON").put("format_version", "1.0").put("entry_context_id", context).put("exported_at", Instant.now().toString());
@@ -84,9 +96,7 @@ public final class OpdTransferService {
         if (!revision.profileBinding().equals(RuntimeActiveBindingProvider.current()))
             throw new ApiException(ApiErrorCode.RULE_VERSION_CONFLICT, 409, false, "目标环境 Profile 或规则绑定与文件不一致");
         var assets = profiles.assemble(revision.profileBinding());
-        for (var item : revision.contexts()) {
-            var generated = text.generate(revision, item.id(), assets); text.validateActiveWriteEvidence(revision, assets, generated);
-        }
+        OpdJsonPackage.validateText(revision, assets);
         var normalized = new LinkedHashMap<>(request); normalized.put("name", name);
         var result = domain.createTransferredModel(project, normalized, document);
         @SuppressWarnings("unchecked") var model = new LinkedHashMap<>((Map<String, Object>) result.get("data"));

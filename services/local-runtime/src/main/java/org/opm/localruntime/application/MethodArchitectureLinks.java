@@ -30,7 +30,7 @@ final class MethodArchitectureLinks {
                     return proposal(document, List.of());
             linkId = "architecture.link." + UUID.randomUUID().toString().replace("-", "");
             source.withArray("architecture_links").addObject().put("link_id", linkId).put("target_context_id", other).put("kind", kind);
-            document.put("schema_version", "0.5");
+            if (!List.of("0.6", "0.7").contains(document.path("schema_version").asText())) document.put("schema_version", "0.5");
             if (!document.has("refinement_edges")) document.putArray("refinement_edges");
         } else {
             linkId = payload.required("link_id").asText(); other = null;

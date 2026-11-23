@@ -3,25 +3,26 @@ import { createHash } from 'node:crypto';
 import { expect, test } from '@playwright/test';
 
 test.use({ baseURL: process.env.OPM_ASSISTANT_BASE ?? 'http://127.0.0.1:5177' });
-test('真实助手保留不同设备同名和指定布局，质量建议不阻断确认且保存恢复', async ({ page }, info) => {
+test('真实助手保留不同设备同名和指定布局，质量建议不阻断自动保存且保存恢复', async ({ page }, info) => {
   test.setTimeout(300_000); test.skip(!process.env.OPM_ASSISTANT_PROOF, '需要独立助手测试项目');
   const proof = JSON.parse(await readFile(process.env.OPM_ASSISTANT_PROOF!, 'utf8'));
   const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
   await page.setViewportSize({ width: 1600, height: 1100 }); await page.goto(`/projects/${proof.projectId}`);
   await page.getByTestId('p02-create-model').click(); await page.getByTestId('ov02-model-name').fill(`建模质量建议-${Date.now()}`);
   await page.getByRole('button', { name: '创建并打开工作台', exact: true }).click(); await expect(page.getByTestId('hs-save')).toBeEnabled();
-  await page.getByTestId('left-tab-assistant').click(); const panel = page.getByTestId('assistant-panel');
+  await page.getByTestId('left-tab-assistant').click(); const panel = page.locator('[data-testid=assistant-panel]:visible');
   const before = await page.getByTestId('hs-draft-identity').innerText();
-  await panel.getByTestId('assistant-input').fill('只创建两个对象，表示两台不同的实物设备。两个对象的显示名称都必须是“设备”，语义身份必须不同，不要合并。第一台坐标x=80,y=200，第二台x=160,y=200；这是有意指定的重叠测试，请保持坐标，最后由我一次确认。不要添加过程、状态或关系。');
+  await panel.getByTestId('assistant-input').fill('只创建两个对象，表示两台不同的实物设备。两个对象的显示名称都必须是“设备”，语义身份必须不同，不要合并。第一台坐标x=80,y=200，第二台x=160,y=200；这是有意指定的重叠测试，请保持坐标。不要添加过程、状态或关系。');
   await panel.getByTestId('assistant-send').click(); await expect(panel.getByTestId('assistant-running')).toBeVisible();
   await expect(panel.getByTestId('assistant-running')).toHaveCount(0, { timeout: 180_000 });
-  await expect(panel.getByTestId('assistant-apply')).toBeEnabled();
-  expect(await page.getByTestId('hs-draft-identity').innerText()).toBe(before);
+  await expect(panel.getByTestId('assistant-apply')).toHaveCount(0);
+  await expect(page.getByTestId('hs-draft-identity')).not.toHaveText(before);
+  await panel.getByTestId('assistant-proposals').locator(':scope > summary').click();
   await expect(page.locator('.x6-node').filter({ has: page.locator('text', { hasText: /^设备$/ }) })).toHaveCount(2);
   await panel.getByTestId('assistant-quality').locator('summary').click();
   await expect(panel.getByTestId('assistant-quality')).toContainText('多个独立语义身份');
   await expect(panel.getByTestId('assistant-quality')).toContainText('布局边界存在重叠');
-  await expect(panel.getByTestId('assistant-quality')).toContainText('建议不影响确认');
+  await expect(panel.getByTestId('assistant-quality')).toContainText('建议不阻断保存');
   const modelId = new URL(page.url()).pathname.match(/\/models\/([^/]+)\/workbench/)![1];
   const contextId = (await page.getByTestId('opd-navigator').locator('[aria-current="page"]').getAttribute('data-testid'))!.replace('p03-context-', '');
   const scope = { projectId: proof.projectId, modelId, contextId }, session = await page.evaluate(() => window.__OPM_LOCAL_SESSION__);
@@ -33,10 +34,9 @@ test('真实助手保留不同设备同名和指定布局，质量建议不阻�
   expect(plan.validation.validation_summary.blocking).toBe(0); expect(plan.review.issues.filter((item: { severity: string }) => item.severity === 'ERROR')).toEqual([]);
   await writeFile(info.outputPath('quality-proof.json'), JSON.stringify({ scope, quality: plan.quality, review: plan.review }, null, 2));
   await page.screenshot({ path: info.outputPath('assistant-quality-advisory.png') });
-  await panel.getByTestId('assistant-apply').click(); await expect(page.getByTestId('hs-draft-identity')).not.toHaveText(before);
   await page.getByTestId('hs-save').click(); await expect(page.getByTestId('hs-save-state')).toHaveText('已手动保存');
   await page.reload(); await expect(page.getByTestId('hs-save')).toBeEnabled(); await page.getByTestId('left-tab-assistant').click();
-  await expect(panel.getByTestId('assistant-proposal')).toContainText('已应用'); expect((await list()).proposals.at(-1).quality).toEqual(plan.quality);
+  await expect(panel.getByTestId('assistant-proposal')).toContainText('已保存'); expect((await list()).proposals.at(-1).quality).toEqual(plan.quality);
   await expect(page.locator('.x6-node').filter({ has: page.locator('text', { hasText: /^设备$/ }) })).toHaveCount(2);
   await page.setViewportSize({ width: 390, height: 844 }); await panel.getByTestId('assistant-proposals').locator(':scope > summary').click();
   await panel.getByTestId('assistant-quality').locator('summary').click(); await panel.getByTestId('assistant-quality').scrollIntoViewIfNeeded();

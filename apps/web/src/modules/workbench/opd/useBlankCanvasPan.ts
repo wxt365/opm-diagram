@@ -8,7 +8,7 @@ export function useBlankCanvasPan(getGraph: () => Graph | undefined, allowed: ()
   function start(event: PointerEvent) {
     suppressClick = false;
     if (!allowed() || event.button !== 0 || event.pointerType !== "mouse"
-      || !(event.target instanceof Element) || event.target.closest(".x6-cell")) return;
+      || !(event.target instanceof Element) || event.target.closest(".x6-cell, .x6-cell-tools")) return;
     const graph = getGraph(), element = event.currentTarget;
     if (!graph || !(element instanceof HTMLElement)) return;
     gesture = { pointerId: event.pointerId, element, x: event.clientX, y: event.clientY, ...graph.translate() };

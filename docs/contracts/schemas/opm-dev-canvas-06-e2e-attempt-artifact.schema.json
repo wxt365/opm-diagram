@@ -123,7 +123,7 @@
       "properties": {
         "storage_root": {"const": "storage"},
         "project_db_ref": {"$ref": "#/$defs/fileRef"},
-        "storage_schema_version": {"const": "1.0"},
+        "storage_schema_version": {"enum": ["1.0", "2.0"]},
         "sqlite_quick_check": {"const": "ok"},
         "foreign_key_check_count": {"const": 0},
         "sidecar_absent": {"const": true}

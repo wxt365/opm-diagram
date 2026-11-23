@@ -17,7 +17,7 @@ test('分析助手读取最新同版本失败报告及端点，保存或模型�
   const service = new AssistantService({ dataRoot: root }); await service.init();
   t.after(async () => { await service.close(); await rm(root, { recursive: true, force: true }); });
   let modelToken = token;
-  service.runtime = () => ({ open: async () => ({ draft_token: modelToken }), snapshot: async () => ({ ...snapshot([]), token: modelToken }), query: async () => structuredClone(data) });
+  service.runtime = () => ({ open: async () => ({ draft_token: modelToken }), snapshot: async () => ({ ...snapshot([]), token: modelToken, model_name: '入库讨论', business_goal: '只讨论物料登记，不包含结算' }), query: async () => structuredClone(data) });
   const conversation = await service.create(scope, 'session');
   const proposal = { id: 'blocked', status: 'blocked', contextId: scope.contextId, baseToken: token,
     analysisSource: { mindmap_id: scope.mindmapId, revision: 0, bindings: [{ source_id: 'beans', target_ref: 'create.beans' }] },
@@ -27,6 +27,7 @@ test('分析助手读取最新同版本失败报告及端点，保存或模型�
   let expected = true;
   service.harnesses.set(scope.projectId, { close() {}, async run(prompt, options) {
     assert.ok(prompt.includes('conversion_diagnostics')); assert.ok(prompt.includes('不同对象'));
+    assert.ok(prompt.includes('只讨论物料登记，不包含结算'));
     const read = await service.tool(options.sessionId, 'read_analysis', {});
     if (expected) {
       assert.equal(read.conversion_diagnostics.proposal_id, 'blocked');
@@ -116,8 +117,9 @@ test('类型不明、排除依赖、已删除绑定及正式关系改变均拒�
 test('分析 SDK 新建和恢复会话仅开放分析工具', async () => {
   const calls = [], make = async options => { options.setup({ tools: { restrict: x => calls.push(x.allow) } }); return { dispose() {} }; };
   const ctx = { on: () => () => {}, agents: { create: make, resume: make }, sessionPersistence: { stat: async id => id.endsWith('existing') ? {} : undefined } };
-  const server = new ModelingSdkServer(ctx, { notify() {} }); await server.createSession('analysis.new'); await server.createSession('analysis.existing');
-  assert.deepEqual(calls, [['read_analysis', 'save_analysis'], ['read_analysis', 'save_analysis']]);
+  const server = Object.assign(Object.create(ModelingSdkServer.prototype), { ctx, sessions: new Map(), cwd: process.cwd() });
+  await server.createSession('analysis.new'); await server.createSession('analysis.existing');
+  assert.deepEqual(calls, [['read_analysis', 'save_analysis', 'apply_analysis_edits'], ['read_analysis', 'save_analysis', 'apply_analysis_edits']]);
 });
 test('转换超过整图修改上限时拒绝，重新绑定不会套用旧目标的改名基线', () => {
   const data = fixture();
@@ -157,4 +159,140 @@ test('分析多轮保存与 OPD 会话隔离，同一模型切图保持同一分
   assert.equal((await service.get(opd.id, { ...scope, kind: 'OPD' }, 'session')).messages.length, 0);
   await assert.rejects(service.tool(`analysis.${analysis.id}`, 'save_analysis', {}), { code: 'RUN_STOPPED' });
   await assert.rejects(service.create({ ...scope, mindmapId: 'mindmap.other' }, 'session'), { code: 'SCOPE_MISMATCH' });
+});
+
+test('OPM 脑图传递节点与分支，聚焦写入保护其他分支并检查修订', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'mindmap-branch-'));
+  let data = fixture(), saves = 0;
+  const service = new AssistantService({ dataRoot: root });
+  await service.init();
+  t.after(async () => { await service.close(); await rm(root, { recursive: true, force: true }); });
+  service.runtime = () => ({
+    open: async () => ({ draft_token: token }), snapshot: async () => snapshot([]),
+    query: async (_scope, _op, input) => {
+      if (input.action === 'SAVE') {
+        saves++;
+        data = { ...data, document: { ...structuredClone(input.document), revision: input.expected_revision + 1 } };
+      }
+      return structuredClone(data);
+    },
+  });
+  const conversation = await service.create(scope, 'session');
+  service.harnesses.set(scope.projectId, { close() {}, async run(_prompt, { sessionId }) {
+    const read = await service.tool(sessionId, 'read_analysis', {});
+    assert.deepEqual(read.edit_scope, { selected_node_ids: ['raw'], focused_branch_id: 'beans' });
+    const write = doc => service.tool(sessionId, 'save_analysis', { document_json: JSON.stringify(doc) });
+    const invalid = structuredClone(read.document);
+    invalid.nodes.find(item => item.id === 'roast').note = '其他分支不能改';
+    await assert.rejects(write(invalid), { code: 'ANALYSIS_SCOPE_INVALID' });
+    const valid = structuredClone(read.document);
+    valid.nodes.find(item => item.id === 'raw').note = '只改当前分支';
+    assert.equal((await write(valid)).revision, 1);
+    valid.revision = 1;
+    await assert.rejects(write(valid), { code: 'ANALYSIS_ALREADY_SAVED' });
+    return { events: [{ type: 'turn/end', data: { reason: { kind: 'completed' } } }] };
+  } });
+  const prompt = revision => service.prompt(conversation.id, scope, 'session', '整理这个分支', ['raw'], token, [], undefined, 'beans', revision);
+  await assert.rejects(prompt(2), { code: 'ANALYSIS_CONFLICT' });
+  await prompt(0);
+  await service.tasks.get(scope.projectId).completion;
+  assert.equal((await service.store.read(conversation.id)).run.status, 'completed');
+  assert.equal(saves, 1);
+  assert.equal(data.document.nodes.find(item => item.id === 'roast').note, '');
+});
+
+test('大脑图可用局部操作修改短字段，失败回合以服务回执取代模型的成功措辞', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'mindmap-local-edits-'));
+  let data = fixture(), writes = 0, invalid = true;
+  data.document.nodes.push(...Array.from({ length: 36 }, (_, i) => ({
+    ...node(`note.${i}`, 'TOPIC'), order: i + 2, note: '详细资料'.repeat(950),
+  })));
+  const service = new AssistantService({ dataRoot: root });
+  await service.init();
+  t.after(async () => { await service.close(); await rm(root, { recursive: true, force: true }); });
+  service.runtime = () => ({
+    open: async () => ({ draft_token: token }), snapshot: async () => snapshot([]),
+    query: async (_scope, _op, input) => {
+      if (input.action === 'SAVE') {
+        assert.equal(input.expected_revision, data.document.revision);
+        writes++;
+        data = { ...data, document: { ...structuredClone(input.document), revision: input.expected_revision + 1 } };
+      }
+      return structuredClone(data);
+    },
+  });
+  const conversation = await service.create(scope, 'session');
+  const original = structuredClone(data.document);
+  assert.ok(JSON.stringify(original).length > 128000);
+  service.harnesses.set(scope.projectId, { close() {}, async run(_prompt, { sessionId }) {
+    const read = await service.tool(sessionId, 'read_analysis', { compact: true, note_node_id: 'raw' });
+    assert.equal(read.document.nodes.find(item => item.id === 'note.0').has_note, true);
+    assert.equal(Object.hasOwn(read.document.nodes.find(item => item.id === 'note.0'), 'note'), false);
+    assert.equal(read.document.nodes.find(item => item.id === 'raw').note, '');
+    const edits = [
+      { op: 'update_node', id: 'beans', label: '原料豆' },
+      { op: 'add_node', id: 'note.new', parent_id: 'beans', label: '讨论说明' },
+      { op: 'move_node', id: 'note.new', parent_id: 'beans', index: 0 },
+      { op: 'add_relation', id: 'relation.new', endpoints: ['note.new', 'roast'], label: '待核对' },
+    ];
+    if (invalid) edits.push({ op: 'update_node', id: 'roast', label: '越界' });
+    const write = () => service.tool(sessionId, 'apply_analysis_edits', { expected_revision: read.document.revision, edits_json: JSON.stringify(edits) });
+    if (invalid) await assert.rejects(write, { code: 'ANALYSIS_SCOPE_INVALID' });
+    else assert.deepEqual(await write(), { saved: true, revision: 1 });
+    return { finalResponse: '已经保存成功', events: [{ type: 'turn/end', data: { reason: { kind: 'completed' } } }] };
+  } });
+  const prompt = async () => {
+    await service.prompt(conversation.id, scope, 'session', '编辑聚焦分支', ['beans'], token, [], undefined, 'beans', data.document.revision);
+    await service.tasks.get(scope.projectId).completion;
+    return service.store.read(conversation.id);
+  };
+  const failed = await prompt();
+  assert.equal(failed.run.status, 'failed');
+  assert.match(failed.run.message, /涉及其他分支/);
+  assert.doesNotMatch(failed.messages.at(-1).text, /已经保存成功/);
+  assert.equal(writes, 0);
+  assert.deepEqual(data.document, original);
+  invalid = false;
+  const saved = await prompt();
+  assert.equal(saved.run.status, 'completed');
+  assert.match(saved.run.message, /已保存（修订 1）/);
+  assert.equal(writes, 1);
+  assert.equal(data.document.nodes.find(item => item.id === 'note.new').order, 0);
+  assert.equal(data.document.nodes.find(item => item.id === 'beans').label, '原料豆');
+  assert.deepEqual(data.document.nodes.filter(item => /^note\.\d/.test(item.id)), original.nodes.filter(item => /^note\.\d/.test(item.id)));
+  assert.equal(data.document.relations.length, original.relations.length + 1);
+});
+
+test('正式模型在脑图保存前发生变化时以冲突结果覆盖模型的成功回复', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'mindmap-model-conflict-'));
+  const data = fixture();
+  let activeToken = token, writes = 0;
+  const service = new AssistantService({ dataRoot: root });
+  await service.init();
+  t.after(async () => { await service.close(); await rm(root, { recursive: true, force: true }); });
+  service.runtime = () => ({
+    open: async () => ({ draft_token: activeToken }),
+    snapshot: async () => snapshot([]),
+    query: async (_scope, _operation, input) => {
+      if (input.action === 'SAVE') writes++;
+      return structuredClone(data);
+    },
+  });
+  const conversation = await service.create(scope, 'session');
+  service.harnesses.set(scope.projectId, { close() {}, async run(_prompt, { sessionId }) {
+    const read = await service.tool(sessionId, 'read_analysis', { compact: true });
+    activeToken = { ...token, edit_seq: token.edit_seq + 1 };
+    await assert.rejects(service.tool(sessionId, 'apply_analysis_edits', {
+      expected_revision: read.document.revision,
+      edits_json: JSON.stringify([{ op: 'update_node', id: 'beans', label: '原料豆' }]),
+    }), { code: 'DRAFT_CONFLICT' });
+    return { finalResponse: '保存成功', events: [{ type: 'turn/end', data: { reason: { kind: 'completed' } } }] };
+  } });
+  await service.prompt(conversation.id, scope, 'session', '改名', ['beans'], token);
+  await service.tasks.get(scope.projectId).completion;
+  const completed = await service.store.read(conversation.id);
+  assert.equal(writes, 0);
+  assert.equal(completed.run.status, 'failed');
+  assert.equal(completed.run.code, 'DRAFT_CONFLICT');
+  assert.match(completed.messages.at(-1).text, /生成期间模型已改变/);
 });

@@ -1,0 +1,32 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { ConversationStore } from '../src/store.mjs';
+import { liveReply, putReply } from '../src/live-reply.mjs';
+
+for (const sessionId of ['conversation.test', 'analysis.conversation.test']) test(`生成文字实时持久化、结束不重复、停止拒绝迟到通知：${sessionId}`, async t => {
+  const root = await mkdtemp(join(tmpdir(), 'opm-live-reply-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const store = new ConversationStore(root); await store.init();
+  const scope = { projectId: 'project.test', modelId: 'model.test', contextId: 'context.root' };
+  const conversation = await store.create(scope);
+  const task = { key: conversation.id, scope, runId: 'run.test', active: true };
+  await store.update(task.key, value => { value.run = { id: task.runId, status: 'running' }; });
+  const reply = liveReply({ store }, task, sessionId); t.after(() => reply.dispose());
+  const notify = frame => reply.notify({ method: 'opm.assistant-stream', params: { sessionId, frame } });
+  notify({ type: 'start', attemptId: 'attempt.1', revision: 1 });
+  notify({ type: 'chunk', attemptId: 'attempt.1', revision: 2, chunk: { type: 'text-delta', text: '正在回答' } });
+  reply.notify({ method: 'opm.assistant-stream', params: { sessionId: 'review.other', frame: { type: 'chunk', attemptId: 'attempt.1', revision: 3, chunk: { type: 'text-delta', text: '审查秘密' } } } });
+  await reply.flush();
+  let value = await store.read(task.key); assert.equal(value.run.status, 'running'); assert.equal(value.messages[0].text, '正在回答');
+  notify({ type: 'chunk', attemptId: 'attempt.1', revision: 3, chunk: { type: 'text-delta', text: '完成' } });
+  notify({ type: 'chunk', attemptId: 'attempt.1', revision: 3, chunk: { type: 'text-delta', text: '重复' } });
+  await reply.flush();
+  await store.update(task.key, value => putReply(value, reply.messageId, '最终回复', scope.contextId));
+  value = await store.read(task.key); assert.equal(value.messages.length, 1); assert.equal(value.messages[0].text, '最终回复');
+  task.active = false;
+  notify({ type: 'chunk', attemptId: 'attempt.1', revision: 4, chunk: { type: 'text-delta', text: '迟到' } });
+  await reply.flush(); assert.equal((await store.read(task.key)).messages[0].text, '最终回复');
+});

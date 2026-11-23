@@ -29,6 +29,8 @@ export interface RelationEdgeSpec {
   readonly id: string;
   readonly source: string;
   readonly target: string;
+  readonly sourceAnchor?: Readonly<{ dx: number; dy: number }>;
+  readonly targetAnchor?: Readonly<{ dx: number; dy: number }>;
   readonly zIndex?: number;
   readonly role?: "PROCESS_INPUT";
   readonly data: Readonly<Record<string, string>>;
@@ -36,6 +38,7 @@ export interface RelationEdgeSpec {
   readonly labels: readonly RelationLabelSpec[];
   readonly vertices?: readonly Readonly<{ x: number; y: number }>[];
   readonly router?: Readonly<{ name: string; args: Readonly<Record<string, unknown>> }>;
+  readonly connector?: Readonly<{ name: string; args: Readonly<Record<string, unknown>> }>;
 }
 
 export interface RelationNodeSpec {

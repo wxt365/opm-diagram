@@ -1,64 +1,23 @@
 package org.opm.localruntime.storage;
-
 import java.nio.file.Path;
+import java.util.Optional;
 import java.util.Objects;
-
 public final class ProjectDatabaseFactory {
-
     private final Path storageRoot;
-    private final FlywayProjectSchemaMigrator migrator;
+    private final RuntimeStore store;
     private final boolean journaledDrafts;
-
-    /** 应用新建入口使用混合保存；历史发布工具仍显式使用旧构造器。 */
-    public static ProjectDatabaseFactory journaledDrafts(Path storageRoot) {
-        return new ProjectDatabaseFactory(storageRoot, new FlywayProjectSchemaMigrator(java.util.List.of(
-                "classpath:db/migration", "classpath:db/hybrid-save", "classpath:db/checkpoint", "classpath:db/pin",
-                "classpath:db/digestv2", "classpath:db/mindmap")), true);
+    public static ProjectDatabaseFactory journaledDrafts(Path root) { return new ProjectDatabaseFactory(root,StorageStores.tools(root),true); }
+    public ProjectDatabaseFactory(Path root) { this(root,StorageStores.tools(root),false); }
+    public ProjectDatabaseFactory(Path root,RuntimeStore store,boolean journaled) {
+        this.storageRoot=Objects.requireNonNull(root).toAbsolutePath().normalize();this.store=Objects.requireNonNull(store);this.journaledDrafts=journaled;
     }
-
-    public ProjectDatabaseFactory(Path storageRoot) {
-        this(storageRoot, new FlywayProjectSchemaMigrator());
+    public ProjectDatabaseOpenResult open(String project) { return new ProjectDatabaseOpenResult.Ready(new ProjectDatabase(databaseScope(project)),Optional.empty()); }
+    public ProjectDatabaseOpenResult openForModelLifecycle(String project) { return open(project); }
+    public boolean usesJournaledDrafts(){return journaledDrafts;}
+    public ProjectScope databaseScope(String project) {
+        if(project==null||project.isBlank())throw new IllegalArgumentException("Project ID required");return store.project(project);
     }
-
-    ProjectDatabaseFactory(Path storageRoot, FlywayProjectSchemaMigrator migrator) {
-        this(storageRoot, migrator, false);
-    }
-
-    private ProjectDatabaseFactory(Path storageRoot, FlywayProjectSchemaMigrator migrator, boolean journaledDrafts) {
-        this.storageRoot = Objects.requireNonNull(storageRoot, "storageRoot must not be null").toAbsolutePath().normalize();
-        this.migrator = Objects.requireNonNull(migrator, "migrator must not be null");
-        this.journaledDrafts = journaledDrafts;
-    }
-
-    public ProjectDatabaseOpenResult open(String projectId) {
-        validateProjectId(projectId);
-        return migrator.migrate(databasePath(projectId), journaledDrafts, journaledDrafts);
-    }
-
-    /** 旧式库只在明确使用模型生命周期时升级删除守卫，避免影响固定版本发布工具。 */
-    public ProjectDatabaseOpenResult openForModelLifecycle(String projectId) {
-        validateProjectId(projectId);
-        return migrator.migrate(databasePath(projectId), journaledDrafts, true);
-    }
-
-    public boolean usesJournaledDrafts() { return journaledDrafts; }
-
-    public Path databasePath(String projectId) {
-        validateProjectId(projectId);
-        Path databasePath = storageRoot.resolve("projects").resolve(projectId).resolve("project.db").normalize();
-        if (!databasePath.startsWith(storageRoot)) {
-            throw new IllegalArgumentException("project database path escapes the configured storage root");
-        }
-        return databasePath;
-    }
-
-    public Path storageRoot() {
-        return storageRoot;
-    }
-
-    private void validateProjectId(String projectId) {
-        if (projectId == null || !projectId.matches("[A-Za-z][A-Za-z0-9._:-]{2,127}")) {
-            throw new IllegalArgumentException("projectId must be a stable identifier without path separators");
-        }
-    }
+    public Path storageRoot(){return storageRoot;}
+    public Path snapshot(String project) {try{return store.snapshot(storageRoot,databaseScope(project));}catch(Exception e){throw new StorageAccessException("Cannot export project snapshot",e);}}
+    public RuntimeStore store(){return store;}
 }

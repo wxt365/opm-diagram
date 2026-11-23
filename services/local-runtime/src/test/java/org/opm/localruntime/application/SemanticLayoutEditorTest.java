@@ -20,10 +20,14 @@ class SemanticLayoutEditorTest {
                 layout(occurrences.get(1), 108, 128, 88, 28), layout(occurrences.get(2), 108, 164, 88, 28),
                 layout(occurrences.get(3), 900, 900, 88, 28)));
         var statesBefore = List.copyOf(layouts.subList(1, layouts.size()));
+        var originalOwner = layouts.get(0);
+        var route = new EdgeRoute("feature.characterization", "CURVE", "MANUAL", List.of(new RoutePoint(300, 200)));
+        layouts.set(0, new SemanticRevision.Layout(originalOwner.id(), originalOwner.x(), originalOwner.y(), originalOwner.width(), originalOwner.height(), originalOwner.zOrder(), List.of(route)));
         SemanticLayoutEditor.compactStateOwner(first, occurrences.get(1), List.of(first, second), occurrences, layouts);
-        assertEquals(160, layouts.getFirst().width());
-        assertEquals(100, layouts.getFirst().height());
+        assertEquals(160, layouts.get(0).width());
+        assertEquals(100, layouts.get(0).height());
         assertEquals(statesBefore, layouts.subList(1, layouts.size()));
+        assertEquals(List.of(route), layouts.get(0).edgeRoutes());
     }
 
     @Test
@@ -33,8 +37,8 @@ class SemanticLayoutEditorTest {
         var child = occurrence(state.id(), "context.root", TargetKind.STATE, "FEATURE_STATE_NODE");
         var layouts = new ArrayList<>(List.of(layout(owner, 100, 100, 600, 200), layout(child, 108, 128, 240, 28)));
         SemanticLayoutEditor.compactStateOwner(state, child, List.of(state), List.of(owner, child), layouts);
-        assertEquals(256, layouts.getFirst().width());
-        assertEquals(72, layouts.getFirst().height());
+        assertEquals(256, layouts.get(0).width());
+        assertEquals(72, layouts.get(0).height());
     }
 
     private State state(String id, String owner, TargetKind kind) {

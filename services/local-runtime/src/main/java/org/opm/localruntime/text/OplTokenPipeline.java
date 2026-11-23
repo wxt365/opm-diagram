@@ -257,7 +257,7 @@ final class OplTokenPipeline {
         for (int index = separatorIndex + direction; index >= 0 && index < tokens.size(); index += direction) {
             OplToken candidate = tokens.get(index);
             if (candidate.kind() != OplToken.Kind.ENTITY && candidate.kind() != OplToken.Kind.STATE) continue;
-            for (SemanticRevision.Endpoint endpoint : sentenceEndpoints(fact, candidate.sourceRefs().getFirst().sentenceSlot())) {
+            for (SemanticRevision.Endpoint endpoint : sentenceEndpoints(fact, candidate.sourceRefs().get(0).sentenceSlot())) {
                 TokenMention mention = tokenMention(endpoint, elements, features, states);
                 if (mention != null && candidate.text().equals(mention.text())) return endpoint;
             }
@@ -347,10 +347,10 @@ final class OplTokenPipeline {
         candidates.sort(Comparator.comparingInt(TokenSpan::start).thenComparing(Comparator.comparingInt(TokenSpan::end).reversed()));
         List<TokenSpan> selected = new ArrayList<>();
         for (TokenSpan candidate : candidates) {
-            if (selected.isEmpty() || candidate.start() >= selected.getLast().end()) {
+            if (selected.isEmpty() || candidate.start() >= selected.get(selected.size() - 1).end()) {
                 selected.add(candidate);
-            } else if (candidate.start() == selected.getLast().start() && candidate.end() == selected.getLast().end()) {
-                TokenSpan previous = selected.removeLast();
+            } else if (candidate.start() == selected.get(selected.size() - 1).start() && candidate.end() == selected.get(selected.size() - 1).end()) {
+                TokenSpan previous = selected.remove(selected.size() - 1);
                 List<OplToken.SourceRef> refs = new ArrayList<>(previous.sourceRefs());
                 refs.addAll(candidate.sourceRefs());
                 selected.add(new TokenSpan(previous.start(), previous.end(), previous.text(), previous.kind(), distinct(refs)));
@@ -705,7 +705,7 @@ final class OplTokenPipeline {
             for (OplToken.SourceRef ref : token.sourceRefs()) {
                 if (ref.sourceKind() == OplToken.SourceKind.RULE) {
                     String ruleId = token.kind() == OplToken.Kind.CONTROL_KEYWORD && ruleIds.size() > 1
-                            ? ruleIds.getLast() : ruleIds.getFirst();
+                            ? ruleIds.get(ruleIds.size() - 1) : ruleIds.get(0);
                     refs.add(source(OplToken.SourceKind.RULE, ruleId, "", ref.endpointOrdinal(), sentenceSlot));
                 } else if (ref.sourceKind() == OplToken.SourceKind.GRAMMAR) {
                     refs.add(source(OplToken.SourceKind.GRAMMAR, grammar.binding().id(), grammarPath(templateId), ref.endpointOrdinal(), sentenceSlot));

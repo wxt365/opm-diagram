@@ -35,6 +35,20 @@ public final class DraftWorkspaceService {
     private final DraftSaveService saves;
     private final DraftCapabilityQuery capabilityQuery;
     private final OplTextGenerationService text = new OplTextGenerationService();
+    private final Map<String, QueryView> queryViews = new java.util.LinkedHashMap<>(4, 0.75f, true);
+    private record QueryView(String raw, ObjectNode document, SemanticRevision revision) { }
+
+    // 仅复用已从数据库验证过的同一份文档；每次查询仍读取存储并核验 token 和 Profile。
+    private synchronized QueryView queryView(String project, String model, String raw) {
+        String key = project + "/" + model;
+        var previous = queryViews.get(key);
+        if (previous != null && previous.raw().equals(raw)) return previous;
+        var document = SaveContentDigestV1.read(raw);
+        var view = new QueryView(raw, document, semantic(document));
+        queryViews.put(key, view);
+        while (queryViews.size() > 4) queryViews.remove(queryViews.keySet().iterator().next());
+        return view;
+    }
 
     public static final class Failure extends RuntimeException {
         private final String code, reason;
@@ -63,10 +77,10 @@ public final class DraftWorkspaceService {
         var repository = repository(project); JsonNode input = request.value();
         if (request.type() == MindmapRequest) {
             require(databases.open(project) instanceof org.opm.localruntime.storage.ProjectDatabaseOpenResult.Ready, "PERSISTENCE_FAILED", null);
-            return new org.opm.localruntime.storage.MindmapRepository(databases.databasePath(project), clock).execute(project, model, input);
+            return new org.opm.localruntime.storage.MindmapRepository(databases.databaseScope(project), clock).execute(project, model, input);
         }
         if (request.type() == DraftModelPlanPreviewRequest) {
-            if (input.has("analysis_source")) new org.opm.localruntime.storage.MindmapRepository(databases.databasePath(project), clock).check(project, model, input.get("analysis_source"));
+            if (input.has("analysis_source")) new org.opm.localruntime.storage.MindmapRepository(databases.databaseScope(project), clock).check(project, model, input.get("analysis_source"));
             var snapshot = repository.read(project, model); var token = input.get("draft_token");
             require(sameToken(token, snapshot), "DRAFT_CONFLICT", null);
             var before = SaveContentDigestV1.read(snapshot.documentJson()); String context = input.get("context_id").asText();
@@ -75,11 +89,14 @@ public final class DraftWorkspaceService {
             var revision = semantic(built.document());
             var result = JSON.createObjectNode();
             result.set("meta", envelope(input, context, JSON.createObjectNode()).get("meta"));
-            result.set("data", projection(revision, built.document(), context)); result.putNull("capabilities"); result.putNull("findings");
+            result.set("data", projection(revision, built.document(), context)); result.putNull("capabilities"); result.putNull("findings"); result.putNull("text");
             if (input.path("finalize").asBoolean(false)) {
                 result.set("findings", planFindings(project, model, token, revision));
+                // 文本与投影必须取自同一候选模型，不能读取尚未应用方案的真实草稿文本。
+                if (result.at("/findings/validation_summary/blocking").asInt() == 0)
+                    result.set("text", textData(revision, context));
                 if (input.has("analysis_source")) {
-                    var analysis = new org.opm.localruntime.storage.MindmapRepository(databases.databasePath(project), clock).source(project, model, input.get("analysis_source"));
+                    var analysis = new org.opm.localruntime.storage.MindmapRepository(databases.databaseScope(project), clock).source(project, model, input.get("analysis_source"));
                     MindmapConversions.bind(analysis, input.get("analysis_source"), result.get("data"), built.aliases(), input.get("steps"));
                 }
             }
@@ -90,6 +107,33 @@ public final class DraftWorkspaceService {
                 var endpoints = JSON.createArrayNode();
                 for (var endpoint : scope.get("endpoints")) endpoints.add(DraftModelPlan.resolve(endpoint.asText(), built.aliases(), revision, context));
                 scope.set("endpoints", endpoints); result.set("capabilities", candidates(project, model, token, scope, revision));
+            }
+            var views = result.putArray("affected_views");
+            var beforeRevision = semantic(before);
+            var renamedParents = new java.util.HashSet<String>();
+            for (var edge : revision.refinementEdges()) if (edge.parentContextId().equals(context)) {
+                var original = beforeRevision.elements().stream().filter(item -> item.id().equals(edge.refineeElementId())).findFirst();
+                var renamed = revision.elements().stream().filter(item -> item.id().equals(edge.refineeElementId())).findFirst().orElseThrow();
+                if (original.isPresent() && !original.get().name().equals(renamed.name())) renamedParents.add(renamed.id());
+            }
+            if (input.get("steps").toString().contains("REORGANIZE_SUBGRAPH") || !renamedParents.isEmpty()) {
+                var renamedReferences = new java.util.HashSet<String>(renamedParents);
+                for (var feature : revision.features()) if (renamedParents.contains(feature.ownerElementId())) renamedReferences.add(feature.id());
+                for (var state : revision.states()) if (renamedReferences.contains(state.ownerElementId())) renamedReferences.add(state.id());
+                for (var candidate : revision.contexts()) {
+                    var edge = revision.refinementEdges().stream().filter(item -> item.childContextId().equals(candidate.id())).findFirst();
+                    boolean added = semantic(before).contexts().stream().noneMatch(item -> item.id().equals(candidate.id()));
+                    boolean nameAffected = edge.map(item -> renamedParents.contains(item.refineeElementId())).orElse(false)
+                        || revision.occurrences().stream().anyMatch(item -> item.contextId().equals(candidate.id())
+                            && (renamedReferences.contains(item.targetId()) || (item.targetKind() == SemanticRevision.TargetKind.FACT
+                            && revision.facts().stream().filter(fact -> fact.id().equals(item.targetId())).anyMatch(fact -> fact.endpoints().stream().anyMatch(endpoint -> renamedReferences.contains(endpoint.targetId()) || renamedReferences.contains(endpoint.stateQualificationId()))))));
+                    if (!candidate.id().equals(context) && !added && !nameAffected) continue;
+                    var view = views.addObject().put("context_id", candidate.id()).put("label", candidate.name().localName());
+                    if (edge.isPresent()) view.put("parent_context_id", edge.get().parentContextId()).put("refinee_element_id", edge.get().refineeElementId());
+                    else view.putNull("parent_context_id").putNull("refinee_element_id");
+                    view.set("data", projection(revision, built.document(), candidate.id())); view.putNull("text");
+                    if (input.path("finalize").asBoolean() && result.at("/findings/validation_summary/blocking").asInt() == 0) view.set("text", textData(revision, candidate.id()));
+                }
             }
             return checked(result, DraftModelPlanPreviewResult);
         }
@@ -119,12 +163,29 @@ public final class DraftWorkspaceService {
             return checked(result, MethodSummaryResult);
         }
         if (request.type() == DraftEditRequest) {
+            if (input.at("/command/command_type").asText().equals("RESTORE_OPERATION")) {
+                require(input.at("/scope/intent").asText().equals("RESTORE_OPERATION") && input.at("/scope/selection_id").isNull()
+                        && input.at("/scope/endpoints").isEmpty() && !input.has("analysis_source"), "INPUT_INVALID", null);
+                return repository.commit(project, model, request, restored -> {
+                    require(new SemanticRevisionValidator().validate(semantic(restored)).isEmpty(), "DRAFT_EDIT_REJECTED", null);
+                    var summary = JSON.createObjectNode().put("blocking", 0).put("warning", 0).put("suggestion", 0).put("coverage_state", "INCOMPLETE");
+                    return new DraftJournalRepository.Proposal(restored.toString(), List.of(), List.of(), summary.toString());
+                }).value();
+            }
             return repository.commit(project, model, request, document -> DraftOperationDescription.describe(input, document,
                     edit(project, model, input, document.deepCopy()))).value();
         }
         if (request.type() == DraftReceiptRequest) return repository.receipt(project, model, request).value();
+        if (request.type() == RecoveryStateRequest) {
+            var data = new org.opm.localruntime.storage.OperationHistoryRepository(databases.databaseScope(project), clock)
+                    .recovery(project, model, input.get("draft_token"));
+            var meta = JSON.createObjectNode().put("request_id", input.path("request_id").asText()).put("project_id", project).put("model_id", model);
+            meta.set("draft_token", input.get("draft_token"));
+            var result = JSON.createObjectNode(); result.set("meta", meta); result.set("data", data);
+            return checked(result, RecoveryStateResult);
+        }
         if (request.type() == OperationHistoryRequest) {
-            var data = new org.opm.localruntime.storage.OperationHistoryRepository(databases.databasePath(project), clock)
+            var data = new org.opm.localruntime.storage.OperationHistoryRepository(databases.databaseScope(project), clock)
                     .read(project, model, input.path("revision").asText(), input.path("before").isNull() ? null : input.path("before").asText());
             var meta = JSON.createObjectNode().put("request_id", input.path("request_id").asText()).put("project_id", project).put("model_id", model).put("revision", input.path("revision").asText());
             var result = JSON.createObjectNode(); result.set("meta", meta); result.set("data", data);
@@ -135,6 +196,19 @@ public final class DraftWorkspaceService {
         if (request.type() == OpenDraftRequest) {
             String context = input.get("context_id").isNull() ? revision.rootContextId() : input.get("context_id").asText();
             context(revision, context);
+            return opened(project, model, input, snapshot, revision, context);
+        }
+        JsonNode token = input.get("draft_token");
+        if (!token.path("binding_digest").asText().equals(snapshot.token().binding_digest())) throw failure("RULE_VERSION_CONFLICT", null);
+        if (!sameToken(token, snapshot)) throw failure("DRAFT_CONFLICT", "DRAFT_CONFLICT");
+        String context = request.type() == DraftCapabilitiesRequest ? input.at("/scope/context_id").asText() : input.path("context_id").asText();
+        context(revision, context);
+        if (request.type() == DraftCapabilitiesRequest) return checked(envelope(input, context, candidates(project, model, token, input.get("scope"), revision)), DraftCapabilitiesResult);
+        // 普通 DraftQueryRequest 的具体查询由 query() 分派，避免用调用顺序推断意图。
+        throw failure("INPUT_INVALID", null);
+    }
+
+    private JsonNode opened(String project, String model, JsonNode input, DraftJournalRepository.Snapshot snapshot, SemanticRevision revision, String context) {
             var result = JSON.createObjectNode().put("request_id", input.get("request_id").asText()).put("project_id", project).put("model_id", model)
                     .put("root_context_id", revision.rootContextId()).put("context_id", context).put("mode", "JOURNALED_DRAFT_V2");
             result.set("draft_token", JSON.valueToTree(snapshot.token()));
@@ -147,15 +221,6 @@ public final class DraftWorkspaceService {
                 result.set("save_state", JSON.valueToTree(current));
             }
             return checked(result, OpenDraftResult);
-        }
-        JsonNode token = input.get("draft_token");
-        if (!token.path("binding_digest").asText().equals(snapshot.token().binding_digest())) throw failure("RULE_VERSION_CONFLICT", null);
-        if (!sameToken(token, snapshot)) throw failure("DRAFT_CONFLICT", "DRAFT_CONFLICT");
-        String context = request.type() == DraftCapabilitiesRequest ? input.at("/scope/context_id").asText() : input.path("context_id").asText();
-        context(revision, context);
-        if (request.type() == DraftCapabilitiesRequest) return checked(envelope(input, context, candidates(project, model, token, input.get("scope"), revision)), DraftCapabilitiesResult);
-        // 普通 DraftQueryRequest 的具体查询由 query() 分派，避免用调用顺序推断意图。
-        throw failure("INPUT_INVALID", null);
     }
 
     public JsonNode query(String project, String model, String operation, DraftWorkspaceContract.Document request) {
@@ -164,9 +229,33 @@ public final class DraftWorkspaceService {
         var snapshot = repository(project).read(project, model); var input = request.value(); var token = input.get("draft_token");
         if (!token.path("binding_digest").asText().equals(snapshot.token().binding_digest())) throw failure("RULE_VERSION_CONFLICT", null);
         require(sameToken(token, snapshot), "DRAFT_CONFLICT", "DRAFT_CONFLICT");
-        ObjectNode document = SaveContentDigestV1.read(snapshot.documentJson()); var revision = semantic(document); String context = input.get("context_id").asText(); context(revision, context);
+        var view = queryView(project, model, snapshot.documentJson());
+        ObjectNode document = view.document(); var revision = view.revision(); String context = input.get("context_id").asText(); context(revision, context);
         require(revision.profileBinding().equals(RuntimeActiveBindingProvider.current()), "RULE_VERSION_CONFLICT", null);
         var assets = profiles.assemble(revision.profileBinding());
+        if (operation.equals("canvas")) {
+            var result = JSON.createObjectNode();
+            result.set("opened", opened(project, model, input, snapshot, revision, context));
+            result.set("projection", checked(envelope(input, context, projection(revision, document, context)), DraftProjectionResult));
+            return result;
+        }
+        if (operation.equals("details")) {
+            var result = JSON.createObjectNode();
+            var findings = DraftModelValidation.findings(project, model, token, revision, assets);
+            result.set("findings", checked(envelope(input, context, findings), DraftFindingsResult));
+            result.set("navigation", checked(envelope(input, context, DraftWorkspaceQueries.navigation(revision, context)), DraftNavigationResult));
+            result.set("catalog", checked(envelope(input, context, DraftWorkspaceQueries.catalog(domain, revision, context, JSON.nullNode(), assets)), DraftRelationCatalogResult));
+            try { result.set("text", checked(envelope(input, context, textData(generate(revision, context, assets))), DraftTextResult)); }
+            catch (Failure failure) {
+                if (!failure.code().equals("DRAFT_EDIT_REJECTED") || findings.path("items").isEmpty()) throw failure;
+                result.putNull("text");
+            }
+            catch (OplGenerationException failure) {
+                if (findings.path("items").isEmpty()) throw failure;
+                result.putNull("text");
+            }
+            return result;
+        }
         if (operation.equals("navigation")) return checked(envelope(input, context, DraftWorkspaceQueries.navigation(revision, context)), DraftNavigationResult);
         if (operation.equals("findings")) {
             var data = DraftModelValidation.findings(project, model, token, revision, assets);
@@ -178,28 +267,43 @@ public final class DraftWorkspaceService {
             return checked(envelope(input, context, projection(revision, document, context)), DraftProjectionResult);
         }
         if (operation.equals("text")) {
-            var generated = generate(revision, context);
-            var data = JSON.createObjectNode().put("artifact_id", generated.artifact().artifactId()).put("modality", "OPL");
-            var sentences = data.putArray("sentences");
-            for (var paragraph : generated.artifact().paragraphs()) for (var sentence : paragraph.sentences())
-                sentences.addObject().put("sentence_id", sentence.sentenceId()).put("text", sentence.text()).put("ordinal", sentence.ordinal());
-            var traces = data.putArray("traces");
-            for (var trace : generated.traces()) for (String sentence : trace.sentenceIds()) {
-                var item = traces.addObject().put("sentence_id", sentence); item.set("fact_ids", JSON.valueToTree(trace.factIds())); item.set("occurrence_ids", JSON.valueToTree(trace.occurrenceIds()));
-            }
-            return checked(envelope(input, context, data), DraftTextResult);
+            return checked(envelope(input, context, textData(generate(revision, context, assets))), DraftTextResult);
         }
         throw failure("DRAFT_EDIT_REJECTED", "COMMAND_NOT_IMPLEMENTED");
     }
 
+    private ObjectNode textData(SemanticRevision revision, String context) {
+        return textData(generate(revision, context));
+    }
+
+    private ObjectNode textData(OplGenerationResult generated) {
+        var data = JSON.createObjectNode().put("artifact_id", generated.artifact().artifactId()).put("modality", "OPL");
+        var sentences = data.putArray("sentences");
+        for (var paragraph : generated.artifact().paragraphs()) for (var sentence : paragraph.sentences())
+            sentences.addObject().put("sentence_id", sentence.sentenceId()).put("text", sentence.text()).put("ordinal", sentence.ordinal());
+        var traces = data.putArray("traces");
+        for (var trace : generated.traces()) for (String sentence : trace.sentenceIds()) {
+            var item = traces.addObject().put("sentence_id", sentence);
+            item.set("fact_ids", JSON.valueToTree(trace.factIds())); item.set("occurrence_ids", JSON.valueToTree(trace.occurrenceIds()));
+        }
+        return data;
+    }
+
     private ObjectNode projection(SemanticRevision revision, ObjectNode document, String context) {
-            ObjectNode data = JSON.valueToTree(domain.projectionData(revision, context));
+            var projected = domain.projectionData(revision, context);
+            OpdProjectionQuery.addRemarks(projected, document);
+            ObjectNode data = JSON.valueToTree(projected);
+            var occurrences = index(document.get("occurrences"), "occurrence_id");
+            var layouts = index(document.get("layouts"), "layout_id");
+            var facts = index(document.get("facts"), "fact_id");
             for (var construct : data.get("constructs")) {
-                var occurrence = find(document.get("occurrences"), "occurrence_id", construct.get("occurrence_id").asText());
-                var layout = find(document.get("layouts"), "layout_id", occurrence.get("layout_id").asText()).deepCopy(); layout.remove("layout_id");
+                var occurrence = occurrences.get(construct.get("occurrence_id").asText());
+                ObjectNode layout = layouts.get(occurrence.get("layout_id").asText()).deepCopy(); layout.remove("layout_id");
                 ((ObjectNode) construct).set("layout", layout);
                 if (construct.has("endpoints")) {
-                    var fact = find(document.get("facts"), "fact_id", construct.get("target_id").asText());
+                    var fact = facts.get(construct.get("target_id").asText());
+                    if (fact.at("/source/source_kind").asText().equals("PROCESS_BOUNDARY_ABSTRACTION"))
+                        ((ObjectNode) construct).set("boundary_source_fact_id", fact.at("/source/source_entity_id"));
                     for (int i = 0; i < construct.get("endpoints").size(); i++) {
                         var endpoint = fact.get("endpoints").get(i);
                         if (endpoint.has("state_qualification_id")) ((ObjectNode) construct.get("endpoints").get(i)).set("state_qualification", endpoint.get("state_qualification_id"));
@@ -221,7 +325,10 @@ public final class DraftWorkspaceService {
     }
 
     /** 对语义身份的修改不得通过整体方案扩大到其他图。 */
-    private void guardPlanTarget(SemanticRevision revision, String context, String target) {
+    private void guardPlanTarget(SemanticRevision revision, String context, String target, String commandType) {
+        // 仅本图直接细化父元素的名称编辑；身份和关系不改变，影响图在最终预览中完整审查。
+        if (commandType.equals("UPDATE_PROPERTY") && revision.refinementEdges().stream()
+                .anyMatch(edge -> edge.parentContextId().equals(context) && edge.refineeElementId().equals(target))) return;
         require(revision.refinementEdges().stream().noneMatch(edge -> edge.refineeElementId().equals(target)), "DRAFT_EDIT_REJECTED", "CONTEXT_NOT_ALLOWED");
         for (var other : revision.contexts()) if (!other.id().equals(context)) {
             JsonNode projection = JSON.valueToTree(domain.projectionData(revision, other.id()));
@@ -260,7 +367,7 @@ public final class DraftWorkspaceService {
             require(findings.at("/validation_summary/blocking").asInt() == 0, "DRAFT_EDIT_REJECTED", null);
             String mappings = null;
             if (input.has("analysis_source")) {
-                var analysis = new org.opm.localruntime.storage.MindmapRepository(databases.databasePath(project), clock).source(project, model, input.get("analysis_source"));
+                var analysis = new org.opm.localruntime.storage.MindmapRepository(databases.databaseScope(project), clock).source(project, model, input.get("analysis_source"));
                 mappings = MindmapConversions.bind(analysis, input.get("analysis_source"), projection(semantic(built.document()), built.document(), scope.get("context_id").asText()), built.aliases(), payload.get("steps"));
             }
             return new DraftJournalRepository.Proposal(built.proposal().documentJson(), built.proposal().affectedIds(), built.proposal().textTraceIds(), findings.get("validation_summary").toString(), null, mappings);
@@ -303,6 +410,20 @@ public final class DraftWorkspaceService {
                 "DRAFT_EDIT_REJECTED", "ENDPOINT_KIND_MISMATCH");
         else if (DraftFactEdits.TYPES.contains(type)) DraftFactEdits.validate(base, scope, chosen, type, payload);
         else DraftCapabilityQuery.validateOwnedPayload(base, scope, chosen, type, payload);
+        if (type.equals("UPDATE_PROPERTY") && payload.path("property_name").asText().equals("remark")) {
+            String kind = payload.at("/target_ref/target_kind").asText(), id = payload.at("/target_ref/target_id").asText();
+            String collection = switch (kind) { case "ELEMENT" -> "elements"; case "FEATURE" -> "features"; case "STATE" -> "states"; default -> throw failure("INPUT_INVALID", null); };
+            String key = switch (kind) { case "ELEMENT" -> "element_id"; case "FEATURE" -> "feature_id"; default -> "state_id"; };
+            var target = find(document.get(collection), key, id);
+            String value = payload.get("value").asText();
+            if (!target.path("remark").asText("").equals(value)) {
+                if (!document.path("schema_version").asText().equals("0.7")) document.put("schema_version", "0.6");
+                if (!document.has("refinement_edges")) document.putArray("refinement_edges");
+                if (value.isEmpty()) target.remove("remark"); else target.put("remark", value);
+            }
+            return new DraftJournalRepository.Proposal(document.toString(), List.of(id), List.of(),
+                    "{\"blocking\":0,\"warning\":0,\"suggestion\":0,\"coverage_state\":\"INCOMPLETE\"}");
+        }
         Map<String, Object> commandPayload = JSON.convertValue(payload, new TypeReference<Map<String, Object>>() { });
         var candidate = type.equals("CREATE_CONTEXT") ? domain.editDraftContext(base, commandPayload)
                 : DraftFactEdits.TYPES.contains(type) ? domain.editDraftFact(base, type, commandPayload)
@@ -318,14 +439,14 @@ public final class DraftWorkspaceService {
             String contextId = scope.get("context_id").asText();
             var context = find(document.get("contexts"), "context_id", contextId);
             context.set("occurrence_ids", find(serialized.get("contexts"), "context_id", contextId).get("occurrence_ids"));
-            affected.add(candidate.elements().getLast().id()); affected.add(candidate.occurrences().getLast().id());
+            affected.add(candidate.elements().get(candidate.elements().size() - 1).id()); affected.add(candidate.occurrences().get(candidate.occurrences().size() - 1).id());
         } else if (type.equals("CREATE_CONTEXT")) {
             ObjectNode serialized = (ObjectNode) org.opm.localruntime.storage.DraftJsonDelta.read(new SemanticRevisionJsonWriter().write(candidate));
-            if (!List.of("0.4", "0.5").contains(document.path("schema_version").asText())) document.put("schema_version", "0.3");
+            if (!List.of("0.4", "0.5", "0.6", "0.7").contains(document.path("schema_version").asText())) document.put("schema_version", "0.3");
             ((ArrayNode) document.get("contexts")).add(serialized.get("contexts").get(serialized.get("contexts").size() - 1).deepCopy());
             if (!document.has("refinement_edges")) document.putArray("refinement_edges");
             ((ArrayNode) document.get("refinement_edges")).add(serialized.get("refinement_edges").get(serialized.get("refinement_edges").size() - 1).deepCopy());
-            affected.add(candidate.contexts().getLast().id()); affected.add(candidate.refinementEdges().getLast().id());
+            affected.add(candidate.contexts().get(candidate.contexts().size() - 1).id()); affected.add(candidate.refinementEdges().get(candidate.refinementEdges().size() - 1).id());
         } else if (type.equals("UPDATE_PROPERTY")) {
             String id = payload.at("/target_ref/target_id").asText();
             boolean feature = payload.at("/target_ref/target_kind").asText().equals("FEATURE");
@@ -335,6 +456,7 @@ public final class DraftWorkspaceService {
         } else if (type.equals("UPDATE_LAYOUT") || type.equals("UPDATE_LAYOUT_BATCH")) {
             if (type.equals("UPDATE_LAYOUT")) affected.add(payload.get("occurrence_id").asText());
             DraftOwnedConstructEdits.syncLayoutGeometry(document, base, candidate, affected);
+            if (type.equals("UPDATE_LAYOUT_BATCH")) DraftOwnedConstructEdits.syncLayoutAppearance(document, base, payload, affected);
         } else if (DraftFactEdits.TYPES.contains(type)) affected.addAll(DraftFactEdits.apply(document, candidate, type, payload));
         else affected.addAll(DraftOwnedConstructEdits.apply(document, base, candidate, type, payload));
         String summary = "{\"blocking\":0,\"warning\":0,\"suggestion\":0,\"coverage_state\":\"INCOMPLETE\"}";
@@ -348,14 +470,22 @@ public final class DraftWorkspaceService {
     }
 
     private OplGenerationResult generate(SemanticRevision revision, String context) {
-        var assets = profiles.assemble(revision.profileBinding()); var result = text.generate(revision, context, assets);
+        return generate(revision, context, profiles.assemble(revision.profileBinding()));
+    }
+    private OplGenerationResult generate(SemanticRevision revision, String context, TextGenerationAssets assets) {
+        var result = text.generate(revision, context, assets);
         text.validateActiveWriteEvidence(revision, assets, result); return result;
+    }
+    private static Map<String, ObjectNode> index(JsonNode items, String key) {
+        var result = new java.util.HashMap<String, ObjectNode>();
+        for (var item : items) result.put(item.path(key).asText(), (ObjectNode) item);
+        return result;
     }
     private ObjectNode planFindings(String project, String model, JsonNode token, SemanticRevision revision) {
         return DraftModelValidation.findings(project, model, token, revision, profiles.assemble(revision.profileBinding()));
     }
     private DraftJournalRepository repository(String project) {
-        var path = databases.databasePath(project); require(Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS), "NOT_FOUND", null);
+        var path = databases.databaseScope(project); require(path.exists(), "NOT_FOUND", null);
         return new DraftJournalRepository(path, clock);
     }
     static SemanticRevision semantic(ObjectNode document) {

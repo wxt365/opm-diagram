@@ -43,6 +43,7 @@ const v1 = name => importRule({ $ref: `#/components/schemas/${name}` }, source, 
 for (const name of ['DraftToken', 'SaveState', 'SaveResult', 'PinResult']) importRule(ref(name), save.$defs, '#/$defs/');
 const id = v1('StableId'), token = ref('DraftToken');
 const commands = {
+  RESTORE_OPERATION: 'RestoreOperationPayload',
   APPLY_MODEL_PLAN: 'ModelPlanPayload',
   CREATE_ARCHITECTURE_LINK: 'CreateArchitectureLinkPayload', DELETE_ARCHITECTURE_LINK: 'DeleteArchitectureLinkPayload', UPDATE_ARCHITECTURE_CLASSIFICATION: 'ArchitectureClassificationPayload', CREATE_ELEMENT: 'CreateElementPayload', CREATE_CONTEXT: 'CreateContextPayload', DELETE_CONTEXT: 'DeleteContextPayload', CREATE_FEATURE: 'CreateFeaturePayload', CREATE_FACT: 'CreateFactPayload',
   CREATE_STATE: 'CreateStatePayload', UPDATE_STATE: 'UpdateStatePayload', UPDATE_FACT: 'UpdateFactPayload',
@@ -50,13 +51,16 @@ const commands = {
   STATE_EXPLICIT: 'StatePresentationPayload', STATE_SUPPRESS: 'StatePresentationPayload', UNFOLD: 'StatePresentationPayload', FOLD: 'StatePresentationPayload',
 };
 for (const name of new Set(Object.values(commands))) {
-  if (['ModelPlanPayload', 'CreateArchitectureLinkPayload', 'DeleteArchitectureLinkPayload', 'ArchitectureClassificationPayload', 'CreateContextPayload', 'DeleteContextPayload', 'UpdateLayoutBatchPayload'].includes(name)) continue;
+  if (['RestoreOperationPayload', 'ModelPlanPayload', 'CreateArchitectureLinkPayload', 'DeleteArchitectureLinkPayload', 'ArchitectureClassificationPayload', 'CreateContextPayload', 'DeleteContextPayload', 'UpdateLayoutBatchPayload'].includes(name)) continue;
   v1(name);
   for (const key of ['capability_query_id', 'selected_option_id']) {
     delete defs[name].properties[key]; defs[name].required = defs[name].required.filter(item => item !== key);
   }
 }
-defs.LayoutGeometry = obj({ x: { type: 'number' }, y: { type: 'number' }, width: { type: 'number', exclusiveMinimum: 0 }, height: { type: 'number', exclusiveMinimum: 0 } });
+defs.EdgeRoute = obj({ segment: { type: 'string', pattern: '^[A-Za-z0-9_.-]{1,128}$' }, style: enumeration('STRAIGHT', 'ROUNDED', 'CURVE'), mode: enumeration('AUTO', 'MANUAL'), points: { ...arr(v1('Point')), maxItems: 128 } });
+const routes = { ...arr(ref('EdgeRoute')), maxItems: 64 };
+defs.NodeAppearance = obj({ stroke: { type: 'string', pattern: '^#[0-9a-fA-F]{6}$' }, fill: { type: 'string', pattern: '^#[0-9a-fA-F]{6}$' } }, []);
+defs.LayoutGeometry = obj({ x: { type: 'number' }, y: { type: 'number' }, width: { type: 'number', exclusiveMinimum: 0 }, height: { type: 'number', exclusiveMinimum: 0 }, edge_routes: routes, appearance: ref('NodeAppearance') }, ['x', 'y', 'width', 'height']);
 defs.UpdateLayoutBatchPayload = obj({ layouts: { ...arr(obj({ occurrence_id: id, layout: ref('LayoutGeometry') })), minItems: 1, maxItems: 1000 } });
 defs.CreateContextPayload = obj({ context_id: id, refinee_element_id: id, name: { type: 'string', minLength: 1, maxLength: 256 } });
 defs.DeleteContextPayload = obj({ context_id: id, impact_token: str });
@@ -67,6 +71,12 @@ defs.ArchitectureLink = obj({ link_id: id, source_context_id: id, target_context
 defs.ArchitectureLevel = enumeration('MISSION', 'FUNCTION', 'PRODUCT');
 defs.ArchitectureClassificationPayload = obj({ context_id: id, architecture_level: nil(ref('ArchitectureLevel')) });
 defs.CreateElementPayload.properties.context_id = id;
+const nameProperty = structuredClone(defs.UpdatePropertyPayload);
+const remarkProperty = structuredClone(nameProperty);
+remarkProperty.properties.target_ref.properties.target_kind.enum = ['ELEMENT', 'FEATURE', 'STATE'];
+remarkProperty.properties.property_name = { const: 'remark' };
+remarkProperty.properties.value = { type: 'string', maxLength: 4000 };
+defs.UpdatePropertyPayload = { oneOf: [nameProperty, remarkProperty] };
 defs.CreateFactPayload.properties.fact_family.enum = defs.CreateFactPayload.properties.fact_family.enum.filter(value => value !== 'CONTROL');
 // State 的持久化正文只有 name/roles，无 ordinal；不能接受后再静默丢弃。
 defs.CreateStatePayload.properties.name_or_value.maxLength = 256;
@@ -75,6 +85,8 @@ delete defs.UpdateStatePayload.properties.changes.properties.ordinal;
 const planName = { type: 'string', minLength: 1, maxLength: 256 };
 const planCommon = { local_id: id };
 defs.ModelPlanStep = { oneOf: [
+  obj({ ...planCommon, command_type: { const: 'REORGANIZE_SUBGRAPH' }, target: id, name: planName, abstract_boundary: { type: 'boolean' },
+    members: { ...arr(id), minItems: 1, maxItems: 100, uniqueItems: true } }, ['local_id', 'command_type', 'target', 'name', 'members']),
   obj({ ...planCommon, command_type: { const: 'CREATE_ELEMENT' }, kind: enumeration('OBJECT', 'PROCESS'), name: planName, layout: ref('NodeLayoutInput') }),
   obj({ ...planCommon, command_type: { const: 'CREATE_STATE' }, target: id, name: planName, state_roles: ref('StateRoles'), layout: ref('NodeLayoutInput') }, ['local_id', 'command_type', 'target', 'name']),
   obj({ ...planCommon, command_type: { const: 'CREATE_FACT' }, endpoints: { ...arr(id), minItems: 2, maxItems: 3 }, capability_id: id }),
@@ -96,6 +108,7 @@ defs.MindmapConversion = obj({ command_id: id, context_id: id, revision: { type:
 defs.MindmapRequest = obj({ request_id: id, action: enumeration('OPEN', 'SAVE'), draft_token: token,
   document: ref('MindmapDocument'), expected_revision: { type: 'integer', minimum: 0, maximum: Number.MAX_SAFE_INTEGER } }, ['request_id', 'action', 'draft_token']);
 defs.MindmapResult = obj({ request_id: id, document: ref('MindmapDocument'), digest: str, conversions: arr(ref('MindmapConversion')) });
+defs.RestoreOperationPayload = obj({ record_id: id, action: enumeration('UNDO', 'REDO') });
 defs.DraftCommandType = enumeration(...Object.keys(commands));
 defs.DraftCommand = { oneOf: Object.entries(commands).map(([command, payload]) => obj({ command_type: { const: command }, payload: ref(payload) })) };
 defs.DraftScope = obj({ context_id: id, selection_id: nil(id), intent: ref('DraftCommandType'), endpoints: arr(id) });
@@ -104,6 +117,22 @@ defs.DraftEditRequest = obj({ request_id: id, command_id: id, expected_draft_tok
   scope: ref('DraftScope'), authorization: ref('DraftAuthorization'), command: ref('DraftCommand'), analysis_source: ref('AnalysisSource') },
   ['request_id', 'command_id', 'expected_draft_token', 'scope', 'authorization', 'command']);
 defs.DraftQueryRequest = obj({ request_id: id, draft_token: token, context_id: id });
+
+const graphOptions = { request_id: id, context_id: id, scope: enumeration('CONTEXT', 'CONTEXT_SUBTREE', 'MODEL'),
+  include_hidden_states: { type: 'boolean' }, include_boundary_nodes: { type: 'boolean' }, include_state_ownership: { type: 'boolean' } };
+defs.GraphAnalysisRequest = obj({ ...graphOptions, draft_token: token });
+defs.GraphAnalysisRevisionRequest = obj(graphOptions);
+defs.GraphSourceRef = obj({ context_id: id, context_name: str, occurrence_id: id, target_id: id });
+defs.GraphNode = obj({ id, kind: enumeration('OBJECT', 'PROCESS', 'STATE'), label: str, owner_id: nil(id), boundary: { type: 'boolean' }, source_refs: arr(ref('GraphSourceRef')) });
+defs.GraphEndpoint = obj({ role: str, target_id: id, ordinal: { type: 'integer' } });
+defs.GraphEdge = obj({ id: str, source: id, target: id, relation_type: str, label: str, direction: enumeration('DIRECTED', 'UNDIRECTED', 'BIDIRECTIONAL'),
+  fact_id: nil(id), group_id: str, derived: { type: 'boolean' }, endpoints: arr(ref('GraphEndpoint')), source_refs: arr(ref('GraphSourceRef')) });
+defs.GraphAnalysisResult = obj({ source: obj({ project_id: id, model_id: id, request_id: id, context_id: id,
+  scope: graphOptions.scope, draft_token: nil(token), revision_id: nil(id), binding: str, projection_version: { type: 'integer', minimum: 1, maximum: 1 } }),
+  nodes: { ...arr(ref('GraphNode')), maxItems: 2000 }, edges: { ...arr(ref('GraphEdge')), maxItems: 10000 },
+  relation_types: arr(obj({ id: str, label: str, count: { type: 'integer' } })),
+  statistics: obj({ node_count: { type: 'integer' }, fact_count: { type: 'integer' }, derived_count: { type: 'integer' }, edge_count: { type: 'integer' }, excluded_count: { type: 'integer' } }),
+  warnings: arr(obj({ code: str, target_id: id, message: str })) });
 defs.MethodSource = { oneOf: [obj({ draft_token: token }), obj({ revision_id: id })] };
 defs.MethodSummaryRequest = obj({ request_id: id, context_id: id, source: ref('MethodSource') });
 defs.MethodEvidence = obj({ fact_id: id, capability_id: str, description: str, context_ids: arr(id), target_ids: arr(id) });
@@ -117,8 +146,14 @@ defs.MethodSummaryResult = obj({ meta: obj({ request_id: id, context_id: id, sou
 defs.OperationHistoryRequest = obj({ request_id: id, revision: id, before: nil({ type: 'string', minLength: 1, maxLength: 2048 }) });
 defs.OperationHistoryItem = obj({ record_id: id, occurred_at: { type: 'string', format: 'date-time' }, operation: str,
   title: { type: 'string', minLength: 1 }, context_id: nil(id), context_name: nil(str), status: str, revision_id: nil(id), detail_available: { type: 'boolean' } });
+defs.OperationHistoryItem.properties.recovery_action = enumeration('UNDO', 'REDO');
 defs.OperationHistoryResult = obj({ meta: obj({ request_id: id, project_id: id, model_id: id, revision: id }),
   data: obj({ items: { ...arr(ref('OperationHistoryItem')), maxItems: 100 }, next_before: nil({ type: 'string', minLength: 1, maxLength: 2048 }) }) });
+defs.RecoveryStateRequest = obj({ request_id: id, draft_token: token });
+defs.RecoveryStateItem = structuredClone(defs.OperationHistoryItem);
+defs.RecoveryStateItem.required.push('recovery_action');
+defs.RecoveryStateResult = obj({ meta: obj({ request_id: id, project_id: id, model_id: id, draft_token: token }),
+  data: obj({ items: { ...arr(ref('RecoveryStateItem')), maxItems: 2 }, next_before: { type: 'null' } }) });
 defs.DraftRelationCatalogRequest = obj({ request_id: id, draft_token: token, context_id: id, selection_id: nil(id) });
 defs.DraftCapabilitiesRequest = obj({ request_id: id, draft_token: token, scope: ref('DraftScope') });
 defs.OpenDraftRequest = obj({ request_id: id, context_id: nil(id) });
@@ -166,7 +201,7 @@ defs.DraftCapabilitiesData = obj({ scope: ref('DraftScope'), allowed: arr(ref('D
 
 // 封闭当前投影所有已知字段；边几何补齐为可选字段，防止有损回读。
 defs.ProjectionLayout = obj({ ...structuredClone(defs.NodeLayoutInput.properties), z_order: { type: 'integer', minimum: -Number.MAX_SAFE_INTEGER, maximum: Number.MAX_SAFE_INTEGER },
-  route_points: arr(v1('Point')), label_positions: arr(ref('Point')), junction_position: ref('Point') }, ['x', 'y', 'width', 'height', 'z_order']);
+  route_points: arr(v1('Point')), edge_routes: routes, appearance: ref('NodeAppearance'), label_positions: arr(ref('Point')), junction_position: ref('Point') }, ['x', 'y', 'width', 'height', 'z_order']);
 defs.ProjectionEndpoint = obj({ role: str, target_kind: enumeration('ELEMENT', 'FEATURE', 'STATE', 'FACT', 'CONTEXT'),
   target_id: id, ordinal: { type: 'integer', minimum: 0, maximum: Number.MAX_SAFE_INTEGER }, state_qualification: id }, ['role', 'target_kind', 'target_id', 'ordinal']);
 const construct = structuredClone(source.ContextProjectionResult.properties.data.properties.constructs.items);
@@ -184,11 +219,16 @@ function projectionRefs(value) {
 }
 defs.ProjectionConstruct = projectionRefs(construct);
 defs.ProjectionConstruct.additionalProperties = false;
+defs.ProjectionConstruct.properties.boundary_source_fact_id = id;
+defs.ProjectionConstruct.properties.remark = { type: 'string', maxLength: 4000 };
 defs.DraftProjectionData = obj({ context_id: id, constructs: arr(ref('ProjectionConstruct')), suppressed_states: arr(v1('SuppressedState')) });
 defs.DraftModelPlanPreviewRequest = obj({ request_id: id, draft_token: token, context_id: id, plan_id: id,
   steps: { ...arr(ref('ModelPlanStep')), maxItems: 100 }, next_scope: nil(ref('DraftScope')), finalize: { type: 'boolean' }, analysis_source: ref('AnalysisSource') },
   ['request_id', 'draft_token', 'context_id', 'plan_id', 'steps', 'next_scope']);
-defs.DraftModelPlanPreviewResult = obj({ meta: ref('DraftQueryMeta'), data: ref('DraftProjectionData'), capabilities: nil(ref('DraftCapabilitiesData')), findings: nil(ref('DraftFindingsData')) });
+defs.DraftModelPlanPreviewResult = obj({ meta: ref('DraftQueryMeta'), data: ref('DraftProjectionData'), capabilities: nil(ref('DraftCapabilitiesData')), findings: nil(ref('DraftFindingsData')), text: nil(ref('DraftTextData')) },
+  ['meta', 'data', 'capabilities', 'findings']);
+defs.DraftModelPlanPreviewResult.properties.affected_views = { ...arr(obj({ context_id: id, label: planName,
+  parent_context_id: nil(id), refinee_element_id: nil(id), data: ref('DraftProjectionData'), text: nil(ref('DraftTextData')) })), maxItems: 101 };
 for (const [name, sourceName] of [['DraftTextData', 'TextProjectionResult'], ['DraftNavigationData', 'ContextNavigationResult'],
   ['DraftRelationCatalogData', 'RelationCatalogResult']]) {
   defs[name] = importRule(source[sourceName].properties.data, source, '#/components/schemas/');
@@ -240,6 +280,7 @@ function tsType(rule) {
 }
 const ts = '// 由 scripts/generate-draft-workspace-contract.mjs 生成，请勿手改。\n\n' + Object.entries(defs).map(([name, rule]) => `export type ${name} = ${tsType(rule)};`).join('\n\n') + '\n';
 const operations = {
+  'graph-analysis': ['QueryGraphAnalysis', 'GraphAnalysisRequest', 'GraphAnalysisResult'],
   mindmap: ['ManageMindmap', 'MindmapRequest', 'MindmapResult'],
   'plan-preview': ['PreviewModelPlan', 'DraftModelPlanPreviewRequest', 'DraftModelPlanPreviewResult'],
   open: ['OpenDraft', 'OpenDraftRequest', 'OpenDraftResult'], projection: ['QueryDraftProjection', 'DraftQueryRequest', 'DraftProjectionResult'],
@@ -248,6 +289,7 @@ const operations = {
   capabilities: ['QueryDraftCapabilities', 'DraftCapabilitiesRequest', 'DraftCapabilitiesResult'], commands: ['ExecuteDraftEdit', 'DraftEditRequest', 'DraftEditResult'],
   receipts: ['GetDraftReceipt', 'DraftReceiptRequest', 'DraftReceiptResult'],
   'operation-history': ['QueryOperationHistory', 'OperationHistoryRequest', 'OperationHistoryResult'],
+  'recovery-state': ['QueryRecoveryState', 'RecoveryStateRequest', 'RecoveryStateResult'],
   'method-summary': ['GetMethodSummary', 'MethodSummaryRequest', 'MethodSummaryResult'],
 };
 const apiRef = name => ({ $ref: `../schemas/opm-draft-workspace-v02.schema.json#/$defs/${name}` });
@@ -259,7 +301,13 @@ const api = { openapi: '3.1.0', info: { title: 'OPM 草稿编辑、查询与模�
     post: { operationId, requestBody: { required: true, content: media(request) }, responses: { '200': { description: '成功', content: media(result) },
       ...Object.fromEntries(['400', '403', '404', '409', '422', '503'].map(status => [status, { description: '草稿协议错误，映射见 HS-01D', content: media('DraftError') }])) } },
   }])), components: { securitySchemes: { localSession: { type: 'apiKey', in: 'header', name: 'X-OPM-Session' } } } };
-const rootTypes = [...new Set(Object.values(operations).flatMap(([, request, result]) => [request, result])), 'DraftError'];
+api.paths['/projects/{project_id}/models/{model_id}/revisions/{revision_id}/graph-analysis'] = {
+  parameters: ['project_id', 'model_id', 'revision_id'].map(name => ({ name, in: 'path', required: true, schema: apiRef('StableId') })),
+  post: { operationId: 'QueryRevisionGraphAnalysis', requestBody: { required: true, content: media('GraphAnalysisRevisionRequest') },
+    responses: { '200': { description: '固定版本图谱', content: media('GraphAnalysisResult') },
+      ...Object.fromEntries(['400', '403', '404', '409', '422', '503'].map(status => [status, { description: '查询失败', content: media('DraftError') }])) } },
+};
+const rootTypes = [...new Set(Object.values(operations).flatMap(([, request, result]) => [request, result])), 'GraphAnalysisRevisionRequest', 'DraftError'];
 const java = `package org.opm.localruntime.api.generated;
 
 // 由 scripts/generate-draft-workspace-contract.mjs 生成，请勿手改。
@@ -294,3 +342,20 @@ for (const [file, content] of [
   } else await writeFile(path.join(root, file), content);
 }
 console.log('草稿编辑与查询协议生成检查通过');
+
+// Revision exchange shares the same optional route wire as draft commands.
+for (const name of ['opm-revision', 'opm-revision-v0.2', 'opm-revision-v0.3', 'opm-revision-v0.4', 'opm-revision-v0.5']) {
+  const file = path.join(root, `docs/contracts/schemas/${name}.schema.json`);
+  const raw = await readFile(file, 'utf8');
+  const revision = JSON.parse(raw);
+  const route = structuredClone(defs.EdgeRoute);
+  route.properties.points.items = { type: 'object', additionalProperties: false, required: ['x', 'y'], properties: { x: { type: 'number' }, y: { type: 'number' } } };
+  const expected = { type: 'array', maxItems: 64, items: route };
+  if (JSON.stringify(revision.$defs.layout.properties.edge_routes) === JSON.stringify(expected)) continue;
+  if (revision.$defs.layout.properties.edge_routes) throw new Error(`Revision route schema differs: ${file}`);
+  const content = raw.replace(/(?=        "route_points":)/, `        "edge_routes": ${JSON.stringify(expected)},\n`);
+  if (content === raw) throw new Error(`Revision layout anchor missing: ${file}`);
+  if (process.argv.includes('--check')) {
+    if (await readFile(file, 'utf8') !== content) throw new Error(`生成文件过期：${file}`);
+  } else await writeFile(file, content);
+}

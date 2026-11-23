@@ -32,17 +32,17 @@ test("真实画布滚轮缩放：鼠标锚点、上下限、平移和只读、�
     const panScale = (await matrix(page)).scale; await wheel(page, -120); expect((await matrix(page)).scale).toBeGreaterThan(panScale);
     await page.getByTestId("p03-tool-select").click();
     expect(writes).toHaveLength(count); await expect(page.getByTestId("hs-draft-identity")).toHaveText(identity); expect(await node.getAttribute("transform")).toBe(beforeNode);
-    await chooseViewportAction(page, "reset"); await expect(page.getByTestId("p03-zoom-output")).toHaveValue("100%");
+    await chooseViewportAction(page, "reset"); await expect(page.getByTestId("p03-zoom-output").filter({ visible: true })).toHaveValue("100%");
     // 画布外滚动不会改变比例。
-    await page.getByTestId("opd-navigator").hover(); await wheel(page, -120); await expect(page.getByTestId("p03-zoom-output")).toHaveValue("100%");
+    await page.getByTestId("opd-navigator").hover(); await wheel(page, -120); await expect(page.getByTestId("p03-zoom-output").filter({ visible: true })).toHaveValue("100%");
     // 名称输入期间，仅画布接收滚轮；覆盖输入框不触发视口缩放。
     await node.dblclick({ position: { x: 30, y: 14 } }); const editor = page.getByTestId("p03-name-editor"); await expect(editor).toBeVisible();
-    await editor.hover(); await wheel(page, -120); await expect(page.getByTestId("p03-zoom-output")).toHaveValue("100%"); await editor.press("Escape");
+    await editor.hover(); await wheel(page, -120); await expect(page.getByTestId("p03-zoom-output").filter({ visible: true })).toHaveValue("100%"); await editor.press("Escape");
     await page.mouse.move(anchor.x, anchor.y);
     for (let index = 0; index < 14; index++) await wheel(page, -120);
-    await expect(page.getByTestId("p03-zoom-output")).toHaveValue("400%"); expect((await matrix(page)).scale).toBe(4);
+    await expect(page.getByTestId("p03-zoom-output").filter({ visible: true })).toHaveValue("400%"); expect((await matrix(page)).scale).toBe(4);
     for (let index = 0; index < 65; index++) await wheel(page, 120);
-    await expect(page.getByTestId("p03-zoom-output")).toHaveValue("0.01%"); expect((await matrix(page)).scale).toBeCloseTo(0.0001, 6);
+    await expect(page.getByTestId("p03-zoom-output").filter({ visible: true })).toHaveValue("0.01%"); expect((await matrix(page)).scale).toBeCloseTo(0.0001, 6);
     await chooseViewportAction(page, "reset"); await chooseViewportAction(page, "fit"); await frames(page);
     await page.mouse.move(anchor.x, anchor.y); await wheel(page, -120);
     // 缩放后仍能选择和拖动真实元素。
@@ -52,7 +52,7 @@ test("真实画布滚轮缩放：鼠标锚点、上下限、平移和只读、�
     await page.mouse.move(dragBox.x + 68, dragBox.y + 46, { steps: 10 }); await page.mouse.up();
     await expect(page.getByTestId("hs-draft-identity")).not.toHaveText(identity); await expect(page.getByTestId("hs-save")).toBeEnabled();
     expect(await node.getAttribute("transform")).not.toBe(beforeNode);
-    await page.getByTestId("p03-zoom-in").click(); await expect.poll(() => zoom(page)).toBeCloseTo(dragScale * 100 + 10, 2);
+    await page.getByTestId("p03-zoom-in").filter({ visible: true }).click(); await expect.poll(() => zoom(page)).toBeCloseTo(dragScale * 100 + 10, 2);
     await page.screenshot({ path: info.outputPath("wheel-zoom-desktop.png") });
     await page.getByTestId("hs-save").click(); await expect(page.getByTestId("hs-save-state")).toHaveText("已手动保存");
     const versions = await page.getByTestId("p03-version-select").locator("option").evaluateAll(items => items.map(item => (item as HTMLOptionElement).value));
@@ -67,7 +67,7 @@ test("真实画布滚轮缩放：鼠标锚点、上下限、平移和只读、�
 });
 async function frames(page: Page) { await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))); }
 async function wheel(page: Page, delta: number) { await page.mouse.wheel(0, delta); await frames(page); }
-async function zoom(page: Page) { return parseFloat(await page.getByTestId("p03-zoom-output").inputValue()); }
+async function zoom(page: Page) { return parseFloat(await page.getByTestId("p03-zoom-output").filter({ visible: true }).inputValue()); }
 async function matrix(page: Page) { return page.locator(".x6-graph-svg-viewport").evaluate(element => {
   const m = (element as SVGGElement).transform.baseVal.consolidate()?.matrix ?? new DOMMatrix(), bounds = element.closest(".opd-canvas")!.getBoundingClientRect();
   return { scale: m.a, tx: m.e, ty: m.f, left: bounds.left, top: bounds.top };

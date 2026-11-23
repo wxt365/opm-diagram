@@ -1,11 +1,6 @@
 @media (max-width: 1280px) {
-  .workbench,
-  .workbench.workbench--bottom-collapsed {
-    grid-template-rows: auto minmax(0, 1fr) 38px;
-  }
-
-  .workbench:not(.workbench--bottom-collapsed) {
-    grid-template-rows: auto minmax(0, 1fr) var(--workbench-bottom-height, 240px);
+  .workbench {
+    grid-template-rows: auto minmax(0, 1fr) var(--workbench-bottom-track-height);
   }
 
   .workbench-header {
@@ -30,11 +25,11 @@
   .workbench {
     height: auto;
     min-height: calc(100vh - 56px);
-    grid-template-rows: auto auto var(--workbench-bottom-height, 240px);
+    grid-template-rows: auto minmax(0, 1fr) var(--workbench-bottom-track-height);
   }
 
-  .workbench.workbench--bottom-collapsed {
-    grid-template-rows: auto auto 38px;
+  .workbench.workbench--bottom-collapsed:not(.workbench--bottom-hidden) {
+    grid-template-rows: auto auto var(--workbench-bottom-track-height);
   }
 
   .workbench-header,

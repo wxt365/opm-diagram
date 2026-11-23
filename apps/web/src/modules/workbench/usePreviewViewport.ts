@@ -7,7 +7,7 @@ import type { NodeLayout } from "@/stores/workbench/layoutSelection";
 
 /** 预览开始和退出时恢复视口，不覆盖用户后续的手工平移。 */
 export function usePreviewViewport(input: { canvasEditor: Ref<InstanceType<typeof OpdCanvas> | undefined>;
-  assistantPreview: Ref<AssistantProposal | null>; autoLayoutPreview: () => { layouts: NodeLayout[] } | null; nodes: () => OpdNode[] }) {
+  assistantPreview: Ref<AssistantProposal | null>; autoLayoutPreview: () => { layouts: NodeLayout[] } | null; nodes: () => OpdNode[]; preserveAssistantViewportOnExit?: () => boolean }) {
   const { canvasEditor, assistantPreview } = input;
   let previewViewport: CanvasViewport | undefined;
   let assistantViewport: CanvasViewport | undefined;
@@ -19,6 +19,7 @@ export function usePreviewViewport(input: { canvasEditor: Ref<InstanceType<typeo
       if (assistantPreview.value && canvasEditor.value) canvasEditor.value.fitToView();
     } else if (!preview && previous) {
       const saved = assistantViewport, canvas = canvasEditor.value; assistantViewport = undefined;
+      if (input.preserveAssistantViewportOnExit?.()) return;
       await nextTick();
       if (saved && !assistantPreview.value && canvas === canvasEditor.value) canvas?.restoreViewport?.(saved);
     }

@@ -103,7 +103,7 @@ public final class RecoveryFactoryMaterializerMain {
         for (RecoveryFactoryDescriptorWriter.Input profileEntry : profileEntries) {
             inputEntries.add(new RecoveryFactoryDescriptorWriter.Input(profileEntry.kind(), "assets/" + profileEntry.path(), profileEntry.mediaType()));
         }
-        inputEntries.add(new RecoveryFactoryDescriptorWriter.Input("PROJECT_DB", fixtureRoot.relativize(sqlite.databasePath()).toString(), "application/vnd.sqlite3"));
+        inputEntries.add(new RecoveryFactoryDescriptorWriter.Input("PROJECT_DB", fixtureRoot.toRealPath().relativize(sqlite.databasePath().toRealPath()).toString(), "application/vnd.sqlite3"));
         if (arguments.has("--gate-fixture")) {
             inputEntries.add(new RecoveryFactoryDescriptorWriter.Input("GATE_WORK_COPY", "gate/gate-fixture-work.json", "application/json"));
         }
@@ -347,7 +347,7 @@ public final class RecoveryFactoryMaterializerMain {
                                                 RecoveryFactorySqliteMaterializer.Result sqlite, boolean rollback) throws Exception {
         Path database = sqlite.databasePath();
         Path finalDatabase = finalAttemptRoot.resolve("fixture/storage").resolve(
-                stagingAttemptRoot.resolve("fixture/storage").relativize(database));
+                stagingAttemptRoot.resolve("fixture/storage").toRealPath().relativize(database.toRealPath()));
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("storage_root", "fixture/storage");
         result.put("project_db_ref", referenceForFinal(evidenceRoot, database, finalDatabase, "RECOVERY_PROJECT_DB"));
@@ -356,7 +356,7 @@ public final class RecoveryFactoryMaterializerMain {
                     stagingAttemptRoot.resolve("fixture/gate/gate-fixture-work.json"), finalAttemptRoot.resolve("fixture/gate/gate-fixture-work.json"),
                     "RECOVERY_GATE_WORK_COPY"));
         }
-        result.put("storage_schema_version", "1.0");
+        result.put("storage_schema_version", "2.0");
         result.put("transaction_status", "COMMITTED");
         result.put("table_counts", sqlite.tableCounts());
         result.put("sqlite_quick_check", "ok");
@@ -402,7 +402,7 @@ public final class RecoveryFactoryMaterializerMain {
         snapshot.put("draft_head_revision_id", revisionId);
         snapshot.put("head_sequence", base.path("revision_sequence").intValue());
         snapshot.put("revision_digest", sha256(Files.readAllBytes(fixtureRoot.resolve("base-revision.json"))));
-        snapshot.put("projection_digest", ProjectionDigestV01.sha256(projectionData));
+        snapshot.put("projection_digest", ProjectionDigestV01.sha256(ProjectionDigestV01.apiProjectionDigestView(projectionData)));
         snapshot.put("opl_digest", sha256(Rfc8785JsonCanonicalizer.canonicalize(asJavaValue(base.get("text_artifact"))).getBytes(StandardCharsets.UTF_8)));
         snapshot.put("trace_digest", sha256(Rfc8785JsonCanonicalizer.canonicalize(asJavaValue(base.get("text_traces"))).getBytes(StandardCharsets.UTF_8)));
         snapshot.put("sqlite_quick_check", "ok");

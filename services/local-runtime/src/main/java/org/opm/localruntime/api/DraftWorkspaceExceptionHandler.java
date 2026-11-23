@@ -15,15 +15,16 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @Order(Ordered.HIGHEST_PRECEDENCE)
-@RestControllerAdvice(assignableTypes = DraftWorkspaceController.class)
+@RestControllerAdvice(assignableTypes = {DraftWorkspaceController.class, GraphAnalysisController.class})
 public final class DraftWorkspaceExceptionHandler {
     @ExceptionHandler(Exception.class)
     public ResponseEntity<JsonNode> handle(Exception exception) {
         String code = "PERSISTENCE_FAILED", reason = null;
-        if (exception instanceof DraftWorkspaceService.Failure failure) { code = failure.code(); reason = failure.reason(); }
+        if (exception instanceof org.opm.localruntime.application.GraphAnalysisService.LimitExceeded) code = "DRAFT_EDIT_REJECTED";
+        else if (exception instanceof DraftWorkspaceService.Failure failure) { code = failure.code(); reason = failure.reason(); }
         else if (exception instanceof DraftJournalRepository.Failure failure) code = failure.code();
         else if (exception instanceof ApiException api) {
-            code = api.code() == ApiErrorCode.INVALID_ARGUMENT ? "INPUT_INVALID" : "DRAFT_EDIT_REJECTED";
+            code = api.code() == ApiErrorCode.INVALID_ARGUMENT ? "INPUT_INVALID" : api.code() == ApiErrorCode.NOT_FOUND ? "NOT_FOUND" : "DRAFT_EDIT_REJECTED";
         } else if (exception instanceof ProfilePackageAssemblyException) {
             code = "DRAFT_EDIT_REJECTED";
         } else if (exception instanceof OplGenerationException) code = "DRAFT_EDIT_REJECTED";
@@ -44,6 +45,7 @@ public final class DraftWorkspaceExceptionHandler {
             case "DRAFT_EDIT_REJECTED" -> "草稿操作未通过领域或资产校验";
             default -> "草稿操作未完成：" + code;
         }).put("retryable", code.equals("PERSISTENCE_FAILED")).put("reason_code", reason);
+        if (exception instanceof org.opm.localruntime.application.GraphAnalysisService.LimitExceeded) body.put("message", exception.getMessage());
         return ResponseEntity.status(status).body(DraftWorkspaceContract.read(body.toString(), DraftWorkspaceContract.Type.DraftError).value());
     }
 }

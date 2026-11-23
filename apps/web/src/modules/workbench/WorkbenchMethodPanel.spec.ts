@@ -69,4 +69,34 @@ describe("架构方法面板", () => {
     await flushPromises(); expect(store.highlightedMethodFactId).toBe("");
     expect(store.methodSummary.data).toBeNull(); wrapper.unmount();
   });
+  it("跨图投影就绪后恢复证据高亮，自动摘要刷新不清除目标，普通导航清除", async () => {
+    vi.spyOn(localRuntimeApi, "methodSummary").mockResolvedValue(data);
+    const { store, wrapper } = setup(); await flushPromises();
+    store.workbench.bottomTab = "method"; store.workbench.bottomPanelExpanded = true;
+    await flushPromises(); store.methodSummary.data = structuredClone(data);
+    const evidence = store.methodSummary.data.processes[0]!.roles[3]!.evidence[0]!;
+    store.locateMethodEvidence(evidence);
+    store.workbench.resourceState = "loading"; await flushPromises();
+    store.workbench.activeContextId = "context.child";
+    store.workbench.nodes = ["object.1", "process.root"].map(id => ({ id, occurrenceId: `occ.${id}`, kind: "object", label: id,
+      x: 0, y: 0, valueDomain: "", visibility: "public", multiplicity: "1", architectureLayer: "任务", occurrenceRole: "owned" }));
+    store.workbench.resourceState = "ready"; await flushPromises();
+    expect(store.highlightedMethodFactId).toBe("fact.1");
+    expect(store.highlightedMethodNodeIds).toEqual(["object.1", "process.root"]);
+    expect(store.methodSummary.data).not.toBeNull();
+    store.workbench.activeContextId = "context.root"; await flushPromises();
+    expect(store.highlightedMethodNodeIds).toEqual([]);
+    expect(store.highlightedMethodFactId).toBe(""); wrapper.unmount();
+  });
+  it("提交中打开方法面板不发摘要查询，就绪后的正常刷新仍可用", async () => {
+    const query = vi.spyOn(localRuntimeApi, "methodSummary").mockResolvedValue(data);
+    const { store, wrapper } = setup(); await flushPromises(); query.mockClear();
+    store.workbench.commandState = "submitting";
+    store.workbench.bottomTab = "method"; store.workbench.bottomPanelExpanded = true;
+    await flushPromises(); expect(query).not.toHaveBeenCalled();
+    store.workbench.commandState = "idle";
+    await store.refreshMethodSummary(); await flushPromises();
+    expect(query).toHaveBeenCalledOnce(); expect(store.methodSummary.data).not.toBeNull();
+    wrapper.unmount();
+  });
 });

@@ -215,6 +215,7 @@ public final class SemanticRevisionJsonWriter {
             node.put("width", layout.width());
             node.put("height", layout.height());
             node.put("z_order", layout.zOrder());
+            if (!layout.edgeRoutes().isEmpty()) node.set("edge_routes", objectMapper.valueToTree(layout.edgeRoutes()));
         }
         return result;
     }

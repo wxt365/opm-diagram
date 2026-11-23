@@ -1,0 +1,46 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { AssistantService } from '../src/service.mjs';
+import { appendUserMessage, editPrompt, visibleMessages } from '../src/message-edit.mjs';
+import { brief } from '../src/messages.mjs';
+
+test('连续修订仅显示当前轮内容，内部保留原文，旧消息及伪造身份拒绝', () => {
+  const v={messages:[{id:'old',role:'user',text:'早期问题'},{id:'a0',role:'assistant',text:'早期回复'},{id:'u',role:'user',text:'原问题'},{id:'a',role:'assistant',text:'过期回复'}],proposals:[]};
+  for(const id of ['old','missing',null]) assert.throws(()=>editPrompt(v.messages,'新问题',id),e=>e.code==='MESSAGE_EDIT_CONFLICT');
+  appendUserMessage(v,{id:'u2',role:'user',text:'修订问题'},'u');
+  v.messages.push({id:'a2',role:'assistant',text:'新回复'});
+  appendUserMessage(v,{id:'u3',role:'user',text:'再次修订'},'u2');
+  assert.deepEqual(visibleMessages(v.messages).map(m=>m.text),['早期问题','早期回复','再次修订']);
+  assert.equal(v.messages.length,7);
+  assert.deepEqual(brief(v).messages.map(m=>m.text),['早期问题','早期回复','再次修订']);
+});
+for(const kind of ['OPD','ANALYSIS']) test(`${kind} 修订持久化后无重复气泡，模型收到修订指令，拒绝编辑历史`, async t=>{
+  const root=await mkdtemp(join(tmpdir(),'opm-message-edit-'));
+  const prompts=[];
+  const factory=async()=>({run:async text=>{prompts.push(text);return {finalResponse:'修订后的回复',events:[{type:'turn/end',data:{reason:{kind:'completed'}}}]};},close:async()=>{}});
+  const service=new AssistantService({dataRoot:root},factory);await service.init();
+  t.after(async()=>{await service.close();await rm(root,{recursive:true,force:true});});
+  const scope={projectId:'p',modelId:'m',contextId:'view.root',...(kind==='OPD'?{}:{kind}),...(kind==='ANALYSIS'?{mindmapId:'mindmap.test'}:{})};
+  const api=service;
+  const token={draft_id:'draft.test',edit_seq:0,binding_digest:'a'.repeat(64)};
+  const snapshot={token,model_name:'验收'};
+  api.runtime=()=>({open:async()=>({draft_token:token}),snapshot:async()=>snapshot,analysis:async()=>({document:{id:'analysis.test',revision:0},digest:'b'}),query:async()=>({document:{id:'mindmap.test',revision:0}})});
+  const v=await api.store.create(scope);
+  await api.store.update(v.id,value=>{value.messages=[{id:'early',role:'user',text:'早期问题'},{id:'early.a',role:'assistant',text:'早期回复'},{id:'latest',role:'user',text:'原问题'},{id:'latest.a',role:'assistant',text:'旧回复'}];});
+  const send=(text,id)=>api.prompt(v.id,scope,'s',text,[],token,[],id);
+  await assert.rejects(send('不允许','early'),e=>e.code==='MESSAGE_EDIT_CONFLICT');
+  assert.equal(service.tasks.size,0);
+  await send('修订问题','latest');
+  await service.tasks.get('p')?.completion;
+  const stored=await api.store.read(v.id), result=brief(stored);
+  assert.equal(result.run.status,'completed');
+  assert.deepEqual(result.messages.map(m=>m.text),['早期问题','早期回复','修订问题','修订后的回复']);
+  assert(stored.messages.some(m=>m.text==='旧回复'));
+  assert(prompts[0].includes('原问题及该轮旧回复已被替代'));
+  await send('再次修订',result.messages.findLast(m=>m.role==='user').id);
+  await service.tasks.get('p')?.completion;
+  assert.deepEqual(brief(await api.store.read(v.id)).messages.map(m=>m.text),['早期问题','早期回复','再次修订','修订后的回复']);
+});

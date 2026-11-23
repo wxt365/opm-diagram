@@ -40,12 +40,28 @@ test('密集并行关系与状态/特征增量变更保留未修改图形', asyn
   const load = await page.evaluate(() => (window as any).canvasPerformance.load(1000, true));
   await expect(page.locator('.x6-edge')).toHaveCount(2000);
   await page.evaluate(() => { (window as any).unchangedNode = document.querySelector('.x6-node[data-cell-id="node.3"]'); });
+  await page.evaluate(() => {
+    const tasks: number[] = [];
+    const observer = new PerformanceObserver(list => tasks.push(...list.getEntries().map(entry => entry.duration)));
+    observer.observe({ type: 'longtask', buffered: false });
+    (window as any).detailTasks = { tasks, observer };
+  });
+  const started = Date.now();
   const details = await page.evaluate(() => (window as any).canvasPerformance.details());
   await expect(page.locator('.x6-node[data-cell-id="state.node.0"]')).toBeVisible();
   await expect(page.locator('.x6-node[data-cell-id="feature.node.0"]')).toBeVisible();
   await expect(page.locator('.x6-edge[data-cell-id="state.default.state.node.0"]')).toHaveCount(1);
+  await expect(page.locator('.x6-edge[data-cell-id^="state.default."]')).toHaveCount(500);
+  await expect(page.locator('.x6-node[data-cell-id^="state.final-outline."]')).toHaveCount(500);
+  const completion = Date.now() - started;
+  const longTasks = await page.evaluate(() => {
+    const { tasks, observer } = (window as any).detailTasks;
+    tasks.push(...observer.takeRecords().map((entry: PerformanceEntry) => entry.duration)); observer.disconnect();
+    return { count: tasks.length, maximum: Math.max(0, ...tasks), total: tasks.reduce((sum: number, ms: number) => sum + ms, 0) };
+  });
+  console.log('CANVAS_DETAILS', JSON.stringify({ details, completion, longTasks }));
   await page.evaluate(() => (window as any).canvasPerformance.rename());
-  await expect(page.locator('.x6-node[data-cell-id="node.0"] text')).toHaveText('咖啡豆');
+  await expect(page.locator('.x6-node[data-cell-id="node.0"] text').first()).toHaveText('咖啡豆');
   const select = await page.evaluate(() => (window as any).canvasPerformance.select('fact.0'));
   await expect(page.locator('.x6-edge[data-cell-id="fact.0"] path[data-opm-selected]')).toHaveAttribute('stroke', '#0b6bcb');
   await page.evaluate(() => (window as any).canvasPerformance.remove());
@@ -54,5 +70,5 @@ test('密集并行关系与状态/特征增量变更保留未修改图形', asyn
   await expect(page.locator('.x6-edge[data-cell-id="state.default.state.node.0"]')).toHaveCount(0);
   expect(await page.evaluate(() => (window as any).unchangedNode === document.querySelector('.x6-node[data-cell-id="node.3"]'))).toBe(true);
   expect(errors).toEqual([]);
-  await info.attach('密集关系与混合元素性能毫秒', { body: JSON.stringify({ nodes: 2000, relations: 2000, load, details, select }), contentType: 'application/json' });
+  await info.attach('密集关系与混合元素性能毫秒', { body: JSON.stringify({ nodes: 2000, relations: 2000, load, details, completion, longTasks, select }), contentType: 'application/json' });
 });

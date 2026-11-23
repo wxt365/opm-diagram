@@ -13,7 +13,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-
 class GoldenFixtureSeedRepositoryTest {
 
     @TempDir
@@ -64,9 +63,9 @@ class GoldenFixtureSeedRepositoryTest {
                 temporaryDirectory.resolve("family"), bytes, fixtureSha256, 1782864000L, identity);
 
         assertEquals(identity.projectId(), result.projectId());
-        assertEquals(temporaryDirectory.resolve("family").resolve("projects").resolve(identity.projectId()).resolve("project.db"), result.databasePath());
+        assertEquals(temporaryDirectory.resolve("family").resolve("projects").resolve(identity.projectId()).resolve("project.db").toRealPath(), result.databasePath());
         assertFalse(Files.exists(temporaryDirectory.resolve("family").resolve("projects").resolve("project.golden.fixture." + fixtureSha256)));
-        try (var connection = DriverManager.getConnection("jdbc:sqlite:" + result.databasePath())) {
+        try (var connection = org.opm.localruntime.storage.SqliteTestSupport.connection(result.databasePath())) {
             try (var row = connection.createStatement().executeQuery("SELECT project_id, name, description FROM project_metadata")) {
                 assertTrue(row.next());
                 assertEquals(identity.projectId(), row.getString("project_id"));
@@ -105,13 +104,14 @@ class GoldenFixtureSeedRepositoryTest {
                 assertFalse(Files.exists(database));
                 continue;
             }
+            database=new org.opm.localruntime.storage.ProjectDatabaseFactory(storage).snapshot("project.golden.fixture."+fixtureSha256);
             assertTrue(Files.isRegularFile(database), fault.stage());
             assertBusinessRows(database, fault.committedRows());
         }
     }
 
     private void assertBusinessRows(Path database, boolean committedRows) throws Exception {
-        try (var connection = DriverManager.getConnection("jdbc:sqlite:" + database)) {
+        try (var connection = org.opm.localruntime.storage.SqliteTestSupport.connection(database)) {
             for (String table : List.of("project_metadata", "profile_package", "rule_set_package", "grammar_package", "model_catalog", "revision_document", "model_head")) {
                 try (var result = connection.createStatement().executeQuery("SELECT COUNT(*) FROM " + table)) {
                     assertTrue(result.next());

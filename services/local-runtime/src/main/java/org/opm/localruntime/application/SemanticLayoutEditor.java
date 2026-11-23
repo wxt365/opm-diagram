@@ -64,7 +64,7 @@ final class SemanticLayoutEditor {
             throw domain("该 Occurrence 不支持普通布局编辑");
         }
         var current = occurrenceLayout(occurrence, layouts);
-        replaceLayout(layouts, new SemanticRevision.Layout(current.id(), x, y, current.width(), current.height(), current.zOrder()));
+        replaceLayout(layouts, new SemanticRevision.Layout(current.id(), x, y, current.width(), current.height(), current.zOrder(), current.edgeRoutes()));
         if (occurrence.targetKind() == SemanticRevision.TargetKind.STATE) {
             var state = base.states().stream().filter(item -> item.id().equals(occurrence.targetId())).findFirst().orElseThrow();
             containState(state, occurrence, occurrences, layouts, false);
@@ -87,22 +87,59 @@ final class SemanticLayoutEditor {
     /** 批量绝对几何快照；由上层先验证完整授权，候选验证完成后才写入 journal。 */
     static void updateBatch(SemanticRevision base, Map<String, Object> payload, List<SemanticRevision.Layout> layouts) {
         var ids = new java.util.HashSet<String>();
+        var geometryChanges = new java.util.HashSet<String>();
         for (Object entry : (List<?>) payload.get("layouts")) {
             var item = map(entry); String id = required(item, "occurrence_id");
             if (!ids.add(id)) throw domain("批量布局目标重复");
             var occurrence = base.occurrences().stream().filter(value -> value.id().equals(id)).findFirst().orElseThrow(() -> domain("Occurrence 不存在"));
             var previous = occurrenceLayout(occurrence, layouts); var geometry = requiredMap(item, "layout");
+            var routes = previous.edgeRoutes();
+            if (geometry.containsKey("edge_routes")) {
+                Set<String> allowedSegments = switch (occurrence.targetKind()) {
+                    case FACT -> null;
+                    case FEATURE -> Set.of("feature.owner");
+                    case ELEMENT -> {
+                        var element = base.elements().stream().filter(value -> value.id().equals(occurrence.targetId()))
+                                .findFirst().orElseThrow(() -> domain("Occurrence Element 不存在"));
+                        var segment = element.coreKind() == SemanticRevision.CoreKind.OBJECT ? "feature.characterization" : "feature.composition";
+                        yield Set.of(segment, segment + ".junction");
+                    }
+                    default -> throw domain("该节点不支持所属连线路径");
+                };
+                try {
+                    var parsed = new java.util.ArrayList<SemanticRevision.EdgeRoute>();
+                    for (var value : (List<?>) geometry.get("edge_routes")) {
+                        var route = map(value); var points = new java.util.ArrayList<SemanticRevision.RoutePoint>();
+                        if (allowedSegments != null && !allowedSegments.contains(required(route, "segment")))
+                            throw domain("所属连线路径段与节点种类不匹配");
+                        for (var pointValue : (List<?>) route.get("points")) {
+                            var point = map(pointValue);
+                            points.add(new SemanticRevision.RoutePoint(requiredFiniteNumber(point, "x"), requiredFiniteNumber(point, "y")));
+                        }
+                        String segment = required(route, "segment"), mode = required(route, "mode");
+                        if (allowedSegments != null && segment.endsWith(".junction")
+                                && (mode.equals("MANUAL") ? points.size() != 1 : !points.isEmpty()))
+                            throw domain("所属标记手动位置必须有一个点，自动位置必须为空");
+                        parsed.add(new SemanticRevision.EdgeRoute(segment, required(route, "style"), mode, points));
+                    }
+                    if (parsed.size() > 64 || parsed.stream().map(SemanticRevision.EdgeRoute::segment).distinct().count() != parsed.size())
+                        throw domain("关系路径线段重复或过多");
+                    routes = parsed;
+                } catch (IllegalArgumentException exception) { throw domain("关系路径格式无效：" + exception.getMessage()); }
+            }
             double width = requiredFiniteNumber(geometry, "width"), height = requiredFiniteNumber(geometry, "height");
             if (width <= 0 || height <= 0) throw domain("布局尺寸必须为正数");
-            replaceLayout(layouts, new SemanticRevision.Layout(previous.id(), requiredFiniteNumber(geometry, "x"),
-                    requiredFiniteNumber(geometry, "y"), width, height, previous.zOrder()));
+            double x = requiredFiniteNumber(geometry, "x"), y = requiredFiniteNumber(geometry, "y");
+            if (Double.compare(previous.x(), x) != 0 || Double.compare(previous.y(), y) != 0
+                    || Double.compare(previous.width(), width) != 0 || Double.compare(previous.height(), height) != 0) geometryChanges.add(id);
+            replaceLayout(layouts, new SemanticRevision.Layout(previous.id(), x, y, width, height, previous.zOrder(), routes));
         }
         // 快照已包含父状态联动，不能再隐式加偏移；校验最终容纳关系。只检查受影响的容器。
         for (var state : base.states()) for (var child : base.occurrences()) {
             if (child.targetKind() != SemanticRevision.TargetKind.STATE || !child.targetId().equals(state.id())
                     || child.ownership() != SemanticRevision.OccurrenceOwnership.OWNED) continue;
             var owner = stateOwner(state, child, base.occurrences());
-            if (!ids.contains(child.id()) && !ids.contains(owner.id())) continue;
+            if (!geometryChanges.contains(child.id()) && !geometryChanges.contains(owner.id())) continue;
             var box = occurrenceLayout(owner, layouts); var position = occurrenceLayout(child, layouts);
             double tolerance = 1e-7;
             if (position.x() < box.x() + 8 - tolerance || position.y() < box.y() + 28 - tolerance
@@ -119,7 +156,7 @@ final class SemanticLayoutEditor {
                 && (state.ownerTargetKind() == SemanticRevision.TargetKind.ELEMENT ? "OBJECT_NODE".equals(item.constructRole())
                 : java.util.Set.of("ATTRIBUTE_NODE", "OPERATION_NODE").contains(item.constructRole()))).toList();
         if (owners.size() != 1) throw domain("State 必须有唯一的同 Context owned owner");
-        return owners.getFirst();
+        return owners.get(0);
     }
 
     static SemanticRevision.Layout occurrenceLayout(SemanticRevision.Occurrence occurrence, List<SemanticRevision.Layout> layouts) {
@@ -148,7 +185,7 @@ final class SemanticLayoutEditor {
             width = Math.max(width, position.x() + position.width() + 8 - bounds.x());
             height = Math.max(height, position.y() + position.height() + 8 - bounds.y());
         }
-        replaceLayout(layouts, new SemanticRevision.Layout(bounds.id(), bounds.x(), bounds.y(), width, height, bounds.zOrder()));
+        replaceLayout(layouts, new SemanticRevision.Layout(bounds.id(), bounds.x(), bounds.y(), width, height, bounds.zOrder(), bounds.edgeRoutes()));
     }
 
     /** 状态保持在所属节点的内容区；创建与父移动可以扩大容器，单独拖动只夹取位置。 */
@@ -160,7 +197,7 @@ final class SemanticLayoutEditor {
         if (expand) { width = Math.max(width, x - box.x() + position.width() + 8); height = Math.max(height, y - box.y() + position.height() + 8); }
         x = Math.min(x, box.x() + width - position.width() - 8);
         y = Math.min(y, box.y() + height - position.height() - 8);
-        replaceLayout(layouts, new SemanticRevision.Layout(box.id(), box.x(), box.y(), width, height, box.zOrder()));
+        replaceLayout(layouts, new SemanticRevision.Layout(box.id(), box.x(), box.y(), width, height, box.zOrder(), box.edgeRoutes()));
         replaceLayout(layouts, new SemanticRevision.Layout(position.id(), x, y, position.width(), position.height(), position.zOrder()));
     }
 

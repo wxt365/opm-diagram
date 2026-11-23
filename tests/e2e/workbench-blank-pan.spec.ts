@@ -1,4 +1,5 @@
 import { chooseViewportAction } from "./viewport-controls";
+import { localLayout } from "./helpers/local-layout";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 test.use({ baseURL: process.env.OPM_PLACEMENT_BASE ?? "http://127.0.0.1:5176" });
 
@@ -21,6 +22,7 @@ test("选择模式直接拖动空白，保留选择且不写模型", async ({ pa
     await edit(page, () => page.getByTestId("p03-tool-object").click()); await edit(page, () => page.getByTestId("p03-tool-process").click());
     await owner.click({ position: { x: 20, y: 14 } }); await processNode.click({ modifiers: ["Shift"] });
     const before = await owner.boundingBox(), identity = await page.getByTestId("hs-draft-identity").innerText(), count = writes.length;
+    const undo = page.getByTestId("opd-undo-layout"), undoEnabled = await undo.isEnabled(), undoTitle = await undo.getAttribute("title");
     const frame = (await page.locator(".canvas-frame").boundingBox())!;
     await pan(page, frame.x + 8, frame.y + 8, 64, 40);
     const after = (await owner.boundingBox())!;
@@ -28,15 +30,23 @@ test("选择模式直接拖动空白，保留选择且不写模型", async ({ pa
     for (const item of [owner, processNode]) await expect(item.locator("rect,ellipse").first()).toHaveAttribute("fill", "#eaf3fc");
     await expect(page.getByTestId("p03-tool-select")).toHaveAttribute("aria-pressed", "true");
     expect(writes).toHaveLength(count); expect(await page.getByTestId("hs-draft-identity").innerText()).toBe(identity);
-    await expect(page.getByTestId("opd-undo-layout")).toBeDisabled();
+    expect(await undo.isEnabled()).toBe(undoEnabled);
+    await expect(undo).toHaveAttribute("title", undoTitle!);
     // 释放到画布外，再移动鼠标应保持视口；点击空白仍清空选择。
     await pan(page, frame.x + 8, frame.y + 8, -30, 20);
     const released = await owner.boundingBox(); await page.mouse.move(frame.x + 180, frame.y + 20); expect(await owner.boundingBox()).toEqual(released);
     await page.getByTestId("p03-canvas").click({ position: { x: 8, y: 8 } });
     for (const item of [owner, processNode]) await expect(item.locator("rect,ellipse").first()).toHaveAttribute("fill", "#ffffff");
     await owner.click({ position: { x: 20, y: 14 } }); const nodeBefore = (await owner.boundingBox())!;
-    await edit(page, () => dragNode(page, owner, 32, 16)); const nodeAfter = (await owner.boundingBox())!;
-    expect(nodeAfter.x - nodeBefore.x).toBeCloseTo(32, 0); expect(nodeAfter.y - nodeBefore.y).toBeCloseTo(16, 0);
+    const modelBefore = await worldPosition(owner);
+    const scale = parseFloat(await page.getByTestId("p03-zoom-output").filter({ visible: true }).inputValue()) / 100;
+    await localLayout(page, () => dragNode(page, owner, 32, 16)); const nodeAfter = (await owner.boundingBox())!;
+    const modelAfter = await worldPosition(owner);
+    // X6 使用 16 单位网格吸附，原节点位置可能不在网格上。
+    expect(modelAfter.x).toBe(Math.round((modelBefore.x + 32 / scale) / 16) * 16);
+    expect(modelAfter.y).toBe(Math.round((modelBefore.y + 16 / scale) / 16) * 16);
+    expect(nodeAfter.x - nodeBefore.x).toBeCloseTo((modelAfter.x - modelBefore.x) * scale, 0);
+    expect(nodeAfter.y - nodeBefore.y).toBeCloseTo((modelAfter.y - modelBefore.y) * scale, 0);
     // 状态指定之外的简单生成/消耗关系通过真实拖线创建，空白平移不抢占关系手势。
     await page.getByTestId("p03-relation-quick-option-CAP-ISO-PROC-001").click();
     await edit(page, async () => {
@@ -77,3 +87,6 @@ async function pan(page: Page, x: number, y: number, dx: number, dy: number) {
   await page.mouse.move(x, y); await page.mouse.down(); await page.mouse.move(x + dx, y + dy, { steps: 12 }); await page.mouse.up();
 }
 async function dragNode(page: Page, item: Locator, dx: number, dy: number) { const box = (await item.boundingBox())!; await pan(page, box.x + 20, box.y + 14, dx, dy); }
+async function worldPosition(item: Locator) {
+  return item.evaluate(element => { const matrix = (element as SVGGraphicsElement).transform.baseVal.consolidate()!.matrix; return { x: matrix.e, y: matrix.f }; });
+}

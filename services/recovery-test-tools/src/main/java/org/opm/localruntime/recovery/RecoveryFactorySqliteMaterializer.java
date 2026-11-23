@@ -41,7 +41,8 @@ final class RecoveryFactorySqliteMaterializer {
             if (!(opened instanceof ProjectDatabaseOpenResult.Ready ready)) {
                 throw new RecoveryFactoryException("SQLite V1 migration did not become ready.");
             }
-            try (Connection connection = connect(ready.database().databasePath())) {
+            Path database = ready.database().snapshot();
+            try (Connection connection = connect(database)) {
                 connection.setAutoCommit(false);
                 try {
                     insertProject(connection, projectId, revision, fixedTime);
@@ -55,8 +56,8 @@ final class RecoveryFactorySqliteMaterializer {
                     throw exception;
                 }
             }
-            Map<String, Integer> counts = verify(ready.database().databasePath(), projectId, revision);
-            return new Result(ready.database().databasePath(), Map.copyOf(counts));
+            Map<String, Integer> counts = verify(database, projectId, revision);
+            return new Result(database, Map.copyOf(counts));
         } catch (RecoveryFactoryException exception) {
             throw exception;
         } catch (Exception exception) {
@@ -204,9 +205,7 @@ final class RecoveryFactorySqliteMaterializer {
     }
 
     private Connection connect(Path database) throws Exception {
-        Connection connection = DriverManager.getConnection("jdbc:sqlite:" + database.toAbsolutePath() + "?foreign_keys=on");
-        connection.createStatement().execute("PRAGMA foreign_keys = ON");
-        return connection;
+        return org.opm.localruntime.storage.SqliteSnapshots.connection(database);
     }
 
     private void validateRevision(JsonNode revision) {

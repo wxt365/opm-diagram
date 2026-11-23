@@ -13,6 +13,28 @@ const doc: MindmapDocument = { format_version: 1, id: 'mindmap.test', revision: 
 ], relations: [] };
 const result = (): MindmapResult => ({ request_id: 'request.test', document: structuredClone(doc), digest: 'b'.repeat(64), conversions: [] });
 function setup() { return mount(MindmapPanel, { props: { projectId: 'project.test', modelId: 'model.test', token, readonly: false, generating: false, contexts: [{ id: 'context.root', label: 'SD' }], activeContext: 'context.root', targets: [] } }); }
+it('头部右侧栏按钮隐藏恢复后保留分析节点', async () => {
+  vi.mocked(localRuntimeApi.draftQuery).mockImplementation(async (_p, _m, _op, input) => ({ ...result(), request_id: (input as { request_id: string }).request_id }) as never);
+  const w = setup(); await flushPromises();
+  const input = w.get('[data-testid="mindmap-node-label"]');
+  const value = (input.element as HTMLInputElement).value;
+  await w.get('[aria-label="切换脑图右侧栏"]').trigger('click');
+  expect(w.find('.mindmap-details').exists()).toBe(false);
+  await w.get('[aria-label="切换脑图右侧栏"]').trigger('click');
+  expect(w.get('.mindmap-details').isVisible()).toBe(true);
+  expect(w.get('[data-testid="mindmap-node-label"]').element).toHaveProperty('value', value); w.unmount();
+});
+it('复用OPD缩放菜单，400%预设和恢复100%更新脑图画布', async () => {
+  vi.mocked(localRuntimeApi.draftQuery).mockResolvedValue(result() as never);
+  const w = setup(); await flushPromises();
+  await w.get('[data-testid="p03-zoom-menu-toggle"]').trigger('click');
+  await w.get('[data-testid="p03-zoom-preset-400"]').trigger('click');
+  expect(w.get('[data-testid="p03-zoom-output"]').element).toHaveProperty('value', '400%');
+  await w.get('[data-testid="p03-zoom-menu-toggle"]').trigger('click');
+  await w.get('[data-testid="p03-zoom-reset"]').trigger('click');
+  expect(w.get('[data-testid="p03-zoom-output"]').element).toHaveProperty('value', '100%');
+  w.unmount();
+});
 it('属性问题集中展示、定位与明确排除；两个生成入口使用相同目标和排除项', async () => {
   const value = result(); value.document.nodes.push({ ...value.document.nodes[1]!, id: 'dose', label: '目标粉量', kind: 'ATTRIBUTE', owner_id: 'beans', target_id: null });
   vi.mocked(localRuntimeApi.draftQuery).mockImplementation(async (_p, _m, _op, input) => ({ ...value, request_id: (input as { request_id: string }).request_id }) as never);
@@ -45,11 +67,15 @@ it('响应式文档可通过键盘编辑、撤销并保存，分析保存不提�
   expect(w.findAll('.mindmap-node')).toHaveLength(4); await w.get('[data-testid="mindmap-node-label"]').setValue('新增过程');
   await w.get('[data-testid="mindmap-node-kind"]').setValue('PROCESS'); await w.get('[data-testid="mindmap-save"]').trigger('click'); await flushPromises();
   expect(w.get('[data-testid="mindmap-save-state"]').text()).toBe('分析已保存');
+  expect(w.get('[data-testid="mindmap-save-state"]').classes()).toContain('sr-only');
+  expect(w.get('[data-testid="mindmap-save"]').attributes('title')).toContain('分析已保存');
   const request = vi.mocked(localRuntimeApi.draftQuery).mock.calls.at(-1)![3] as { document: MindmapDocument; expected_revision: number };
   expect(request.expected_revision).toBe(0); expect(request.document.nodes.at(-1)?.label).toBe('新增过程');
   expect(w.emitted('invalidated')?.length).toBeGreaterThan(0);
   await w.get('[data-testid="mindmap-canvas"]').trigger('keydown', { key: 'z', ctrlKey: true }); await flushPromises();
-  expect(w.get('[data-testid="mindmap-save-state"]').text()).toBe('分析未保存'); w.unmount();
+  expect(w.get('[data-testid="mindmap-save-state"]').text()).toBe('分析未保存');
+  expect(w.get('[data-testid="mindmap-save-state"]').classes()).not.toContain('sr-only');
+  w.unmount();
 });
 it('保存冲突保留本地内容，可导出备份；生成期间和只读禁止编辑', async () => {
   const w = setup(); await flushPromises(); await w.get('[data-testid="mindmap-add-child"]').trigger('click'); await flushPromises();
@@ -92,4 +118,75 @@ it('脑图键盘不冒泡到 OPD 全局监听，输入框保存快捷键只保�
   expect(listener).not.toHaveBeenCalled(); expect(w.get('[data-testid="mindmap-save-state"]').text()).toBe('分析已保存');
   expect(vi.mocked(localRuntimeApi.draftQuery).mock.calls.map(call => call[2])).toEqual(['mindmap', 'mindmap']);
   window.removeEventListener('keydown', listener); w.unmount();
+});
+
+it.each([true, false])('在途保存禁止重新读取，完成后可重试、读取并再次保存，成功=%s', async succeeds => {
+  const w = setup(); await flushPromises();
+  await w.get('[data-testid="mindmap-node-label"]').setValue('第一次修改');
+  let complete!: () => void;
+  vi.mocked(localRuntimeApi.draftQuery).mockImplementationOnce(async (_p, _m, _op, input) => {
+    const request = input as { request_id: string; document: MindmapDocument };
+    return await new Promise<MindmapResult>((resolve, reject) => { complete = () => succeeds ? resolve({ ...result(), request_id: request.request_id,
+      document: { ...structuredClone(request.document), revision: request.document.revision + 1 } }) : reject(new Error('保存暂时失败')); }) as never;
+  });
+  const editor = w.vm as unknown as { save: () => Promise<boolean>; reload: (force: boolean) => Promise<void> };
+  const saving = editor.save(); await flushPromises();
+  await editor.reload(true);
+  expect(localRuntimeApi.draftQuery).toHaveBeenCalledTimes(2);
+  complete(); expect(await saving).toBe(succeeds); await flushPromises();
+  if (!succeeds) {
+    expect(w.get('[data-testid="mindmap-node-label"]').element).toHaveProperty('value', '第一次修改');
+    expect(w.get('[data-testid="mindmap-save-state"]').text()).toBe('分析未保存');
+    expect(await editor.save()).toBe(true); await flushPromises();
+  }
+  expect(w.get('[data-testid="mindmap-save-state"]').text()).toBe('分析已保存');
+  await editor.reload(true); await flushPromises();
+  await w.get('[data-testid="mindmap-node-label"]').setValue('第二次修改');
+  expect(await editor.save()).toBe(true); await flushPromises();
+  expect(w.get('[data-testid="mindmap-save-state"]').text()).toBe('分析已保存'); w.unmount();
+});
+
+it('切换模型后旧保存响应不覆盖新脑图或结束新保存', async () => {
+  const w = setup(); await flushPromises();
+  const editor = w.vm as unknown as { save: () => Promise<boolean> };
+  const pendingSave = () => {
+    let complete!: () => void;
+    vi.mocked(localRuntimeApi.draftQuery).mockImplementationOnce(async (_p, _m, _op, input) => {
+      const request = input as { request_id: string; document: MindmapDocument };
+      return await new Promise<MindmapResult>(resolve => { complete = () => resolve({ ...result(), request_id: request.request_id,
+        document: { ...structuredClone(request.document), revision: request.document.revision + 1 } }); }) as never;
+    });
+    return () => complete();
+  };
+  await w.get('[data-testid="mindmap-node-label"]').setValue('旧模型');
+  const completeOld = pendingSave(), oldSave = editor.save();
+  await w.setProps({ modelId: 'model.next' }); await flushPromises();
+  await w.get('[data-testid="mindmap-node-label"]').setValue('新模型');
+  const completeNew = pendingSave(), newSave = editor.save();
+  completeOld(); expect(await oldSave).toBe(false); await flushPromises();
+  expect(w.get('[data-testid="mindmap-node-label"]').element).toHaveProperty('value', '新模型');
+  expect(w.get('[data-testid="mindmap-save-state"]').text()).toBe('正在保存分析…');
+  completeNew(); expect(await newSave).toBe(true); await flushPromises();
+  expect(w.get('[data-testid="mindmap-save-state"]').text()).toBe('分析已保存'); w.unmount();
+});
+
+it.each(['owner', 'entity'] as const)('类型修改保护 %s 入向引用，合法解除引用后允许修改并保存', async reference => {
+  const value = result();
+  if (reference === 'entity') value.document.nodes[2] = { ...value.document.nodes[2]!, kind: 'OBJECT', owner_id: null, entity_ref: 'beans' };
+  vi.mocked(localRuntimeApi.draftQuery).mockImplementationOnce(async (_p, _m, _op, input) => ({ ...value, request_id: (input as { request_id: string }).request_id }) as never);
+  const w = setup(); await flushPromises();
+  await w.get('[data-testid="mindmap-node-beans"] .mindmap-node__body').trigger('click');
+  await w.get('[data-testid="mindmap-node-kind"]').setValue('PROCESS');
+  expect(w.get('[data-testid="mindmap-node-kind"]').element).toHaveProperty('value', 'OBJECT');
+  expect(w.get('[role="alert"]').text()).toContain('引用');
+  expect(w.get('[data-testid="mindmap-save-state"]').text()).toBe('分析已保存');
+  await w.get('[data-testid="mindmap-node-raw"] .mindmap-node__body').trigger('click');
+  await w.get('[data-testid="mindmap-node-kind"]').setValue('PROCESS');
+  await w.get('[data-testid="mindmap-node-beans"] .mindmap-node__body').trigger('click');
+  await w.get('[data-testid="mindmap-node-kind"]').setValue('PROCESS');
+  await w.get('[data-testid="mindmap-save"]').trigger('click'); await flushPromises();
+  expect(w.get('[data-testid="mindmap-save-state"]').text()).toBe('分析已保存');
+  const request = vi.mocked(localRuntimeApi.draftQuery).mock.calls.at(-1)![3] as { document: MindmapDocument };
+  expect(request.document.nodes.find(node => node.id === 'beans')?.kind).toBe('PROCESS');
+  expect(request.document.nodes.find(node => node.id === 'raw')).toMatchObject({ owner_id: null, entity_ref: null }); w.unmount();
 });

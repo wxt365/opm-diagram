@@ -6,6 +6,15 @@ import { createCanvasMovement } from "./canvas-movement";
 afterEach(() => vi.unstubAllGlobals());
 
 describe("画布移动预览", () => {
+  it("moves a saved junction and manual root bends during owner drag without writing layout data", () => {
+    const saved = { segment: "feature.characterization.junction", style: "CURVE" as const, mode: "MANUAL" as const, points: [{ x: 280, y: 160 }] };
+    const nodes = [{ ...node("owner", "object", 80, 80), edgeRoutes: [saved] }, { ...node("f", "attribute", 320, 180), ownerId: "owner" }];
+    const syncFeatures = vi.fn();
+    const movement = createCanvasMovement({ nodes: () => nodes, visibleNodes: () => nodes, selection: () => ["owner"], syncFeatures, graph: () => undefined });
+    movement.finish("owner", { x: 120, y: 140 });
+    expect(syncFeatures.mock.lastCall?.[0][0].edgeRoutes).toEqual([{ ...saved, points: [{ x: 320, y: 220 }] }]);
+    expect(nodes[0]!.edgeRoutes).toEqual([saved]);
+  });
   it("连续事件合并一帧，结束冲刷最终位置，所属状态只移动一次", () => {
     const frames = new Map<number, FrameRequestCallback>();
     let sequence = 0;
@@ -50,8 +59,42 @@ describe("画布移动预览", () => {
     const nodes = [node("owner", "object", 80, 80), { ...node("feature", "attribute", 320, 80), ownerId: "owner" }];
     const syncFeatures = vi.fn();
     const movement = createCanvasMovement({ nodes: () => nodes, visibleNodes: () => [nodes[0]], selection: id => [id], syncFeatures, graph: () => undefined });
-    movement.finish("owner", { x: 112, y: 112 });
+    const moved = movement.finish("owner", { x: 112, y: 112 });
+    expect(moved.map(item => item.occurrence_id)).toEqual(["occurrence.owner", "occurrence.feature"]);
+    expect(moved[1]!.layout).toMatchObject({ x: 352, y: 112 });
     expect(syncFeatures).not.toHaveBeenCalled();
+  });
+
+  it("拖动对象时可见特征及其状态同步预览，保存绝对坐标并重绘所属线", () => {
+    const nodes = [node("owner", "object", 80, 80), { ...node("feature", "attribute", 320, 176), ownerId: "owner", width: 160, height: 108 },
+      { ...node("fs", "state", 328, 204), ownerId: "feature" }];
+    const syncFeatures = vi.fn();
+    const movement = createCanvasMovement({ nodes: () => nodes, visibleNodes: () => nodes, selection: id => [id], syncFeatures, graph: () => undefined });
+    const moved = movement.finish("owner", { x: 120, y: 140 });
+    expect(moved.map(item => item.occurrence_id)).toEqual(["occurrence.owner", "occurrence.feature", "occurrence.fs"]);
+    expect(syncFeatures).toHaveBeenCalledExactlyOnceWith(nodes.map(node => ({ ...node,
+      ...moved.find(item => item.occurrence_id === node.occurrenceId)!.layout })));
+  });
+
+  it("状态拖动扩容后回到碰撞位置，恢复上一帧容器和属性并保留终态外框尺寸", () => {
+    const nodes = [{ ...node("owner", "object", 100, 100), width: 160, height: 100 },
+      { ...node("a", "state", 108, 128), ownerId: "owner" },
+      { ...node("b", "state", 108, 164), ownerId: "owner", stateRoles: ["FINAL"] as OpdNode["stateRoles"] },
+      { ...node("f", "attribute", 316, 224), ownerId: "owner" }];
+    const cells = new Map([...nodes.map(node => node.id), "state.final-outline.b"].map(id => [id, { isNode: () => true, position: vi.fn(), resize: vi.fn() }]));
+    const syncFeatures = vi.fn();
+    const movement = createCanvasMovement({ nodes: () => nodes, visibleNodes: () => nodes, selection: id => [id], syncFeatures,
+      graph: () => ({ getCellById: (id: string) => cells.get(id) }) as Graph });
+    movement.start("b"); movement.finish("b", { x: 108, y: 264 });
+    expect(cells.get("owner")!.resize).toHaveBeenLastCalledWith(160, 200);
+    expect(cells.get("f")!.position).toHaveBeenLastCalledWith(316, 324);
+    expect(movement.finish("b", { x: 108, y: 128 })).toEqual([]);
+    expect(cells.get("owner")!.resize).toHaveBeenLastCalledWith(160, 100);
+    expect(cells.get("b")!.position).toHaveBeenLastCalledWith(108, 164);
+    expect(cells.get("f")!.position).toHaveBeenLastCalledWith(316, 224);
+    expect(cells.get("state.final-outline.b")!.resize).toHaveBeenLastCalledWith(82, 22);
+    expect(syncFeatures.mock.lastCall?.[0].map((node: OpdNode) => [node.id, node.x, node.y]))
+      .toEqual(nodes.map(node => [node.id, node.x, node.y]));
   });
 });
 

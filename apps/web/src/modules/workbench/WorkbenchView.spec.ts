@@ -6,10 +6,12 @@ import { DraftWorkbenchSession } from "@/shared/api/draftWorkbenchSession";
 import { useWorkbenchRuntimeStore } from "@/stores/workbenchRuntime";
 
 import WorkbenchView from "./WorkbenchView.vue";
+import MindmapPanel from "./MindmapPanel.vue";
+import type { MindmapDocument, MindmapResult } from "@/shared/api/generated/draftWorkspaceContract";
 import { LocalRuntimeApiError, localRuntimeApi } from "@/shared/api/localRuntimeApi";
 import { assistantRequest, watchAssistant } from "@/shared/api/assistantApi";
 
-vi.mock("@/shared/api/assistantApi", () => ({ assistantRequest: vi.fn(async () => []), watchAssistant: vi.fn() }));
+vi.mock("@/shared/api/assistantApi", () => ({ assistantRequest: vi.fn(async () => []), watchAssistant: vi.fn(), watchBusinessAssistant: vi.fn() }));
 
 vi.mock("@/shared/api/localRuntimeApi", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/shared/api/localRuntimeApi")>();
@@ -26,6 +28,7 @@ vi.mock("@/shared/api/localRuntimeApi", async (importOriginal) => {
       textProjection: vi.fn(),
       findings: vi.fn(),
       operationRecords: vi.fn(),
+      operationHistory: vi.fn(),
       releaseVisualCommonFaultCommand: vi.fn(),
       revisions: vi.fn(),
       executeP0Command: vi.fn(),
@@ -75,6 +78,7 @@ const expectedRelationToolLabels = {
 } as const;
 
 function configureApi() {
+  api.operationHistory.mockResolvedValue({ items: [], next_before: null });
   api.draftQuery.mockRejectedValue(new LocalRuntimeApiError("DRAFT_MODE_REQUIRED", "旧模式"));
   api.getProject.mockResolvedValue({ project_id: "project.1", name: "仓储项目", archive_state: "ACTIVE", model_count: 1, updated_at: "2026-07-28T00:00:00Z" });
   api.workspaceSession.mockImplementation((_project, _model, revision?: string) => Promise.resolve({ meta: { read_revision: revision && revision !== "head" ? revision : "revision.1" }, data: { model: { project_id: "project.1", model_id: "model.1", name: "生产模型", profile_id: "profile.iso", profile_version: "0.1.0", access_mode: "EDITABLE_DRAFT", head_revision: revision && revision !== "head" ? revision : "revision.1" }, root_context_id: "context.root", current_context_id: "context.root" } }));
@@ -110,10 +114,12 @@ async function mountWorkbench(query = "") {
     global: {
       plugins: [createPinia(), router],
       stubs: {
+        GraphAnalysisPanel: { template: '<div data-testid="graph-analysis-panel" tabindex="0" />' },
         OpdCanvas: {
-          methods: { async finishNameEdit() { return true; } },
-          props: ["beginNameEdit", "submitNameEdit", "interactionTool"],
-          emits: ["select", "move", "relationIntent", "constructActionsMenuRequested", "relationLabelEditRequested"],
+          name: 'OpdCanvas',
+          methods: { async finishNameEdit() { return true; }, fitToView() {}, getElementPosition() { return { x: 320, y: 240 }; } },
+          props: ["beginNameEdit", "submitNameEdit", "interactionTool", "collapsedFeatures"],
+          emits: ["select", "move", "relationIntent", "constructActionsMenuRequested", "relationLabelEditRequested", "featureCollapseChange"],
           template: `<div :data-interaction-tool="interactionTool">
             <button data-testid="p03-canvas-select-object" type="button" @click="$emit('select', 'element.object')" />
             <button data-testid="p03-canvas-select-product" type="button" @click="$emit('select', 'element.object.product')" />
@@ -172,23 +178,444 @@ describe("WorkbenchView", () => {
     configureApi();
   });
 
+  it("图列表箭头独立折叠多层子图，不切换画布且定位子图时展开祖先", async () => {
+    const { wrapper, router } = await mountWorkbench();
+    const store = useWorkbenchRuntimeStore();
+    const key = 'opm.context-tree.collapsed.v1:["project.1","model.1"]';
+    const previous = localStorage.getItem(key);
+    try {
+      store.contexts = [
+        { id: "context.root", label: "总图", kind: "SYSTEM_DIAGRAM", depth: 0 },
+        { id: "context.branch", label: "分支", kind: "PROCESS_REFINEMENT", parentId: "context.root", depth: 1 },
+        { id: "context.child", label: "下级", kind: "PROCESS_REFINEMENT", parentId: "context.branch", depth: 2 },
+        { id: "context.sibling", label: "同级", kind: "PROCESS_REFINEMENT", parentId: "context.root", depth: 1 },
+      ];
+      await flushPromises();
+      const location = router.currentRoute.value.fullPath;
+      const reads = api.projection.mock.calls.length;
+      const writes = api.executeP0Command.mock.calls.length;
+      expect(wrapper.find('[data-testid="opd-toggle-context.child"]').exists()).toBe(false);
+      await wrapper.get('[data-testid="opd-toggle-context.branch"]').trigger("click");
+      expect(wrapper.find('[data-testid="p03-context-context.child"]').exists()).toBe(false);
+      expect(wrapper.find('[data-testid="p03-context-context.sibling"]').exists()).toBe(true);
+      expect(wrapper.get('[data-testid="opd-toggle-context.branch"]').attributes("aria-expanded")).toBe("false");
+      await wrapper.get('[data-testid="opd-toggle-context.root"]').trigger("click");
+      expect(wrapper.findAll('.context-tree__item')).toHaveLength(1);
+      expect(wrapper.get('.navigator-count').text()).toBe("4");
+      expect(router.currentRoute.value.fullPath).toBe(location);
+      expect(api.projection).toHaveBeenCalledTimes(reads);
+      expect(api.executeP0Command).toHaveBeenCalledTimes(writes);
+      expect(store.layoutDirty).toBe(false);
+      store.workbench.activeContextId = "context.child"; await flushPromises();
+      expect(wrapper.get('[data-testid="p03-context-context.child"]').attributes("aria-current")).toBe("page");
+      expect(wrapper.get('[data-testid="opd-toggle-context.root"]').attributes("aria-expanded")).toBe("true");
+      await wrapper.get('[data-testid="p03-context-context.sibling"]').trigger("click"); await flushPromises();
+      expect(api.workspaceSession.mock.calls.at(-1)?.[3]).toBe("context.sibling");
+    } finally {
+      wrapper.unmount();
+      if (previous === null) localStorage.removeItem(key); else localStorage.setItem(key, previous);
+    }
+  });
+
   function draftFixture() {
+    // 旧历史用例复用记录 fixture；运行时实际通过独立 recovery-state 查询读取。
+    api.draftQuery.mockImplementation(async (project, model, operation, input) => {
+      if (operation !== 'recovery-state') throw new LocalRuntimeApiError('DRAFT_MODE_REQUIRED', '旧模式');
+      const data = await api.operationHistory(project, model, 'HEAD');
+      return { meta: { request_id: input.request_id, project_id: project, model_id: model, draft_token: input.draft_token },
+        data: { items: data.items.filter((item: { recovery_action?: string }) => item.recovery_action), next_before: null } };
+    });
     let seq = 0;
     const token = () => ({ draft_id: "draft.ui", edit_seq: seq, binding_digest: "a".repeat(64) });
     const state = () => ({ durable_token: token(), checkpoint_token: null, last_manual_revision: null,
       dirty_since: seq ? "2026-09-14T00:00:00.000Z" : null, deadline: seq ? "2026-09-14T00:00:10.000Z" : null, in_flight: "NONE" as const, pending_manual_target: null, last_error: null });
     const opened = () => ({ request_id: "request.ui", project_id: "project.1", model_id: "model.1", root_context_id: "context.root", context_id: "context.root", mode: "JOURNALED_DRAFT_V2" as const, draft_token: token(), save_state: state() });
     const open = vi.spyOn(DraftWorkbenchSession.prototype, "open").mockImplementation(async () => opened());
+    const saveState = vi.spyOn(DraftWorkbenchSession.prototype, "saveState").mockImplementation(async () => state());
     vi.spyOn(DraftWorkbenchSession.prototype, "recover").mockResolvedValue();
     vi.spyOn(DraftWorkbenchSession.prototype, "pending").mockResolvedValue([]);
     const read = vi.spyOn(DraftWorkbenchSession.prototype, "read").mockImplementation(async () => ({ opened: opened(), project: { name: "项目" }, model: { name: "草稿模型", profile_id: "profile.1", profile_version: "0.2.0", head_revision: "revision.1" }, history: [{ revision_id: "revision.1", sequence: 1, kind: "DRAFT", created_at: "2026-09-14T00:00:00Z" }], navigation: { process_tree: [], object_forest: [], views: [] }, constructs: [{ occurrence_id: "occ.object", target_id: "element.object", target_kind: "ELEMENT", construct_role: "OBJECT_NODE", label: `Object ${seq}`, layout: { x: seq, y: 0, width: 100, height: 60, z_order: 0 }, capability_id: "CAP-OBJECT-001" }], suppressed: [], text: { sentences: [{ sentence_id: `sentence.${seq}`, text: `文本 ${seq}`, ordinal: 0 }], traces: [] }, findings: { items: [], validation_summary: { blocking: 0, coverage_state: "INCOMPLETE" } }, catalog: [] }) as never);
+    const readCanvas = vi.spyOn(DraftWorkbenchSession.prototype, "readCanvas").mockImplementation(async opened => {
+      const snapshot = await read(opened);
+      return { opened: snapshot.opened, constructs: snapshot.constructs, suppressed: snapshot.suppressed };
+    });
+    vi.spyOn(DraftWorkbenchSession.prototype, "readEditedCanvas").mockImplementation(async () => readCanvas(opened()));
+    const readDetails = vi.spyOn(DraftWorkbenchSession.prototype, "readDetails").mockImplementation(async opened => {
+      const snapshot = await read(opened);
+      return { text: snapshot.text, textError: snapshot.textError, navigation: snapshot.navigation, findings: snapshot.findings, catalog: snapshot.catalog };
+    });
     const edit = vi.spyOn(DraftWorkbenchSession.prototype, "edit").mockImplementation(async () => { seq++; return { result_token: token() } as never; });
     const save = vi.spyOn(DraftWorkbenchSession.prototype, "save").mockImplementation(async captured => ({ save_id: "save.ui", status: "SAVED", captured_token: captured, head_token: token(), revision_id: "revision.saved", checkpoint_id: "checkpoint.ui" }));
     const pin = vi.spyOn(DraftWorkbenchSession.prototype, "pin").mockImplementation(async captured => ({ pin_id: "pin.ui", captured_token: captured, revision_id: "revision.pinned" }));
     vi.spyOn(DraftWorkbenchSession.prototype, "catalog").mockResolvedValue({ data: { items: [] } } as never);
     vi.spyOn(DraftWorkbenchSession.prototype, "capabilities").mockResolvedValue({ data: { options: [] } } as never);
-    return { token, open, read, edit, save, pin };
+    return { token, open, saveState, read, readCanvas, readDetails, edit, save, pin };
   }
+
+  it("图谱快捷键不触发隐藏 OPD 撤销重做，返回 OPD 恢复快捷键", async () => {
+    const { wrapper } = await mountWorkbench(); const store = useWorkbenchRuntimeStore();
+    const undo = vi.spyOn(store, 'undo').mockResolvedValue(), redo = vi.spyOn(store, 'redo').mockResolvedValue();
+    await wrapper.get('[data-testid="editor-mode-graph"]').trigger('click'); await flushPromises();
+    const graph = wrapper.get('[data-testid="graph-analysis-panel"]');
+    await graph.trigger('keydown', { key: 'z', ctrlKey: true });
+    await graph.trigger('keydown', { key: 'z', metaKey: true, shiftKey: true });
+    await graph.trigger('keydown', { key: 'y', ctrlKey: true });
+    expect(undo).not.toHaveBeenCalled(); expect(redo).not.toHaveBeenCalled();
+    await wrapper.get('[data-testid="editor-mode-opd"]').trigger('click'); await flushPromises();
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true }));
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'y', ctrlKey: true }));
+    await flushPromises();
+    expect(undo).toHaveBeenCalledOnce(); expect(redo).toHaveBeenCalledOnce(); wrapper.unmount();
+  });
+
+  it("脑图未保存、保存中和失败均阻止刷新，确认保存后解除保护", async () => {
+    draftFixture();
+    const document: MindmapDocument = { format_version: 1, id: 'mindmap.ui', revision: 0, root_id: 'root', relations: [], nodes: [
+      { id: 'root', parent_id: null, label: '分析', kind: 'TOPIC', order: 0, note: '', collapsed: false, owner_id: null, entity_ref: null, target_id: null },
+    ] };
+    let rejectSave!: (error: Error) => void;
+    api.draftQuery.mockImplementation(async (_project, _model, _operation, input) => {
+      const request = input as { request_id: string; action: string; document?: MindmapDocument };
+      if (request.action === 'SAVE') return await new Promise<MindmapResult>((_resolve, reject) => { rejectSave = reject; });
+      return { request_id: request.request_id, document, digest: 'a'.repeat(64), conversions: [] };
+    });
+    const { wrapper } = await mountWorkbench();
+    await wrapper.get('[data-testid="p03-tab-history"]').trigger('click');
+    await wrapper.get('[data-testid="p03-bottom-toggle"]').trigger('click');
+    await wrapper.get('[data-testid="editor-mode-analysis"]').trigger('click'); await flushPromises();
+    expect(wrapper.get('[data-testid="p03-bottom-toggle"]').isVisible()).toBe(false);
+    expect(wrapper.get('[data-testid="p03-workbench"]').classes()).toContain('workbench--bottom-hidden');
+    const blocked = () => { const event = new Event('beforeunload', { cancelable: true }); window.dispatchEvent(event); return event.defaultPrevented; };
+    expect(blocked()).toBe(false);
+    await wrapper.get('[data-testid="mindmap-node-label"]').setValue('尚未保存'); expect(blocked()).toBe(true);
+    const panel = wrapper.findComponent(MindmapPanel);
+    const saving = panel.vm.save(); await flushPromises(); expect(blocked()).toBe(true);
+    rejectSave(new Error('保存失败')); expect(await saving).toBe(false); await flushPromises(); expect(blocked()).toBe(true);
+    api.draftQuery.mockImplementationOnce(async (_project, _model, _operation, input) => {
+      const request = input as { request_id: string; document: MindmapDocument };
+      return { request_id: request.request_id, document: { ...request.document, revision: request.document.revision + 1 }, digest: 'b'.repeat(64), conversions: [] };
+    });
+    expect(await panel.vm.save()).toBe(true); await flushPromises(); expect(blocked()).toBe(false);
+    await wrapper.get('[data-testid="editor-mode-opd"]').trigger('click'); await flushPromises();
+    expect(wrapper.get('[data-testid="p03-bottom-toggle"]').isVisible()).toBe(true);
+    expect(wrapper.get('[data-testid="p03-bottom-toggle"]').attributes('aria-expanded')).toBe('false');
+    expect(useWorkbenchRuntimeStore().workbench.bottomTab).toBe('history');
+    wrapper.unmount();
+  });
+
+  it("统一历史无需打开面板，工具栏支持撤销重做且历史无重复入口，保存后不重复撤销布局", async () => {
+    const fixture = draftFixture();
+    const record = (action: 'UNDO' | 'REDO', id = 'history.edit') => ({ record_id: id, title: '删除对象', operation: 'DELETE_CONSTRUCT', occurred_at: '2026-11-09T00:00:00Z', status: action === 'REDO' ? 'UNDONE' : 'DURABLE', context_id: 'context.root', context_name: 'SD', revision_id: null, detail_available: true, recovery_action: action });
+    let records = [record('UNDO')];
+    let paginate = false;
+    api.operationHistory.mockImplementation(async (_project, _model, _revision, before) => before || !paginate
+      ? { items: records, next_before: null }
+      : { items: [], next_before: 'older' });
+    const originalEdit = fixture.edit.getMockImplementation()!;
+    fixture.edit.mockImplementation(async (token, context, command) => {
+      const result = await originalEdit(token, context, command);
+      records = [record(command.commandType === 'RESTORE_OPERATION' && command.payload.action === 'UNDO' ? 'REDO' : 'UNDO')];
+      return result;
+    });
+    const { wrapper } = await mountWorkbench(); const store = useWorkbenchRuntimeStore(); await flushPromises();
+    expect(store.workbench.bottomTab).not.toBe('history'); expect(store.canUndo).toBe(true);
+    expect(wrapper.get('[data-testid="opd-undo-layout"]').attributes('title')).toContain('删除对象');
+    await store.moveElements([{ occurrence_id: 'occ.object', layout: { x: 30, y: 20, width: 100, height: 60 } }]);
+    await store.undo(); expect(fixture.edit).not.toHaveBeenCalled(); expect(store.layoutDirty).toBe(false);
+    await store.redo(); expect(store.layoutDirty).toBe(true);
+    await store.saveDraft(); await flushPromises(); expect(store.canUndoLayout).toBe(false); expect(store.canRedoLayout).toBe(false);
+    await wrapper.get('[data-testid="opd-undo-layout"]').trigger('click'); await flushPromises();
+    expect(fixture.edit).toHaveBeenLastCalledWith(expect.anything(), 'context.root', { commandType: 'RESTORE_OPERATION', payload: { record_id: 'history.edit', action: 'UNDO' } });
+    await vi.waitFor(() => expect(store.canRedo).toBe(true));
+    paginate = false; store.setBottomTab('history'); await flushPromises();
+    expect(store.canRestoreOperation).toBe(true);
+    expect(store.canUndoLayout).toBe(false); expect(store.canRedoLayout).toBe(false); expect(store.canRedo).toBe(true);
+    expect(wrapper.find('[data-testid="p03-history-restore"]').exists()).toBe(false);
+    await wrapper.get('[data-testid="opd-redo-layout"]').trigger('click'); await flushPromises();
+    expect(fixture.edit).toHaveBeenLastCalledWith(expect.anything(), 'context.root', { commandType: 'RESTORE_OPERATION', payload: { record_id: 'history.edit', action: 'REDO' } });
+    store.historyInteractionBusy = true; expect(store.canUndo).toBe(false); expect(store.canRedo).toBe(false);
+    const count = fixture.edit.mock.calls.length; await store.undo(); expect(fixture.edit).toHaveBeenCalledTimes(count);
+    store.historyInteractionBusy = false;
+    fixture.edit.mockRejectedValueOnce(new LocalRuntimeApiError('DRAFT_EDIT_REJECTED', '操作暂时失败'));
+    await store.undo(); await flushPromises(); expect(store.workbench.commandFeedback).toContain('操作暂时失败');
+    expect(store.canUndo).toBe(true);
+    await store.undo(); await flushPromises(); expect(store.canRedo).toBe(true);
+    const shortcutCount = fixture.edit.mock.calls.length;
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, shiftKey: true, cancelable: true }));
+    await vi.waitFor(() => expect(fixture.edit).toHaveBeenCalledTimes(shortcutCount + 1));
+    await vi.waitFor(() => expect(store.canUndo).toBe(true));
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, cancelable: true }));
+    await vi.waitFor(() => expect(fixture.edit).toHaveBeenCalledTimes(shortcutCount + 2));
+    await vi.waitFor(() => expect(store.canRedo).toBe(true));
+    await store.moveElements([{ occurrence_id: 'occ.object', layout: { x: 40, y: 20, width: 100, height: 60 } }]);
+    expect(store.canRedo).toBe(false); await store.undo(); expect(store.layoutDirty).toBe(false);
+    const branchCount = fixture.edit.mock.calls.length;
+    await flushPromises(); expect(wrapper.find('[data-testid="p03-history-restore"]').exists()).toBe(false);
+    await store.restoreOperation('history.edit'); expect(fixture.edit).toHaveBeenCalledTimes(branchCount);
+    await store.redo(); await store.undo(); expect(store.canRedo).toBe(true);
+    store.workbench.accessMode = 'readonly'; expect(store.canUndo).toBe(false); expect(store.canRedo).toBe(false);
+    wrapper.unmount();
+  });
+
+  it("工具栏直接查询恢复状态，不遍历历史；响应 token 不匹配时关闭恢复入口", async () => {
+    draftFixture();
+    const recovery = { record_id: 'history.edit', operation: 'DELETE_CONSTRUCT', title: '删除对象',
+      occurred_at: '2026-11-10T00:00:00Z', status: 'DURABLE', context_id: 'context.root', context_name: 'SD', revision_id: null,
+      detail_available: true, recovery_action: 'UNDO' };
+    let mismatch = false;
+    api.draftQuery.mockImplementation(async (project, model, operation, input) => {
+      expect(operation).toBe('recovery-state');
+      return { meta: { request_id: input.request_id, project_id: project, model_id: model,
+        draft_token: mismatch ? { ...input.draft_token, edit_seq: 999 } : input.draft_token }, data: { items: [recovery], next_before: null } };
+    });
+    api.operationHistory.mockRejectedValue(new Error('不应扫描历史'));
+    const { wrapper } = await mountWorkbench(); const store = useWorkbenchRuntimeStore();
+    try {
+      expect(store.canUndo).toBe(true); expect(api.operationHistory).not.toHaveBeenCalled();
+      mismatch = true; await store.retryHistoryRecovery();
+      expect(store.historyRecoveryError).toContain('身份不匹配'); expect(store.canUndo).toBe(false);
+      mismatch = false; await store.retryHistoryRecovery(); expect(store.canUndo).toBe(true);
+    } finally { wrapper.unmount(); }
+  });
+
+  it.each([false, true])("恢复操作仅查询一次恢复状态，面板打开=%s，手动刷新仍重新读取", async expanded => {
+    const fixture = draftFixture();
+    api.operationHistory.mockImplementation(async () => ({ items: [{ record_id: 'history.edit', operation: 'DELETE_CONSTRUCT', title: '删除对象',
+      occurred_at: '2026-11-10T00:00:00Z', status: 'DURABLE', context_id: 'context.root', context_name: 'SD', revision_id: null,
+      detail_available: true, recovery_action: fixture.token().edit_seq ? 'REDO' : 'UNDO' }], next_before: null }));
+    const { wrapper } = await mountWorkbench(); const store = useWorkbenchRuntimeStore();
+    try {
+      if (expanded) { store.setBottomTab('history'); await flushPromises(); }
+      api.operationHistory.mockClear();
+      await store.undo(); await flushPromises();
+      expect(store.canRedo).toBe(true); expect(api.operationHistory).toHaveBeenCalledTimes(expanded ? 2 : 1);
+      api.operationHistory.mockClear();
+      await store.refreshOperationHistory();
+      expect(api.operationHistory).toHaveBeenCalledTimes(2);
+    } finally { wrapper.unmount(); }
+  });
+
+  it.each(['DELETE_CONSTRUCT', 'UPDATE_PROPERTY', 'UPDATE_LAYOUT_BATCH', 'CREATE_ELEMENT', 'CREATE_CONTEXT', 'DELETE_CONTEXT', 'UNKNOWN', 'FALLBACK'])("恢复 %s 保持正确的辅助信息等待边界", async operation => {
+    const fixture = draftFixture();
+    const background = ['DELETE_CONSTRUCT', 'UPDATE_PROPERTY', 'UPDATE_LAYOUT_BATCH', 'CREATE_ELEMENT'].includes(operation);
+    api.operationHistory.mockResolvedValue({ items: [{ record_id: 'history.edit', operation: operation === 'FALLBACK' ? 'DELETE_CONSTRUCT' : operation,
+      title: '恢复操作', occurred_at: '2026-11-10T00:00:00Z', status: 'DURABLE', context_id: 'context.root', context_name: 'SD', revision_id: null,
+      detail_available: true, recovery_action: 'UNDO' }], next_before: null });
+    const { wrapper } = await mountWorkbench(); const store = useWorkbenchRuntimeStore();
+    const original = fixture.readDetails.getMockImplementation()!;
+    let finish!: () => void;
+    let previous!: Awaited<ReturnType<DraftWorkbenchSession['readDetails']>>;
+    fixture.readDetails.mockImplementationOnce(async opened => {
+      previous = await original(opened);
+      await new Promise<void>(resolve => { finish = resolve; });
+      return previous;
+    });
+    if (operation === 'FALLBACK') vi.mocked(DraftWorkbenchSession.prototype.readEditedCanvas).mockRejectedValueOnce(new LocalRuntimeApiError('NOT_FOUND', '图已删除'));
+    let completed = false;
+    const restoring = store.undo().then(() => { completed = true; });
+    try {
+      await vi.waitFor(() => expect(finish).toBeTypeOf('function'));
+      expect(completed).toBe(background);
+      if (background) {
+        await store.addElement('OBJECT');
+        expect(store.draftToken?.edit_seq).toBe(2);
+        finish(); await restoring;
+        await vi.waitFor(() => expect(store.textLines[0]?.text).toBe('文本 2'));
+      } else {
+        finish(); await restoring;
+        expect(store.textLines[0]?.text).toBe('文本 1');
+      }
+    } finally { finish?.(); await restoring; wrapper.unmount(); }
+  });
+
+  it.each(['save', 'redo', 'leave', 'failure'])("恢复后慢辅助查询期间 %s 不破坏确认状态", async action => {
+    const fixture = draftFixture();
+    api.operationHistory.mockImplementation(async () => ({ items: [{ record_id: 'history.edit', operation: 'DELETE_CONSTRUCT', title: '删除对象',
+      occurred_at: '2026-11-10T00:00:00Z', status: 'DURABLE', context_id: 'context.root', context_name: 'SD', revision_id: null,
+      detail_available: true, recovery_action: fixture.token().edit_seq % 2 ? 'REDO' : 'UNDO' }], next_before: null }));
+    const { wrapper } = await mountWorkbench(); const store = useWorkbenchRuntimeStore();
+    const original = fixture.readDetails.getMockImplementation()!;
+    let finish!: () => void;
+    fixture.readDetails.mockImplementationOnce(async opened => {
+      const previous = await original(opened);
+      await new Promise<void>(resolve => { finish = resolve; });
+      if (action === 'failure') throw new Error('辅助网络失败');
+      return previous;
+    });
+    try {
+      await store.undo();
+      await vi.waitFor(() => expect(finish).toBeTypeOf('function'));
+      expect(store.draftToken?.edit_seq).toBe(1);
+      if (action === 'save') {
+        await store.saveDraft();
+        expect(fixture.save).toHaveBeenCalledWith(expect.objectContaining({ edit_seq: 1 }));
+      } else if (action === 'redo') {
+        await vi.waitFor(() => expect(store.canRedo).toBe(true));
+        await store.redo(); expect(store.draftToken?.edit_seq).toBe(2);
+      } else if (action === 'leave') store.leaveWorkbench();
+      finish();
+      if (action === 'redo') await vi.waitFor(() => expect(store.textLines[0]?.text).toBe('文本 2'));
+      else if (action === 'leave') {
+        await flushPromises(); expect(store.draftToken).toBeNull(); expect(store.textLines).toEqual([]);
+      } else if (action === 'failure') {
+        await vi.waitFor(() => expect(store.workbench.commandFeedback).toContain('辅助信息刷新失败'));
+        expect(store.draftToken?.edit_seq).toBe(1); expect(store.workbench.nodes[0]?.label).toBe('Object 1');
+        expect(store.canRedo).toBe(true);
+      } else await vi.waitFor(() => expect(store.textLines[0]?.text).toBe('文本 1'));
+    } finally { finish?.(); wrapper.unmount(); }
+  });
+
+  it("历史查询未完成时重复刷新复用请求，失败后可以重新读取", async () => {
+    draftFixture(); const { wrapper } = await mountWorkbench(); const store = useWorkbenchRuntimeStore();
+    let fail!: (error: Error) => void;
+    api.operationHistory.mockImplementationOnce(() => new Promise((_resolve, reject) => { fail = reject; }));
+    api.operationHistory.mockClear();
+    try {
+      const first = store.refreshOperationHistory(), second = store.refreshOperationHistory();
+      expect(api.operationHistory).toHaveBeenCalledTimes(2);
+      fail(new Error('历史网络失败')); await Promise.all([first, second]);
+      expect(store.operationHistory.error).toContain('历史网络失败');
+      api.operationHistory.mockResolvedValue({ items: [], next_before: null });
+      await store.refreshOperationHistory();
+      expect(api.operationHistory).toHaveBeenCalledTimes(4); expect(store.historyRecoveryError).toBe('');
+    } finally { wrapper.unmount(); }
+  });
+
+  it("语义编辑被拒绝保留布局历史，成功提交后未保存布局仍可撤销重做", async () => {
+    const fixture = draftFixture(); const { wrapper } = await mountWorkbench(); const store = useWorkbenchRuntimeStore();
+    await store.moveElements([{ occurrence_id: 'occ.object', layout: { x: 50, y: 20, width: 100, height: 60 } }]);
+    fixture.edit.mockRejectedValueOnce(new LocalRuntimeApiError('DRAFT_EDIT_REJECTED', '创建被拒绝'));
+    await store.addElement('OBJECT'); await flushPromises();
+    expect(store.workbench.commandFeedback).toContain('创建被拒绝'); expect(store.layoutDirty).toBe(true);
+    expect(store.canUndo).toBe(true); await store.undo(); expect(store.layoutDirty).toBe(false); expect(store.workbench.nodes[0]!.x).toBe(0);
+    fixture.edit.mockRejectedValueOnce(new LocalRuntimeApiError('DRAFT_EDIT_REJECTED', '再次拒绝'));
+    await store.addElement('OBJECT'); await flushPromises();
+    expect(store.canRedo).toBe(true); await store.redo(); expect(store.workbench.nodes[0]!.x).toBe(50);
+    await store.addElement('OBJECT'); await flushPromises();
+    expect(store.layoutDirty).toBe(true); expect(store.canUndo).toBe(true); expect(store.canRedoLayout).toBe(false);
+    const count = fixture.edit.mock.calls.length;
+    await store.undo(); expect(store.layoutDirty).toBe(false); expect(store.workbench.nodes[0]!.x).toBe(1);
+    await store.redo(); expect(store.layoutDirty).toBe(true); expect(store.workbench.nodes[0]!.x).toBe(50);
+    expect(fixture.edit).toHaveBeenCalledTimes(count);
+    wrapper.unmount();
+  });
+
+  it("恢复历史读取失败可见并可重试，不影响本地撤销", async () => {
+    draftFixture(); api.operationHistory.mockRejectedValue(new Error('历史服务暂不可用'));
+    const { wrapper } = await mountWorkbench(); const store = useWorkbenchRuntimeStore(); await flushPromises();
+    expect(wrapper.get('[data-testid="history-recovery-error"]').text()).toContain('历史服务暂不可用');
+    expect(store.canUndo).toBe(false);
+    await store.moveElements([{ occurrence_id: 'occ.object', layout: { x: 30, y: 20, width: 100, height: 60 } }]);
+    expect(store.canUndo).toBe(true); await store.undo(); expect(store.layoutDirty).toBe(false);
+    api.operationHistory.mockResolvedValue({ items: [{ record_id: 'history.edit', title: '创建对象', operation: 'CREATE_ELEMENT', occurred_at: '2026-11-10T00:00:00Z', status: 'DURABLE', context_id: 'context.root', context_name: 'SD', revision_id: null, detail_available: true, recovery_action: 'UNDO' }], next_before: null });
+    await wrapper.get('[data-testid="history-recovery-retry"]').trigger('click'); await flushPromises();
+    expect(wrapper.find('[data-testid="history-recovery-error"]').exists()).toBe(false);
+    await store.redo(); await store.undo(); await store.saveDraft(); await flushPromises();
+    expect(store.canUndo).toBe(true); expect(store.undoLabel).toContain('创建对象');
+    wrapper.unmount();
+  });
+
+  it("创建确认后先显示画布，慢辅助刷新不阻塞下一次创建，旧响应不能覆盖新版本", async () => {
+    const fixture = draftFixture();
+    const { wrapper } = await mountWorkbench();
+    const originalDetails = fixture.readDetails.getMockImplementation()!;
+    let finish!: (value: Awaited<ReturnType<DraftWorkbenchSession["readDetails"]>>) => void;
+    let previous!: Awaited<ReturnType<DraftWorkbenchSession["readDetails"]>>;
+    fixture.readDetails.mockImplementationOnce(async opened => {
+      previous = await originalDetails(opened);
+      return new Promise(resolve => { finish = resolve; });
+    });
+    const store = useWorkbenchRuntimeStore();
+    await store.addElement("OBJECT");
+    expect(store.workbench.nodes[0]?.label).toBe("Object 1");
+    expect(store.workbench.commandState).toBe("idle");
+    expect(store.textLines).toEqual([]);
+    await vi.waitFor(() => expect(fixture.readDetails).toHaveBeenCalledTimes(1));
+    await store.addElement("PROCESS");
+    await vi.waitFor(() => expect(store.textLines[0]?.text).toBe("文本 2"));
+    expect(store.workbench.nodes[0]?.label).toBe("Object 2");
+    expect(fixture.readDetails).toHaveBeenCalledTimes(2);
+    await store.addElement("OBJECT");
+    await vi.waitFor(() => expect(store.textLines[0]?.text).toBe("文本 3"));
+    finish(previous); await flushPromises();
+    expect(store.textLines[0]?.text).toBe("文本 3");
+    expect(store.draftToken?.edit_seq).toBe(3);
+    expect(fixture.readDetails).toHaveBeenCalledTimes(3);
+    wrapper.unmount();
+  });
+
+  it("同 token 重新应用画布时，失效的旧辅助查询不吞掉新刷新", async () => {
+    const fixture = draftFixture(); const { wrapper } = await mountWorkbench(); const store = useWorkbenchRuntimeStore();
+    fixture.edit.mockImplementation(async () => ({ result_token: fixture.token() }) as never);
+    const original = fixture.readDetails.getMockImplementation()!;
+    let finish!: () => void;
+    fixture.readDetails.mockImplementationOnce(async opened => {
+      const data = await original(opened); await new Promise<void>(resolve => { finish = resolve; }); return data;
+    });
+    try {
+      await store.addElement('OBJECT'); await vi.waitFor(() => expect(finish).toBeTypeOf('function'));
+      await store.addElement('OBJECT');
+      await vi.waitFor(() => expect(store.textLines[0]?.text).toBe('文本 0'));
+      expect(fixture.readDetails).toHaveBeenCalledTimes(2);
+      finish(); await flushPromises(); expect(store.textLines[0]?.text).toBe('文本 0');
+    } finally { finish?.(); wrapper.unmount(); }
+  });
+
+  it("辅助查询失败保留已确认元素并显示错误", async () => {
+    const fixture = draftFixture();
+    const { wrapper } = await mountWorkbench();
+    fixture.readDetails.mockRejectedValueOnce(new LocalRuntimeApiError("UNAVAILABLE", "网络错误"));
+    const store = useWorkbenchRuntimeStore();
+    await store.addElement("OBJECT");
+    await vi.waitFor(() => expect(store.workbench.commandFeedback).toContain("辅助信息刷新失败"));
+    expect(store.workbench.nodes[0]?.label).toBe("Object 1");
+    expect(store.workbench.commandState).toBe("idle");
+    expect(store.workbench.commandFeedback).toContain("辅助信息刷新失败");
+    expect(store.relationCatalog.loading).toBe(false);
+    wrapper.unmount();
+  });
+
+  it.each(["OBJECT", "PROCESS"] as const)("工具栏创建 %s 使用画布位置并兼容直接调用", async kind => {
+    const fixture = draftFixture();
+    const { wrapper } = await mountWorkbench();
+    await wrapper.get(`[data-testid="p03-tool-${kind.toLowerCase()}"]`).trigger("click");
+    await flushPromises();
+    expect(fixture.edit.mock.calls[0]?.[2]).toMatchObject({
+      commandType: "CREATE_ELEMENT", payload: { kind, layout: { x: 320, y: 240 } },
+    });
+    await useWorkbenchRuntimeStore().addElement(kind);
+    expect(fixture.edit.mock.calls[1]?.[2]).toMatchObject({
+      commandType: "CREATE_ELEMENT", payload: { kind, layout: { x: kind === "OBJECT" ? 80 : 420 } },
+    });
+    wrapper.unmount();
+  });
+
+  it.each([false, true])("创建属性查询冲突后只同步并重试一次，持续冲突=%s", async persistent => {
+    const fixture = draftFixture();
+    const { wrapper } = await mountWorkbench();
+    const store = useWorkbenchRuntimeStore();
+    await wrapper.get('[data-testid="p03-canvas-select-object"]').trigger("click");
+    await flushPromises();
+    await fixture.edit({} as never, "context.root", {} as never);
+    let calls = 0;
+    const queriedTokens: number[] = [];
+    vi.spyOn(DraftWorkbenchSession.prototype, "capabilities").mockImplementation(async (_token, _context, _selection, intent) => {
+      if (intent !== "CREATE_FEATURE") return { data: { options: [] } } as never;
+      queriedTokens.push(_token.edit_seq);
+      if (++calls === 1 || persistent) throw new LocalRuntimeApiError("DRAFT_CONFLICT", "草稿已变化，请重新读取");
+      return { data: { options: [{ command_type: "CREATE_FEATURE", enabled: true, capability_query_id: "query.feature", option_id: "option.feature", capability_ref: { capability_id: "CAP-FEAT-ATTRIBUTE-001" }, required_fields: [{ field_id: "feature_kind", allowed_values: ["ATTRIBUTE"] }] }] } } as never;
+    });
+    fixture.open.mockClear(); fixture.edit.mockClear();
+    await store.addFeature("ATTRIBUTE");
+    expect(calls).toBe(2);
+    expect(queriedTokens).toEqual([0, 1]);
+    expect(fixture.edit).toHaveBeenCalledTimes(persistent ? 0 : 1);
+    if (persistent) {
+      expect(fixture.open).toHaveBeenCalledTimes(1);
+      expect(store.workbench.commandFeedback).toContain("草稿已变化");
+    } else expect(fixture.edit.mock.calls[0]?.[2]).toMatchObject({ commandType: "CREATE_FEATURE", payload: { owner_element_id: "element.object" } });
+    wrapper.unmount();
+  });
 
   it("OPD右键删除预览可取消，确认删除当前图后回读父图并更新导航", async () => {
     const fixture = draftFixture(), originalOpen = fixture.open.getMockImplementation()!, originalRead = fixture.read.getMockImplementation()!, originalEdit = fixture.edit.getMockImplementation()!;
@@ -262,7 +689,55 @@ describe("WorkbenchView", () => {
     wrapper.unmount();
   });
 
-  it("布局历史恢复完整几何，新移动清除重做，失败和重载清除历史", async () => {
+  it("调色支持撤销重做，拖动与回读保留颜色，保存重开及清空覆盖", async () => {
+    const fixture = draftFixture();
+    const readOriginal = fixture.read.getMockImplementation()!;
+    const editOriginal = fixture.edit.getMockImplementation()!;
+    let layout: import("@/shared/api/localRuntimeApi").ProjectionConstructWire["layout"] = { x: 0, y: 0, width: 100, height: 60, z_order: 0 };
+    fixture.read.mockImplementation(async opened => {
+      const snapshot = await readOriginal(opened); snapshot.constructs[0]!.layout = { ...layout }; return snapshot;
+    });
+    fixture.edit.mockImplementation(async (token, context, command) => {
+      const result = await editOriginal(token, context, command);
+      if (command.commandType === "UPDATE_LAYOUT_BATCH") {
+        const next = command.payload.layouts[0]!.layout;
+        layout = { ...next, z_order: 0, appearance: next.appearance && Object.keys(next.appearance).length ? next.appearance : undefined };
+      }
+      return result;
+    });
+    const { wrapper } = await mountWorkbench(); const store = useWorkbenchRuntimeStore();
+    await store.editNodeAppearance("occ.object", {}); expect(store.layoutDirty).toBe(false);
+    store.nodeColors.loaded = true;
+    store.nodeColors.palette = { object: { stroke: '#0000ff' } };
+    await store.selectConstruct('element.object');
+    store.openRightPanel(); await flushPromises();
+    const colorEditor = wrapper.getComponent({ name: 'ElementAppearanceProperty' });
+    await colorEditor.get('input[aria-label="边框颜色"]').setValue('#123456');
+    await flushPromises();
+    expect(store.workbench.nodes[0]!.appearance).toEqual({ stroke: '#123456' });
+    expect(store.nodeColors.palette.object).toEqual({ stroke: '#0000ff' });
+    await store.undoLayout();
+    const colors = { stroke: "#123456", fill: "#222222" };
+    await store.editNodeAppearance("occ.object", colors);
+    expect(store.workbench.nodes[0]!.appearance).toEqual(colors);
+    expect(fixture.edit).not.toHaveBeenCalled();
+    await store.undoLayout(); expect(store.layoutDirty).toBe(false);
+    await store.redoLayout(); expect(store.workbench.nodes[0]!.appearance).toEqual(colors);
+    await store.moveElements([{ occurrence_id: "occ.object", layout: { x: 20, y: 30, width: 100, height: 60 } }]);
+    expect(store.workbench.nodes[0]!.appearance).toEqual(colors);
+    await store.saveDraft(); expect(layout.appearance).toEqual(colors); expect(store.layoutDirty).toBe(false);
+    await store.load("project.1", "model.1", "context.root");
+    expect(store.workbench.nodes[0]!.appearance).toEqual(colors);
+    await store.editNodeAppearance("occ.object", {});
+    expect(store.workbench.nodes[0]!.appearance).toBeUndefined();
+    await store.undoLayout(); expect(store.workbench.nodes[0]!.appearance).toEqual(colors);
+    await store.redoLayout(); await store.saveDraft();
+    expect(layout.appearance).toBeUndefined(); expect(store.layoutDirty).toBe(false);
+    expect(fixture.edit.mock.calls.at(-1)?.[2]).toMatchObject({ payload: { layouts: [{ layout: { appearance: {} } }] } });
+    wrapper.unmount();
+  });
+
+  it("布局历史只更新本地几何，手动保存批量提交一次", async () => {
     const fixture = draftFixture();
     const readOriginal = fixture.read.getMockImplementation()!;
     const editOriginal = fixture.edit.getMockImplementation()!;
@@ -281,16 +756,18 @@ describe("WorkbenchView", () => {
     const store = useWorkbenchRuntimeStore();
     const move = () => store.moveElements([{ occurrence_id: "occ.object", layout: { x: 32, y: 16, width: 160, height: 72 } }]);
     await move(); expect(store.canUndoLayout).toBe(true);
-    await store.undoLayout(); expect(layout).toEqual({ x: 0, y: 0, width: 100, height: 60, z_order: 0 });
+    await store.undoLayout(); expect(store.workbench.nodes[0]!.x).toBe(0); expect(store.layoutDirty).toBe(false);
     expect(store.canRedoLayout).toBe(true);
     const input = document.createElement("input"); document.body.append(input);
     input.dispatchEvent(new KeyboardEvent("keydown", { key: "z", ctrlKey: true, bubbles: true }));
-    expect(fixture.edit).toHaveBeenCalledTimes(2); input.remove();
-    await store.redoLayout(); expect(layout.x).toBe(32);
+    expect(fixture.edit).not.toHaveBeenCalled(); input.remove();
+    await store.redoLayout(); expect(store.workbench.nodes[0]!.x).toBe(32);
     await store.undoLayout(); await move(); expect(store.canRedoLayout).toBe(false);
     fixture.edit.mockRejectedValueOnce(new LocalRuntimeApiError("DRAFT_EDIT_REJECTED", "拒绝"));
-    await move(); expect(store.canUndoLayout).toBe(false); expect(store.workbench.nodes[0]!.x).toBe(32);
-    await move(); expect(store.canUndoLayout).toBe(true);
+    expect(await store.saveDraft()).toBeNull(); expect(store.layoutDirty).toBe(true); expect(store.workbench.nodes[0]!.x).toBe(32);
+    expect(fixture.save).not.toHaveBeenCalled();
+    await store.saveDraft(); expect(layout.x).toBe(32); expect(store.layoutDirty).toBe(false);
+    expect(fixture.edit).toHaveBeenCalledTimes(2); expect(fixture.save).toHaveBeenCalledTimes(1);
     await store.load("project.1", "model.1", "context.root"); expect(store.canUndoLayout).toBe(false);
     wrapper.unmount();
   });
@@ -316,7 +793,74 @@ describe("WorkbenchView", () => {
     return { ...fixture, layouts };
   }
 
-  it("自动布局预览零提交且取消还原；确认一次批量请求、撤销重做和无变化", async () => {
+  it("多次移动保留最终位置，语义回读和状态轮询不提交本地布局", async () => {
+    const fixture = draftFixture(), { wrapper } = await mountWorkbench(), store = useWorkbenchRuntimeStore();
+    await store.moveElements([{ occurrence_id: "occ.object", layout: { x: 40, y: 20, width: 100, height: 60 } }]);
+    await store.moveElements([{ occurrence_id: "occ.object", layout: { x: 80, y: 40, width: 100, height: 60 } }]);
+    expect(fixture.edit).not.toHaveBeenCalled(); expect(store.draftToken!.edit_seq).toBe(0);
+    expect(store.saveLabel).toContain("布局未保存");
+    await store.addElement("object"); expect(fixture.edit).toHaveBeenCalledTimes(1);
+    expect(store.workbench.nodes[0]!.x).toBe(80); expect(store.layoutDirty).toBe(true);
+    await store.pollDraftState(); expect(store.workbench.nodes[0]!.x).toBe(80); expect(fixture.edit).toHaveBeenCalledTimes(1);
+    await store.saveDraft(); expect(fixture.edit).toHaveBeenCalledTimes(2);
+    expect(fixture.edit).toHaveBeenLastCalledWith(expect.anything(), "context.root", expect.objectContaining({
+      commandType: "UPDATE_LAYOUT_BATCH", payload: { layouts: [{ occurrence_id: "occ.object", layout: { x: 80, y: 40, width: 100, height: 60 } }] },
+    }));
+    expect(fixture.save).toHaveBeenCalledWith(expect.objectContaining({ edit_seq: 2 }));
+    expect(store.layoutDirty).toBe(false); await store.saveDraft(); expect(fixture.edit).toHaveBeenCalledTimes(2);
+    wrapper.unmount();
+  });
+
+  it("已提交布局后的保存失败不重复提交；保存中移动无效", async () => {
+    const fixture = autoLayoutFixture(), { wrapper } = await mountWorkbench(), store = useWorkbenchRuntimeStore();
+    await store.moveElements([{ occurrence_id: "occ.0", layout: { x: 480, y: 340, width: 160, height: 72 } }]);
+    let reject!: (error: Error) => void;
+    fixture.save.mockImplementationOnce(() => new Promise((_done, fail) => { reject = fail; }));
+    const saving = store.saveDraft(); await flushPromises(); expect(store.saving).toBe(true);
+    await store.moveElements([{ occurrence_id: "occ.0", layout: { x: 600, y: 600, width: 160, height: 72 } }]);
+    expect(store.workbench.nodes[0]!.x).toBe(480);
+    reject(new Error("保存响应失败")); await saving;
+    expect(store.layoutDirty).toBe(false); expect(store.workbench.nodes[0]!.x).toBe(480);
+    await store.saveDraft(); expect(fixture.edit).toHaveBeenCalledTimes(1); expect(fixture.save).toHaveBeenCalledTimes(2);
+    wrapper.unmount();
+  });
+
+  it("未保存布局不能静默固定链接或切换，关闭提示和放弃行为明确", async () => {
+    const fixture = draftFixture(), { wrapper } = await mountWorkbench(), store = useWorkbenchRuntimeStore();
+    await store.moveElements([{ occurrence_id: "occ.object", layout: { x: 40, y: 20, width: 100, height: 60 } }]);
+    expect(await store.saveDraft(true)).toBeNull(); expect(fixture.pin).not.toHaveBeenCalled();
+    expect(await store.load("project.1", "model.1", "context.child")).toBe(false);
+    expect(store.workbench.nodes[0]!.x).toBe(40);
+    const event = new Event("beforeunload", { cancelable: true }); window.dispatchEvent(event); expect(event.defaultPrevented).toBe(true);
+    store.discardLayouts(); expect(store.workbench.nodes[0]!.x).toBe(0); expect(store.layoutDirty).toBe(false);
+    wrapper.unmount();
+  });
+
+  it("布局已提交但响应丢失，重新读取后不再提交同一布局", async () => {
+    const fixture = autoLayoutFixture(), { wrapper } = await mountWorkbench(), store = useWorkbenchRuntimeStore();
+    await store.moveElements([{ occurrence_id: "occ.0", layout: { x: 480, y: 340, width: 160, height: 72 } }]);
+    const effect = fixture.edit.getMockImplementation()!;
+    fixture.edit.mockImplementationOnce(async (...args) => { await effect(...args); throw new Error("响应丢失"); });
+    expect(await store.saveDraft()).toBeNull(); expect(store.layoutDirty).toBe(true);
+    await store.load("project.1", "model.1", "context.root");
+    expect(store.layoutDirty).toBe(false); expect(store.workbench.nodes[0]!.x).toBe(480);
+    await store.saveDraft(); expect(fixture.edit).toHaveBeenCalledTimes(1); wrapper.unmount();
+  });
+
+  it("语义回读保留服务器最新尺寸和本地位置，删除目标清理待保存布局", async () => {
+    const fixture = autoLayoutFixture(), { wrapper } = await mountWorkbench(), store = useWorkbenchRuntimeStore();
+    await store.moveElements([{ occurrence_id: "occ.0", layout: { x: 480, y: 340, width: 160, height: 72 } }]);
+    fixture.layouts[0]!.height = 120;
+    await store.load("project.1", "model.1", "context.root");
+    expect(store.workbench.nodes[0]).toMatchObject({ x: 480, y: 340, height: 120 });
+    store.discardLayouts(); expect(store.workbench.nodes[0]).toMatchObject({ x: 400, height: 120 });
+    await store.moveElements([{ occurrence_id: "occ.0", layout: { x: 480, y: 340, width: 160, height: 120 } }]);
+    const read = fixture.read.getMockImplementation()!;
+    fixture.read.mockImplementationOnce(async opened => { const snapshot = await read(opened); snapshot.constructs = []; return snapshot; });
+    await store.load("project.1", "model.1", "context.root"); expect(store.layoutDirty).toBe(false); wrapper.unmount();
+  });
+
+  it("自动布局预览和应用零提交，手动保存一次批量请求，支持本地撤销重做", async () => {
     const fixture = autoLayoutFixture(), { wrapper } = await mountWorkbench(), store = useWorkbenchRuntimeStore();
     const original = structuredClone(fixture.layouts);
     await wrapper.get('[data-testid="opd-layout-menu-toggle"]').trigger("click"); await flushPromises();
@@ -329,13 +873,12 @@ describe("WorkbenchView", () => {
     await wrapper.get('[data-testid="opd-auto-cancel"]').trigger("click"); await flushPromises();
     expect(store.autoLayoutPreview).toBeNull(); expect(fixture.layouts).toEqual(original);
     store.previewAutoLayout(); await store.applyAutoLayout();
-    expect(fixture.edit).toHaveBeenCalledTimes(1);
-    expect(fixture.edit).toHaveBeenLastCalledWith(expect.anything(), "context.root", expect.objectContaining({ commandType: "UPDATE_LAYOUT_BATCH" }));
-    const applied = structuredClone(fixture.layouts); expect(store.autoLayoutPreview).toBeNull(); expect(store.canUndoLayout).toBe(true);
-    await store.undoLayout(); expect(fixture.layouts).toEqual(original);
-    await store.redoLayout(); expect(fixture.layouts).toEqual(applied);
+    expect(fixture.edit).not.toHaveBeenCalled();
+    const applied = store.workbench.nodes.map(node => ({ x: node.x, y: node.y })); expect(store.autoLayoutPreview).toBeNull(); expect(store.canUndoLayout).toBe(true);
+    await store.undoLayout(); expect(store.workbench.nodes.map(node => ({ x: node.x, y: node.y }))).toEqual(original.map(node => ({ x: node.x, y: node.y })));
+    await store.redoLayout(); expect(store.workbench.nodes.map(node => ({ x: node.x, y: node.y }))).toEqual(applied);
     store.previewAutoLayout(); expect(store.autoLayoutPreview).toBeNull(); expect(store.workbench.commandFeedback).toContain("已符合该自动布局");
-    expect(fixture.edit).toHaveBeenCalledTimes(3); wrapper.unmount();
+    expect(fixture.edit).not.toHaveBeenCalled(); await store.saveDraft(); expect(fixture.edit).toHaveBeenCalledTimes(1); wrapper.unmount();
   });
 
   it("草稿或几何变化取消旧预览，重载、关系编辑、只读和提交中不应用", async () => {
@@ -354,21 +897,21 @@ describe("WorkbenchView", () => {
     expect(fixture.edit).not.toHaveBeenCalled(); wrapper.unmount();
   });
 
-  it("自动布局应用防重复提交，失败清预览并恢复确认几何", async () => {
+  it("自动布局本地应用防重复，保存失败保留几何", async () => {
     const fixture = autoLayoutFixture(), { wrapper } = await mountWorkbench(), store = useWorkbenchRuntimeStore();
     const original = structuredClone(fixture.layouts); let reject!: (reason: Error) => void;
     fixture.edit.mockImplementationOnce(() => new Promise((_resolve, fail) => { reject = fail; }));
-    store.previewAutoLayout(); const applying = store.applyAutoLayout();
-    await store.applyAutoLayout(); expect(fixture.edit).toHaveBeenCalledTimes(1); expect(store.applyingAutoLayout).toBe(true);
-    expect(store.autoLayoutPreview).not.toBeNull();
-    reject(new LocalRuntimeApiError("DRAFT_EDIT_REJECTED", "自动布局应用失败")); await applying;
+    store.previewAutoLayout(); await store.applyAutoLayout(); await store.applyAutoLayout();
+    expect(fixture.edit).not.toHaveBeenCalled(); expect(store.layoutDirty).toBe(true);
+    const saving = store.saveDraft(); await flushPromises(); expect(fixture.edit).toHaveBeenCalledTimes(1);
+    reject(new LocalRuntimeApiError("DRAFT_EDIT_REJECTED", "自动布局应用失败")); await saving;
     expect(store.autoLayoutPreview).toBeNull(); expect(store.applyingAutoLayout).toBe(false);
-    expect(fixture.layouts).toEqual(original); expect(store.autoLayoutNodes[0]!.x).toBe(400);
-    expect(store.canUndoLayout).toBe(false); expect(store.workbench.commandFeedback).toContain("自动布局应用失败");
+    expect(fixture.layouts).toEqual(original); expect(store.autoLayoutNodes[0]!.x).toBe(80);
+    expect(store.canUndoLayout).toBe(true); expect(store.layoutDirty).toBe(true); expect(store.workbench.commandFeedback).toContain("自动布局应用失败");
     wrapper.unmount();
   });
 
-  it("排列菜单按末选基准批量提交，复用历史，无变化和禁用状态零请求", async () => {
+  it("排列菜单按末选基准本地整理，手动保存批量提交，禁用状态零请求", async () => {
     const fixture = draftFixture();
     const readOriginal = fixture.read.getMockImplementation()!;
     const editOriginal = fixture.edit.getMockImplementation()!;
@@ -396,6 +939,10 @@ describe("WorkbenchView", () => {
     expect(store.layoutArrangement).toMatchObject({ canAlign: true, canDistribute: true, referenceLabel: "对象 2" });
     await wrapper.get('[data-testid="opd-layout-menu-toggle"]').trigger("click"); await flushPromises();
     (document.querySelector('[data-testid="opd-layout-right"]') as HTMLButtonElement).click(); await flushPromises();
+    expect(fixture.edit).not.toHaveBeenCalled();
+    await store.undo(); expect(store.workbench.nodes[0]!.x).toBe(0); expect(store.workbench.nodes[1]!.x).toBe(200);
+    await store.redo(); expect(store.workbench.nodes[0]!.x).toBe(620); expect(store.workbench.nodes[1]!.x).toBe(560);
+    await store.saveDraft();
     expect(fixture.edit).toHaveBeenCalledTimes(1);
     expect(fixture.edit).toHaveBeenLastCalledWith(expect.anything(), "context.root", expect.objectContaining({
       commandType: "UPDATE_LAYOUT_BATCH", payload: { layouts: [
@@ -405,8 +952,7 @@ describe("WorkbenchView", () => {
     }));
     await store.arrangeSelection("right"); expect(fixture.edit).toHaveBeenCalledTimes(1);
     expect(store.workbench.commandFeedback).toContain("已符合该布局");
-    await store.undoLayout(); expect(layouts[0]!.x).toBe(0); expect(layouts[1]!.x).toBe(200);
-    await store.redoLayout(); expect(layouts[0]!.x).toBe(620); expect(layouts[1]!.x).toBe(560);
+    expect(store.canUndoLayout).toBe(false); expect(store.canRedoLayout).toBe(false);
     const calls = fixture.edit.mock.calls.length;
     store.workbench.commandState = "submitting"; await store.arrangeSelection("left");
     expect(store.layoutArrangement.canAlign).toBe(false); expect(fixture.edit).toHaveBeenCalledTimes(calls);
@@ -580,6 +1126,7 @@ describe("WorkbenchView", () => {
     const { wrapper } = await mountWorkbench();
 
     expect(wrapper.get(".workbench-header__revision-group").find('[data-testid="hs-draft-identity"]').exists()).toBe(true);
+    expect(wrapper.find(".workbench-header__context .profile-tag").exists()).toBe(false);
     expect(wrapper.get(".workbench-header__revision-group").find('[data-testid="p03-version-select"]').exists()).toBe(true);
     expect(wrapper.get(".workbench-header__revision-group").find('[data-testid="hs-save-state"]').exists()).toBe(true);
     expect(wrapper.get(".workbench-header__actions").find('[data-testid="p03-copy-permalink"] svg').exists()).toBe(true);
@@ -605,23 +1152,396 @@ describe("WorkbenchView", () => {
     expect(store.workbench.commandFeedback).toBe("状态候选读取失败"); expect(edit).not.toHaveBeenCalled();
     let complete!: (value: never) => void;
     vi.mocked(DraftWorkbenchSession.prototype.capabilities).mockImplementationOnce(() => new Promise(resolve => { complete = resolve; }));
-    const pending = store.saveSelectedState(); store.workbench.selectedId = "element.object";
+    const pending = store.saveSelectedState(); await flushPromises(); store.workbench.selectedId = "element.object";
     complete({ data: { options: [{ command_type: "UPDATE_STATE", enabled: true }] } } as never); await pending;
     expect(edit).not.toHaveBeenCalled(); wrapper.unmount();
   });
 
-  it("V2 轮询发现外部编辑保持原画布且只读，卸载后的迟到响应不回填", async () => {
-    const { token } = draftFixture(); const { wrapper } = await mountWorkbench();
-    const store = useWorkbenchRuntimeStore(); const open = vi.mocked(DraftWorkbenchSession.prototype.open);
-    const opened = await open.getMockImplementation()!.call({} as DraftWorkbenchSession, null);
-    open.mockResolvedValueOnce({ ...opened, draft_token: { ...token(), edit_seq: 9 } });
-    await store.pollDraftState(); expect(store.isReadonly).toBe(true);
-    expect(store.draftToken?.edit_seq).toBe(0); expect(store.workbench.nodes[0]?.label).toBe("Object 0");
-    expect(store.saveError).toContain("其他页面更新");
-    let complete!: (value: typeof opened) => void;
-    open.mockImplementationOnce(() => new Promise(resolve => { complete = resolve; }));
-    const polling = store.pollDraftState(); wrapper.unmount(); complete(opened); await polling;
+  it("重叠提示直接进入现有布局预览，取消保留排版且零提交", async () => {
+    const fixture = autoLayoutFixture(), { wrapper } = await mountWorkbench(), store = useWorkbenchRuntimeStore();
+    store.workbench.nodes[1]!.x = store.workbench.nodes[0]!.x;
+    store.workbench.nodes[1]!.y = store.workbench.nodes[0]!.y; await flushPromises();
+    expect(wrapper.get('[data-testid="opd-overlap-notice"]').text()).toContain("重叠");
+    const original = store.workbench.nodes.map(node => [node.x, node.y]);
+    await wrapper.get('[data-testid="opd-repair-layout"]').trigger("click"); await flushPromises();
+    expect(wrapper.find('[data-testid="opd-auto-preview"]').exists()).toBe(true);
+    await wrapper.get('[data-testid="opd-auto-cancel"]').trigger("click");
+    expect(store.workbench.nodes.map(node => [node.x, node.y])).toEqual(original);
+    expect(fixture.edit).not.toHaveBeenCalled(); wrapper.unmount();
+  });
+
+  function stateLayoutFixture() {
+    const fixture = draftFixture(), readOriginal = fixture.read.getMockImplementation()!, editOriginal = fixture.edit.getMockImplementation()!;
+    const constructs = [
+      { occurrence_id: "occ.object", target_id: "element.object", target_kind: "ELEMENT", construct_role: "OBJECT_NODE", label: "咖啡豆",
+        layout: { x: 100, y: 100, width: 224, height: 72, z_order: 0 }, capability_id: "CAP-OBJECT-001" },
+      { occurrence_id: "occ.feature", target_id: "feature.attribute", target_kind: "FEATURE", construct_role: "ATTRIBUTE_NODE", label: "烘焙程度", owner_id: "element.object",
+        layout: { x: 380, y: 196, width: 160, height: 72, z_order: 1 }, capability_id: "CAP-FEAT-ATTRIBUTE-001" },
+    ];
+    fixture.read.mockImplementation(async opened => ({ ...await readOriginal(opened), constructs: structuredClone(constructs) }) as never);
+    fixture.edit.mockImplementation(async (token, context, command) => {
+      const result = await editOriginal(token, context, command);
+      if (command.commandType === "UPDATE_LAYOUT_BATCH") for (const item of command.payload.layouts) {
+        const target = constructs.find(node => node.occurrence_id === item.occurrence_id)!;
+        target.layout = { ...target.layout, ...item.layout };
+      }
+      if (command.commandType === "CREATE_STATE") {
+        const id = `s${constructs.length}`;
+        constructs.push({ occurrence_id: `occ.${id}`, target_id: id, target_kind: "STATE", construct_role: "STATE_NODE", label: command.payload.name_or_value,
+          owner_id: command.payload.owner_ref.target_id, capability_id: "CAP-STATE-001",
+          layout: { ...command.payload.layout, width: 88, height: 28, z_order: 3 } });
+        const owner = constructs[0]!, state = constructs.at(-1)!;
+        owner.layout.height = Math.max(owner.layout.height, state.layout.y + 36 - owner.layout.y);
+      }
+      if (command.commandType === "UPDATE_STATE") constructs.find(node => node.target_id === command.payload.state_id)!.label = command.payload.changes.name_or_value!;
+      return result;
+    });
+    vi.spyOn(DraftWorkbenchSession.prototype, "capabilities").mockImplementation(async (token, _context, _selection, intent) => ({ data: { options: [{
+      command_type: intent, enabled: true, capability_query_id: `query.${token.edit_seq}`, option_id: `option.${token.edit_seq}`, capability_ref: { capability_id: "CAP-STATE-001" },
+    }] } }) as never);
+    return { ...fixture, constructs };
+  }
+
+  it("草稿 State 首项默认选择初始化，保存关闭切换不误提交，普通回读保留输入", async () => {
+    const fixture = stateLayoutFixture();
+    fixture.constructs.unshift({ occurrence_id: 'occ.state', target_id: 'state.material.ready', target_kind: 'STATE', construct_role: 'STATE_NODE',
+      label: '默认状态', owner_id: 'element.object', state_roles: ['INITIAL', 'FINAL'], capability_id: 'CAP-STATE-001', layout: { x: 92, y: 120, width: 88, height: 28, z_order: 3 } });
+    const { wrapper } = await mountWorkbench(); const store = useWorkbenchRuntimeStore();
+    expect(store.selectedNode?.id).toBe('state.material.ready');
+    expect(store.stateEditor).toEqual({ name: '默认状态', roles: ['INITIAL', 'FINAL'] });
+    await openRightPanel(wrapper);
+    expect((wrapper.get('[data-testid="p03-state-inspector-name"]').element as HTMLInputElement).value).toBe('默认状态');
+    const updates = () => fixture.edit.mock.calls.filter(call => call[2].commandType === 'UPDATE_STATE').length;
+    await wrapper.get('[data-testid="hs-save"]').trigger('click'); await flushPromises();
+    expect(updates()).toBe(0);
+    await wrapper.get('[data-testid="p03-right-panel-open"]').trigger('click'); await flushPromises();
+    expect(store.rightPanel.open).toBe(false);
+    await wrapper.get('[data-testid="p03-canvas-select-object"]').trigger('click'); await flushPromises();
+    expect(store.selectedNode?.kind).toBe('object'); expect(updates()).toBe(0);
+    await store.selectConstruct('state.material.ready'); await flushPromises();
+    store.stateEditor.name = '未提交'; store.stateEditor.roles = ['DEFAULT'];
+    await store.addElement('OBJECT'); await flushPromises();
+    expect(store.selectedNode?.id).toBe('state.material.ready');
+    expect(store.stateEditor).toEqual({ name: '未提交', roles: ['DEFAULT'] });
+    await store.load('project.1', 'model.1', 'context.root'); await flushPromises();
+    expect(store.stateEditor).toEqual({ name: '默认状态', roles: ['INITIAL', 'FINAL'] });
+    fixture.constructs[0] = { ...fixture.constructs[0]!, target_id: 'state.fallback', occurrence_id: 'occ.fallback', label: '回退选择', state_roles: ['DEFAULT'] };
+    store.stateEditor.name = '旧目标输入';
+    await store.addElement('OBJECT'); await flushPromises();
+    expect(store.selectedNode?.id).toBe('state.fallback');
+    expect(store.stateEditor).toEqual({ name: '回退选择', roles: ['DEFAULT'] });
+    wrapper.unmount();
+  });
+
+  it("只读投影 State 首项覆盖旧缓冲，未编辑时可以关闭面板并切换", async () => {
+    const originalProjection = api.projection.getMockImplementation()!;
+    api.projection.mockImplementation(async (...args: unknown[]) => {
+      const projection = await originalProjection(...args);
+      projection.data.constructs.sort((a: { construct_role: string }, b: { construct_role: string }) =>
+        Number(b.construct_role === 'STATE_NODE') - Number(a.construct_role === 'STATE_NODE'));
+      return projection;
+    });
+    const { wrapper } = await mountWorkbench('?revision=revision.1'); const store = useWorkbenchRuntimeStore();
+    expect(store.selectedNode?.kind).toBe('state');
+    expect(store.stateEditor).toEqual({ name: 'Ready', roles: ['INITIAL'] });
+    store.stateEditor.name = '其他版本旧值'; store.stateEditor.roles = ['FINAL'];
+    await store.load('project.1', 'model.1', 'context.root', 'revision.1'); await flushPromises();
+    expect(store.stateEditor).toEqual({ name: 'Ready', roles: ['INITIAL'] });
+    await openRightPanel(wrapper);
+    await wrapper.get('[data-testid="p03-right-panel-close"]').trigger('click'); await flushPromises();
+    expect(store.rightPanel.open).toBe(false);
+    await wrapper.get('[data-testid="p03-canvas-select-object"]').trigger('click'); await flushPromises();
+    expect(store.selectedNode?.kind).toBe('object');
+    expect(api.executeP0Command).not.toHaveBeenCalled(); wrapper.unmount();
+  });
+
+  it("State 确认值随撤销重做回读同步，保存和切换不会重提已撤销内容", async () => {
+    const fixture = stateLayoutFixture();
+    fixture.constructs.push({ occurrence_id: 'occ.state', target_id: 'state.material.ready', target_kind: 'STATE', construct_role: 'STATE_NODE',
+      label: 'A', owner_id: 'element.object', state_roles: ['INITIAL'], capability_id: 'CAP-STATE-001', layout: { x: 92, y: 120, width: 88, height: 28, z_order: 3 } });
+    let action: 'UNDO' | 'REDO' = 'UNDO';
+    api.operationHistory.mockImplementation(async () => ({ items: [{ record_id: 'history.state', title: '修改状态', operation: 'UPDATE_STATE',
+      occurred_at: '2026-11-09T00:00:00Z', status: action === 'REDO' ? 'UNDONE' : 'DURABLE', context_id: 'context.root', context_name: 'SD', revision_id: null, detail_available: true, recovery_action: action }], next_before: null }));
+    const editOriginal = fixture.edit.getMockImplementation()!;
+    fixture.edit.mockImplementation(async (token, context, command) => {
+      const result = await editOriginal(token, context, command);
+      if (command.commandType === 'RESTORE_OPERATION') {
+        const undo = command.payload.action === 'UNDO';
+        fixture.constructs.find(node => node.target_id === 'state.material.ready')!.label = undo ? 'A' : 'B';
+        action = undo ? 'REDO' : 'UNDO';
+      }
+      return result;
+    });
+    const { wrapper } = await mountWorkbench(); const store = useWorkbenchRuntimeStore();
+    await wrapper.get('[data-testid="p03-canvas-select-state"]').trigger('click'); await flushPromises(); await openRightPanel(wrapper);
+    await wrapper.get('[data-testid="p03-state-inspector-name"]').setValue('B');
+    await wrapper.get('form.state-editor').trigger('submit'); await flushPromises();
+    expect(store.selectedNode?.label).toBe('B');
+    await vi.waitFor(() => expect(store.canUndo).toBe(true));
+    await wrapper.get('[data-testid="opd-undo-layout"]').trigger('click'); await flushPromises();
+    expect(store.selectedNode?.label).toBe('A'); expect(store.stateEditor.name).toBe('A');
+    await vi.waitFor(() => expect(store.canRedo).toBe(true));
+    await wrapper.get('[data-testid="opd-redo-layout"]').trigger('click'); await flushPromises();
+    expect(store.selectedNode?.label).toBe('B'); expect(store.stateEditor.name).toBe('B');
+    await vi.waitFor(() => expect(store.canUndo).toBe(true));
+    await wrapper.get('[data-testid="opd-undo-layout"]').trigger('click'); await flushPromises();
+    expect(store.stateEditor.name).toBe('A');
+    const updates = () => fixture.edit.mock.calls.filter(call => call[2].commandType === 'UPDATE_STATE').length;
+    const count = updates();
+    await wrapper.get('[data-testid="hs-save"]').trigger('click'); await flushPromises();
+    await wrapper.get('[data-testid="p03-canvas-select-object"]').trigger('click'); await flushPromises();
+    expect(updates()).toBe(count); expect(count).toBe(1);
+    wrapper.unmount();
+  });
+
+  it("State 外部回读逐字段同步干净输入，保留失败改名及角色输入", async () => {
+    const { wrapper } = await mountWorkbench(); const store = useWorkbenchRuntimeStore();
+    await wrapper.get('[data-testid="p03-canvas-select-state"]').trigger('click'); await flushPromises(); await openRightPanel(wrapper);
+    const node = () => store.workbench.nodes.find(item => item.id === 'state.material.ready')!;
+    node().label = 'external'; node().stateRoles = ['FINAL']; await flushPromises();
+    expect(store.stateEditor).toEqual({ name: 'external', roles: ['FINAL'] });
+    await wrapper.get('[data-testid="p03-state-inspector-name"]').setValue('pending');
+    vi.spyOn(store, 'saveSelectedState').mockResolvedValue();
+    await wrapper.get('form.state-editor').trigger('submit'); await flushPromises();
+    node().label = 'external again'; node().stateRoles = ['DEFAULT']; await flushPromises();
+    expect(store.stateEditor).toEqual({ name: 'pending', roles: ['DEFAULT'] });
+    store.stateEditor.roles = ['INITIAL'];
+    node().stateRoles = ['FINAL']; await flushPromises();
+    expect(store.stateEditor.roles).toEqual(['INITIAL']);
+    await store.selectConstruct('element.object'); await flushPromises();
+    await store.selectConstruct('state.material.ready'); await flushPromises();
+    expect(store.stateEditor).toEqual({ name: 'external again', roles: ['FINAL'] });
+    wrapper.unmount();
+  });
+
+  it("首开状态自动整理不标记手动修改，显式保存持久化修正且重开稳定", async () => {
+    const fixture = stateLayoutFixture();
+    fixture.constructs[0]!.layout = { x: 84, y: 334, width: 280, height: 96, z_order: 0 };
+    for (const [index, label] of ["通过", "不通过"].entries()) fixture.constructs.push({
+      occurrence_id: `occ.imported.${index}`, target_id: `imported.${index}`, target_kind: "STATE", construct_role: "STATE_NODE", label,
+      owner_id: "element.object", capability_id: "CAP-STATE-001", layout: { x: 12 + index * 128, y: 50, width: 116, height: 28, z_order: 3 },
+    });
+    const { wrapper } = await mountWorkbench(), store = useWorkbenchRuntimeStore();
+    const states = store.workbench.nodes.filter(node => node.kind === "state");
+    expect(states.map(node => [node.x, node.y])).toEqual([[92, 362], [216, 362]]);
+    expect(store.workbench.nodes[0]).toMatchObject({ x: 84, y: 334, width: 280, height: 96 });
+    expect(fixture.edit).not.toHaveBeenCalled(); expect(store.layoutDirty).toBe(false);
+    expect(store.canUndoLayout).toBe(false);
+    const unload = new Event("beforeunload", { cancelable: true }); window.dispatchEvent(unload);
+    expect(unload.defaultPrevented).toBe(false);
+    const repaired = JSON.parse(JSON.stringify(store.workbench.nodes));
+    fixture.edit.mockRejectedValueOnce(new LocalRuntimeApiError("DRAFT_EDIT_REJECTED", "保存布局失败"));
+    expect(await store.saveDraft()).toBeNull(); expect(store.layoutDirty).toBe(false);
+    expect(store.workbench.commandFeedback).toContain("保存布局失败");
+    expect(store.workbench.nodes).toEqual(repaired);
+    await store.saveDraft();
+    expect(fixture.edit.mock.calls.at(-1)?.[2]).toMatchObject({ commandType: "UPDATE_LAYOUT_BATCH", payload: { layouts: [
+      { occurrence_id: "occ.imported.0", layout: { x: 92, y: 362 } },
+      { occurrence_id: "occ.imported.1", layout: { x: 216, y: 362 } },
+    ] } });
+    expect(store.layoutDirty).toBe(false);
+    await store.load("project.1", "model.1", "context.root");
+    expect(store.workbench.nodes).toEqual(repaired); expect(store.layoutDirty).toBe(false);
+    wrapper.unmount();
+  });
+
+  it("自动整理后可直接切换子图，手动拖动和撤销仍按显示基线保护", async () => {
+    const fixture = stateLayoutFixture();
+    fixture.constructs.push({ occurrence_id: "occ.old", target_id: "old", target_kind: "STATE", construct_role: "STATE_NODE", label: "通过",
+      owner_id: "element.object", capability_id: "CAP-STATE-001", layout: { x: 12, y: 50, width: 116, height: 28, z_order: 3 } });
+    const readOriginal = fixture.read.getMockImplementation()!;
+    fixture.read.mockImplementation(async opened => ({ ...await readOriginal(opened), opened }) as never);
+    const { wrapper } = await mountWorkbench(), store = useWorkbenchRuntimeStore();
+    expect(store.layoutDirty).toBe(false);
+    const opened = await fixture.open.getMockImplementation()!(null);
+    fixture.open.mockResolvedValueOnce({ ...opened, context_id: "context.child" });
+    fixture.open.mockResolvedValueOnce({ ...opened, context_id: "context.child" });
+    await store.selectContext("context.child");
+    expect(store.workbench.activeContextId).toBe("context.child");
+    expect(store.layoutDirty).toBe(false);
+    expect(fixture.edit).not.toHaveBeenCalled();
+    const before = JSON.parse(JSON.stringify(store.workbench.nodes));
+    await store.moveElement("occ.object", 140, 160);
+    expect(store.layoutDirty).toBe(true);
+    expect(await store.load("project.1", "model.1", "context.root")).toBe(false);
+    await store.undoLayout();
+    expect(store.workbench.nodes).toEqual(before);
+    expect(store.layoutDirty).toBe(false);
+    const unload = new Event("beforeunload", { cancelable: true }); window.dispatchEvent(unload);
+    expect(unload.defaultPrevented).toBe(false);
+    await store.saveDraft();
+    expect(fixture.edit).toHaveBeenCalledTimes(1);
+    expect(fixture.edit.mock.calls[0]?.[2]).toMatchObject({ commandType: "UPDATE_LAYOUT_BATCH", payload: { layouts: [
+      { occurrence_id: "occ.old", layout: { x: 108, y: 128 } },
+    ] } });
+    wrapper.unmount();
+  });
+
+  it("自动整理与手动移动合并保存，语义回读保留手动位置且重开不重复提交", async () => {
+    const fixture = stateLayoutFixture();
+    fixture.constructs.push({ occurrence_id: "occ.old", target_id: "old", target_kind: "STATE", construct_role: "STATE_NODE", label: "通过",
+      owner_id: "element.object", capability_id: "CAP-STATE-001", layout: { x: 12, y: 50, width: 116, height: 28, z_order: 3 } });
+    const { wrapper } = await mountWorkbench(), store = useWorkbenchRuntimeStore();
+    await store.moveElement("occ.object", 140, 160);
+    const moved = JSON.parse(JSON.stringify(store.workbench.nodes));
+    await store.addElement("process");
+    expect(store.workbench.nodes).toEqual(moved); expect(store.layoutDirty).toBe(true);
+    await store.saveDraft();
+    const batches = fixture.edit.mock.calls.filter(call => call[2].commandType === "UPDATE_LAYOUT_BATCH");
+    expect(batches).toHaveLength(1);
+    expect(batches[0]?.[2]).toMatchObject({ payload: { layouts: expect.arrayContaining([
+      { occurrence_id: "occ.object", layout: expect.objectContaining({ x: 140, y: 160 }) },
+      { occurrence_id: "occ.old", layout: expect.objectContaining({ x: 148, y: 188 }) },
+    ]) } });
+    expect(new Set(batches[0]![2].payload.layouts.map(item => item.occurrence_id)).size).toBe(batches[0]![2].payload.layouts.length);
+    expect(store.layoutDirty).toBe(false);
+    await store.load("project.1", "model.1", "context.root");
+    expect(store.workbench.nodes).toEqual(moved); expect(store.layoutDirty).toBe(false);
+    await store.saveDraft();
+    expect(fixture.edit.mock.calls.filter(call => call[2].commandType === "UPDATE_LAYOUT_BATCH")).toHaveLength(1);
+    wrapper.unmount();
+  });
+
+  it("切到其他子图不提交上一图的自动整理", async () => {
+    const fixture = stateLayoutFixture();
+    fixture.constructs.push({ occurrence_id: "occ.old", target_id: "old", target_kind: "STATE", construct_role: "STATE_NODE", label: "通过",
+      owner_id: "element.object", capability_id: "CAP-STATE-001", layout: { x: 12, y: 50, width: 116, height: 28, z_order: 3 } });
+    const readOriginal = fixture.read.getMockImplementation()!, openOriginal = fixture.open.getMockImplementation()!;
+    fixture.open.mockImplementation(async context => ({ ...await openOriginal(context), context_id: context ?? "context.root" }));
+    fixture.read.mockImplementation(async opened => ({ ...await readOriginal(opened), opened,
+      ...(opened.context_id === "context.child" ? { constructs: [] } : {}) }) as never);
+    const { wrapper } = await mountWorkbench(), store = useWorkbenchRuntimeStore();
+    expect(store.layoutDirty).toBe(false);
+    await store.selectContext("context.child");
+    expect(store.workbench.activeContextId).toBe("context.child");
+    expect(store.workbench.nodes).toHaveLength(0);
+    await store.saveDraft();
+    expect(fixture.edit).not.toHaveBeenCalled();
+    await store.selectContext("context.root");
+    expect(store.workbench.nodes.find(node => node.id === "old")).toMatchObject({ x: 108, y: 128 });
+    expect(store.layoutDirty).toBe(false);
+    await store.saveDraft();
+    expect(fixture.edit).toHaveBeenCalledTimes(1);
+    expect(fixture.edit.mock.calls[0]?.[1]).toBe("context.root");
+    wrapper.unmount();
+  });
+
+  it("切换子图及外部更新后也整理新读到的旧状态", async () => {
+    const fixture = stateLayoutFixture();
+    const readOriginal = fixture.read.getMockImplementation()!;
+    fixture.read.mockImplementation(async opened => ({ ...await readOriginal(opened), opened }) as never);
+    const { wrapper } = await mountWorkbench(), store = useWorkbenchRuntimeStore();
+    fixture.constructs.push({ occurrence_id: "occ.old", target_id: "old", target_kind: "STATE", construct_role: "STATE_NODE", label: "通过",
+      owner_id: "element.object", capability_id: "CAP-STATE-001", layout: { x: 12, y: 50, width: 116, height: 28, z_order: 3 } });
+    fixture.open.mockResolvedValueOnce({ ...await fixture.open.getMockImplementation()!(null), context_id: "context.child" });
+    fixture.open.mockResolvedValueOnce({ ...await fixture.open.getMockImplementation()!(null), context_id: "context.child" });
+    await store.selectContext("context.child");
+    expect(store.workbench.activeContextId).toBe("context.child");
+    expect(store.workbench.nodes.find(node => node.id === "old")).toMatchObject({ x: 108, y: 128 });
+    expect(fixture.edit).not.toHaveBeenCalled();
+    await store.saveDraft();
+    fixture.constructs.find(node => node.target_id === "old")!.layout.y = 5000;
+    const saveState = vi.mocked(DraftWorkbenchSession.prototype.saveState);
+    const state = await saveState.getMockImplementation()!();
+    saveState.mockResolvedValueOnce({ ...state, durable_token: { ...state.durable_token, edit_seq: 9 } });
+    await store.pollDraftState();
+    expect(store.workbench.nodes.find(node => node.id === "old")).toMatchObject({ x: 108, y: 128 });
+    expect(store.layoutDirty).toBe(false);
+    wrapper.unmount();
+  });
+
+  it("只读精确版本和静态快照修正状态显示但不写布局，保持关系端点与原快照", async () => {
+    const originalProjection = await api.projection.getMockImplementation()!("project.1", "model.1", "context.root", "revision.1");
+    const owner = originalProjection.data.constructs.find((item: { target_id: string }) => item.target_id === "element.object");
+    owner.layout = { x: 84, y: 334, width: 280, height: 96, z_order: 0 };
+    const state = originalProjection.data.constructs.find((item: { target_id: string }) => item.target_id === "state.material.ready");
+    state.layout = { x: 12, y: 50, width: 116, height: 28, z_order: 3 };
+    api.projection.mockResolvedValue(originalProjection);
+    const { wrapper } = await mountWorkbench("?revision=revision.1"), store = useWorkbenchRuntimeStore();
+    expect(store.workbench.nodes.find(node => node.id === state.target_id)).toMatchObject({ x: 92, y: 362 });
+    expect(store.layoutDirty).toBe(false); expect(store.isReadonly).toBe(true);
+    const relations = JSON.parse(JSON.stringify(store.workbench.relations));
+    const nodes = JSON.parse(JSON.stringify(store.workbench.nodes));
+    nodes.find((node: { id: string }) => node.id === state.target_id).y = 5000;
+    const snapshot = { diagrams: [{ id: "snapshot.root", label: "SD", kind: "SYSTEM_DIAGRAM", depth: 0, nodes, relations }] };
+    const before = structuredClone(snapshot);
+    store.setSnapshot({ activeContextId: "snapshot.root" }, snapshot);
+    expect(store.workbench.nodes.find(node => node.id === state.target_id)).toMatchObject({ x: 92, y: 362 });
+    expect(store.workbench.relations).toEqual(relations); expect(snapshot).toEqual(before);
+    expect(store.layoutDirty).toBe(false); expect(await store.saveDraft()).toBeNull();
+    expect(api.executeP0Command).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+
+  it("移动对象后连续创建状态先提交绝对几何，再换行扩容；保存重读保持状态和外部属性", async () => {
+    const fixture = stateLayoutFixture(), { wrapper } = await mountWorkbench(), store = useWorkbenchRuntimeStore();
+    await store.selectConstruct("element.object");
+    await store.moveElement("occ.object", 140, 160);
+    await store.armStateCreation();
+    expect(fixture.edit.mock.calls[0]?.[2].commandType).toBe("UPDATE_LAYOUT_BATCH");
+    expect(fixture.edit.mock.calls[1]?.[2]).toMatchObject({ commandType: "CREATE_STATE", payload: { layout: { x: 148, y: 188 }, capability_query_id: "query.1" } });
+    await store.armStateCreation(); await store.armStateCreation();
+    const states = store.workbench.nodes.filter(node => node.kind === "state");
+    expect(states.map(node => [node.x, node.y])).toEqual([[148, 188], [244, 188], [148, 224]]);
+    expect(store.workbench.nodes.find(node => node.id === "element.object")!.height).toBe(100);
+    expect(store.workbench.nodes.find(node => node.id === "feature.attribute")!.y).toBe(284);
+    expect(store.layoutDirty).toBe(true);
+    await store.saveDraft();
+    const geometry = store.workbench.nodes.map(node => ({ id: node.id, x: node.x, y: node.y, width: node.width, height: node.height }));
+    await store.load("project.1", "model.1", "context.root");
+    expect(store.workbench.nodes.map(node => ({ id: node.id, x: node.x, y: node.y, width: node.width, height: node.height }))).toEqual(geometry);
+    expect(store.layoutDirty).toBe(false); wrapper.unmount();
+  });
+
+  it("状态改成长中文保留待提交输入、换行扩容，布局提交失败时不继续新建状态", async () => {
+    const fixture = stateLayoutFixture(), { wrapper } = await mountWorkbench(), store = useWorkbenchRuntimeStore();
+    await store.selectConstruct("element.object"); await store.armStateCreation();
+    const state = store.workbench.nodes.find(node => node.kind === "state")!;
+    await store.selectConstruct(state.id);
+    await store.moveElement(state.occurrenceId, state.x, state.y + 36);
+    store.stateEditor.name = "已经完成烘焙并且检验合格等待出库的咖啡豆";
+    await store.saveSelectedState();
+    expect(fixture.constructs.find(node => node.target_id === state.id)!.label).toBe("已经完成烘焙并且检验合格等待出库的咖啡豆");
+    expect(store.workbench.nodes.find(node => node.id === state.id)!.height).toBeGreaterThan(28);
+    await store.saveDraft();
+    await store.selectConstruct("element.object"); await store.moveElement("occ.object", 140, 160);
+    const count = fixture.constructs.filter(node => node.target_kind === "STATE").length;
+    fixture.edit.mockRejectedValueOnce(new LocalRuntimeApiError("DRAFT_EDIT_REJECTED", "布局提交失败"));
+    await store.armStateCreation();
+    expect(fixture.constructs.filter(node => node.target_kind === "STATE")).toHaveLength(count);
+    expect(store.layoutDirty).toBe(true); expect(store.workbench.commandFeedback).toContain("布局提交失败");
+    wrapper.unmount();
+  });
+
+  it("V2 轮询发现外部编辑自动同步，卸载后的迟到响应不回填", async () => {
+    const { token, open, read } = draftFixture(); const { wrapper } = await mountWorkbench();
+    const store = useWorkbenchRuntimeStore(); const saveState = vi.mocked(DraftWorkbenchSession.prototype.saveState);
+    const state = await saveState.getMockImplementation()!.call({} as DraftWorkbenchSession);
+    saveState.mockResolvedValueOnce({ ...state, durable_token: { ...token(), edit_seq: 9 } });
+    const originalOpen = open.getMockImplementation()!, originalRead = read.getMockImplementation()!;
+    open.mockImplementation(async context => ({ ...await originalOpen(context), draft_token: { ...token(), edit_seq: 9 } }));
+    read.mockImplementation(async opened => ({ ...await originalRead(opened), opened }));
+    await store.pollDraftState(); expect(store.isReadonly).toBe(false);
+    expect(store.draftToken?.edit_seq).toBe(9); expect(store.saveError).toBe("");
+    let complete!: (value: typeof state) => void;
+    saveState.mockImplementationOnce(() => new Promise(resolve => { complete = resolve; }));
+    const polling = store.pollDraftState(); wrapper.unmount(); complete(state); await polling;
     expect(store.draftToken).toBeNull(); expect(store.draftSaveState).toBeNull(); expect(store.isReadonly).toBe(true);
+  });
+
+  it("外部更新遇到本地未保存布局时保留几何且不自动覆盖", async () => {
+    const fixture = draftFixture(); const { wrapper } = await mountWorkbench();
+    const store = useWorkbenchRuntimeStore();
+    await store.moveElements([{ occurrence_id: "occ.object", layout: { x: 32, y: 16, width: 160, height: 72 } }]);
+    const state = await fixture.saveState.getMockImplementation()!.call({} as DraftWorkbenchSession);
+    fixture.saveState.mockResolvedValueOnce({ ...state, durable_token: { ...fixture.token(), edit_seq: 9 } });
+    fixture.open.mockClear();
+    await store.pollDraftState();
+    expect(fixture.open).not.toHaveBeenCalled();
+    expect(store.workbench.nodes[0]?.x).toBe(32);
+    expect(store.layoutDirty).toBe(true); expect(store.isReadonly).toBe(true);
+    expect(store.workbench.commandFeedback).toContain("未保存布局");
+    wrapper.unmount();
   });
 
   it.each(["SAVE", "EDIT"] as const)("V2 %s 失败后的队列读取晚于重载，不污染新会话", async operation => {
@@ -708,6 +1628,55 @@ describe("WorkbenchView", () => {
     wrapper.unmount();
   });
 
+  it("生成子图进入OPD导航，切换预览保持会话和路由且持续更新不跳回主图", async () => {
+    const { wrapper, router } = await mountWorkbench();
+    await wrapper.get('[data-testid="left-tab-assistant"]').trigger('click'); await flushPromises();
+    const panel = wrapper.findComponent({ name: 'AssistantPanel' });
+    const token = useWorkbenchRuntimeStore().draftToken ?? { draft_id: 'd', edit_seq: 0, binding_digest: 'a' };
+    const proposal = { id: 'preview.split', contextId: 'context.root', status: 'staging', summary: '功能拆分', baseToken: token,
+      command: { command_type: 'APPLY_MODEL_PLAN', payload: { context_id: 'context.root', steps: [] } }, previewData: { context_id: 'context.root', constructs: [], suppressed_states: [] },
+      previewViews: [{ context_id: 'context.root', label: 'SD', parent_context_id: null, refinee_element_id: null, data: { context_id: 'context.root', constructs: [], suppressed_states: [] } },
+        { context_id: 'context.preview.child', label: '查询理解与规划', parent_context_id: 'context.root', refinee_element_id: 'process.parent', data: { context_id: 'context.preview.child', constructs: [], suppressed_states: [] } }] };
+    panel.vm.$emit('running', true); panel.vm.$emit('preview', proposal); await flushPromises();
+    await wrapper.get('[data-testid="left-tab-navigation"]').trigger('click');
+    expect(wrapper.get('[data-testid="p03-context-context.preview.child"]').text()).toContain('查询理解与规划 · 预览');
+    const routeBefore = router.currentRoute.value.fullPath;
+    await wrapper.get('[data-testid="p03-context-context.preview.child"]').trigger('click'); await flushPromises();
+    expect(router.currentRoute.value.fullPath).toBe(routeBefore);
+    expect(panel.props('scope').contextId).toBe('context.root');
+    expect(wrapper.get('[data-testid="assistant-preview-context"]').element).toHaveProperty('value', 'context.preview.child');
+    panel.vm.$emit('preview', { ...proposal, summary: '继续生成' }); await flushPromises();
+    expect(wrapper.get('[data-testid="assistant-preview-context"]').element).toHaveProperty('value', 'context.preview.child');
+    expect(wrapper.get('[data-testid="p03-context-context.preview.child"]').attributes('aria-current')).toBe('page');
+    wrapper.unmount();
+  });
+  it("确认应用延迟回读保持所选子图预览，失败可重试读取无需再次应用", async () => {
+    const { wrapper } = await mountWorkbench();
+    await wrapper.get('[data-testid="left-tab-assistant"]').trigger('click'); await flushPromises();
+    const panel = wrapper.findComponent({ name: 'AssistantPanel' });
+    const store = useWorkbenchRuntimeStore();
+    const scope = { projectId: store.projectId, modelId: store.modelId, contextId: store.workbench.activeContextId };
+    const data = { context_id: scope.contextId, constructs: [], suppressed_states: [] };
+    const proposal = { id: 'preview.applied', contextId: scope.contextId, status: 'ready', summary: '子图重组',
+      command: { command_type: 'APPLY_MODEL_PLAN', payload: { context_id: scope.contextId, steps: [] } }, previewData: data,
+      previewViews: [{ context_id: scope.contextId, label: '主图', data }, { context_id: 'context.new', label: '已生成子图', parent_context_id: scope.contextId, data: { ...data, context_id: 'context.new' } }] };
+    panel.vm.$emit('preview', proposal); await flushPromises();
+    await wrapper.get('[data-testid="assistant-preview-context"]').setValue('context.new');
+    let finish: (value: boolean) => void = () => {};
+    const load = vi.spyOn(store, 'load').mockImplementation(() => new Promise<boolean>(resolve => { finish = resolve; }));
+    panel.vm.$emit('applying', true); panel.vm.$emit('preview', null); panel.vm.$emit('applied', scope); panel.vm.$emit('applying', false);
+    await flushPromises();
+    expect(wrapper.find('[data-testid="assistant-canvas-preview"]').exists()).toBe(true);
+    expect(wrapper.get('[data-testid="assistant-preview-context"]').element).toHaveProperty('value', 'context.new');
+    expect(load).toHaveBeenCalledWith(scope.projectId, scope.modelId, 'context.new', undefined, true, true);
+    finish(false); await flushPromises();
+    expect(wrapper.get('[data-testid="assistant-canvas-preview"]').text()).toContain('修改已应用，但新图读取失败');
+    load.mockResolvedValue(true);
+    await wrapper.get('[data-testid="assistant-readback-retry"]').trigger('click'); await flushPromises();
+    expect(wrapper.find('[data-testid="assistant-canvas-preview"]').exists()).toBe(false);
+    expect(load).toHaveBeenCalledTimes(2); expect(assistantRequest).not.toHaveBeenCalledWith('apply', expect.anything(), expect.anything());
+    wrapper.unmount();
+  });
   it("左侧助手独立于底部和属性区，切换保留输入与分别调整的宽度", async () => {
     vi.mocked(assistantRequest).mockResolvedValue([{ id: 'session.fixed', projectId: 'project.1', modelId: 'model.1', contextId: 'context.root', title: 'OPD 会话', updatedAt: '1', messages: [], proposals: [], run: null }]);
     const { wrapper } = await mountWorkbench();
@@ -788,6 +1757,17 @@ describe("WorkbenchView", () => {
     expect(wrapper.get('[data-testid="p03-command-feedback"]').text()).toContain("该版本的根系统图");
     wrapper.unmount();
   });
+  it("草稿未知 Context 回退当前模型根图，不把不存在的模型当作可编辑图", async () => {
+    const fixture = draftFixture();
+    fixture.open.mockImplementationOnce(async () => { throw new LocalRuntimeApiError('NOT_FOUND', 'Context 不存在'); });
+    const { wrapper } = await mountWorkbench('?context=context.missing');
+    expect(fixture.open).toHaveBeenCalledWith('context.missing');
+    expect(fixture.open).toHaveBeenCalledWith(null);
+    const store = useWorkbenchRuntimeStore();
+    expect(store.workbench.resourceState).toBe('ready');
+    expect(store.workbench.commandFeedback).toContain('根系统图');
+    wrapper.unmount();
+  });
 
   it("无活动 Head 的会话转为只读 Baseline EXACT", async () => {
     api.workspaceSession.mockResolvedValueOnce({ meta: { read_revision: "revision.baseline" }, data: { model: { name: "生产模型", profile_id: "profile.iso", profile_version: "0.2.0", head_revision: null, access_mode: "READONLY_BASELINE" }, root_context_id: "context.root", current_context_id: "context.root" } });
@@ -855,10 +1835,21 @@ describe("WorkbenchView", () => {
     wrapper.unmount();
   });
 
+  it("preserves an imported overview name instead of replacing it with the topic name", async () => {
+    api.navigation.mockResolvedValue({ data: {
+      process_tree: [{ context_id: "context.root", label: "01 事件因果链研判：业务总图", context_kind: "SYSTEM_DIAGRAM", has_children: false }],
+      object_forest: [], views: [],
+    } });
+    const { wrapper } = await mountWorkbench();
+    expect(wrapper.get('[data-testid="p03-context-context.root"]').text()).toBe("01 事件因果链研判：业务总图");
+    expect(wrapper.get('[data-testid="p03-context-context.root"]').attributes("title")).toContain("总图");
+    wrapper.unmount();
+  });
+
   it("读取真实 P03 投影、OPL 和稳定修订定位", async () => {
     const { wrapper, router } = await mountWorkbench();
 
-    expect(wrapper.get('[data-testid="p03-opl-sentence"]').text()).toBe("Transform consumes Material.");
+    expect(wrapper.get('[data-testid="p03-opl-sentence"]').text()).toBe("Transform 消耗 Material。");
     expect(wrapper.get('[data-testid="p03-context-context.root"]').text()).toBe("生产模型");
     expect(wrapper.get('[data-testid="p03-context-context.root"]').attributes("title")).toBe("生产模型（SD · 根图）");
     expect(wrapper.get('[data-testid="opd-add-context.root"]').attributes("aria-label")).toBe("在 生产模型 下创建子图");
@@ -884,10 +1875,12 @@ describe("WorkbenchView", () => {
       { id: "sentence.feature", text: "Material exhibits Temperature.", factIds: [], occurrenceIds: ["occ.attribute"] }];
     await flushPromises();
     await wrapper.findAll('[data-testid="p03-opl-sentence"]')[0]!.trigger("click");
+    await flushPromises();
     expect(store.highlightedTextNodeIds).toEqual(["element.object.product", "state.material.ready", "element.object"]);
     expect(store.workbench.selectedId).toBe("fact.structural");
     expect(store.isReadonly).toBe(true);
     await wrapper.findAll('[data-testid="p03-opl-sentence"]')[1]!.trigger("click");
+    await flushPromises();
     expect(store.highlightedTextNodeIds).toEqual(["feature.attribute", "element.object"]);
     store.selectNodes([]);
     expect(store.highlightedTextNodeIds).toEqual([]);
@@ -924,6 +1917,54 @@ describe("WorkbenchView", () => {
     expect(canvas.attributes("data-interaction-tool")).toBe("select");
   });
 
+  it("右键关联助手切换左栏并追加目标信息，不自动发送", async () => {
+    const sessions = [{ id: 'session.fixed', projectId: 'project.1', modelId: 'model.1', contextId: 'context.root', title: 'OPD 会话', updatedAt: '1', messages: [], proposals: [], run: null }];
+    let finishLoading!: () => void;
+    vi.mocked(assistantRequest).mockImplementationOnce(() => new Promise(resolve => { finishLoading = () => resolve(sessions); }));
+    const { wrapper } = await mountWorkbench();
+    useWorkbenchRuntimeStore().draftToken = { draft_id: 'draft.assistant', edit_seq: 0, binding_digest: 'binding' };
+    await flushPromises();
+    await wrapper.get('[data-testid="p03-canvas-delete-state"]').trigger('click'); await flushPromises();
+    const menu = wrapper.get('[data-testid="p03-construct-actions-menu"]');
+    expect(menu.findAll('[role="menuitem"]')[1]!.text()).toContain('关联助手');
+    await wrapper.get('[data-testid="p03-construct-ask-assistant"]').trigger('click'); await flushPromises();
+    expect(wrapper.get('[data-testid="left-tab-assistant"]').attributes('aria-selected')).toBe('true');
+    expect(wrapper.find('[data-testid="p03-construct-actions-menu"]').exists()).toBe(false);
+    const input = wrapper.get('[data-testid="assistant-input"]');
+    expect((input.element as HTMLTextAreaElement).value).toContain('状态：');
+    expect((input.element as HTMLTextAreaElement).value).toContain('修改要求：');
+    expect(input.attributes('disabled')).toBeDefined();
+    const prefilled = (input.element as HTMLTextAreaElement).value;
+    finishLoading(); await flushPromises();
+    expect(input.attributes('disabled')).toBeUndefined();
+    expect((input.element as HTMLTextAreaElement).value).toBe(prefilled);
+    await input.setValue('保留我的要求');
+    await wrapper.get('[data-testid="left-tab-navigation"]').trigger('click');
+    await wrapper.get('[data-testid="p03-canvas-delete-fact"]').trigger('click'); await flushPromises();
+    await wrapper.get('[data-testid="p03-construct-ask-assistant"]').trigger('click'); await flushPromises();
+    expect((input.element as HTMLTextAreaElement).value).toMatch(/^保留我的要求\n\n请修改以下内容：/);
+    expect((input.element as HTMLTextAreaElement).value).toContain('关系：');
+    expect(vi.mocked(assistantRequest).mock.calls.some(call => call[0] === 'prompt')).toBe(false);
+    expect(api.executeP0Command).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+
+  it("未选择时显示画布属性和内嵌调色盘，选择与取消后切换属性", async () => {
+    const { wrapper } = await mountWorkbench();
+    const store = useWorkbenchRuntimeStore();
+    store.selectNodes([]);
+    await wrapper.get('[data-testid="p03-right-panel-open"]').trigger('click'); await flushPromises();
+    expect(wrapper.get('[data-testid="canvas-properties"]').text()).toContain('元素调色盘');
+    expect(wrapper.findAll('[data-testid="canvas-colors-panel"] input')).toHaveLength(10);
+    expect(wrapper.find('[data-testid="canvas-colors-toggle"]').exists()).toBe(false);
+    await store.selectConstruct('element.object'); await flushPromises();
+    expect(wrapper.find('[data-testid="canvas-properties"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="element-colors"]').exists()).toBe(true);
+    store.selectNodes([]); await flushPromises();
+    expect(wrapper.find('[data-testid="canvas-properties"]').exists()).toBe(true);
+    wrapper.unmount();
+  });
+
   it("属性检查器默认不占用画布，右键或工具栏显式打开且关闭后释放空间", async () => {
     const { wrapper } = await mountWorkbench();
     const grid = wrapper.get(".workbench-grid");
@@ -951,6 +1992,7 @@ describe("WorkbenchView", () => {
     expect(grid.classes()).toContain("workbench-grid--inspector-open");
 
     await wrapper.get('[data-testid="p03-right-panel-close"]').trigger("click");
+    await flushPromises();
     expect(wrapper.find('[data-testid="p03-right-panel"]').exists()).toBe(false);
     expect(grid.classes()).not.toContain("workbench-grid--inspector-open");
     expect(wrapper.get('[data-testid="p03-capture-view-state"]').attributes("data-selection-target-id")).toBe("element.object");
@@ -1268,7 +2310,7 @@ describe("WorkbenchView", () => {
     await flushPromises();
     expect(api.executeP0Command).toHaveBeenCalledWith("project.1", "model.1", "context.root", "revision.1", expect.objectContaining({
       commandType: "CREATE_FEATURE",
-      payload: expect.objectContaining({ feature_kind: "ATTRIBUTE", owner_element_id: "element.object", layout: { x: 296, y: 272 } }),
+      payload: expect.objectContaining({ feature_kind: "ATTRIBUTE", owner_element_id: "element.object", layout: { x: 296, y: 256 } }),
     }));
   });
 
@@ -1309,7 +2351,7 @@ describe("WorkbenchView", () => {
         name_or_value: "State 2",
         state_roles: [],
         occurrence: { ownership: "OWNED", construct_role: "STATE_NODE" },
-        layout: { x: 116, y: 154 },
+        layout: { x: 88, y: 144 },
         capability_query_id: "query.state.1",
         selected_option_id: "option.state.1",
       },
@@ -1351,7 +2393,168 @@ describe("WorkbenchView", () => {
     });
   });
 
-  it("State inspector 提供冻结的根与名称定位标识", async () => {
+  it("State 脏输入阻止选择与全局保存，确认后才继续并在离开前提交", async () => {
+    draftFixture();
+    const { wrapper } = await mountWorkbench();
+    const store = useWorkbenchRuntimeStore();
+    store.workbench.nodes.push({ ...store.workbench.nodes[0], id: 'state.material.ready', occurrenceId: 'occ.state', kind: 'state', label: 'Ready', ownerId: 'element.object', stateRoles: ['INITIAL'], occurrenceRole: 'owned' });
+    await wrapper.get('[data-testid="p03-canvas-select-state"]').trigger('click');
+    await flushPromises(); await openRightPanel(wrapper);
+    const saveState = vi.spyOn(store, 'saveSelectedState').mockResolvedValue();
+    const saveDraft = vi.spyOn(store, 'saveDraft').mockResolvedValue('revision.saved');
+    await wrapper.get('[data-testid="p03-state-inspector-name"]').setValue('new');
+    await wrapper.get('[data-testid="p03-canvas-select-object"]').trigger('click');
+    await flushPromises();
+    expect(store.selectedNode?.kind).toBe('state');
+    await wrapper.get('[data-testid="hs-save"]').trigger('click'); await flushPromises();
+    expect(saveDraft).not.toHaveBeenCalled();
+    const handle = wrapper.findComponent({ name: 'OpmWorkbench' }).vm as unknown as { prepareLeave: () => Promise<boolean> };
+    expect(await handle.prepareLeave()).toBe(false);
+    saveState.mockImplementation(async () => {
+      const node = store.workbench.nodes.find(item => item.id === store.selectedNode?.id)!;
+      node.label = store.stateEditor.name.trim(); node.stateRoles = [...store.stateEditor.roles];
+    });
+    expect(await handle.prepareLeave()).toBe(true);
+    await wrapper.get('[data-testid="hs-save"]').trigger('click'); await flushPromises();
+    expect(saveDraft).toHaveBeenCalledTimes(1);
+    await wrapper.get('[data-testid="p03-canvas-select-object"]').trigger('click'); await flushPromises();
+    expect(store.selectedNode?.kind).toBe('object');
+    wrapper.unmount();
+  });
+
+  it("State 输入保护 OPL、工具栏关闭及刷新，失败保留输入并在成功后解除", async () => {
+    const { wrapper } = await mountWorkbench();
+    const store = useWorkbenchRuntimeStore();
+    await wrapper.get('[data-testid="p03-canvas-select-state"]').trigger('click');
+    await flushPromises(); await openRightPanel(wrapper);
+    const blocked = () => {
+      const event = new Event('beforeunload', { cancelable: true });
+      window.dispatchEvent(event); return event.defaultPrevented;
+    };
+    expect(blocked()).toBe(false);
+    const originalRoles = [...store.stateEditor.roles];
+    store.stateEditor.roles = ['FINAL'];
+    expect(blocked()).toBe(true);
+    store.stateEditor.roles = originalRoles;
+    expect(blocked()).toBe(false);
+    await wrapper.get('[data-testid="p03-state-inspector-name"]').setValue('new');
+    expect(blocked()).toBe(true);
+    const save = vi.spyOn(store, 'saveSelectedState').mockResolvedValue();
+    store.textLines = [{ id: 'opl.object', text: 'Material exists.', factIds: [], occurrenceIds: ['occ.object'] }];
+    await flushPromises();
+    await wrapper.get('[data-testid="p03-opl-sentence"]').trigger('click'); await flushPromises();
+    expect(store.selectedNode?.kind).toBe('state');
+    await wrapper.get('[data-testid="p03-right-panel-open"]').trigger('click'); await flushPromises();
+    expect(store.rightPanel.open).toBe(true);
+    expect(store.stateEditor.name).toBe('new'); expect(blocked()).toBe(true);
+    let complete!: () => void;
+    save.mockImplementation(() => new Promise<void>(resolve => {
+      const node = store.selectedNode!;
+      node.label = store.stateEditor.name;
+      complete = resolve;
+    }));
+    await wrapper.get('form.state-editor').trigger('submit');
+    expect(blocked()).toBe(true);
+    complete(); await flushPromises();
+    expect(blocked()).toBe(false);
+    save.mockImplementation(async () => { store.selectedNode!.label = store.stateEditor.name; });
+    await wrapper.get('[data-testid="p03-state-inspector-name"]').setValue('opl saved');
+    await wrapper.get('[data-testid="p03-opl-sentence"]').trigger('click'); await flushPromises();
+    expect(store.selectedNode?.kind).toBe('object');
+    expect(store.workbench.nodes.find(node => node.kind === 'state')?.label).toBe('opl saved');
+    await wrapper.get('[data-testid="p03-canvas-select-state"]').trigger('click'); await flushPromises();
+    await wrapper.get('[data-testid="p03-state-inspector-name"]').setValue('toolbar saved');
+    await wrapper.get('[data-testid="p03-right-panel-open"]').trigger('click'); await flushPromises();
+    expect(store.rightPanel.open).toBe(false);
+    expect(store.workbench.nodes.find(node => node.kind === 'state')?.label).toBe('toolbar saved');
+    expect(blocked()).toBe(false);
+    wrapper.unmount(); expect(blocked()).toBe(false);
+  });
+
+  it("记忆展开后新 owner 首个特征默认折叠，重读与加载恢复保留选择", async () => {
+    const { wrapper } = await mountWorkbench();
+    const store = useWorkbenchRuntimeStore();
+    const canvas = () => wrapper.findComponent({ name: 'OpdCanvas' });
+    canvas().vm.$emit('featureCollapseChange', []); await flushPromises();
+    expect(canvas().props('collapsedFeatures')).toEqual([]);
+    const feature = { ...store.workbench.nodes.find(node => node.kind === 'attribute')!,
+      id: 'feature.product.first', occurrenceId: 'occ.feature.product.first', ownerId: 'element.object.product' };
+    store.workbench.nodes.push(feature); await flushPromises();
+    expect(canvas().props('collapsedFeatures')).toEqual(['element.object.product']);
+    canvas().vm.$emit('featureCollapseChange', []); await flushPromises();
+    store.workbench.nodes = store.workbench.nodes.map(node => ({ ...node })); await flushPromises();
+    expect(canvas().props('collapsedFeatures')).toEqual([]);
+    store.workbench.resourceState = 'loading'; await flushPromises();
+    store.workbench.nodes = store.workbench.nodes.map(node => ({ ...node }));
+    store.workbench.resourceState = 'ready'; await flushPromises();
+    expect(canvas().props('collapsedFeatures')).toEqual([]);
+    wrapper.unmount();
+  });
+
+  it("State 提交失败阻止菜单、直接删除、关系双击和历史快捷键，成功后继续", async () => {
+    const { wrapper } = await mountWorkbench();
+    const store = useWorkbenchRuntimeStore();
+    await wrapper.get('[data-testid="p03-canvas-select-state"]').trigger('click');
+    await flushPromises(); await openRightPanel(wrapper);
+    await wrapper.get('[data-testid="p03-state-inspector-name"]').setValue('pending');
+    const save = vi.spyOn(store, 'saveSelectedState').mockResolvedValue();
+    const menu = vi.spyOn(store, 'requestConstructActions').mockResolvedValue();
+    const structural = vi.spyOn(store, 'armStructuralUpdate').mockResolvedValue();
+    const undo = vi.spyOn(store, 'undo').mockResolvedValue(), redo = vi.spyOn(store, 'redo').mockResolvedValue();
+    const shortcuts = async () => {
+      for (const [key, shiftKey] of [['z', false], ['y', false], ['z', true]] as const)
+        window.dispatchEvent(new KeyboardEvent('keydown', { key, shiftKey, ctrlKey: true, cancelable: true }));
+      await flushPromises();
+    };
+    await wrapper.get('[data-testid="p03-canvas-delete-state"]').trigger('click'); await flushPromises();
+    await wrapper.get('[data-testid="p03-canvas-keyboard-delete-state"]').trigger('click'); await flushPromises();
+    await wrapper.get('[data-testid="p03-canvas-edit-relation-label"]').trigger('click'); await flushPromises();
+    await shortcuts();
+    expect(menu).not.toHaveBeenCalled(); expect(structural).not.toHaveBeenCalled();
+    expect(undo).not.toHaveBeenCalled(); expect(redo).not.toHaveBeenCalled();
+    expect(store.selectedNode?.kind).toBe('state'); expect(store.stateEditor.name).toBe('pending');
+    save.mockImplementation(async () => { store.selectedNode!.label = store.stateEditor.name; });
+    await shortcuts(); expect(undo).toHaveBeenCalledTimes(1); expect(redo).toHaveBeenCalledTimes(2);
+    await wrapper.get('[data-testid="p03-canvas-delete-state"]').trigger('click'); await flushPromises();
+    expect(menu).toHaveBeenCalledTimes(1);
+    await wrapper.get('[data-testid="p03-canvas-keyboard-delete-state"]').trigger('click'); await flushPromises();
+    expect(menu.mock.calls[1]?.[2]).toBe('direct');
+    await wrapper.get('[data-testid="p03-canvas-edit-relation-label"]').trigger('click'); await flushPromises();
+    expect(structural).toHaveBeenCalledWith(true); expect(store.selectedRelation?.id).toBe('fact.structural');
+    wrapper.unmount();
+  });
+
+  it("已打开菜单的细化和删除也检查 State 输入，失败不切换，重试成功继续", async () => {
+    draftFixture();
+    const { wrapper } = await mountWorkbench();
+    const store = useWorkbenchRuntimeStore();
+    store.workbench.nodes.push({ ...store.workbench.nodes[0], id: 'state.material.ready', occurrenceId: 'occ.state', kind: 'state', label: 'Ready', ownerId: 'element.object', stateRoles: ['INITIAL'], occurrenceRole: 'owned' });
+    await wrapper.get('[data-testid="p03-canvas-select-state"]').trigger('click');
+    await flushPromises(); await openRightPanel(wrapper);
+    await wrapper.get('[data-testid="p03-state-inspector-name"]').setValue('pending');
+    const save = vi.spyOn(store, 'saveSelectedState').mockResolvedValue();
+    const choose = vi.spyOn(store, 'chooseConstructDelete').mockResolvedValue();
+    store.constructActions.selectionId = 'occ.object'; store.constructActions.open = true;
+    store.constructActions.options = [{ enabled: true, option_id: 'option.delete', command_type: 'DELETE_CONSTRUCT', reason_codes: [] }] as unknown as typeof store.constructActions.options;
+    await flushPromises();
+    await wrapper.get('[data-testid="p03-construct-delete-action"]').trigger('click'); await flushPromises();
+    expect(choose).not.toHaveBeenCalled();
+    store.workbench.nodes.push({ ...store.workbench.nodes.find(node => node.kind === 'object')!, id: 'element.refine.new', occurrenceId: 'occ.refine.new', label: 'New owner', occurrenceRole: 'owned' });
+    store.constructActions.selectionId = 'occ.refine.new'; await flushPromises();
+    expect(wrapper.get('[data-testid="p03-construct-add-refinement"]').attributes('disabled')).toBeUndefined();
+    await wrapper.get('[data-testid="p03-construct-add-refinement"]').trigger('click'); await flushPromises();
+    expect(store.selectedNode?.kind).toBe('state');
+    expect(wrapper.find('[data-testid="opd-refinement-panel"]').exists()).toBe(false);
+    save.mockImplementation(async () => { store.selectedNode!.label = store.stateEditor.name; });
+    await wrapper.get('[data-testid="p03-construct-delete-action"]').trigger('click'); await flushPromises();
+    expect(choose).toHaveBeenCalledTimes(1);
+    await wrapper.get('[data-testid="p03-construct-add-refinement"]').trigger('click'); await flushPromises();
+    expect(store.selectedNode?.id).toBe('element.refine.new');
+    expect(wrapper.find('[data-testid="opd-refinement-panel"]').exists()).toBe(true);
+    wrapper.unmount();
+  });
+
+  it("State inspector 展示名称、多行备注与颜色设置", async () => {
     const { wrapper } = await mountWorkbench();
 
     await wrapper.get('[data-testid="p03-canvas-select-state"]').trigger("click");
@@ -1360,15 +2563,58 @@ describe("WorkbenchView", () => {
 
     expect(wrapper.get('[data-testid="p03-state-inspector"]').exists()).toBe(true);
     expect(wrapper.get('[data-testid="p03-state-inspector-name"]').element.tagName).toBe("INPUT");
+    expect(wrapper.get('[data-testid="p03-inspector-remark"]').element.tagName).toBe("TEXTAREA");
     expect(wrapper.get(".inspector-panel__body").exists()).toBe(true);
     expect(wrapper.get(".inspector-panel__title").text()).toContain("属性面板");
     expect(wrapper.get('[data-testid="p03-state-inspector"]').findAll(".inspector-section__heading").map(section => section.text())).toEqual([
-      "基本信息", "状态角色", "显示方式", "标识信息",
+      "基本信息",
+      "颜色设置",
     ]);
-    expect(wrapper.get('[data-testid="p03-state-inspector"]').get('button.button--primary').text()).toBe("保存 State");
+    expect(wrapper.get('[data-testid="p03-state-inspector"]').findAll('input:not([type="color"]):not([type="checkbox"]),textarea')).toHaveLength(2);
+    expect(wrapper.get('[data-testid="p03-state-inspector"]').findAll('input[type="checkbox"]')).toHaveLength(3);
+    expect(wrapper.get('[data-testid="p03-state-inspector"]').findAll('input[type="color"]')).toHaveLength(2);
+    const store = useWorkbenchRuntimeStore();
+    await wrapper.get('[data-testid="p03-state-inspector-name"]').setValue('可编辑状态');
+    await wrapper.get('input[type="checkbox"]').setValue(false);
+    expect(store.stateEditor.name).toBe('可编辑状态');
+    store.workbench.locationMode = 'EXACT'; await flushPromises();
+    expect(wrapper.get('[data-testid="p03-state-inspector-name"]').attributes('disabled')).toBeDefined();
+    expect(wrapper.get('.state-editor button[type="submit"]').attributes('disabled')).toBeDefined();
   });
 
-  it("Object inspector 通过 Projection 清单显式化抑制 State", async () => {
+  it("草稿备注失焦保存原元素、失败保留输入，重新读取及清空不影响名称", async () => {
+    const fixture = draftFixture(), originalRead = fixture.read.getMockImplementation()!, originalEdit = fixture.edit.getMockImplementation()!;
+    let remark = "";
+    fixture.read.mockImplementation(async opened => {
+      const result = await originalRead(opened);
+      return { ...result, constructs: result.constructs.map(item => ({ ...item, label: "原始名称", remark })) };
+    });
+    fixture.edit.mockImplementation(async (token, context, command) => {
+      const result = await originalEdit(token, context, command);
+      if (command.commandType === "UPDATE_PROPERTY" && command.payload.property_name === "remark") remark = command.payload.value;
+      return result;
+    });
+    vi.spyOn(DraftWorkbenchSession.prototype, "capabilities").mockImplementation(async token => ({ data: { options: [{
+      command_type: "UPDATE_PROPERTY", enabled: true, capability_query_id: `query.${token.edit_seq}`, option_id: `option.${token.edit_seq}`,
+    }] } }) as never);
+    const { wrapper } = await mountWorkbench(), store = useWorkbenchRuntimeStore();
+    await store.selectConstruct("element.object"); await openRightPanel(wrapper);
+    let input = wrapper.get<HTMLTextAreaElement>('[data-testid="p03-inspector-remark"]');
+    fixture.edit.mockRejectedValueOnce(new LocalRuntimeApiError("DRAFT_EDIT_REJECTED", "保存失败"));
+    await input.setValue("第一行\n普通备注"); await input.trigger("blur"); await flushPromises();
+    expect(input.element.value).toBe("第一行\n普通备注"); expect(remark).toBe("");
+    await input.trigger("blur"); await flushPromises();
+    expect(remark).toBe("第一行\n普通备注"); expect(store.workbench.nodes[0]!.label).toBe("原始名称");
+    expect(fixture.edit).toHaveBeenLastCalledWith(expect.anything(), "context.root", expect.objectContaining({ commandType: "UPDATE_PROPERTY", payload: expect.objectContaining({
+      property_name: "remark", target_ref: { target_kind: "ELEMENT", target_id: "element.object" }, value: "第一行\n普通备注",
+    }) }));
+    await store.load("project.1", "model.1", "context.root"); await store.selectConstruct("element.object"); await flushPromises();
+    input = wrapper.get<HTMLTextAreaElement>('[data-testid="p03-inspector-remark"]'); expect(input.element.value).toBe(remark);
+    await input.setValue(""); await input.trigger("blur"); await flushPromises(); expect(remark).toBe("");
+    expect(store.workbench.nodes[0]!.label).toBe("原始名称"); wrapper.unmount();
+  });
+
+  it("Object inspector 隐藏标识和状态配置，展示名称备注与颜色设置", async () => {
     api.projection.mockResolvedValueOnce({ meta: { read_revision: "revision.1" }, data: { context_id: "context.root",
       constructs: [{ occurrence_id: "occ.object", target_id: "element.object", construct_role: "OBJECT_NODE", label: "Material", layout: { x: 80, y: 80, width: 160, height: 72, z_order: 1 } }],
       suppressed_states: [{ state_id: "state.common.subject", owner_ref: { target_kind: "ELEMENT", target_id: "element.object" }, name_or_value: "draft", state_roles: ["INITIAL"], explicitness: "SUPPRESSED" }],
@@ -1378,13 +2624,11 @@ describe("WorkbenchView", () => {
     await wrapper.get('[data-testid="p03-canvas-select-object"]').trigger("click");
     await flushPromises();
     await openRightPanel(wrapper);
-    await wrapper.get('[data-testid="p03-suppressed-state-state.common.subject"]').trigger("click");
-    await flushPromises();
-
-    expect(api.executeP0Command).toHaveBeenCalledWith("project.1", "model.1", "context.root", "revision.1", {
-      commandType: "STATE_EXPLICIT",
-      payload: { context_id: "context.root", state_id: "state.common.subject" },
-    });
+    expect(wrapper.find('[data-testid="p03-suppressed-states"]').exists()).toBe(false);
+    expect(wrapper.get('[data-testid="p03-node-inspector"]').findAll(".inspector-section__heading").map(section => section.text())).toEqual(["基本信息", "颜色设置"]);
+    expect(wrapper.get('[data-testid="p03-node-inspector"]').findAll('input:not([type="color"]),textarea')).toHaveLength(2);
+    expect(wrapper.get('[data-testid="p03-node-inspector"]').findAll('input[type="color"]')).toHaveLength(2);
+    expect(api.executeP0Command).not.toHaveBeenCalled();
   });
 
   it("Fact 删除仅使用 Runtime 返回的 enabled impact token", async () => {
@@ -1406,7 +2650,8 @@ describe("WorkbenchView", () => {
     await flushPromises();
     const option = wrapper.get('[data-testid="p03-construct-delete-action"]');
     expect(option.attributes("disabled")).toBeDefined();
-    expect(wrapper.get('[data-testid="p03-construct-actions-menu"]').text()).toContain("DELETE_DEPENDENCY_EXISTS");
+    expect(wrapper.get('[data-testid="p03-construct-actions-menu"]').text()).not.toContain("DELETE_DEPENDENCY_EXISTS");
+    expect(wrapper.get('[data-testid="p03-construct-delete-tooltip"]').attributes("title")).toBe("存在关联依赖，无法直接删除");
     await option.trigger("click");
     expect(api.executeP0Command).not.toHaveBeenCalled();
   });

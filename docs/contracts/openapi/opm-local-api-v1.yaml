@@ -662,6 +662,10 @@ components:
         model_id: {$ref: "#/components/schemas/StableId"}
         project_id: {$ref: "#/components/schemas/StableId"}
         name: {type: string, minLength: 1, maxLength: 256}
+        description:
+          type: string
+          maxLength: 4000
+          description: 模型业务目标与范围；workspace-session 返回当前目录元数据，旧模型为空。只作建模背景，不属于图语义或历史修订。
         head_revision:
           description: 当前活动草稿 Head；无活动草稿时为 null，不代表本次读取目标。
           oneOf:
@@ -908,6 +912,7 @@ components:
                   target_kind: {type: string, enum: [ELEMENT, FEATURE, STATE, FACT]}
                   construct_role: {type: string}
                   label: {type: string}
+                  remark: {type: string, maxLength: 4000, description: 元素的普通文本备注，不参与执行语义}
                   owner_id: {$ref: "#/components/schemas/StableId"}
                   state_roles: {type: array, items: {type: string, enum: [INITIAL, DEFAULT, FINAL]}}
                   explicitness: {type: string, enum: [EXPLICIT, SUPPRESSED]}

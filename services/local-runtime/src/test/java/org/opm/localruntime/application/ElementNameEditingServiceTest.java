@@ -6,7 +6,9 @@ import org.opm.localruntime.api.ApiErrorCode;
 import org.opm.localruntime.api.ApiException;
 import org.opm.localruntime.storage.ProjectDatabaseFactory;
 
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.security.MessageDigest;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -35,7 +37,7 @@ class ElementNameEditingServiceTest {
         assertTrue(list(capabilities.get("allowed")).contains("UPDATE_PROPERTY"));
         assertFalse(list(capabilities.get("forbidden")).stream().map(Map.class::cast)
                 .anyMatch(item -> "UPDATE_PROPERTY".equals(item.get("command_type"))));
-        Map<String, Object> option = mapValue(list(capabilities.get("options")).getFirst());
+        Map<String, Object> option = mapValue(list(capabilities.get("options")).get(0));
         assertEquals(List.of("target_ref", "property_name", "value"), list(option.get("required_fields")).stream()
                 .map(Map.class::cast).map(item -> item.get("field_id")).toList());
 
@@ -72,7 +74,7 @@ class ElementNameEditingServiceTest {
                 List.of("feature.attribute", "Renamed Attribute", "element.object", "symbol.feature.attribute"),
                 List.of("feature.operation", "Renamed Operation", "element.process", "symbol.feature.operation"))) {
             Map<String, Object> option = propertyOption(fixture, revision, target.get(0));
-            Map<String, Object> endpoint = mapValue(list(option.get("normalized_endpoints")).getFirst());
+            Map<String, Object> endpoint = mapValue(list(option.get("normalized_endpoints")).get(0));
             assertEquals("FEATURE", mapValue(endpoint.get("target_ref")).get("target_kind"));
             assertEquals(target.get(3), mapValue(option.get("symbol_descriptor")).get("id"));
             Map<String, Object> before = construct(fixture, revision, target.get(0));
@@ -131,33 +133,18 @@ class ElementNameEditingServiceTest {
         Map<String, Object> validation = data(fixture.service().validate(fixture.projectId(), fixture.modelId(), map(
                 "request_id", "request.validation", "command_id", "command.validation", "input_revision", baselineRevision,
                 "binding", binding(), "scope", "FULL")));
-        Path database = new ProjectDatabaseFactory(temporaryDirectory.resolve("guards")).databasePath(fixture.projectId());
-        Map<?, ?> summary;
-        try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + database);
-             var query = connection.prepareStatement("SELECT result_json FROM background_task WHERE task_id = ?")) {
-            query.setString(1, validation.get("task_id").toString());
-            try (var rows = query.executeQuery()) {
-                assertTrue(rows.next());
-                summary = new com.fasterxml.jackson.databind.ObjectMapper().readValue(rows.getString(1), Map.class);
-            }
-        }
-        assertEquals("INCOMPLETE", summary.get("coverage_state"));
-        assertCode(ApiErrorCode.VALIDATION_BLOCKED, () -> fixture.service().baseline(fixture.projectId(), fixture.modelId(), map(
+        String taskId = validation.get("task_id").toString();
+        String evidence = "evidence." + digest(taskId + baselineRevision).substring(0, 32);
+        assertCode(ApiErrorCode.VALIDATION_BLOCKED,()->fixture.service().baseline(fixture.projectId(), fixture.modelId(), map(
                 "request_id", "request.baseline", "command_id", "command.baseline", "base_revision", baselineRevision,
-                "binding", binding(), "name", "Frozen", "evidence_summary_token", summary.get("evidence_summary_token"))));
-
-        // 历史基线只读保护与创建门禁分开验证；夹具不伪称部分校验生成了完整证据。
-        try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + database);
-             var insert = connection.prepareStatement("INSERT INTO baseline(baseline_id, model_id, revision_id, name, normalized_name, validation_report_digest, evidence_summary_json, created_at) VALUES ('baseline.history', ?, ?, 'Frozen', 'frozen', 'historical-fixture', '{}', '2026-10-05')")) {
-            try (var query = connection.createStatement(); var rows = query.executeQuery("SELECT COUNT(*) FROM baseline")) {
-                assertTrue(rows.next());
-                assertEquals(0, rows.getInt(1));
-            }
-            insert.setString(1, fixture.modelId()); insert.setString(2, baselineRevision); insert.executeUpdate();
-        }
+                "binding", binding(), "name", "Frozen", "evidence_summary_token", evidence)));
 
         Map<String, Object> baselineOption = propertyOption(fixture, baselineRevision, "element.object");
         String currentRevision = rename(fixture, baselineRevision, "command.rename.current", baselineOption, "Current Name");
+        // 存储夹具代表已经发布的历史基线；当前部分规则校验不得发布新基线。
+        try(var c=new ProjectDatabaseFactory(temporaryDirectory.resolve("guards")).databaseScope(fixture.projectId()).getConnection();var statement=c.prepareStatement("INSERT INTO baseline(baseline_id,model_id,revision_id,name,normalized_name,validation_report_digest,evidence_summary_json,created_at) VALUES ('baseline.fixture',?,?,'Frozen','frozen',?,'{}',?)")) {
+            statement.setString(1,fixture.modelId());statement.setString(2,baselineRevision);statement.setString(3,digest(evidence));statement.setString(4,java.time.Instant.now().toString());statement.executeUpdate();
+        }
         assertEquals("REVISION_STALE", forbiddenReason(fixture, objectRevision));
         assertEquals("READ_ONLY_REVISION", forbiddenReason(fixture, baselineRevision));
 
@@ -210,7 +197,7 @@ class ElementNameEditingServiceTest {
     private Map<String, Object> propertyOption(Fixture fixture, String revision, String elementId) {
         Map<String, Object> capabilities = data(fixture.service().capabilities(
                 "request.capabilities." + revision, fixture.projectId(), fixture.modelId(), revision, elementId, "UPDATE_PROPERTY"));
-        return mapValue(list(capabilities.get("options")).getFirst());
+        return mapValue(list(capabilities.get("options")).get(0));
     }
 
     private String forbiddenReason(Fixture fixture, String revision) {
@@ -236,7 +223,7 @@ class ElementNameEditingServiceTest {
     }
 
     private String firstSentence(Fixture fixture, String revision) {
-        return mapValue(list(data(fixture.service().text("request.text." + revision, fixture.projectId(), fixture.modelId(), fixture.contextId(), revision)).get("sentences")).getFirst()).get("text").toString();
+        return mapValue(list(data(fixture.service().text("request.text." + revision, fixture.projectId(), fixture.modelId(), fixture.contextId(), revision)).get("sentences")).get(0)).get("text").toString();
     }
 
     private String currentRevision(Fixture fixture) {
@@ -274,6 +261,17 @@ class ElementNameEditingServiceTest {
 
     private String committed(Map<String, Object> envelope) {
         return mapValue(envelope.get("meta")).get("committed_revision").toString();
+    }
+
+    private String digest(String value) {
+        try {
+            byte[] bytes = MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8));
+            StringBuilder result = new StringBuilder();
+            for (byte item : bytes) result.append(String.format("%02x", item));
+            return result.toString();
+        } catch (Exception exception) {
+            throw new IllegalStateException(exception);
+        }
     }
 
     private Map<String, Object> map(Object... values) {

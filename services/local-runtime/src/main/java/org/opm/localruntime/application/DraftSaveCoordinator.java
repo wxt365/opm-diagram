@@ -21,12 +21,12 @@ import java.util.function.LongSupplier;
 /** 单模型保存队列；由宿主显式注册和启动，不扫描或迁移用户库。 */
 public final class DraftSaveCoordinator implements AutoCloseable {
     interface Backend {
-        DraftJournalRepository.Snapshot read();
+        DraftJournalRepository.StateSnapshot readState();
         SaveResult manual(SaveRequest request);
         PinResult pin(PinRequest request);
         void checkpoint();
     }
-    private sealed interface Task permits Pending, PendingPin {
+    private interface Task {
         String key();
         String mode();
         void execute(Backend backend);
@@ -60,7 +60,7 @@ public final class DraftSaveCoordinator implements AutoCloseable {
     public DraftSaveCoordinator(String project, String model, DraftSaveRepository repository, Consumer<ObjectNode> validate,
                                 Clock clock, LongSupplier nanoTime) {
         this(new Backend() {
-            public DraftJournalRepository.Snapshot read() { return repository.read(project, model); }
+            public DraftJournalRepository.StateSnapshot readState() { return repository.readState(project, model); }
             public SaveResult manual(SaveRequest request) { return repository.manual(project, model, request, validate); }
             public PinResult pin(PinRequest request) { return repository.pin(project, model, request, validate); }
             public void checkpoint() { repository.checkpoint(project, model, validate); }
@@ -93,7 +93,7 @@ public final class DraftSaveCoordinator implements AutoCloseable {
 
     public synchronized void start(ScheduledExecutorService executor) {
         if (closed || timer != null) throw new IllegalStateException("保存调度不能重复启动或在关闭后启动");
-        timer = Objects.requireNonNull(executor).scheduleWithFixedDelay(this::poll, 0, 100, TimeUnit.MILLISECONDS);
+        timer = Objects.requireNonNull(executor).scheduleWithFixedDelay(this::poll, 0, 1000, TimeUnit.MILLISECONDS);
     }
 
     /** 可控时钟测试直接驱动一次调度；外部 executor 调用同一入口。 */
@@ -111,7 +111,7 @@ public final class DraftSaveCoordinator implements AutoCloseable {
                 synchronized (this) {
                     if (automaticBlocked || retrying && nanoTime.getAsLong() - retryNanos < 0) return;
                 }
-                var snapshot = backend.read();
+                var snapshot = backend.readState();
                 synchronized (this) {
                     refreshDeadline(snapshot);
                     if (closed || !pending.isEmpty() || deadlineDirty == null || nanoTime.getAsLong() - dueNanos < 0) return;
@@ -141,7 +141,7 @@ public final class DraftSaveCoordinator implements AutoCloseable {
         }
     }
 
-    private void refreshDeadline(DraftJournalRepository.Snapshot snapshot) {
+    private void refreshDeadline(DraftJournalRepository.StateSnapshot snapshot) {
         if (snapshot.dirtySince() == null) { deadlineDirty = null; return; }
         if (snapshot.dirtySince().equals(deadlineDirty)) return;
         deadlineDirty = snapshot.dirtySince(); Instant now = clock.instant(), dirty = Instant.parse(deadlineDirty);
@@ -151,7 +151,7 @@ public final class DraftSaveCoordinator implements AutoCloseable {
     }
 
     public SaveState state() {
-        var snapshot = backend.read();
+        var snapshot = backend.readState();
         synchronized (this) {
             DraftToken highest = null;
             for (var item : pending.values()) {

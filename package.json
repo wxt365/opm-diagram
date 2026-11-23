@@ -121,7 +121,13 @@
     "test:e2e": "playwright test --config=tests/e2e/playwright.config.ts",
     "backend:verify": "./mvnw verify",
     "assistant:dev": "npm run dev --workspace=@opm/assistant",
-    "assistant:test": "npm run test --workspace=@opm/assistant"
+    "assistant:test": "npm run test --workspace=@opm/assistant",
+    "desktop:dev": "npm run dev --workspace=@opm/desktop",
+    "desktop:test": "npm run test --workspace=@opm/desktop",
+    "desktop:prepare": "npm run build && ./mvnw -pl services/local-runtime package -DskipTests && npm run prepare:resources --workspace=@opm/desktop",
+    "desktop:smoke": "npm run smoke --workspace=@opm/desktop",
+    "desktop:package": "npm run package --workspace=@opm/desktop",
+    "desktop:make": "npm run make --workspace=@opm/desktop"
   },
   "devDependencies": {
     "@apidevtools/swagger-parser": "10.1.1",

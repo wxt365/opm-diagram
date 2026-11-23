@@ -26,7 +26,7 @@ test("头部操作区与全部检查器状态在桌面和窄屏保持清晰且�
   await expect(page.locator(".workbench-header__actions")).toBeVisible();
   await expect(page.getByTestId("p03-run-validation").locator("svg")).toBeVisible();
   await expect(page.locator(".inspector-panel__title")).toContainText("对象");
-  await expect(page.locator(".inspector-section__heading")).toContainText(["基本信息", "标识信息"]);
+  await expect(page.locator(".inspector-section__heading")).toContainText(["基本信息", "颜色设置"]);
   expect((await inspector.boundingBox())!.width).toBeGreaterThanOrEqual(315);
   await expectNoOverlap(context, status);
   await expect(page.locator(".workbench-header__context strong")).toHaveAttribute("title", /^语义审查修正/);
@@ -43,7 +43,7 @@ test("头部操作区与全部检查器状态在桌面和窄屏保持清晰且�
   await state.click();
   await expect(page.getByTestId("p03-state-inspector")).toBeVisible();
   await expect(page.getByTestId("p03-state-inspector").locator(".inspector-section__heading")).toContainText([
-    "基本信息", "状态角色", "显示方式", "标识信息",
+    "基本信息", "颜色设置",
   ]);
   await expect(page.getByRole("button", { name: "保存 State", exact: true })).toHaveClass(/button--primary/);
   await expectInspectorValuesContained(inspector);
@@ -55,10 +55,10 @@ test("头部操作区与全部检查器状态在桌面和窄屏保持清晰且�
   await page.getByTestId("p03-relation-quick-option-CAP-ISO-PROC-001").click();
   await dragRelationEndpoint(page, object, process);
   await expect(page.getByTestId("hs-draft-identity")).not.toHaveText(revision);
-  await page.getByTestId("p03-opl-sentence").filter({ hasText: "Process 1 consumes Object 1." }).click();
+  await page.getByTitle("Process 1 consumes Object 1.", { exact: true }).click();
   await page.getByTestId("p03-right-panel-open").click();
   await expect(page.locator(".inspector-panel__title")).toContainText("关系");
-  await expect(page.locator(".inspector-section__heading")).toContainText(["关系信息", "端点与约束", "Control"]);
+  await expect(page.locator(".inspector-section__heading")).toContainText(["关系信息", "Control"]);
   await expectInspectorValuesContained(inspector);
   await page.screenshot({ path: test.info().outputPath("relation-inspector-desktop.png") });
 

@@ -22,7 +22,8 @@ export interface DraftPendingStore {
 
 // 每次操作独立连接，只在事务 complete 后兑现 Promise；不回退内存。
 export class IndexedDbDraftPendingStore implements DraftPendingStore {
-  constructor(private readonly factory: () => IDBFactory = () => globalThis.indexedDB) { }
+  constructor(private readonly factory: () => IDBFactory = () => globalThis.indexedDB,
+    private readonly databaseName = "opm-draft-delivery") { }
 
   read(project: string, model: string, lane: DraftLane): Promise<DraftPendingEntry | null> {
     return this.transaction("readonly", (store, set) => {
@@ -62,7 +63,7 @@ export class IndexedDbDraftPendingStore implements DraftPendingStore {
       let failed = false;
       const fail = () => { failed = true; reject(protectionError()); };
       try {
-        const request = this.factory().open("opm-draft-delivery", 1);
+        const request = this.factory().open(this.databaseName, 1);
         request.onupgradeneeded = () => {
           if (failed) { request.transaction?.abort(); return; }
           request.result.createObjectStore("pending", { keyPath: ["project_id", "model_id", "lane"] });

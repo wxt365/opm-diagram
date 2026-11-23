@@ -1,3 +1,4 @@
+import { localLayout } from './helpers/local-layout';
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { chooseViewportAction } from "./viewport-controls";
 
@@ -44,12 +45,12 @@ test("多选移动只提交一次，状态去重、撤销重做及保存重开",
     const state3 = page.locator(".x6-node").filter({ hasText: "State 3" });
     const expanded = await geometry([owner, state3]);
     await state3.click();
-    await edit(page, () => drag(page, state3, 0, -36));
-    expect(Number((await geometry([owner]))[0]!.height)).toBeLessThan(Number(expanded[0]!.height));
-    await edit(page, () => page.getByTestId("opd-undo-layout").click());
+    await localLayout(page, () => drag(page, state3, 0, 36));
+    expect(Number((await geometry([owner]))[0]!.height)).toBeGreaterThan(Number(expanded[0]!.height));
+    await localLayout(page, () => page.getByTestId("opd-undo-layout").click());
     expect(await geometry([owner, state3])).toEqual(expanded);
-    await edit(page, () => page.getByTestId("opd-redo-layout").click());
-    await edit(page, () => page.getByTestId("opd-undo-layout").click());
+    await localLayout(page, () => page.getByTestId("opd-redo-layout").click());
+    await localLayout(page, () => page.getByTestId("opd-undo-layout").click());
     expect(await geometry([owner, state3])).toEqual(expanded);
     await edit(page, () => page.getByTestId("p03-tool-object").click());
     await edit(page, () => page.getByTestId("p03-tool-process").click());
@@ -78,15 +79,17 @@ test("多选移动只提交一次，状态去重、撤销重做及保存重开",
       if (request.url().includes(`/models/${modelId}/draft/commands`)) requests.push(request.postDataJSON());
     });
     const seq = await editSeq(page);
-    await edit(page, () => drag(page, owner, 64, 32));
-    expect(await editSeq(page)).toBe(seq + 1);
-    expect(requests).toHaveLength(1);
-    expect(requests[0]!.command.command_type).toBe("UPDATE_LAYOUT_BATCH");
-    expect(requests[0]!.command.payload.layouts).toHaveLength(7);
+    const ownerPosition = await owner.evaluate(element => {
+      const matrix = (element as SVGGraphicsElement).transform.baseVal.consolidate()!.matrix;
+      return { x: matrix.e, y: matrix.f };
+    });
+    await localLayout(page, () => drag(page, owner, 64, 32));
+    expect(await editSeq(page)).toBe(seq);
+    expect(requests).toHaveLength(0);
     const after = await geometry(nodes);
     for (let index = 0; index < before.length; index++) {
-      expect(after[index]!.x - before[index]!.x).toBeCloseTo(64, 0);
-      expect(after[index]!.y - before[index]!.y).toBeCloseTo(32, 0);
+      expect(after[index]!.x - before[index]!.x).toBeCloseTo(Math.round((ownerPosition.x + 64) / 16) * 16 - ownerPosition.x, 0);
+      expect(after[index]!.y - before[index]!.y).toBeCloseTo(Math.round((ownerPosition.y + 32) / 16) * 16 - ownerPosition.y, 0);
     }
     const childId = await child.getAttribute("data-cell-id");
     const outline = page.locator(`.x6-node[data-cell-id="state.final-outline.${childId}"]`);
@@ -94,55 +97,60 @@ test("多选移动只提交一次，状态去重、撤销重做及保存重开",
     expect(outlineBox.x - childBox.x).toBeCloseTo(3.5, 0);
     expect(outlineBox.y - childBox.y).toBeCloseTo(3.5, 0);
     await page.screenshot({ path: info.outputPath("multi-selection.png") });
-    await edit(page, () => page.getByTestId("opd-undo-layout").click());
+    await localLayout(page, () => page.getByTestId("opd-undo-layout").click());
     expect(await geometry(nodes)).toEqual(before);
-    await edit(page, () => page.keyboard.press("Control+Shift+z"));
+    await localLayout(page, () => page.keyboard.press("Control+Shift+z"));
     expect(await geometry(nodes)).toEqual(after);
-    await edit(page, () => page.keyboard.press("Meta+z"));
+    await localLayout(page, () => page.keyboard.press("Meta+z"));
     expect(await geometry(nodes)).toEqual(before);
     // 新移动丢弃重做分支；Shift 再点同一节点将其移出选择。
     await child.click({ modifiers: ["Shift"] });
-    await expect(child.locator("rect").first()).toHaveAttribute("fill", "#ffffff");
+    await expect(child.locator("rect").first()).toHaveAttribute("fill", "#fff7df");
     for (const node of [owner, other, process, feature]) await expect(node.locator("rect,ellipse").first()).toHaveAttribute("fill", "#eaf3fc");
     expect(await toolbarGeometry(page)).toEqual(singleSelectionToolbar);
-    await edit(page, () => drag(page, owner, 32, 16));
+    await localLayout(page, () => drag(page, owner, 32, 16));
     await expect(page.getByTestId("opd-redo-layout")).toBeDisabled();
     const saved = await geometry(nodes);
     await page.getByTestId("hs-save").click();
     await expect(page.getByTestId("hs-save-state")).toHaveText("已手动保存");
+    expect(requests).toHaveLength(1);
+    expect(requests[0]!.command.command_type).toBe("UPDATE_LAYOUT_BATCH");
+    expect(requests[0]!.command.payload.layouts).toHaveLength(7);
     const historySeq = await editSeq(page);
     await page.reload();
     await expect(page.getByTestId("hs-save")).toBeEnabled();
     await owner.locator('[data-testid^="p03-feature-toggle-"]').click();
     expect(await geometry(nodes)).toEqual(saved);
     expect(await editSeq(page)).toBe(historySeq);
-    await expect(page.getByTestId("opd-undo-layout")).toBeDisabled();
+    await expect(page.getByTestId("opd-undo-layout")).toHaveAttribute('title', /撤销：/);
     await expect(page.getByTestId("opd-redo-layout")).toBeDisabled();
     const rejectedBefore = await geometry(nodes); const rejectedSeq = await editSeq(page);
     await page.route(`**/models/${modelId}/draft/commands`, route => route.fulfill({ status: 422, contentType: "application/json",
       body: JSON.stringify({ code: "DRAFT_EDIT_REJECTED", message: "布局拒绝验证", retryable: false, reason_code: null }) }), { times: 1 });
-    await drag(page, owner, 32, 16);
+    await localLayout(page, () => drag(page, owner, 32, 16));
+    const rejectedLocal = await geometry(nodes);
+    await page.getByTestId("hs-save").click();
     await expect(page.getByTestId("p03-command-feedback")).toContainText("布局拒绝验证");
     expect(await editSeq(page)).toBe(rejectedSeq);
-    expect(await geometry(nodes)).toEqual(rejectedBefore);
-    await expect(page.getByTestId("opd-undo-layout")).toBeDisabled();
+    expect(await geometry(nodes)).toEqual(rejectedLocal);
     await expect(page.getByTestId("p03-readonly-banner")).toBeVisible();
     // 响应拒绝保留原请求；恢复会查询 receipt 并以同一 command_id 重试。
     await page.getByTestId("hs-retry-delivery").click();
     await expect(page.getByTestId("hs-save")).toBeEnabled();
     expect(await editSeq(page)).toBe(rejectedSeq + 1);
-    // 当前图以外的切换清理历史，EXACT 只读时拖动不产生请求。
+    // 切图前保存本地布局，统一模型历史仍可用；EXACT 只读时拖动不产生请求。
     await owner.click({ position: { x: 20, y: 14 } });
-    await edit(page, () => drag(page, owner, 16, 16));
+    await localLayout(page, () => drag(page, owner, 16, 16));
     const parentTestId = (await page.getByTestId("opd-navigator").locator('[aria-current="page"]').getAttribute("data-testid"))!;
     await page.getByTestId(parentTestId.replace("p03-context-", "opd-add-")).click();
     await page.getByTestId("opd-refinement-name").fill("布局子图");
     await page.getByTestId("opd-refine").click();
+    await page.getByTestId('layout-leave-save').click();
     await expect(page.getByTestId("opd-parent")).toBeVisible();
-    await expect(page.getByTestId("opd-undo-layout")).toBeDisabled();
+    await expect(page.getByTestId("opd-undo-layout")).toBeVisible();
     await page.getByTestId("opd-parent").click();
     await expect(owner).toBeVisible();
-    await expect(page.getByTestId("opd-undo-layout")).toBeDisabled();
+    await expect(page.getByTestId("opd-undo-layout")).toHaveAttribute('title', /撤销：/);
     await page.getByTestId("hs-save").click();
     await expect(page.getByTestId("hs-save-state")).toHaveText("已手动保存");
     const versions = await page.getByTestId("p03-version-select").locator("option").evaluateAll(options => options.map(option => (option as HTMLOptionElement).value));
@@ -212,7 +220,8 @@ async function drag(page: Page, node: Locator, dx: number, dy: number) {
 async function geometry(nodes: Locator[]) {
   return Promise.all(nodes.map(node => node.evaluate(element => {
     const body = element.querySelector('rect,ellipse')!;
-    return { x: element.getBoundingClientRect().x, y: element.getBoundingClientRect().y,
+      const matrix = (element as SVGGraphicsElement).getScreenCTM()!;
+      return { x: matrix.e, y: matrix.f,
       transform: element.getAttribute("transform"), width: body.getAttribute("width") ?? body.getAttribute("rx"), height: body.getAttribute("height") ?? body.getAttribute("ry") };
   })));
 }

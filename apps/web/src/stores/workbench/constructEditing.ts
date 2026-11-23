@@ -1,4 +1,4 @@
-import { reactive, type Ref, type ComputedRef } from "vue";
+import { reactive, watch, type Ref, type ComputedRef } from "vue";
 import type { localRuntimeApi, SuppressedStateWire } from "@/shared/api/localRuntimeApi";
 import type { OpdNode } from "@/shared/types/modeling";
 import type { ApiEdtStateRole } from "@/shared/api/generated/apiEdtContract";
@@ -17,27 +17,58 @@ interface ConstructEditingDependencies {
   stateCreateOption: Ref<WorkbenchCapabilityOption | null>;
   getLoadSequence: () => number;
   isDraftSession: () => boolean;
+  prepareStateEdit: () => boolean | Promise<boolean>;
+  reflowStates: (ownerId: string, previousNodes: readonly OpdNode[]) => Promise<void>;
+  refineeId?: () => string | undefined;
   queryCapabilities: (project: string, model: string, context: string, revision: string, selection?: string, intent?: string, endpoints?: string[]) => Promise<{ data: { allowed: string[]; options: WorkbenchCapabilityOption[] } }>;
   execute: (command: Parameters<typeof localRuntimeApi.executeP0Command>[4]) => Promise<boolean>;
   block: (reason: string) => void;
 }
 
 /** State 编辑及删除候选；异步有效性依赖会话所有者提供的当前序号。 */
-export function createConstructEditing({ workbench, projectId, modelId, isReadonly, selectedNode, selectedObjectSuppressedStates, stateCreateOption, queryCapabilities, execute, block, getLoadSequence, isDraftSession }: ConstructEditingDependencies) {
+export function createConstructEditing({ workbench, projectId, modelId, isReadonly, selectedNode, selectedObjectSuppressedStates, stateCreateOption, queryCapabilities, execute, block, getLoadSequence, isDraftSession, prepareStateEdit, reflowStates, refineeId }: ConstructEditingDependencies) {
   const constructActions = reactive({ open: false, selectionId: "", anchor: { x: 16, y: 16 }, options: [] as WorkbenchCapabilityOption[], submitting: false });
   const stateEditor = reactive({ name: "", roles: [] as ApiEdtStateRole[] });
+  const rolesKey = (roles: readonly ApiEdtStateRole[]) => JSON.stringify([...roles].sort());
+  // Observe the settled projection, not the temporary selection while a canvas
+  // snapshot replaces its nodes. Refresh each clean field from confirmed data.
+  watch(() => {
+    const node = selectedNode.value;
+    return node?.kind === "state" ? { id: node.id, name: node.label, roles: [...(node.stateRoles ?? [])] } : null;
+  }, (current, previous) => {
+    // Selection initialization belongs to selectConstruct. Do not overwrite an
+    // input set in the same tick as a newly selected State.
+    if (!current || !previous || current.id !== previous.id) return;
+    if (stateEditor.name.trim() === previous.name) stateEditor.name = current.name;
+    if (rolesKey(stateEditor.roles) === rolesKey(previous.roles)) stateEditor.roles = current.roles;
+  }, { immediate: true });
   let constructActionsRequestId = 0;
 
   async function armStateCreation() {
+    const selectedId = selectedNode.value?.id, sequence = getLoadSequence();
+    const ready = prepareStateEdit();
+    if (ready !== true && !await ready) return;
+    if (sequence !== getLoadSequence() || selectedNode.value?.id !== selectedId) return;
     const owner = selectedNode.value;
     if (isReadonly.value) return block("当前修订为只读版本，不能创建 State。");
     if (!owner || owner.kind !== "object") return block("请先选择一个 Object，再创建 State。");
+    if (isDraftSession()) {
+      try {
+        const result = await queryCapabilities(projectId.value, modelId.value, workbench.activeContextId, workbench.revision, owner.id, "CREATE_STATE");
+        if (sequence !== getLoadSequence() || selectedNode.value?.id !== owner.id) return;
+        stateCreateOption.value = result.data.options.find(option => option.command_type === "CREATE_STATE" && option.enabled) ?? null;
+      } catch (error) {
+        if (sequence === getLoadSequence()) block(message(error));
+        return;
+      }
+    }
     if (!stateCreateOption.value?.enabled) return block("当前 Object 不支持创建 State。");
     const option = stateCreateOption.value;
     const stateCount = workbench.nodes.filter((node) => node.kind === "state" && node.ownerId === owner.id).length;
     const name = `State ${stateCount + 1}`;
-    const layout = nextStatePosition(owner, workbench.nodes);
+    const layout = nextStatePosition(owner, workbench.nodes, refineeId?.(), isDraftSession());
     if (!layout) return block("当前对象周围没有安全的状态空间，请先移动对象或邻近元素，再创建 State。");
+    const previous = [...workbench.nodes];
     const created = await execute({ commandType: "CREATE_STATE", payload: {
       context_id: workbench.activeContextId,
       owner_ref: { target_kind: "ELEMENT", target_id: owner.id },
@@ -49,22 +80,28 @@ export function createConstructEditing({ workbench, projectId, modelId, isReadon
       capability_query_id: option.capability_query_id,
       selected_option_id: option.option_id,
     } });
-    if (created) workbench.lastAction = `已创建 ${name}。`;
+    if (created) { await reflowStates(owner.id, previous); workbench.lastAction = `已创建 ${name}。`; }
   }
 
   async function saveSelectedState() {
+    const selectedId = selectedNode.value?.id, loadSequence = getLoadSequence();
+    const name = stateEditor.name.trim(), roles = [...stateEditor.roles];
+    const ready = prepareStateEdit();
+    if (ready !== true && !await ready) return;
+    if (loadSequence !== getLoadSequence() || selectedNode.value?.id !== selectedId) return;
     const state = selectedNode.value;
     if (!state || state.kind !== "state" || !state.ownerId) return;
     if (isDraftSession()) {
       const sequence = getLoadSequence();
-      const name = stateEditor.name.trim(), roles = [...stateEditor.roles];
       try {
         const result = await queryCapabilities(projectId.value, modelId.value, workbench.activeContextId, workbench.revision, state.id, "UPDATE_STATE");
         if (sequence !== getLoadSequence() || selectedNode.value?.id !== state.id) return;
         const option = result.data.options.find(item => item.command_type === "UPDATE_STATE" && item.enabled);
         if (!option) return block("当前 State 没有更新候选。");
         const owner = workbench.nodes.find(node => node.id === state.ownerId);
-        await execute({ commandType: "UPDATE_STATE", payload: { state_id: state.id, expected_owner_ref: { target_kind: owner?.kind === "attribute" || owner?.kind === "operation" ? "FEATURE" : "ELEMENT", target_id: state.ownerId }, changes: { name_or_value: name, state_roles: roles }, capability_query_id: option.capability_query_id, selected_option_id: option.option_id } });
+        const previous = [...workbench.nodes];
+        const updated = await execute({ commandType: "UPDATE_STATE", payload: { state_id: state.id, expected_owner_ref: { target_kind: owner?.kind === "attribute" || owner?.kind === "operation" ? "FEATURE" : "ELEMENT", target_id: state.ownerId }, changes: { name_or_value: name, state_roles: roles }, capability_query_id: option.capability_query_id, selected_option_id: option.option_id } });
+        if (updated) await reflowStates(state.ownerId, previous);
       } catch (error) {
         if (sequence === getLoadSequence() && selectedNode.value?.id === state.id) block(message(error));
       }
@@ -73,7 +110,7 @@ export function createConstructEditing({ workbench, projectId, modelId, isReadon
     await execute({ commandType: "UPDATE_STATE", payload: {
       state_id: state.id,
       expected_owner_ref: { target_kind: "ELEMENT", target_id: state.ownerId },
-      changes: { name_or_value: stateEditor.name.trim(), state_roles: stateEditor.roles },
+      changes: { name_or_value: name, state_roles: roles },
       capability_query_id: stateCreateOption.value?.capability_query_id ?? "query.state.update",
       selected_option_id: stateCreateOption.value?.option_id ?? "option.state.update",
     } });

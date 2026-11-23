@@ -1,9 +1,9 @@
 import { computed, nextTick, ref, watch } from "vue";
-import type { RouteLocationNormalizedLoaded } from "vue-router";
+import type { WorkbenchLocation } from "@/workbench/internal";
 import type { useWorkbenchRuntimeStore } from "@/stores/workbenchRuntime";
 
 /** 子图编辑只管理局部交互；语义提交复用工作台 store。 */
-export function useOpdRefinement(input: { store: ReturnType<typeof useWorkbenchRuntimeStore>; route: RouteLocationNormalizedLoaded; openContext: (id: string) => void }) {
+export function useOpdRefinement(input: { store: ReturnType<typeof useWorkbenchRuntimeStore>; route: WorkbenchLocation; openContext: (id: string) => void }) {
   const { store } = input;
   const childContexts = computed(() => store.contexts.filter(context => context.parentId === store.workbench.activeContextId && context.refineeId));
   const refinedElementIds = computed(() => childContexts.value.map(context => context.refineeId!));

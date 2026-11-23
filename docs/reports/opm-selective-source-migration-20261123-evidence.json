@@ -1,0 +1,198 @@
+{
+  "formatVersion": 1,
+  "date": "2026-11-23",
+  "kind": "DEVELOPMENT_MIGRATION_VERIFICATION",
+  "note": "日志保留在本地临时证据目录；摘要不是受信任的正式发布证明。测试集合有包含关系，不应直接相加。",
+  "localLogRoot": "/private/tmp/opm-selective-migration-20261123",
+  "platform": "darwin-arm64",
+  "node": "24.22.3",
+  "java": "17.0.9",
+  "services": {
+    "runtimePort": 17881,
+    "vitePort": 5186,
+    "stoppedAfterVerification": true
+  },
+  "liveProviderInvoked": false,
+  "candidateGenerated": false,
+  "activationGenerated": false,
+  "capabilityEnabled": false,
+  "logs": [
+    {
+      "file": "web-test.log",
+      "scope": "Web Vitest",
+      "status": "PASSED",
+      "passed": 809,
+      "exitCode": 0,
+      "byteLength": 92447,
+      "sha256": "852b7844bd6bc640e66c3e2cbef7030d47aea0b23ad3b30ffd7f24b9c0c6df67"
+    },
+    {
+      "file": "maven-final-verify-green.log",
+      "scope": "Maven verify Runtime 631 + Recovery 8",
+      "status": "PASSED",
+      "passed": 639,
+      "exitCode": 0,
+      "byteLength": 6675118,
+      "sha256": "1e23e76ca74b18ff747d22b6a34ccb20d70ac89ad68df6b7dd4deda1828423be"
+    },
+    {
+      "file": "fault-jar-it.log",
+      "scope": "Fault packaged-JAR integration",
+      "status": "PASSED",
+      "passed": 6,
+      "exitCode": 0,
+      "byteLength": 2190,
+      "sha256": "06056b645b56cb250c1bd33bd401cf49196b70464f9943b51af66cb04b2b58de"
+    },
+    {
+      "file": "legacy-import-test.log",
+      "scope": "旧 SQLite 转换（已包含在 Runtime 631 中）",
+      "status": "PASSED",
+      "passed": 4,
+      "exitCode": 0,
+      "byteLength": 22924,
+      "sha256": "98ccbc40217f0d6334d292404ead7b0b75c0bc3de87d76e67bcd1038df90ff19"
+    },
+    {
+      "file": "assistant-test.log",
+      "scope": "OPM 助手，本机 SDK 模拟",
+      "status": "PASSED",
+      "passed": 142,
+      "exitCode": 0,
+      "byteLength": 13966,
+      "sha256": "8a73e7edb1f802269507d00c82c9e583104751ba162328cd5765169e8282ceed"
+    },
+    {
+      "file": "desktop-test.log",
+      "scope": "桌面 Node 单元",
+      "status": "PASSED",
+      "passed": 12,
+      "exitCode": 0,
+      "byteLength": 1423,
+      "sha256": "47b14296340a03ddb930db31faaa58b76a91ace95ff4b2163bb9ebaf716e5dba"
+    },
+    {
+      "file": "contracts-test.log",
+      "scope": "Node 机器契约",
+      "status": "PASSED",
+      "passed": 70,
+      "exitCode": 0,
+      "byteLength": 6493,
+      "sha256": "8251673cad565c76eb483439a3c78fe046f4c575bff0377595c9d180a482204a"
+    },
+    {
+      "file": "browser-unified.log",
+      "scope": "统一隔离 Playwright",
+      "status": "PASSED",
+      "passed": 8,
+      "exitCode": 0,
+      "byteLength": 1748,
+      "sha256": "942e27afd91a9a0334f7b68283ad157f76464b574181f666c36ec2449f94e006"
+    },
+    {
+      "file": "web-typecheck.log",
+      "scope": "Web Typecheck",
+      "status": "PASSED",
+      "passed": null,
+      "exitCode": 0,
+      "byteLength": 136,
+      "sha256": "1267481a0f73c65dee042ff9590fe9f8dc3f35ad77c1a83506b27d21189300f3"
+    },
+    {
+      "file": "web-lint.log",
+      "scope": "Web ESLint",
+      "status": "PASSED",
+      "passed": null,
+      "exitCode": 0,
+      "byteLength": 123,
+      "sha256": "6530bd24cc55178edae170adff50aad138c2b01f26e9e9543c4a8cb23569e4e9"
+    },
+    {
+      "file": "web-build.log",
+      "scope": "Web Production build",
+      "status": "PASSED",
+      "passed": null,
+      "exitCode": 0,
+      "byteLength": 1601,
+      "sha256": "b301f97278659f39c462f90c911d1944bd87bf878bdbfe3b58c1be4355dcdc5a"
+    },
+    {
+      "file": "workbench-build.log",
+      "scope": "嵌入式组件 build",
+      "status": "PASSED",
+      "passed": null,
+      "exitCode": 0,
+      "byteLength": 810,
+      "sha256": "1b340bad282e0a6d22339feb88d058c7fc582e163fc4f17c6043f684ec190650"
+    },
+    {
+      "file": "contract-final.log",
+      "scope": "OpenAPI、Schema 与生成 DTO 一致性",
+      "status": "PASSED",
+      "passed": null,
+      "exitCode": 0,
+      "byteLength": 327,
+      "sha256": "d3312f13e88ca3fd3f0eadb1cfbb05c1440f166c3b2be9c01b661b475d29b153"
+    },
+    {
+      "file": "desktop-prepare.log",
+      "scope": "开发桌面资源装配",
+      "status": "PASSED",
+      "passed": null,
+      "exitCode": 0,
+      "byteLength": 80,
+      "sha256": "2ae80a427ccb2f92b312b38e444ba218f32fe85779bef9003569dad4f1f5dd8e"
+    },
+    {
+      "file": "desktop-smoke.log",
+      "scope": "真实 Electron 开发 smoke",
+      "status": "PASSED",
+      "passed": null,
+      "exitCode": 0,
+      "byteLength": 441,
+      "sha256": "6f7fdecb43a3df8efc25fd48156116d498ef65e2a59c8d0f8cd17004ff735394"
+    }
+  ],
+  "electron": {
+    "status": "PASSED",
+    "packaged": false,
+    "launchTimesMs": [
+      12512,
+      5771,
+      7789
+    ],
+    "tests": [
+      "设置窗口重复关闭与重开无异常",
+      "真实画布创建对象与过程",
+      "改名及保存",
+      "无 Key 核心可用",
+      "独立 Node 助手握手",
+      "设置界面",
+      "停服备份",
+      "重开持久化与稳定 origin",
+      "真实 SQLite 恢复",
+      "退出提交未完成改名",
+      "中文及空格数据路径",
+      "退出回收子进程"
+    ],
+    "platform": "darwin",
+    "arch": "arm64"
+  },
+  "dependencyInstallAudit": {
+    "total": 98,
+    "moderate": 88,
+    "high": 9,
+    "critical": 1,
+    "autoFixApplied": false
+  },
+  "warnings": [
+    "Vite main chunk 574.82 kB exceeds 500 kB warning threshold",
+    "Existing bootstrap script is not type=module"
+  ],
+  "notVerified": [
+    "live DeepSeek remote conversation",
+    "production 194/388 and other frozen release gates",
+    "signed installers",
+    "Windows and macOS Intel and minimum OS matrix"
+  ]
+}

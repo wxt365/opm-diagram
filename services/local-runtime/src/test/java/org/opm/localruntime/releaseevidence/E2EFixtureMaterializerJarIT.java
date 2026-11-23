@@ -22,7 +22,6 @@ import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-
 class E2EFixtureMaterializerJarIT {
 
     private static final ObjectMapper JSON = new ObjectMapper();
@@ -92,7 +91,7 @@ class E2EFixtureMaterializerJarIT {
         Path baseDatabase = fixture.attemptRoot().resolve(artifact.required("storage").required("project_db_ref").required("path").asText());
         Path workingDatabase = fixture.attemptRoot().resolve(artifact.required("storage").required("working_project_db_path").asText());
         String baseShaBeforeEdit = sha256(Files.readAllBytes(baseDatabase));
-        assertEquals(baseShaBeforeEdit, sha256(Files.readAllBytes(workingDatabase)));
+        assertEquals(JSON.readTree(Files.readAllBytes(baseDatabase)).get("tables"), JSON.readTree(Files.readAllBytes(workingDatabase)).get("tables"));
 
         Set<FileProfilePackageLoader.DirectPackageFile> profileFiles = new HashSet<>();
         for (JsonNode ref : artifact.required("profile_asset_refs")) {
@@ -148,7 +147,7 @@ class E2EFixtureMaterializerJarIT {
                                 "layout", Map.of("x", 80, "y", 120))));
         String afterRevision = ((Map<?, ?>) edit.get("meta")).get("committed_revision").toString();
         assertEquals(baseShaBeforeEdit, sha256(Files.readAllBytes(baseDatabase)));
-        assertTrue(!baseShaBeforeEdit.equals(sha256(Files.readAllBytes(workingDatabase))), "正式提交必须只改变working SQLite。");
+        assertTrue(!baseShaBeforeEdit.equals(sha256(Files.readAllBytes(workingDatabase))), "正式提交必须只改变 working SQLite 快照。");
         JsonNode transaction = runTransactionSnapshot(fixture, runtimeJar, identity, beforeRevision, afterRevision);
         JsonNode before = transaction.required("before");
         JsonNode after = transaction.required("after");
@@ -204,9 +203,13 @@ class E2EFixtureMaterializerJarIT {
         assertTrue(Files.isRegularFile(base));
         assertTrue(Files.isRegularFile(working));
         assertEquals("storage/materialized-base", storage.required("materialized_base_root").asText());
-        assertEquals(sha256(Files.readAllBytes(base)), sha256(Files.readAllBytes(working)));
-        assertEquals(storage.required("project_db_ref").required("sha256").asText(), storage.required("working_clone_sha256").asText());
-        assertEquals(storage.required("project_db_ref").required("byte_length").asLong(), storage.required("working_clone_byte_length").asLong());
+        assertEquals(storage.required("project_db_ref").required("sha256").asText(), sha256(Files.readAllBytes(base)));
+        assertEquals(storage.required("working_clone_sha256").asText(), sha256(Files.readAllBytes(working)));
+        assertEquals(Files.size(working), storage.required("working_clone_byte_length").asLong());
+        JsonNode baseSnapshot = JSON.readTree(Files.readAllBytes(base));
+        JsonNode workingSnapshot = JSON.readTree(Files.readAllBytes(working));
+        assertEquals(baseSnapshot.required("tables"), workingSnapshot.required("tables"));
+        assertTrue(!baseSnapshot.required("schema").equals(workingSnapshot.required("schema")));
         assertTrue(!Files.isSameFile(base, working));
     }
 

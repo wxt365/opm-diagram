@@ -1,5 +1,6 @@
 import type { DraftEditRequest, DraftToken } from "./generated/draftWorkspaceContract";
 import type { PinRequest, SaveRequest } from "./generated/draftSaveContract";
+import { sha256Hex } from "@/shared/platform/browserCrypto";
 
 export type DraftMutation = { operation: "EDIT"; request: DraftEditRequest }
   | { operation: "SAVE"; request: SaveRequest } | { operation: "PIN"; request: PinRequest };
@@ -16,8 +17,7 @@ export function draftRequestCanonical(project: string, model: string, mutation: 
 }
 
 export async function draftSha256(raw: string): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(raw));
-  return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, "0")).join("");
+  return sha256Hex(raw);
 }
 
 export function mutationId(mutation: DraftMutation): string {

@@ -26,7 +26,7 @@ final class LocalApiResponses {
     }
 
     static void validateBinding(Map<String, Object> binding) { if (!PROFILE_ID.equals(required(binding, "profile_id")) || !PROFILE_VERSION.equals(required(binding, "profile_version")) || !RULE_ID.equals(required(binding, "rule_set_id")) || !RULE_VERSION.equals(required(binding, "rule_version"))) throw new ApiException(ApiErrorCode.RULE_VERSION_CONFLICT, 409, false, "Profile 或 Rule 版本不匹配"); }
-    static ApiException persistence(Exception exception) { return new ApiException(ApiErrorCode.PERSISTENCE_FAILED, 500, true, "本地持久化失败"); }
+    static ApiException persistence(Exception exception) { var error=new ApiException(ApiErrorCode.PERSISTENCE_FAILED, 500, true, "本地持久化失败");error.initCause(exception);return error; }
     static String requestDigest(Map<String, Object> request) { try { return digest(objectMapper.writeValueAsString(request)); } catch (Exception exception) { throw new ApiException(ApiErrorCode.INVALID_ARGUMENT, 400, false, "请求无法序列化"); } }
 
     static Map<String, Object> model(ResultSet result) throws SQLException { return Map.of("model_id", result.getString(1), "project_id", result.getString(2), "name", result.getString(3), "head_revision", result.getString(4), "profile_id", result.getString(5), "profile_version", result.getString(6), "rule_version", result.getString(7), "access_mode", "EDITABLE_DRAFT"); }

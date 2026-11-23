@@ -3,7 +3,7 @@ package org.opm.localruntime.api.generated;
 // 由 scripts/generate-draft-workspace-contract.mjs 生成，请勿手改。
 public final class DraftWorkspaceContract {
     private DraftWorkspaceContract() { }
-    public enum Type { MindmapRequest, MindmapResult, DraftModelPlanPreviewRequest, DraftModelPlanPreviewResult, OpenDraftRequest, OpenDraftResult, DraftQueryRequest, DraftProjectionResult, DraftTextResult, DraftNavigationResult, DraftFindingsResult, DraftRelationCatalogRequest, DraftRelationCatalogResult, DraftCapabilitiesRequest, DraftCapabilitiesResult, DraftEditRequest, DraftEditResult, DraftReceiptRequest, DraftReceiptResult, OperationHistoryRequest, OperationHistoryResult, MethodSummaryRequest, MethodSummaryResult, DraftError }
+    public enum Type { GraphAnalysisRequest, GraphAnalysisResult, MindmapRequest, MindmapResult, DraftModelPlanPreviewRequest, DraftModelPlanPreviewResult, OpenDraftRequest, OpenDraftResult, DraftQueryRequest, DraftProjectionResult, DraftTextResult, DraftNavigationResult, DraftFindingsResult, DraftRelationCatalogRequest, DraftRelationCatalogResult, DraftCapabilitiesRequest, DraftCapabilitiesResult, DraftEditRequest, DraftEditResult, DraftReceiptRequest, DraftReceiptResult, OperationHistoryRequest, OperationHistoryResult, RecoveryStateRequest, RecoveryStateResult, MethodSummaryRequest, MethodSummaryResult, GraphAnalysisRevisionRequest, DraftError }
 
     /** 只允许从严格解码入口构造，输出副本不能修改已验证的请求。 */
     public static final class Document {

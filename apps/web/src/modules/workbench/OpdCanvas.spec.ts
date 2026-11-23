@@ -27,26 +27,39 @@ const graphInstances = vi.hoisted(() => [] as GraphMock[]);
 
 vi.mock("@antv/x6", () => ({
   Graph: class {
+    static registerConnector = vi.fn();
     addEdge = vi.fn();
     addNode = vi.fn();
     clearCells = vi.fn();
     dispose = vi.fn();
     disablePanning = vi.fn();
     enablePanning = vi.fn();
-    findViewByCell = vi.fn(() => ({ container: { getBoundingClientRect: () => ({ top: 80, right: 240 }) } }));
-    getCellById = vi.fn(() => ({
+    findViewByCell = vi.fn(() => ({ unmount: vi.fn(), container: { getBoundingClientRect: () => ({ top: 80, right: 240 }) } }));
+    getCellById = vi.fn((id?: string) => {
+      if (id?.startsWith("feature.owner") && ![...this.addNode.mock.calls, ...this.addEdge.mock.calls].some(([value]) => value.id === id)) return undefined;
+      return {
       isNode: () => true,
       isEdge: () => true,
+      id,
+      getVertices: () => [],
+      getRouter: () => undefined,
+      addTools: vi.fn(),
+      removeTools: vi.fn(),
       position: vi.fn(),
       rotate: vi.fn(),
       attr: vi.fn(),
       setData: vi.fn(),
+      setSource: vi.fn(),
+      setTarget: vi.fn(),
       setVertices: vi.fn(),
       setRouter: vi.fn(),
       removeRouter: vi.fn(),
+      setConnector: vi.fn(),
+      removeConnector: vi.fn(),
       setLabels: vi.fn(),
       remove: vi.fn(),
-    }));
+      };
+    });
     getCells = vi.fn(() => []);
     getNodesFromPoint = vi.fn(() => []);
     localToClient = vi.fn(({ x, y, width, height }) => ({ x: x + 100, y: y + 40, width: width * 2, height: height * 2 }));
@@ -66,6 +79,70 @@ vi.mock("@antv/x6", () => ({
 import OpdCanvas from "./OpdCanvas.vue";
 
 describe("OpdCanvas", () => {
+  it("重挂载与异步加载均尊重显式空折叠列表", async () => {
+    const feature = { ...createNode('feature', 'attribute', 360, 220), ownerId: 'element.object' };
+    for (const deferred of [false, true]) {
+      graphInstances.length = 0;
+      const wrapper = mount(OpdCanvas, { props: { nodes: deferred ? [] : [...nodes(), feature], relations: [], selectedId: '', zoom: 100, collapsedFeatures: [] } });
+      if (deferred) await wrapper.setProps({ nodes: [...nodes(), feature] });
+      expect(graphInstances[0].addNode.mock.calls.some(([value]) => value.id === feature.id)).toBe(true);
+      expect(wrapper.emitted('featureCollapseChange')).toBeUndefined();
+      wrapper.unmount();
+    }
+  });
+  it("宿主提供新特征默认折叠列表，显式展开后的普通回读不覆盖选择", async () => {
+    graphInstances.length = 0;
+    const wrapper = mount(OpdCanvas, { props: { nodes: nodes(), relations: [], selectedId: '', zoom: 100, collapsedFeatures: [] } });
+    const graph = graphInstances[0], feature = { ...createNode('feature.new', 'attribute', 360, 220), ownerId: 'element.object' };
+    const offset = graph.addNode.mock.calls.length;
+    await wrapper.setProps({ collapsedFeatures: ['element.object'] });
+    await wrapper.setProps({ nodes: [...nodes(), feature] });
+    expect(graph.addNode.mock.calls.slice(offset).some(([value]) => value.id === feature.id)).toBe(false);
+    expect(wrapper.emitted('featureCollapseChange')).toBeUndefined();
+    await wrapper.setProps({ collapsedFeatures: ['element.object'] });
+    await wrapper.setProps({ collapsedFeatures: [] });
+    expect(graph.addNode.mock.calls.some(([value]) => value.id === feature.id)).toBe(true);
+    const eventCount = wrapper.emitted('featureCollapseChange')?.length;
+    await wrapper.setProps({ nodes: [...nodes(), { ...feature }] });
+    expect(wrapper.emitted('featureCollapseChange')?.length).toBe(eventCount);
+    wrapper.unmount();
+  });
+  it("异步读取图元素时保留传入的折叠选择，不当成新增属性展开", async () => {
+    graphInstances.length = 0;
+    const wrapper = mount(OpdCanvas, { props: { nodes: [], relations: [], selectedId: "", zoom: 100, collapsedFeatures: ["element.object"] } });
+    const graph = graphInstances[0], feature = { ...createNode("feature", "attribute", 360, 220), ownerId: "element.object" };
+    await wrapper.setProps({ nodes: [...nodes(), feature] });
+    expect(graph.addNode.mock.calls.some(([value]) => value.id === feature.id)).toBe(false);
+    expect(wrapper.emitted("featureCollapseChange")).toBeUndefined(); wrapper.unmount();
+  });
+  it("重新创建画布仅折叠显式指定的 owner，保留其他 owner 展开", () => {
+    const features = [
+      { ...createNode('feature.a', 'attribute', 360, 220), ownerId: 'element.object' },
+      { ...createNode('feature.b', 'operation', 600, 220), ownerId: 'element.process' },
+    ];
+    for (let mountIndex = 0; mountIndex < 2; mountIndex++) {
+      graphInstances.length = 0;
+      const wrapper = mount(OpdCanvas, { props: { nodes: [...nodes(), ...features], relations: [], selectedId: '', zoom: 100, collapsedFeatures: ['element.object'] } });
+      const ids = graphInstances[0].addNode.mock.calls.map(([value]) => value.id);
+      expect(ids).not.toContain('feature.a');
+      expect(ids).toContain('feature.b');
+      wrapper.unmount();
+    }
+  });
+  it("首次显示属性和操作，按上下文恢复折叠选择，展开不依赖拖动", async () => {
+    graphInstances.length = 0;
+    const feature = { ...createNode("feature", "attribute", 360, 220), ownerId: "element.object" };
+    const wrapper = mount(OpdCanvas, { props: { nodes: [...nodes(), feature], relations: [], selectedId: "", zoom: 100 } });
+    const graph = graphInstances[0];
+    expect(node(graph, feature.id)).toBeDefined();
+    graphEvent(graph, "node:toggle-features")({ node: { id: "element.object" } });
+    expect(wrapper.emitted("featureCollapseChange")?.at(-1)).toEqual([["element.object"]]);
+    await wrapper.setProps({ collapsedFeatures: ["element.object"] });
+    const offset = graph.addNode.mock.calls.length;
+    await wrapper.setProps({ collapsedFeatures: [] });
+    expect(graph.addNode.mock.calls.slice(offset).some(([value]) => value.id === feature.id)).toBe(true);
+    expect(graph.clearCells).not.toHaveBeenCalled(); wrapper.unmount();
+  });
   it("定位临时展开的属性可以按可见减号收起，取消定位后保持收起", async () => {
     graphInstances.length = 0;
     const feature = { ...createNode("feature.weight", "attribute", 420, 120), ownerId: "element.object" };
@@ -94,9 +171,8 @@ describe("OpdCanvas", () => {
       setData: vi.fn(), setVertices: vi.fn(), removeRouter: vi.fn(), setLabels: vi.fn(), remove: vi.fn() }));
     graph.clearCells.mockClear();
     await wrapper.setProps({ highlightedTextNodeIds: [], highlightedTextRelationIds: [], selectedId: "" });
-    expect(attr).toHaveBeenCalledWith("body/fill", "#ffffff");
-    expect(attr).toHaveBeenCalledWith("body/stroke", "#20242a");
-    expect(attr).toHaveBeenCalledWith("body/data-opm-text-highlighted", "false");
+    expect(attr).toHaveBeenCalledWith(expect.objectContaining({ body: expect.objectContaining({ fill: "#ffffff", stroke: "#f28c28", "data-opm-text-highlighted": "false" }) }), { async: false });
+    expect(attr).toHaveBeenCalledWith(expect.objectContaining({ body: expect.objectContaining({ stroke: "#14b8a6" }) }), { async: false });
     expect(graph.clearCells).not.toHaveBeenCalled();
     wrapper.unmount();
   });
@@ -106,14 +182,14 @@ describe("OpdCanvas", () => {
     const graph = graphInstances[0];
     const selectedEdges = graph.addEdge.mock.calls.map(([value]) => value).filter(value => value.data?.relationId === selectedId);
     expect(selectedEdges.length).toBe(selectedId === "fact.effect" ? 2 : selectedId === "fact.fan" ? 3 : 1);
-    selectedEdges.forEach(edge => expect(edge.attrs.line).toMatchObject({ stroke: "#0b6bcb", strokeWidth: 3, "data-opm-selected": "true" }));
+    selectedEdges.forEach(edge => expect(edge.attrs.line).toMatchObject({ stroke: "#0b6bcb", strokeWidth: 2.15, "data-opm-selected": "true" }));
     if (selectedId === "fact.fan") expect(node(graph, "fact.fan.junction").attrs.body).toMatchObject({ fill: "#0b6bcb", stroke: "#0b6bcb" });
     const attr = vi.fn();
     graph.getCellById.mockImplementation(() => ({ isNode: () => true, isEdge: () => true, position: vi.fn(), rotate: vi.fn(), attr,
       setData: vi.fn(), setVertices: vi.fn(), removeRouter: vi.fn(), setLabels: vi.fn(), remove: vi.fn() }));
     graph.clearCells.mockClear(); graph.addEdge.mockClear();
     await wrapper.setProps({ selectedId: "element.object" });
-    expect(attr.mock.calls.filter(([value]) => value?.line?.stroke === "#20242a")).toHaveLength(selectedEdges.length);
+    expect(attr.mock.calls.filter(([value]) => value?.line?.stroke === "#8793a1")).toHaveLength(selectedEdges.length);
     expect(graph.clearCells).not.toHaveBeenCalled(); expect(graph.addEdge).not.toHaveBeenCalled();
     wrapper.unmount();
   });
@@ -152,11 +228,10 @@ describe("OpdCanvas", () => {
     graph.getCellById.mockImplementation(id => id === "element.object" ? objectCell : undefined);
     graph.clearCells.mockClear();
     await wrapper.setProps({ refinedElementIds: [], selectedId: "element.object" });
-    expect(objectCell.attr).toHaveBeenCalledWith("body", expect.objectContaining({ strokeWidth: 2, "data-opm-has-child-opd": "false", title: "" }));
-    expect(objectCell.attr).toHaveBeenCalledWith("body/fill", "#eaf3fc");
+    expect(objectCell.attr).toHaveBeenCalledWith(expect.objectContaining({ body: expect.objectContaining({ strokeWidth: 2, "data-opm-has-child-opd": "false", title: "", fill: "#eaf3fc" }) }), { async: false });
     expect(graph.clearCells).not.toHaveBeenCalled();
     await wrapper.setProps({ refinedElementIds: ["element.object"], readonly: true, selectedId: "" });
-    expect(objectCell.attr).toHaveBeenLastCalledWith("body", expect.objectContaining({ strokeWidth: 4, "data-opm-has-child-opd": "true" }));
+    expect(objectCell.attr).toHaveBeenLastCalledWith(expect.objectContaining({ body: expect.objectContaining({ strokeWidth: 4, "data-opm-has-child-opd": "true" }) }), { async: false });
     wrapper.unmount();
   });
   it("只读版本禁止节点移动但仍允许选择和平移", async () => {
@@ -209,7 +284,7 @@ describe("OpdCanvas", () => {
 
     const graph = graphInstances[0];
     expect(graph).toBeDefined();
-    expect(graph.options).toMatchObject({ autoResize: true });
+    expect(graph.options).toMatchObject({ autoResize: false });
     const initialAnchors = captureAnchors(graph);
     expect(initialAnchors).toEqual([
       "occurrence.element.object", "occurrence.element.part-a", "occurrence.element.part-b", "occurrence.element.process", "occurrence.fact.effect", "occurrence.fact.fan", "occurrence.fact.simple", "occurrence.state.final",
@@ -369,25 +444,14 @@ describe("OpdCanvas", () => {
     expect(graph.clearCells).toHaveBeenCalledTimes(clearCalls);
     const objectCell = graph.getCellById.mock.results
       .map((result) => result.value)
-      .find((cell) => cell.position.mock.calls.some(([x, y]: [number, number]) => x === 240 && y === 180));
+      .find((cell) => cell?.position.mock.calls.some(([x, y]: [number, number]) => x === 240 && y === 180));
     expect(objectCell.position).toHaveBeenCalledWith(240, 180);
-    expect(objectCell.attr).toHaveBeenCalledWith("body/fill", "#eaf3fc");
+    expect(objectCell.attr).toHaveBeenCalledWith(expect.objectContaining({ body: expect.objectContaining({ fill: "#eaf3fc" }) }), { async: false });
     wrapper.unmount();
   });
 
-  it("Attribute 与 Operation 默认连接 owner，Element 控件可展开且新增 Feature 后自动收起", async () => {
+  it("恢复折叠选择后 Attribute 与 Operation 可展开，新增 Feature 收起且不影响其他 owner", async () => {
     graphInstances.length = 0;
-    const wrapper = mount(OpdCanvas, { props: { nodes: nodes(), relations: [], selectedId: "", zoom: 100 } });
-    await nextTick();
-
-    const graph = graphInstances[0];
-    const click = graphEvent(graph, "node:click");
-    const toggle = graphEvent(graph, "node:toggle-features");
-    const clearCallsBeforeSelection = graph.clearCells.mock.calls.length;
-    click({ node: { id: "element.object" } });
-    expect(wrapper.emitted("select")).toEqual([["element.object"]]);
-    expect(graph.clearCells).toHaveBeenCalledTimes(clearCallsBeforeSelection);
-
     const attributes = [
       { ...createNode("feature.attribute-1", "attribute", 280, 94), ownerId: "element.object" },
       { ...createNode("feature.attribute-2", "attribute", 280, 190), ownerId: "element.object" },
@@ -400,14 +464,23 @@ describe("OpdCanvas", () => {
     const operationState = { ...createNode("state.operation.ready", "state", 650, 130), ownerId: "feature.operation-1" };
     const otherAttribute = { ...createNode("feature.other-attribute", "attribute", 780, 40), ownerId: "element.part-a" };
     const orphanAttribute = { ...createNode("feature.orphan-attribute", "attribute", 780, 120), ownerId: "element.missing" };
-    const nodeOffset = graph.addNode.mock.calls.length;
-    const edgeOffset = graph.addEdge.mock.calls.length;
-    await wrapper.setProps({ nodes: [...nodes(), ...attributes, ...operations, operationState, otherAttribute, orphanAttribute] });
+    const wrapper = mount(OpdCanvas, { props: {
+      nodes: [...nodes(), ...attributes, ...operations, operationState, otherAttribute, orphanAttribute],
+      collapsedFeatures: ["element.object", "element.process", "element.part-a"],
+      relations: [], selectedId: "", zoom: 100,
+    } });
     await nextTick();
+    const graph = graphInstances[0];
+    const click = graphEvent(graph, "node:click");
+    const toggle = graphEvent(graph, "node:toggle-features");
+    const clearCallsBeforeSelection = graph.clearCells.mock.calls.length;
+    click({ node: { id: "element.object" } });
+    expect(wrapper.emitted("select")).toEqual([["element.object"]]);
+    expect(graph.clearCells).toHaveBeenCalledTimes(clearCallsBeforeSelection);
 
-    const addedNodeSpecs = graph.addNode.mock.calls.slice(nodeOffset).map(([value]) => value);
+    const addedNodeSpecs = graph.addNode.mock.calls.map(([value]) => value);
     const addedNodes = addedNodeSpecs.map((value) => value.id);
-    const addedEdges = graph.addEdge.mock.calls.slice(edgeOffset).map(([value]) => value);
+    const addedEdges = graph.addEdge.mock.calls.map(([value]) => value);
     expect(addedNodes).not.toContain("feature.attribute-1");
     expect(addedNodes).not.toContain("feature.operation-1");
     expect(addedNodes).not.toContain("state.operation.ready");
@@ -430,25 +503,25 @@ describe("OpdCanvas", () => {
     const attributeRelationId = "feature.owner-group.element.object.characterization";
     expect(expandedEdges).toContainEqual(expect.objectContaining({
       id: attributeRelationId,
-      source: "element.object",
-      target: `${attributeRelationId}.junction`,
+      source: expect.objectContaining({ cell: "element.object" }),
+      target: expect.objectContaining({ cell: `${attributeRelationId}.junction` }),
       attrs: {
-        wrap: { pointerEvents: "none" },
-        line: expect.objectContaining({ pointerEvents: "none", sourceMarker: null, targetMarker: null, strokeDasharray: undefined }),
+        wrap: { pointerEvents: "stroke" },
+        line: expect.objectContaining({ pointerEvents: "stroke", sourceMarker: null, targetMarker: null, strokeDasharray: undefined }),
       },
     }));
     expectDecorativeCell(expandedEdges.find((value) => value.id === attributeRelationId), "line");
     attributes.forEach((attribute) => expect(expandedEdges).toContainEqual(expect.objectContaining({
       id: `${attributeRelationId}.member.${attribute.id}`,
-      source: `${attributeRelationId}.junction`,
-      target: attribute.id,
-      vertices: [{ x: 253, y: attribute.y + 22 }],
+      source: expect.objectContaining({ cell: `${attributeRelationId}.junction` }),
+      target: expect.objectContaining({ cell: attribute.id }),
+      connector: expect.objectContaining({ name: "normal" }),
     })));
     expect(expandedEdges.filter((value) => value.id.startsWith(`${attributeRelationId}.member.`))).toHaveLength(3);
     const attributeMarker = node(graph, `${attributeRelationId}.junction`);
     const attributeInnerMarker = node(graph, `${attributeRelationId}.junction.inner`);
-    expect(attributeMarker).toMatchObject({ shape: "polygon", x: 241, y: 104, angle: 270, attrs: { body: { fill: "#ffffff", pointerEvents: "none" } } });
-    expect(attributeInnerMarker).toMatchObject({ shape: "polygon", angle: attributeMarker.angle, attrs: { body: { fill: "#20242a", pointerEvents: "none" } } });
+    expect(attributeMarker).toMatchObject({ shape: "polygon", x: 260, y: 108, width: 16, height: 16, angle: 270, attrs: { body: { fill: "#ffffff", pointerEvents: "none" } } });
+    expect(attributeInnerMarker).toMatchObject({ shape: "polygon", angle: attributeMarker.angle, attrs: { body: { fill: "#8793a1", pointerEvents: "none" } } });
     expectDecorativeCell(attributeMarker, "body");
     expectDecorativeCell(attributeInnerMarker, "body");
     expect(graph.addNode.mock.calls.slice(expandedNodeOffset).map(([value]) => value.id).filter((id) => id === `${attributeRelationId}.junction`)).toHaveLength(1);
@@ -463,18 +536,18 @@ describe("OpdCanvas", () => {
     const operationRelationId = "feature.owner-group.element.process.composition";
     expect(processExpandedEdges).toContainEqual(expect.objectContaining({
       id: operationRelationId,
-      source: "element.process",
-      target: `${operationRelationId}.junction`,
+      source: expect.objectContaining({ cell: "element.process" }),
+      target: expect.objectContaining({ cell: `${operationRelationId}.junction` }),
     }));
     operations.forEach((operation) => expect(processExpandedEdges).toContainEqual(expect.objectContaining({
       id: `${operationRelationId}.member.${operation.id}`,
-      source: `${operationRelationId}.junction`,
-      target: operation.id,
-      vertices: [{ x: 595, y: operation.y + 22 }],
+      source: expect.objectContaining({ cell: `${operationRelationId}.junction` }),
+      target: expect.objectContaining({ cell: operation.id }),
+      connector: expect.objectContaining({ name: "normal" }),
     })));
     expect(processExpandedEdges.filter((value) => value.id.startsWith(`${operationRelationId}.member.`))).toHaveLength(2);
     const operationMarker = node(graph, `${operationRelationId}.junction`);
-    expect(operationMarker).toMatchObject({ shape: "polygon", x: 583, y: 110, angle: 270, attrs: { body: { fill: "#20242a", pointerEvents: "none" } } });
+    expect(operationMarker).toMatchObject({ shape: "polygon", x: 608, y: 114, width: 16, height: 16, angle: 270, attrs: { body: { fill: "#8793a1", pointerEvents: "none" } } });
     expect(graph.addNode.mock.calls.map(([value]) => value.id)).not.toContain(`${operationRelationId}.junction.inner`);
     expectDecorativeCell(operationMarker, "body");
     expect(processExpandedNodes.filter((id) => id === `${operationRelationId}.junction`)).toHaveLength(1);
@@ -485,10 +558,13 @@ describe("OpdCanvas", () => {
     const newlyCreatedOperation = { ...createNode("feature.operation-3", "operation", 620, 292), ownerId: "element.process" };
     await wrapper.setProps({ nodes: [...nodes(), ...attributes, newlyCreatedAttribute, ...operations, newlyCreatedOperation, operationState, otherAttribute, orphanAttribute] });
     await nextTick();
-    expect(graph.addNode.mock.calls.slice(createdNodeOffset).map(([value]) => value.id)).not.toContain("feature.attribute-1");
-    expect(graph.addNode.mock.calls.slice(createdNodeOffset).map(([value]) => value.id)).not.toContain("feature.operation-1");
-    expect(graph.addEdge.mock.calls.slice(createdEdgeOffset).map(([value]) => value.id)).not.toContain(attributeRelationId);
-    expect(graph.addEdge.mock.calls.slice(createdEdgeOffset).map(([value]) => value.id)).not.toContain(operationRelationId);
+    const createdNodes = graph.addNode.mock.calls.slice(createdNodeOffset).map(([value]) => value.id);
+    expect(createdNodes).not.toContain(newlyCreatedAttribute.id);
+    expect(createdNodes).not.toContain(newlyCreatedOperation.id);
+    expect(createdNodes).not.toContain(otherAttribute.id);
+    const createdEdges = graph.addEdge.mock.calls.slice(createdEdgeOffset).map(([value]) => value);
+    expect(createdEdges.filter((value) => value.id.startsWith(`${attributeRelationId}.member.`))).toHaveLength(0);
+    expect(createdEdges.filter((value) => value.id.startsWith(`${operationRelationId}.member.`))).toHaveLength(0);
 
     const reexpandedNodeOffset = graph.addNode.mock.calls.length;
     const reexpandedEdgeOffset = graph.addEdge.mock.calls.length;
@@ -707,6 +783,19 @@ describe("OpdCanvas", () => {
     input.remove();
     wrapper.unmount();
   });
+  it("嵌入实例的删除快捷键只作用于事件所属工作台", async () => {
+    const firstHost = document.createElement("div"), secondHost = document.createElement("div");
+    firstHost.className = secondHost.className = "opm-workbench";
+    document.body.append(firstHost, secondHost);
+    const props = { nodes: nodes(), relations: relations(), selectedId: "element.object", zoom: 100, keyboardScope: true };
+    const first = mount(OpdCanvas, { attachTo: firstHost, props });
+    const second = mount(OpdCanvas, { attachTo: secondHost, props });
+    await first.get('[data-testid="p03-canvas"]').trigger("keydown", { key: "Delete" });
+    expect(first.emitted("constructActionsMenuRequested")).toHaveLength(1);
+    expect(second.emitted("constructActionsMenuRequested")).toBeUndefined();
+    first.unmount(); second.unmount(); firstHost.remove(); secondHost.remove();
+  });
+
   it("非活动画布与已处理的快捷键不会请求删除正式元素", async () => {
     const wrapper = mount(OpdCanvas, { props: { nodes: nodes(), relations: relations(), selectedId: 'element.object', zoom: 100, keyboardDisabled: true } });
     await nextTick(); window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete', cancelable: true }));

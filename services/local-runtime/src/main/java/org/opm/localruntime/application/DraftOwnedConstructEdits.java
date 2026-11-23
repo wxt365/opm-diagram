@@ -45,7 +45,7 @@ final class DraftOwnedConstructEdits {
         JsonNode occurrenceIds = find(serialized.get("contexts"), "context_id", contextId).get("occurrence_ids");
         if (!context.get("occurrence_ids").equals(occurrenceIds)) context.set("occurrence_ids", occurrenceIds);
         if (!type.equals("CREATE_FEATURE")) {
-            String stateId = type.equals("CREATE_STATE") ? after.states().getLast().id() : payload.get("state_id").asText();
+            String stateId = type.equals("CREATE_STATE") ? after.states().get(after.states().size() - 1).id() : payload.get("state_id").asText();
             JsonNode next = presentation(serialized.path("state_presentations"), contextId, stateId);
             ObjectNode current = presentation(document.path("state_presentations"), contextId, stateId);
             if (current != null) {
@@ -67,9 +67,31 @@ final class DraftOwnedConstructEdits {
             if (Double.compare(previous.y(), next.y()) != 0) raw.put("y", next.y());
             if (Double.compare(previous.width(), next.width()) != 0) raw.put("width", next.width());
             if (Double.compare(previous.height(), next.height()) != 0) raw.put("height", next.height());
+            if (!previous.edgeRoutes().equals(next.edgeRoutes())) {
+                if (next.edgeRoutes().isEmpty()) raw.remove("edge_routes");
+                else raw.set("edge_routes", new com.fasterxml.jackson.databind.ObjectMapper().valueToTree(next.edgeRoutes()));
+            }
             if (!previous.equals(next)) after.occurrences().stream().filter(item -> item.layoutId().equals(next.id())).forEach(item -> {
                 if (!affected.contains(item.id())) affected.add(item.id());
             });
+        }
+    }
+
+    static void syncLayoutAppearance(ObjectNode document, SemanticRevision base, JsonNode payload, List<String> affected) {
+        for (var entry : payload.path("layouts")) {
+            var appearance = entry.path("layout").get("appearance");
+            if (appearance == null) continue;
+            String id = entry.path("occurrence_id").asText();
+            var occurrence = base.occurrences().stream().filter(item -> item.id().equals(id)).findFirst().orElseThrow();
+            if (occurrence.targetKind() == SemanticRevision.TargetKind.FACT)
+                throw new org.opm.localruntime.api.ApiException(org.opm.localruntime.api.ApiErrorCode.INVALID_ARGUMENT, 400, false, "关系线不支持节点颜色配置");
+            var layout = find(document.get("layouts"), "layout_id", occurrence.layoutId());
+            var previous = layout.get("appearance");
+            if (appearance.isEmpty() ? previous == null : appearance.equals(previous)) continue;
+            if (appearance.isEmpty()) layout.remove("appearance"); else layout.set("appearance", appearance.deepCopy());
+            document.put("schema_version", "0.7");
+            if (!document.has("refinement_edges")) document.putArray("refinement_edges");
+            if (!affected.contains(id)) affected.add(id);
         }
     }
 

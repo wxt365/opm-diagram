@@ -37,7 +37,6 @@
   font-weight: 700;
 }
 
-.brand-mark,
 .resource-symbol,
 .model-card__marker {
   display: inline-grid;
@@ -48,10 +47,10 @@
 }
 
 .brand-mark {
-  width: 31px;
-  height: 27px;
-  font-size: 10px;
-  letter-spacing: 0;
+  display: block;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
 }
 
 .header-context {

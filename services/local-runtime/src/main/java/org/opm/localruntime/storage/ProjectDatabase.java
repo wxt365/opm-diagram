@@ -1,23 +1,8 @@
 package org.opm.localruntime.storage;
-
-import java.nio.file.Path;
 import java.util.Objects;
-
-public final class ProjectDatabase {
-
-    private final Path databasePath;
-    private final SchemaMetadataRepository schemaMetadataRepository;
-
-    ProjectDatabase(Path databasePath, SchemaMetadataRepository schemaMetadataRepository) {
-        this.databasePath = Objects.requireNonNull(databasePath, "databasePath must not be null");
-        this.schemaMetadataRepository = Objects.requireNonNull(schemaMetadataRepository, "schemaMetadataRepository must not be null");
-    }
-
-    public Path databasePath() {
-        return databasePath;
-    }
-
-    public StorageSchemaVersion storageSchemaVersion() {
-        return schemaMetadataRepository.storageSchemaVersion();
-    }
+public record ProjectDatabase(ProjectScope scope) {
+    public ProjectDatabase { Objects.requireNonNull(scope); }
+    public ProjectScope databaseScope() { return scope; }
+    public java.nio.file.Path snapshot() {try{return scope.store().snapshot(java.nio.file.Path.of("target/storage-snapshots",scope.store().schema()),scope);}catch(Exception e){throw new StorageAccessException("Cannot export project snapshot",e);}}
+    public StorageSchemaVersion storageSchemaVersion() { return new StorageSchemaVersion("2.0"); }
 }

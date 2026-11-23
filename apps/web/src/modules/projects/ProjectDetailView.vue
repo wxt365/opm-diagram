@@ -11,7 +11,7 @@
       <button class="button" type="button" @click="loadProject">重试</button>
     </div>
     <template v-else-if="project">
-      <OpdJsonImportDialog v-if="isOpdImportOpen" :project-id="project.id" @close="isOpdImportOpen = false" @imported="openImportedOpd" />
+      <OpdJsonImportDialog v-if="isOpdImportOpen" :key="project.id" :project-id="project.id" @close="isOpdImportOpen = false" @imported="openImportedOpd" />
       <div class="page-heading">
         <div>
           <p class="page-kicker">P02 · 项目详情</p>
@@ -21,6 +21,7 @@
         <div class="project-import-actions">
           <button class="button button--secondary" type="button" data-testid="p02-import-opd-json" @click="isOpdImportOpen = true">导入 OPD JSON</button>
           <button
+            v-if="store.modelArchiveState === 'ACTIVE'"
             class="button button--primary"
             type="button"
             data-testid="p02-create-model"
@@ -46,6 +47,7 @@
         </div>
       </div>
 
+      <p v-if="store.projectError" class="command-feedback" role="alert" data-testid="p02-project-summary-error">{{ store.projectError }} <button class="button" type="button" :disabled="store.modelListResource === 'loading'" @click="switchModels(store.modelArchiveState)">重试读取</button></p>
       <div class="section-heading">
         <div>
           <h2>{{ store.modelArchiveState === 'ACTIVE' ? '模型' : '模型回收站' }}</h2>
@@ -56,6 +58,7 @@
           <button class="button" type="button" data-testid="p02-trash-tab" :aria-pressed="store.modelArchiveState === 'ARCHIVED'" :disabled="store.lifecycleBusy" @click="switchModels('ARCHIVED')">回收站</button>
         </div>
       </div>
+      <p v-if="store.workspaceError" class="command-feedback" role="alert" data-testid="p02-workspace-error">{{ store.workspaceError }} <button class="button" type="button" :disabled="store.openWorkspaceState === 'opening' || !lastOpenModel" @click="openModel(lastOpenModel)">重试打开</button></p>
       <div v-if="store.modelListResource === 'loading'" class="empty-state" role="status">正在读取模型…</div>
       <div v-else-if="store.modelListResource === 'empty'" class="empty-state">{{ store.modelArchiveState === 'ACTIVE' ? '当前项目还没有模型。' : '回收站为空。' }}</div>
       <div v-else-if="store.modelListResource === 'error'" class="empty-state" role="alert">{{ store.modelError }}</div>
@@ -155,6 +158,11 @@
             autofocus
           >
         </label>
+        <label class="form-field">
+          <span>建模目标与范围（可选）</span>
+          <textarea v-model="modelGoal" data-testid="ov02-model-goal" rows="4" maxlength="4000" aria-describedby="ov02-model-goal-help" />
+          <small id="ov02-model-goal-help">帮助智能助手理解模型方向，可以留空。</small>
+        </label>
         <div class="form-readonly"><span>Profile</span><strong>{{ project?.profile }}</strong></div>
         <div class="dialog-summary-grid">
           <div><span>根 Context</span><strong>SD</strong></div>
@@ -216,7 +224,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { Trash2 } from "@lucide/vue";
 
@@ -224,13 +232,18 @@ import OpdJsonImportDialog from "./OpdJsonImportDialog.vue";
 import { useDialogFocus } from "@/shared/composables/useDialogFocus";
 import { useProjectModelStore, type ModelListItem } from "@/stores/projectModel";
 import type { ModelArchiveState, ModelLifecycleAction } from "@/shared/api/localRuntimeApi";
+import { randomUuid } from "@/shared/platform/browserCrypto";
 
 const route = useRoute();
 const router = useRouter();
 const store = useProjectModelStore();
 const modelName = ref("原料加工模型");
+const modelGoal = ref("");
 const isDialogOpen = ref(false);
 const isOpdImportOpen = ref(false);
+const lastOpenModel = ref('');
+let viewVersion = 0, openingSequence = 0;
+onBeforeUnmount(() => { viewVersion++; });
 async function openImportedOpd(model: string, context: string) {
   isOpdImportOpen.value = false;
   await router.push(`/projects/${encodeURIComponent(String(route.params.projectId))}/models/${encodeURIComponent(model)}/workbench?context=${encodeURIComponent(context)}`);
@@ -252,6 +265,8 @@ const { captureTrigger, closeDialog, onDialogKeydown, setDialogElement } = useDi
 watch(
   () => route.params.projectId,
   (projectId) => {
+    viewVersion++; openingSequence++;
+    isDialogOpen.value = false; isOpdImportOpen.value = false; lifecycleModel.value = null; lastOpenModel.value = '';
     if (typeof projectId === "string") void store.loadProject(projectId);
   },
   { immediate: true },
@@ -266,8 +281,11 @@ function loadProject() {
 async function openModel(modelId: string) {
   const projectId = route.params.projectId;
   if (typeof projectId !== "string") return;
+  const version = viewVersion, sequence = ++openingSequence, location = route.fullPath;
+  lastOpenModel.value = modelId;
   try {
     await store.openWorkspace(projectId, modelId);
+    if (version !== viewVersion || sequence !== openingSequence || location !== route.fullPath) return;
     await router.push(`/projects/${projectId}/models/${modelId}/workbench`);
   } catch {
     // 错误已映射到模型区域。
@@ -289,7 +307,7 @@ function openLifecycle(model: ModelListItem, action: ModelLifecycleAction) {
   lifecycleModel.value = model;
   lifecycleAction.value = action;
   confirmationName.value = "";
-  lifecycleCommandId = `command.model-lifecycle.${crypto.randomUUID()}`;
+  lifecycleCommandId = `command.model-lifecycle.${randomUuid()}`;
   store.lifecycleError = "";
 }
 
@@ -298,10 +316,11 @@ async function submitLifecycle() {
   const model = lifecycleModel.value;
   if (typeof projectId !== "string" || !model || store.lifecycleBusy) return;
   if (lifecycleAction.value === "PURGE" && confirmationName.value !== model.name) return;
+  const version = viewVersion;
   try {
     await store.changeModelLifecycle(projectId, model.id, lifecycleAction.value, lifecycleCommandId,
       lifecycleAction.value === "PURGE" ? confirmationName.value : undefined);
-    lifecycleFocus.closeDialog();
+    if (version === viewVersion) lifecycleFocus.closeDialog();
   } catch {
     // 保留对话框和操作标识，失败重试沿用同一命令。
   }
@@ -309,9 +328,11 @@ async function submitLifecycle() {
 
 async function submitModel() {
   const projectId = route.params.projectId;
-  if (typeof projectId !== "string") return;
+  if (typeof projectId !== "string" || store.isCreatingModel) return;
+  const version = viewVersion, location = route.fullPath;
   try {
-    const model = await store.createModel(projectId, modelName.value);
+    const model = await store.createModel(projectId, modelName.value, modelGoal.value);
+    if (version !== viewVersion || location !== route.fullPath) return;
     closeDialog();
     await openModel(model.id);
   } catch {

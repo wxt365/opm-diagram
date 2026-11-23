@@ -1,5 +1,6 @@
 import { expect, test, type Page, type Locator } from "@playwright/test";
 import { chooseViewportAction } from "./viewport-controls";
+import { localLayout } from "./helpers/local-layout";
 
 const chromeExecutable = process.env.OPM_E2E_CHROME_EXECUTABLE;
 test.use(chromeExecutable ? { launchOptions: { executablePath: chromeExecutable } } : {});
@@ -16,30 +17,30 @@ test("状态容器联动、Operation 拖动和反向展示关系在保存重开�
   await page.getByTestId("ov02-model-name").fill("咖啡机");
   await page.getByRole("button", { name: "创建并打开工作台", exact: true }).click();
   await expect(page.getByTestId("hs-save")).toBeEnabled();
+  await page.getByRole("button", { name: "收起底部面板 / Collapse bottom panel", exact: true }).click();
   await edit(page, () => page.getByTestId("p03-tool-object").click());
   const owner = page.locator(".x6-node").filter({ hasText: "Object 1" });
   await owner.click();
   await edit(page, () => page.getByTestId("p03-tool-attribute").click());
   await owner.locator('[data-testid^="p03-feature-toggle-"]').click();
   const attribute = page.locator(".x6-node").filter({ hasText: "Attribute 1" });
-  await edit(page, () => drag(page, attribute, -200, 300));
+  await localLayout(page, () => drag(page, attribute, -200, 300));
   await owner.click();
   await edit(page, () => page.getByTestId("p03-tool-operation").click());
   await owner.locator('[data-testid^="p03-feature-toggle-"]').click();
   const operation = page.locator(".x6-node").filter({ hasText: "Operation 1" });
   await expect(operation.locator("ellipse")).toBeVisible();
-  await edit(page, () => drag(page, operation, 270, 120));
+  await localLayout(page, () => drag(page, operation, 120, -80));
 
   await createState(page, owner, "待机");
   await createState(page, owner, "运行中", "FINAL");
   await page.getByTestId("p03-right-panel-close").click();
-  await page.getByRole("button", { name: "收起底部面板 / Collapse bottom panel", exact: true }).click();
   const states = [page.locator(".x6-node").filter({ hasText: "待机" }), page.locator(".x6-node").filter({ hasText: "运行中" })];
   for (const state of states) await contained(owner, state);
   const oldState = await states[0].boundingBox();
-  await edit(page, () => drag(page, states[0], 20, 0));
+  await localLayout(page, () => drag(page, states[0], 20, 0));
   expect((await states[0].boundingBox())!.x).toBeGreaterThan(oldState!.x);
-  await edit(page, () => drag(page, states[0], -200, -150));
+  await localLayout(page, () => drag(page, states[0], -200, -150));
   await contained(owner, states[0]);
   const before = await Promise.all([owner, ...states].map(node => node.boundingBox()));
   const commands: unknown[] = [];
@@ -47,9 +48,9 @@ test("状态容器联动、Operation 拖动和反向展示关系在保存重开�
     if (request.method() === "POST" && request.url().endsWith("/draft/commands")) commands.push(request.postDataJSON());
   };
   page.on("request", collect);
-  await edit(page, () => drag(page, owner, 150, 170, true));
+  await localLayout(page, () => drag(page, owner, 150, 170, true));
   page.off("request", collect);
-  expect(commands).toHaveLength(1);
+  expect(commands).toHaveLength(0);
   const after = await Promise.all([owner, ...states].map(node => node.boundingBox()));
   const dx = after[0]!.x - before[0]!.x, dy = after[0]!.y - before[0]!.y;
   for (const index of [1, 2]) {
@@ -76,7 +77,9 @@ test("状态容器联动、Operation 拖动和反向展示关系在保存重开�
   const outer = page.locator('.x6-node[data-cell-id$=".junction"]:not([data-cell-id^="feature."])');
   const inner = page.locator('.x6-node[data-cell-id$=".junction.inner"]:not([data-cell-id^="feature."])');
   await expect(outer.locator("polygon")).toHaveAttribute("fill", "#ffffff");
-  await expect(inner.locator("polygon")).toHaveAttribute("fill", "#20242a");
+  const ink = await outer.locator("polygon").getAttribute("stroke");
+  expect(ink).not.toBe("#ffffff");
+  await expect(inner.locator("polygon")).toHaveAttribute("fill", ink!);
   await expect(page.locator('.x6-edge path[marker-end]')).toHaveCount(0);
   const positions = await Promise.all([owner, attribute, operation, ...states].map(node => node.getAttribute("transform")));
   await page.getByTestId("hs-save").click();
@@ -84,6 +87,7 @@ test("状态容器联动、Operation 拖动和反向展示关系在保存重开�
   await page.screenshot({ path: test.info().outputPath("owned-layout.png") });
   await page.reload();
   await expect(page.getByTestId("hs-save")).toBeEnabled();
+  await chooseViewportAction(page, "fit");
   await owner.locator('[data-testid^="p03-feature-toggle-"]').click();
   for (const [index, node] of [owner, attribute, operation, ...states].entries()) await expect(node).toHaveAttribute("transform", positions[index]!);
   await expect(inner).toBeVisible();
@@ -116,15 +120,22 @@ async function createState(page: Page, owner: Locator, name: string, role?: "INI
 }
 
 async function drag(page: Page, node: Locator, dx: number, dy: number, header = false) {
+  await chooseViewportAction(page, "fit");
   const box = (await node.boundingBox())!;
   const x = box.x + (header ? 20 : box.width / 2), y = box.y + (header ? 14 : box.height / 2);
   await page.mouse.move(x, y); await page.mouse.down(); await page.mouse.move(x + dx, y + dy, { steps: 15 }); await page.mouse.up();
 }
 
 async function contained(owner: Locator, state: Locator) {
-  const box = (await owner.boundingBox())!, child = (await state.boundingBox())!;
-  expect(child.x).toBeGreaterThanOrEqual(box.x + 7);
-  expect(child.y).toBeGreaterThanOrEqual(box.y + 27);
-  expect(child.x + child.width).toBeLessThanOrEqual(box.x + box.width - 7);
-  expect(child.y + child.height).toBeLessThanOrEqual(box.y + box.height - 7);
+  const ownerId = (await owner.getAttribute("data-cell-id"))!;
+  // 在同一帧测量实际 body，避免适应视口时跨帧读取两种缩放比例。
+  await expect.poll(() => state.evaluate((element, id) => {
+    const scope = element.closest('[data-testid="p03-canvas"]')!;
+    const parent = scope.querySelector(`[data-cell-id="${CSS.escape(id)}"] [data-opm-capture-cell-id]`)!;
+    const body = element.querySelector('[data-opm-capture-cell-id]')!;
+    const box = parent.getBoundingClientRect(), child = body.getBoundingClientRect();
+    const scale = box.width / Number(parent.getAttribute("width"));
+    return child.left >= box.left + 7 * scale && child.top >= box.top + 27 * scale
+      && child.right <= box.right - 7 * scale && child.bottom <= box.bottom - 7 * scale;
+  }, ownerId)).toBe(true);
 }

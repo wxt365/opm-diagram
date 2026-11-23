@@ -19,5 +19,8 @@ public final class DraftSaveController {
         return service.pin(project, model, DraftSaveContract.read(raw, PinRequest.class));
     }
     @GetMapping(value = "/save-state", produces = "application/json")
-    public SaveState state(@PathVariable String project, @PathVariable String model) { return service.state(project, model); }
+    public SaveState state(@PathVariable String project, @PathVariable String model, jakarta.servlet.http.HttpServletResponse response) {
+        response.setHeader("Cache-Control", "no-store");
+        return service.state(project, model);
+    }
 }

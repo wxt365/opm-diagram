@@ -1,4 +1,5 @@
-import { mkdir, readFile, readdir, rename, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, readdir, rename, writeFile, rm } from 'node:fs/promises';
+import { setTimeout as delay } from 'node:timers/promises';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 
@@ -15,7 +16,7 @@ export const sameScope = (a, b) => a.projectId === b.projectId && a.modelId === 
 
 /** 对话及提交意图独立于模型持久化，临时文件替换保证读取不会看到半份记录。 */
 export class ConversationStore {
-  constructor(root) { this.root = root; this.lanes = new Map(); this.scopeLanes = new Map(); }
+  constructor(root, operations = {}) { this.root = root; this.lanes = new Map(); this.scopeLanes = new Map(); this.rename = operations.rename ?? rename; this.delay = operations.delay ?? delay; }
   async init() { await mkdir(this.root, { recursive: true, mode: 0o700 }); }
   path(key) { check(/^[a-f0-9-]{36}$/.test(key), 'INPUT_INVALID', '无效的对话身份。'); return join(this.root, `${key}.json`); }
   async read(key) {
@@ -50,7 +51,25 @@ export class ConversationStore {
   }
   async write(value) {
     const path = this.path(value.id), temp = `${path}.${id()}.tmp`;
-    await writeFile(temp, JSON.stringify(value), { mode: 0o600 }); await rename(temp, path);
+    const waits = [50, 100, 200, 400, 800]; let attempts = 0;
+    try {
+      await writeFile(temp, JSON.stringify(value), { mode: 0o600 });
+      for (;;) {
+        attempts++;
+        try { await this.rename(temp, path); break; }
+        catch (error) {
+          if (!['EPERM', 'EBUSY'].includes(error.code) || attempts > waits.length) throw error;
+          await this.delay(waits[attempts - 1]);
+        }
+      }
+    } catch (error) {
+      console.error('Assistant conversation save failed', { code: error.code ?? 'UNKNOWN', attempts });
+      const failure = new AssistantError('CONVERSATION_SAVE_FAILED', '助手会话保存失败，请稍后重试；若持续失败，请检查服务器文件占用或权限。', 503);
+      failure.cause = error; throw failure;
+    } finally {
+      try { await rm(temp, { force: true }); }
+      catch (error) { console.error('Assistant temporary file cleanup failed', { code: error.code ?? 'UNKNOWN' }); }
+    }
   }
   update(key, mutate) {
     const task = (this.lanes.get(key) ?? Promise.resolve()).then(async () => {

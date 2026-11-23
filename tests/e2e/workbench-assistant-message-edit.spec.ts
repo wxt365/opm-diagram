@@ -13,7 +13,7 @@ test("编辑错误问题后真实 DeepSeek 提出更正模型，图标显示及�
   await page.getByTestId('ov02-model-name').fill(`助手纠错验证-${Date.now()}`);
   await page.getByRole('button', { name: '创建并打开工作台', exact: true }).click();
   await expect(page.getByTestId('hs-save')).toBeEnabled(); await page.getByTestId('left-tab-assistant').click();
-  const panel = page.getByTestId('assistant-panel'), input = panel.getByTestId('assistant-input');
+  const panel = page.locator('[data-testid=assistant-panel]:visible'), input = panel.getByTestId('assistant-input');
   const original = '只解释“手工开发”作为过程的含义，不修改模型，也不提出修改提案。';
   await input.fill(original); await panel.getByTestId('assistant-send').click();
   await expect(panel.getByTestId('assistant-running')).toBeVisible();
@@ -39,11 +39,8 @@ test("编辑错误问题后真实 DeepSeek 提出更正模型，图标显示及�
   await expect(panel.locator('.assistant-message--user p').last()).toContainText('更正我之前的问题');
   await expect(panel.getByTestId('assistant-proposal')).toHaveCount(1);
   await expect(panel.getByTestId('assistant-proposal')).toContainText('手工咖啡');
-  expect(await page.getByTestId('hs-draft-identity').innerText()).toBe(identity);
-  if (await panel.getByTestId('assistant-preview').isVisible()) await panel.getByTestId('assistant-preview').click();
+  await expect(panel.getByTestId('assistant-apply')).toHaveCount(0);
   const processNode = page.locator('.x6-node').filter({ has: page.locator('text', { hasText: /^手工咖啡$/ }) });
-  await expect(processNode).toBeVisible(); expect(await page.getByTestId('hs-draft-identity').innerText()).toBe(identity);
-  await panel.getByTestId('assistant-apply').click();
   await expect(page.getByTestId('hs-draft-identity')).not.toHaveText(identity); await expect(processNode).toBeVisible();
   await expect(panel.locator('.assistant-message--user .assistant-avatar').first()).toHaveAttribute('aria-label', '用户');
   await expect(panel.locator('.assistant-message--assistant .assistant-avatar').first()).toHaveAttribute('aria-label', '智能助手');

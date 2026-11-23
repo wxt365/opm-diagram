@@ -16,10 +16,12 @@ export function createFindingsWorkflow(input: {
   findingLocations: Ref<Record<string, { contextId: string; targetId: string; label: string }>>;
   getDraftSession: () => DraftWorkbenchSession | null; getLoadSequence: () => number;
   clearMethodHighlight: () => void; block: (text: string) => void;
+  projection?: typeof localRuntimeApi.projection;
+  lookupFindingLocation?: (entityId: string) => { contextId: string; targetId: string; label: string } | undefined;
 }) {
   const { workbench, projectId, modelId, contexts, findings, draftToken, pendingDelivery, selectedFindingId,
     highlightedFindingTargetId, selectedTextLineId, validationError, findingLocationBusy, validatedInput, validationInput,
-    findingLocations, getDraftSession, getLoadSequence, clearMethodHighlight, block } = input;
+    findingLocations, getDraftSession, getLoadSequence, clearMethodHighlight, block, lookupFindingLocation } = input;
   let pendingFinding: { input: string; contextId: string; findingId: string; targetId: string } | null = null;
   const canRunValidation = computed(() => !!draftToken.value && workbench.resourceState === "ready"
     && workbench.commandState !== "submitting" && workbench.validationState !== "running" && !pendingDelivery.value);
@@ -27,7 +29,7 @@ export function createFindingsWorkflow(input: {
     : workbench.validationState === "failed" ? "校验失败，可重试" : workbench.validationState === "current" ? "已完成 · 部分规则"
     : workbench.validationState === "stale" ? "内容已修改，需重新校验" : "尚未运行校验");
   const findingRows = computed(() => findings.value.map(finding => {
-    const location = findingLocations.value[finding.entity_id];
+    const location = lookupFindingLocation?.(finding.entity_id) ?? findingLocations.value[finding.entity_id];
     const contextId = location?.contextId ?? finding.context_id;
     return { ...finding, ...findingDetails(finding), entityLabel: location?.label ?? workbench.nodes.find(node => node.id === finding.entity_id)?.label ?? finding.entity_id,
       contextLabel: contexts.value.find(context => context.id === contextId)?.label ?? "所属 OPD 待定位" };
@@ -82,7 +84,7 @@ export function createFindingsWorkflow(input: {
     const ordered = [...contexts.value].sort((a, b) => Number(b.id === workbench.activeContextId) - Number(a.id === workbench.activeContextId));
     for (const context of ordered) {
       const constructs = session && token ? await session.projection(token, context.id)
-        : (await localRuntimeApi.projection(project, model, context.id, revision)).data.constructs;
+        : (await (input.projection ?? localRuntimeApi.projection.bind(localRuntimeApi))(project, model, context.id, revision)).data.constructs;
       if (!current()) return;
       const byTarget = new Map<string, (typeof constructs)[number]>();
       for (const construct of constructs) if (!byTarget.has(construct.target_id)) byTarget.set(construct.target_id, construct);
@@ -123,9 +125,10 @@ export function createFindingsWorkflow(input: {
       let target = finding.entity_id;
       let contextId = workbench.activeContextId;
       if (!workbench.nodes.some(node => node.id === target) && !workbench.relations.some(relation => relation.id === target)) {
-        if (!findingLocations.value[target]) await indexFindingLocations(current);
+        const suppliedLocation = lookupFindingLocation?.(target);
+        if (!findingLocations.value[target] && !suppliedLocation) await indexFindingLocations(current);
         if (!current()) return;
-        const location = findingLocations.value[target];
+        const location = suppliedLocation ?? findingLocations.value[target];
         if (location) { target = location.targetId; contextId = location.contextId; }
         else {
           const diagram = contexts.value.find(context => context.id === target);

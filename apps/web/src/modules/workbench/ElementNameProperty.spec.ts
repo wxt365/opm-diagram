@@ -3,6 +3,19 @@ import { describe, expect, it, vi } from "vitest";
 import ElementNameProperty from "./ElementNameProperty.vue";
 
 describe("ElementNameProperty", () => {
+  it("备注保留普通文本与换行，Enter不提交，失焦保存且允许清空", async () => {
+    const submitNameEdit = vi.fn<(id: string, value: string) => Promise<boolean>>();
+    const wrapper = mount(ElementNameProperty, { props: { elementId: "element.object", name: "", field: "remark", readonly: false, submitNameEdit } });
+    submitNameEdit.mockImplementation(async (_id, name) => { await wrapper.setProps({ name }); return true; });
+    const input = wrapper.get<HTMLTextAreaElement>("textarea");
+    await input.setValue("第一行\n<b>普通文本</b>"); await input.trigger("keydown", { key: "Enter" });
+    expect(submitNameEdit).not.toHaveBeenCalled(); expect(wrapper.find("b").exists()).toBe(false);
+    await input.trigger("blur"); await flushPromises();
+    expect(submitNameEdit).toHaveBeenLastCalledWith("element.object", "第一行\n<b>普通文本</b>");
+    expect(input.element.value).toBe("第一行\n<b>普通文本</b>");
+    await input.setValue(""); expect(await wrapper.vm.finishNameEdit()).toBe(true);
+    expect(submitNameEdit).toHaveBeenLastCalledWith("element.object", ""); wrapper.unmount();
+  });
   it("Enter与失焦共用命令，正式名称回读同步字段且同名不提交", async () => {
     const submitNameEdit = vi.fn<(id: string, name: string) => Promise<boolean>>();
     const wrapper = mount(ElementNameProperty, { props: { elementId: "element.object", name: "水", readonly: false, submitNameEdit } });

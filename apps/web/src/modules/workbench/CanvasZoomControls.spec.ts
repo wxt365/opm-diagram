@@ -2,6 +2,16 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { describe, expect, it } from "vitest";
 import CanvasZoomControls from "./CanvasZoomControls.vue";
 
+it("嵌套工具栏可以指定实际画布作为菜单可用高度边界", async () => {
+  const surface = document.createElement("div");
+  surface.getBoundingClientRect = () => ({ top: 100 } as DOMRect);
+  const wrapper = mount(CanvasZoomControls, { props: { zoom: 100, menuSurface: surface } });
+  wrapper.element.getBoundingClientRect = () => ({ top: 600 } as DOMRect);
+  await wrapper.get('[data-testid="p03-zoom-menu-toggle"]').trigger("click");
+  expect(wrapper.get('[data-testid="p03-zoom-menu"]').attributes("style")).toContain("484px");
+  wrapper.unmount();
+});
+
 describe("画布缩放控制", () => {
   it("输入百分比、Enter与失焦应用、Esc取消并同步外部滚轮比例", async () => {
     const wrapper = mount(CanvasZoomControls, { props: { zoom: 100 } });

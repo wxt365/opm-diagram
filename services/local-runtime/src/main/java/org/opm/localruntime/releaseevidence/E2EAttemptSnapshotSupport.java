@@ -7,6 +7,7 @@ import org.opm.localruntime.releaseauthoring.Rfc8785JsonCanonicalizer;
 import org.opm.localruntime.storage.ProjectDatabaseFactory;
 import org.sqlite.SQLiteConfig;
 
+
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
@@ -57,14 +58,20 @@ final class E2EAttemptSnapshotSupport {
             throw input("Fixture Materialization storage root不合法。");
         }
         JsonNode storageRef = storageEvidence.path("project_db_ref");
-        Path expectedBase = new ProjectDatabaseFactory(storage.resolve("materialized-base")).databasePath(projectId);
-        Path expectedWorking = new ProjectDatabaseFactory(storage).databasePath(projectId);
+        Path expectedBase = org.opm.localruntime.storage.SqliteSnapshots.path(storage.resolve("materialized-base"),projectId);
+        Path expectedWorking = org.opm.localruntime.storage.SqliteSnapshots.path(storage,projectId);
         Path baseDatabase = resolveAttemptRef(attemptRoot, storageRef.path("path").asText());
         Path workingDatabase = resolveAttemptRef(attemptRoot, storageEvidence.path("working_project_db_path").asText());
         if (!baseDatabase.equals(expectedBase) || !workingDatabase.equals(expectedWorking)
-                || storageEvidence.path("working_clone_byte_length").asLong(-1) != storageRef.path("byte_length").asLong(-2)
-                || !storageEvidence.path("working_clone_sha256").asText().equals(storageRef.path("sha256").asText())) {
+                || storageEvidence.path("working_clone_byte_length").asLong(-1) < 1
+                || !storageEvidence.path("working_clone_sha256").asText().matches("[a-f0-9]{64}")) {
             throw input("Fixture Materialization base/working SQLite身份不闭合。");
+        }
+        JsonNode baseSnapshot = readObject(baseDatabase), workingSnapshot = readObject(workingDatabase);
+        if (!projectId.equals(baseSnapshot.path("project_id").asText())
+                || !projectId.equals(workingSnapshot.path("project_id").asText())
+                || baseSnapshot.path("schema").asText().equals(workingSnapshot.path("schema").asText())) {
+            throw input("base与working必须属于独立SQLite工具schema。");
         }
         verifyRawRef(storageRef, baseDatabase, "E2E_INPUT_INVALID");
         requireRegular(workingDatabase, "working project database");
@@ -81,16 +88,13 @@ final class E2EAttemptSnapshotSupport {
     }
 
     static <T> T withImmutableConnection(Path database, SqlWork<T> work) throws Exception {
-        requireRegular(database, "project database");
         List<Path> sidecars = sidecars(database);
         requireNoSidecars(database, "Snapshot 前 SQLite");
         SQLiteConfig configuration = new SQLiteConfig();
         configuration.setReadOnly(true);
         String immutableDatabaseUrl = "jdbc:sqlite:" + database.toUri().toASCIIString() + "?immutable=1";
         try (Connection connection = DriverManager.getConnection(immutableDatabaseUrl, configuration.toProperties())) {
-            try (var queryOnly = connection.createStatement()) {
-                queryOnly.execute("PRAGMA query_only=ON");
-            }
+            try (var queryOnly = connection.createStatement()) { queryOnly.execute("PRAGMA query_only=ON"); }
             return work.apply(connection);
         } finally {
             if (sidecars.stream().anyMatch(Files::exists)) throw input("只读 Snapshot 产生了 SQLite sidecar。");

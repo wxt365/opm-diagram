@@ -1,6 +1,10 @@
 spring:
   application:
     name: opm-local-runtime
+  autoconfigure:
+    exclude: org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
+  flyway:
+    enabled: false
 
 server:
   address: 127.0.0.1
@@ -17,7 +21,12 @@ management:
         enabled: true
 
 opm:
+  security:
+    trusted-web-origins: ${OPM_TRUSTED_WEB_ORIGINS:}
+    remote-enabled: ${OPM_REMOTE_ENABLED:false}
+    embedded-access-token: ${OPM_EMBEDDED_ACCESS_TOKEN:}
   assets:
     root: packages/profiles
   storage:
+    type: ${OPM_STORAGE_TYPE:sqlite}
     root: runtime-data

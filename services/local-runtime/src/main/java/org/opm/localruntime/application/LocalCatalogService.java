@@ -44,7 +44,7 @@ final class LocalCatalogService {
     private SemanticRevision.ProfileBinding profileBinding() { return RuntimeActiveBindingProvider.current(); }
     public Map<String, Object> listProjects(String requestId, String query) {
         List<Map<String, Object>> projects = new ArrayList<>();
-        for (Path database : repository.projectDatabases()) {
+        for (var database : repository.projectDatabases()) {
             try (Connection connection = repository.connection(database);
                  PreparedStatement statement = connection.prepareStatement("""
                          SELECT p.project_id, p.name, p.description, p.status, p.updated_at,
@@ -53,7 +53,7 @@ final class LocalCatalogService {
                          """)) {
                 try (ResultSet result = statement.executeQuery()) {
                     while (result.next()) {
-                        Map<String, Object> project = project(result);
+                        Map<String, Object> project = project(result, connection);
                         if (query == null || query.isBlank() || string(project.get("name")).contains(query)) projects.add(project);
                     }
                 }
@@ -75,7 +75,7 @@ final class LocalCatalogService {
             statement.setString(1, projectId);
             try (ResultSet result = statement.executeQuery()) {
                 if (!result.next()) throw notFound("项目不存在");
-                return queryResult(requestId, null, null, null, "not-applicable", project(result), false);
+                return queryResult(requestId, null, null, null, "not-applicable", project(result, connection), false);
             }
         } catch (SQLException exception) {
             throw persistence(exception);
@@ -83,6 +83,10 @@ final class LocalCatalogService {
     }
 
     public synchronized Map<String, Object> createProject(Map<String, Object> request) {
+        return repository.catalogWrite(() -> createProjectLocked(request));
+    }
+
+    private Map<String, Object> createProjectLocked(Map<String, Object> request) {
         String commandId = required(request, "command_id");
         String requestId = required(request, "request_id");
         String digest = requestDigest(request);
@@ -99,8 +103,9 @@ final class LocalCatalogService {
         project.put("archive_state", "ACTIVE");
         project.put("model_count", 0);
         project.put("updated_at", now);
-        try (Connection connection = repository.connection(ready.database().databasePath())) {
+        try (Connection connection = repository.connection(ready.database().databaseScope())) {
             connection.setAutoCommit(false);
+            org.opm.localruntime.storage.ProjectConnectionFactory.lockProject(connection);
             try {
                 try (PreparedStatement statement = connection.prepareStatement("""
                         INSERT INTO project_metadata(project_id, name, normalized_name, description, status, default_profile_id, default_profile_version, created_at, updated_at)
@@ -149,6 +154,27 @@ final class LocalCatalogService {
         return createModel(projectId, request, null);
     }
 
+    com.fasterxml.jackson.databind.node.ObjectNode embeddedModelTemplate() {
+        try { return (com.fasterxml.jackson.databind.node.ObjectNode) objectMapper.readTree(
+                revisionWriter.write(initialRevision("model.host.seed", "revision.host.seed", "context.host.root"))); }
+        catch (java.io.IOException exception) { throw new IllegalStateException(exception); }
+    }
+
+    Map<String, Object> createEmbeddedModel(String projectId, Map<String, Object> request, Object initialDocument) {
+        if (initialDocument == null) return createModel(projectId, request);
+        var node = objectMapper.valueToTree(initialDocument);
+        if (!(node instanceof com.fasterxml.jackson.databind.node.ObjectNode)) OpdJsonPackage.invalid("初始模型必须是完整语义文档");
+        var document = (com.fasterxml.jackson.databind.node.ObjectNode) node;
+        var revision = OpdJsonPackage.validate(document);
+        if (!revision.profileBinding().equals(profileBinding()))
+            throw new ApiException(ApiErrorCode.RULE_VERSION_CONFLICT, 409, false, "初始模型 Profile 与当前环境不一致");
+        var assets = profilePackageAssembler.assemble(revision.profileBinding());
+        OpdJsonPackage.validateText(revision, assets);
+        var command = new LinkedHashMap<>(request);
+        command.put("initial_document", document);
+        return createTransferredModel(projectId, command, document);
+    }
+
     synchronized Map<String, Object> createTransferredModel(String projectId, Map<String, Object> request, com.fasterxml.jackson.databind.node.ObjectNode document) {
         return createModel(projectId, request, document);
     }
@@ -174,6 +200,7 @@ final class LocalCatalogService {
                 ((com.fasterxml.jackson.databind.node.ObjectNode) importedDocument.required("model_header")).put("model_id", modelId);
                 ((com.fasterxml.jackson.databind.node.ObjectNode) importedDocument.at("/model_header/identity_namespace")).put("local_name", modelId);
                 OpdJsonPackage.clearEvidence(importedDocument);
+                ImportedLayoutNormalizer.normalize(importedDocument);
             }
             SemanticRevision revision = importedDocument == null ? initialRevision(modelId, revisionId, contextId) : OpdJsonPackage.validate(importedDocument);
             if (importedDocument != null) {
@@ -186,6 +213,7 @@ final class LocalCatalogService {
                     "head_revision", revisionId, "profile_id", PROFILE_ID, "profile_version", PROFILE_VERSION, "rule_version", RULE_VERSION,
                     "access_mode", "EDITABLE_DRAFT");
             connection.setAutoCommit(false);
+            org.opm.localruntime.storage.ProjectConnectionFactory.lockProject(connection);
             try {
                 installBindingPackages(connection, now);
                 try (PreparedStatement statement = connection.prepareStatement("""
@@ -219,16 +247,16 @@ final class LocalCatalogService {
                 connection.commit();
             } catch (Exception exception) {
                 connection.rollback();
-                var failure = persistence(exception); if (imported != null) failure.initCause(exception); throw failure;
+                throw persistence(exception);
             }
             return commandResult(requestId, commandId, "COMMITTED", revisionId, "saved", model);
         } catch (SQLException exception) { throw persistence(exception); }
     }
 
     private void installBindingPackages(Connection connection, String now) throws SQLException {
-        insertPackage(connection, "INSERT OR IGNORE INTO profile_package(profile_id, package_version, package_digest, lifecycle_status, package_json, installed_at) VALUES (?, ?, ?, 'DRAFT', '{}', ?)", PROFILE_ID, PROFILE_VERSION, PROFILE_DIGEST, now);
-        insertPackage(connection, "INSERT OR IGNORE INTO rule_set_package(rule_set_id, rule_set_version, rule_set_digest, lifecycle_status, package_json, installed_at) VALUES (?, ?, ?, 'DRAFT', '{}', ?)", RULE_ID, RULE_VERSION, RULE_DIGEST, now);
-        insertPackage(connection, "INSERT OR IGNORE INTO grammar_package(grammar_id, grammar_version, grammar_digest, text_modality, manifest_json, installed_at) VALUES (?, ?, ?, 'OPL', '{}', ?)", GRAMMAR_ID, GRAMMAR_VERSION, GRAMMAR_DIGEST, now);
+        insertPackage(connection, "INSERT INTO profile_package(profile_id, package_version, package_digest, lifecycle_status, package_json, installed_at) VALUES (?, ?, ?, 'DRAFT', '{}', ?) ON CONFLICT DO NOTHING", PROFILE_ID, PROFILE_VERSION, PROFILE_DIGEST, now);
+        insertPackage(connection, "INSERT INTO rule_set_package(rule_set_id, rule_set_version, rule_set_digest, lifecycle_status, package_json, installed_at) VALUES (?, ?, ?, 'DRAFT', '{}', ?) ON CONFLICT DO NOTHING", RULE_ID, RULE_VERSION, RULE_DIGEST, now);
+        insertPackage(connection, "INSERT INTO grammar_package(grammar_id, grammar_version, grammar_digest, text_modality, manifest_json, installed_at) VALUES (?, ?, ?, 'OPL', '{}', ?) ON CONFLICT DO NOTHING", GRAMMAR_ID, GRAMMAR_VERSION, GRAMMAR_DIGEST, now);
     }
 
     private void insertPackage(Connection connection, String sql, String id, String version, String digest, String now) throws SQLException {
@@ -255,6 +283,8 @@ final class LocalCatalogService {
         return new SemanticRevision(revisionId, modelId, 1, profileBinding(), contextId, List.of(), List.of(), List.of(), List.of(context), List.of(), List.of());
     }
 
-    private Map<String, Object> project(ResultSet result) throws SQLException { return Map.of("project_id", result.getString(1), "name", result.getString(2), "description", result.getString(3) == null ? "" : result.getString(3), "archive_state", result.getString(4), "updated_at", result.getString(5), "model_count", result.getInt(6)); }
+    private Map<String, Object> project(ResultSet result, Connection connection) throws SQLException {
+        return Map.of("project_id", result.getString(1), "name", result.getString(2), "description", result.getString(3) == null ? "" : result.getString(3), "archive_state", result.getString(4), "updated_at", result.getString(5), "model_count", result.getInt(6));
+    }
 
 }

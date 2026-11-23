@@ -20,7 +20,7 @@ class SemanticRevisionValidatorTest {
     @Test
     void allowsOneSemanticElementToHaveOccurrencesInMultipleContexts() {
         SemanticRevision revision = validRevision();
-        SemanticRevision.Context root = revision.contexts().getFirst();
+        SemanticRevision.Context root = revision.contexts().get(0);
         List<SemanticRevision.Context> contexts = new ArrayList<>(revision.contexts());
         contexts.add(new SemanticRevision.Context(
                 "context.secondary",
@@ -47,7 +47,7 @@ class SemanticRevisionValidatorTest {
     @Test
     void rejectsDanglingWrongKindAndDuplicateRefinementEdges() {
         var revision = validRevision();
-        var root = revision.contexts().getFirst();
+        var root = revision.contexts().get(0);
         var child = new SemanticRevision.Context("context.child", SemanticRevision.ContextKind.OBJECT_REFINEMENT,
                 root.capability(), root.name(), List.of(), root.source());
         var contexts = new ArrayList<>(revision.contexts()); contexts.add(child);
@@ -71,7 +71,7 @@ class SemanticRevisionValidatorTest {
     @Test
     void reportsDuplicateStableId() {
         SemanticRevision revision = validRevision();
-        SemanticRevision.Element original = revision.elements().getFirst();
+        SemanticRevision.Element original = revision.elements().get(0);
         List<SemanticRevision.Element> elements = new ArrayList<>(revision.elements());
         elements.add(new SemanticRevision.Element(
                 "state.raw.available", original.coreKind(), original.capability(), original.name(), List.of(), original.source(), original.normalization()));
@@ -83,7 +83,7 @@ class SemanticRevisionValidatorTest {
     @Test
     void reportsCapabilityBindingMismatch() {
         SemanticRevision revision = validRevision();
-        SemanticRevision.Element original = revision.elements().getFirst();
+        SemanticRevision.Element original = revision.elements().get(0);
         List<SemanticRevision.Element> elements = new ArrayList<>(revision.elements());
         elements.set(0, new SemanticRevision.Element(
                 original.id(), original.coreKind(),
@@ -97,7 +97,7 @@ class SemanticRevisionValidatorTest {
     @Test
     void reportsStateOwnerMismatch() {
         SemanticRevision revision = validRevision();
-        SemanticRevision.State original = revision.states().getFirst();
+        SemanticRevision.State original = revision.states().get(0);
         List<SemanticRevision.State> states = List.of(new SemanticRevision.State(
                 original.id(), "element.processing", original.capability(), original.name(), original.roles(), original.source(), original.normalization()));
 
@@ -108,8 +108,8 @@ class SemanticRevisionValidatorTest {
     @Test
     void reportsInvalidEndpointOrdinal() {
         SemanticRevision revision = validRevision();
-        SemanticRevision.Fact original = revision.facts().getFirst();
-        SemanticRevision.Endpoint endpoint = original.endpoints().getFirst();
+        SemanticRevision.Fact original = revision.facts().get(0);
+        SemanticRevision.Endpoint endpoint = original.endpoints().get(0);
         List<SemanticRevision.Endpoint> endpoints = new ArrayList<>(original.endpoints());
         endpoints.set(0, new SemanticRevision.Endpoint(
                 endpoint.id(), endpoint.role(), endpoint.targetKind(), endpoint.targetId(), 5, endpoint.stateQualificationId()));
@@ -123,8 +123,8 @@ class SemanticRevisionValidatorTest {
     @Test
     void reportsMissingEndpointTarget() {
         SemanticRevision revision = validRevision();
-        SemanticRevision.Fact original = revision.facts().getFirst();
-        SemanticRevision.Endpoint endpoint = original.endpoints().getFirst();
+        SemanticRevision.Fact original = revision.facts().get(0);
+        SemanticRevision.Endpoint endpoint = original.endpoints().get(0);
         List<SemanticRevision.Endpoint> endpoints = new ArrayList<>(original.endpoints());
         endpoints.set(0, new SemanticRevision.Endpoint(
                 endpoint.id(), endpoint.role(), endpoint.targetKind(), "element.missing", endpoint.ordinal(), endpoint.stateQualificationId()));
@@ -138,7 +138,7 @@ class SemanticRevisionValidatorTest {
     @Test
     void reportsContextClosureViolation() {
         SemanticRevision revision = validRevision();
-        SemanticRevision.Context original = revision.contexts().getFirst();
+        SemanticRevision.Context original = revision.contexts().get(0);
         List<SemanticRevision.Context> contexts = List.of(new SemanticRevision.Context(
                 original.id(), original.kind(), original.capability(), original.name(), List.of(), original.source()));
 
@@ -149,12 +149,12 @@ class SemanticRevisionValidatorTest {
     @Test
     void reportsMissingReferencesAndInvalidLayout() {
         SemanticRevision revision = validRevision();
-        SemanticRevision.Occurrence originalOccurrence = revision.occurrences().getFirst();
+        SemanticRevision.Occurrence originalOccurrence = revision.occurrences().get(0);
         List<SemanticRevision.Occurrence> occurrences = new ArrayList<>(revision.occurrences());
         occurrences.set(0, new SemanticRevision.Occurrence(
                 originalOccurrence.id(), originalOccurrence.contextId(), originalOccurrence.targetKind(), originalOccurrence.targetId(),
                 originalOccurrence.ownership(), originalOccurrence.constructRole(), "layout.missing"));
-        SemanticRevision.Layout originalLayout = revision.layouts().getFirst();
+        SemanticRevision.Layout originalLayout = revision.layouts().get(0);
         List<SemanticRevision.Layout> layouts = new ArrayList<>(revision.layouts());
         layouts.set(0, new SemanticRevision.Layout(
                 originalLayout.id(), originalLayout.x(), originalLayout.y(), 0, originalLayout.height(), originalLayout.zOrder()));
@@ -200,9 +200,9 @@ class SemanticRevisionValidatorTest {
     void domainCollectionsAreImmutable() {
         SemanticRevision revision = validRevision();
 
-        assertThrows(UnsupportedOperationException.class, () -> revision.elements().add(revision.elements().getFirst()));
-        assertThrows(UnsupportedOperationException.class, () -> revision.contexts().getFirst().occurrenceIds().clear());
-        assertThrows(UnsupportedOperationException.class, () -> revision.facts().getFirst().endpoints().clear());
+        assertThrows(UnsupportedOperationException.class, () -> revision.elements().add(revision.elements().get(0)));
+        assertThrows(UnsupportedOperationException.class, () -> revision.contexts().get(0).occurrenceIds().clear());
+        assertThrows(UnsupportedOperationException.class, () -> revision.facts().get(0).endpoints().clear());
     }
 
     private SemanticRevision validRevision() {

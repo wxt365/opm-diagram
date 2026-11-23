@@ -35,8 +35,8 @@ public final class ModelLifecycleService {
                 || !state.equals(action.equals("TRASH") ? "ACTIVE" : "ARCHIVED")) invalid("模型操作或预期状态不合法");
         String name = optional(request, "confirmation_name");
         if (action.equals("PURGE") ? name == null || name.codePointCount(0, name.length()) > 256 : request.containsKey("confirmation_name")) invalid("永久删除需要模型名称确认");
-        var path = databases.databasePath(project);
-        if (!Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)) throw new ApiException(ApiErrorCode.NOT_FOUND, 404, false, "项目不存在");
+        var path = databases.databaseScope(project);
+        if (!path.exists()) throw new ApiException(ApiErrorCode.NOT_FOUND, 404, false, "项目不存在");
         if (!(databases.openForModelLifecycle(project) instanceof ProjectDatabaseOpenResult.Ready))
             throw new ApiException(ApiErrorCode.PERSISTENCE_FAILED, 503, false, "项目库需要恢复，模型操作未执行");
         try {
@@ -51,7 +51,7 @@ public final class ModelLifecycleService {
             ApiErrorCode code = ApiErrorCode.valueOf(exception.code());
             throw new ApiException(code, code == ApiErrorCode.NOT_FOUND ? 404 : code == ApiErrorCode.INVALID_ARGUMENT ? 400 : 409, false, exception.getMessage());
         } catch (StorageAccessException exception) {
-            throw new ApiException(ApiErrorCode.PERSISTENCE_FAILED, 503, false, "模型操作未完成，数据已回滚");
+            var failure=new ApiException(ApiErrorCode.PERSISTENCE_FAILED, 503, false, "模型操作未完成，数据已回滚");failure.initCause(exception);throw failure;
         } catch (java.security.NoSuchAlgorithmException | com.fasterxml.jackson.core.JsonProcessingException exception) {
             throw new ApiException(ApiErrorCode.PERSISTENCE_FAILED, 503, false, "无法生成模型操作标识");
         }

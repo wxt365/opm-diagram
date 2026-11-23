@@ -12,6 +12,17 @@ async function choose(wrapper: ReturnType<typeof mount>, value: string, size = v
   await wrapper.get("input[type=file]").trigger("change"); await flushPromises();
 }
 describe("OPD JSON 导入", () => {
+  it.each(['switch', 'unmount'] as const)('导入在途 %s 后不回传旧项目结果', async operation => {
+    const wrapper = mount(OpdJsonImportDialog, { props: { projectId: 'project.a' } });
+    await choose(wrapper, JSON.stringify(sample));
+    let complete!: (value: never) => void;
+    vi.mocked(localRuntimeApi.importOpdJson).mockImplementationOnce(() => new Promise(resolve => { complete = resolve; }));
+    await wrapper.get('form').trigger('submit');
+    if (operation === 'switch') await wrapper.setProps({ projectId: 'project.b' }); else wrapper.unmount();
+    complete({ model_id: 'model.old', context_id: 'context.root' } as never); await flushPromises();
+    expect(wrapper.emitted('imported')).toBeUndefined();
+    if (operation === 'switch') { expect(wrapper.find('[data-testid="opd-json-preview"]').exists()).toBe(false); wrapper.unmount(); }
+  });
   it("文件预览与名称确认后只提交一次，失败重试保留命令ID", async () => {
     const wrapper = mount(OpdJsonImportDialog, { props: { projectId: "project.target" } });
     await choose(wrapper, JSON.stringify(sample)); expect(wrapper.get('[data-testid="opd-json-preview"]').text()).toContain("咖啡烘焙 · 1 张图");

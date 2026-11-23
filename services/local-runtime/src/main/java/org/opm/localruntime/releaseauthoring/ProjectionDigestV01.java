@@ -43,10 +43,26 @@ public final class ProjectionDigestV01 {
                 validateSuppressedState(suppressedStates.get(index), "/data/suppressed_states/" + index, violations);
             }
         }
+        List<Object> digestConstructs = new ArrayList<>();
+        if (constructs != null) {
+            for (int index = 0; index < constructs.size(); index++) {
+                Object value = constructs.get(index);
+                if (value instanceof Map<?, ?> construct && construct.containsKey("target_kind")) {
+                    Map<String, Object> copy = new LinkedHashMap<>();
+                    construct.forEach((key, field) -> copy.put((String) key, field));
+                    enumString(copy, "target_kind", "/data/constructs/" + index,
+                            List.of("ELEMENT", "STATE", "FACT", "FEATURE", "CONTEXT"), violations);
+                    copy.remove("target_kind");
+                    digestConstructs.add(copy);
+                } else {
+                    digestConstructs.add(value);
+                }
+            }
+        }
         throwFirst(violations);
         Map<String, Object> digestView = new LinkedHashMap<>();
         digestView.put("context_id", contextId);
-        digestView.put("constructs", constructs);
+        digestView.put("constructs", digestConstructs);
         return Map.copyOf(digestView);
     }
 
@@ -351,7 +367,7 @@ public final class ProjectionDigestV01 {
     private static void throwFirst(List<Violation> violations) {
         if (violations.isEmpty()) return;
         violations.sort(Comparator.comparingInt(Violation::priority).thenComparing(violation -> violation.pointer().getBytes(java.nio.charset.StandardCharsets.UTF_8), ProjectionDigestV01::compareBytes));
-        Violation first = violations.getFirst();
+        Violation first = violations.get(0);
         throw new ProjectionDigestV01Exception(first.code(), first.pointer(), first.message());
     }
 

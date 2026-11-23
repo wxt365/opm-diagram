@@ -33,7 +33,7 @@ class DraftHistoryRepositoryTest {
         });
         assertEquals(1, count(database, "draft_journal")); var token = saves.read(PROJECT, MODEL).token();
         var saved = saves.manual(PROJECT, MODEL, new SaveRequest("save.history", token, "MANUAL"), ignored -> { });
-        try (var c = SqliteConnectionFactory.create(database).getConnection()) {
+        try (var c = org.opm.localruntime.storage.SqliteTestSupport.create(database).getConnection()) {
             var before = DraftHistoryRepository.find(c, PROJECT, MODEL, saved.revision_id()).orElseThrow();
             assertEquals(3, before.entry().sequence()); assertEquals(1, DraftHistoryRepository.list(c, PROJECT, MODEL).size());
             var document = SaveContentDigestV1.read(before.contentDocument()); var original = document.deepCopy();
@@ -41,7 +41,8 @@ class DraftHistoryRepositoryTest {
             assertEquals(original, document); assertEquals(saved.revision_id(), revision.revisionId()); assertEquals(3, revision.revisionSequence());
             // 模拟检查点不可用；历史读取必须仍仅依赖永久内容，不触发草稿恢复。
             try (var statement = c.createStatement()) {
-                statement.execute("PRAGMA foreign_keys=OFF"); statement.executeUpdate("DELETE FROM draft_checkpoint"); statement.executeUpdate("DELETE FROM draft_journal");
+                statement.execute(SqliteTestSupport.sqlite(c) ? "PRAGMA foreign_keys=OFF" : "SET session_replication_role='replica'"); statement.executeUpdate("DELETE FROM draft_checkpoint"); statement.executeUpdate("DELETE FROM draft_journal");
+                statement.execute(SqliteTestSupport.sqlite(c) ? "PRAGMA foreign_keys=ON" : "SET session_replication_role='origin'");
             }
             assertEquals(before, DraftHistoryRepository.find(c, PROJECT, MODEL, saved.revision_id()).orElseThrow());
             assertTrue(DraftHistoryRepository.find(c, "project.other", MODEL, saved.revision_id()).isEmpty());
@@ -54,8 +55,8 @@ class DraftHistoryRepositoryTest {
     @Test void corruptBlobFailsClosedInsteadOfReturningLegacyHead() throws Exception {
         var database = database(); var saves = new DraftSaveRepository(database, CLOCK);
         var result = saves.manual(PROJECT, MODEL, new SaveRequest("save.corrupt", saves.read(PROJECT, MODEL).token(), "MANUAL"), ignored -> { });
-        try (var c = SqliteConnectionFactory.create(database).getConnection(); var s = c.createStatement()) {
-            s.execute("DROP TRIGGER draft_content_no_update"); s.executeUpdate("UPDATE draft_content SET artifact_digest='" + "a".repeat(64) + "'");
+        try (var c = org.opm.localruntime.storage.SqliteTestSupport.create(database).getConnection(); var s = c.createStatement()) {
+            s.execute(org.opm.localruntime.storage.SqliteTestSupport.dropTriggerSql(c, "draft_content_no_update", "draft_content")); s.executeUpdate("UPDATE draft_content SET artifact_digest='" + "a".repeat(64) + "'");
             var error = assertThrows(DraftJournalRepository.Failure.class, () -> DraftHistoryRepository.find(c, PROJECT, MODEL, result.revision_id()));
             assertEquals("DRAFT_RECOVERY_REQUIRED", error.code());
         }
@@ -65,9 +66,9 @@ class DraftHistoryRepositoryTest {
 
     @Test void globalSequenceOverflowRollsBackBeforePublishingUnopenableRevision() throws Exception {
         var database = database(); var saves = new DraftSaveRepository(database, CLOCK);
-        try (var c = SqliteConnectionFactory.create(database).getConnection(); var s = c.createStatement()) {
+        try (var c = org.opm.localruntime.storage.SqliteTestSupport.create(database).getConnection(); var s = c.createStatement()) {
             // 增加合法存储形状的前序保存点，模拟已经到达旧语义整数边界。
-            s.executeUpdate("INSERT INTO draft_savepoint SELECT 'revision.limit',model_id,draft_id,0,2147483645,'EXPORT',content_digest,'" + NOW + "' FROM draft_checkpoint");
+            s.executeUpdate("INSERT INTO draft_savepoint(revision_id,model_id,draft_id,captured_seq,history_sequence,purpose,content_digest,created_at) SELECT 'revision.limit',model_id,draft_id,0,2147483645,'EXPORT',content_digest,'" + NOW + "' FROM draft_checkpoint");
         }
         var error = assertThrows(DraftJournalRepository.Failure.class, () -> saves.manual(PROJECT, MODEL,
                 new SaveRequest("save.limit", saves.read(PROJECT, MODEL).token(), "MANUAL"), ignored -> { }));
@@ -77,7 +78,6 @@ class DraftHistoryRepositoryTest {
     private LocalApiService domain() { return new LocalApiService(new ProjectDatabaseFactory(temporary), new FileProfilePackageLoader(root().resolve("packages/profiles"))); }
     private Path database() throws Exception {
         Path db = create(temporary, true, ignored -> { });
-        Flyway.configure().dataSource(SqliteConnectionFactory.create(db)).locations("filesystem:" + root().resolve("docs/contracts/migrations/sqlite"),
-                "filesystem:" + root().resolve("docs/contracts/migrations/sqlite-checkpoint")).target("4").mixed(true).load().migrate(); return db;
+        org.opm.localruntime.storage.SqliteTestSupport.migrate(db); return db;
     }
 }

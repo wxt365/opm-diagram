@@ -151,6 +151,7 @@ public final class GoldenFixtureMaterializerRunner implements ApplicationRunner,
             System.err.println(errorCode);
         } catch (Exception exception) {
             exitCode = 4;
+            exception.printStackTrace(System.err);
             String errorCode = "GFM_INTERNAL_ERROR";
             try {
                 GoldenFixtureMaterializationException failure = new GoldenFixtureMaterializationException("GFM_INTERNAL_ERROR", "Materializer failed.", exception);
@@ -315,7 +316,7 @@ public final class GoldenFixtureMaterializerRunner implements ApplicationRunner,
         report.put("checks", checks("PASSED", null)); report.put("failures", List.of());
         report.put("materialized_identity", Map.of("project_id", fixtureResult.projectId(), "model_id", fixtureResult.modelId(), "revision_id", fixtureResult.revisionId(), "revision_sequence", fixtureResult.revisionSequence(), "draft_head_revision_id", fixtureResult.revisionId(), "head_sequence", fixtureResult.revisionSequence(), "history_mode", fixtureResult.historyMode()));
         Path root = args.storageRoot().getParent().getParent().getParent(); Path database = fixtureResult.databasePath();
-        report.put("target_storage", Map.of("storage_root", root.relativize(args.storageRoot()).toString(), "database_ref", fileRef("DATABASE", root, database), "storage_schema_version", "1.0", "database_sha256", sha256(Files.readAllBytes(database)), "semantic_state_sha256", sha256(canonical(Map.of("storage_schema_version", "1.0", "project_id", fixtureResult.projectId(), "model_id", fixtureResult.modelId(), "revision_id", fixtureResult.revisionId(), "revision_sequence", fixtureResult.revisionSequence(), "draft_head_revision_id", fixtureResult.revisionId(), "head_sequence", fixtureResult.revisionSequence(), "profile_binding", report.get("runtime_binding"), "document_sha256", ref.get("sha256"), "table_counts", fixtureResult.tableCounts())))));
+        report.put("target_storage", Map.of("storage_root", root.relativize(args.storageRoot()).toString().replace('\\', '/'), "database_ref", fileRef("DATABASE", root, database), "storage_schema_version", "2.0", "database_sha256", sha256(Files.readAllBytes(database)), "semantic_state_sha256", sha256(canonical(Map.of("storage_schema_version", "2.0", "project_id", fixtureResult.projectId(), "model_id", fixtureResult.modelId(), "revision_id", fixtureResult.revisionId(), "revision_sequence", fixtureResult.revisionSequence(), "draft_head_revision_id", fixtureResult.revisionId(), "head_sequence", fixtureResult.revisionSequence(), "profile_binding", report.get("runtime_binding"), "document_sha256", ref.get("sha256"), "table_counts", fixtureResult.tableCounts())))));
         GoldenFixtureSeedRepository.StageDurations durations = fixtureResult.stageDurations();
         report.put("persistence", Map.of("transaction_status", "COMMITTED", "table_counts", fixtureResult.tableCounts(), "integrity_check", "ok", "foreign_key_check", 0, "reopen_matched", true, "sidecar_absent", true, "stage_durations_us", Map.of("preflight", preflightMicros, "migration", durations.migrationMicros(), "seed", durations.seedMicros(), "verify", durations.verifyMicros(), "report", elapsedMicros(reportStarted)), "peak_rss_bytes", peakRssBytes));
         writeReport(args.reportOut(), report);
@@ -346,7 +347,7 @@ public final class GoldenFixtureMaterializerRunner implements ApplicationRunner,
         Map<String, Object> report = baseReport(context.args(), context.plan(), context.fixtureRef(), context.fixture());
         report.put("report_status", "BLOCKED");
         report.put("checks", checks(passedPreflightChecks, failure.code()));
-        Map<String, Object> primaryFailure = failures.getFirst();
+        Map<String, Object> primaryFailure = failures.get(0);
         report.put("primary_failure", primaryFailure);
         report.put("failures", failures);
         writeReport(context.args().reportOut(), report);
@@ -445,7 +446,11 @@ public final class GoldenFixtureMaterializerRunner implements ApplicationRunner,
     }
     private Map<String, Object> binding() { var binding = RuntimeActiveBindingProvider.current(); return Map.of("profile", asset(binding.profile()), "rule_set", asset(binding.ruleSet()), "text_grammar", asset(binding.textGrammar()), "symbol_catalog", asset(binding.symbolCatalog()), "normalization_adapter", asset(binding.normalizationAdapter()), "binding_digest", binding.bindingDigest()); }
     private Map<String, Object> asset(org.opm.localruntime.semantic.SemanticRevision.AssetReference value) { return Map.of("id", value.id(), "version", value.version(), "sha256", value.sha256()); }
-    private Map<String, Object> fileRef(String kind, Path root, Path file) throws Exception { return Map.of("kind", kind, "path", root.relativize(file).toString(), "byte_length", Files.size(file), "sha256", sha256(Files.readAllBytes(file))); }
+    private Map<String, Object> fileRef(String kind, Path root, Path file) throws Exception {
+        Path canonicalRoot = root.toRealPath(), canonicalFile = file.toRealPath();
+        if (!canonicalFile.startsWith(canonicalRoot)) throw new IllegalArgumentException("报告文件不属于证据根目录");
+        return Map.of("kind", kind, "path", canonicalRoot.relativize(canonicalFile).toString().replace('\\', '/'), "byte_length", Files.size(file), "sha256", sha256(Files.readAllBytes(file)));
+    }
     private Path runtimeJar() throws Exception { return runtimeJarLocator.locate(); }
     private static Path runtimeJarFromCodeSource() throws Exception {
         String location = LocalRuntimeApplication.class.getProtectionDomain().getCodeSource().getLocation().toURI().toString();
@@ -457,6 +462,9 @@ public final class GoldenFixtureMaterializerRunner implements ApplicationRunner,
         }
         int separator = location.indexOf('!');
         if (separator >= 0) location = location.substring(0, separator);
+        if (location.endsWith("/")) location = location.substring(0, location.length() - 1);
+        if (location.startsWith("/")) return Path.of(java.net.URI.create("file:" + location)).toRealPath();
+        if (location.matches("^[A-Za-z]:[/\\\\].*")) return Path.of(java.net.URLDecoder.decode(location, java.nio.charset.StandardCharsets.UTF_8)).toRealPath();
         java.net.URI locationUri = java.net.URI.create(location);
         return (locationUri.getScheme() == null ? Path.of(location) : Path.of(locationUri)).toRealPath();
     }

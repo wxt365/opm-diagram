@@ -50,7 +50,7 @@ public final class OplTextGenerationService {
         List<OplTextTrace> traces = new ArrayList<>();
         for (int ordinal = 0; ordinal < plans.size(); ordinal++) {
             SentencePlan plan = plans.get(ordinal);
-            SemanticRevision.Fact fact = facts.get(plan.inputFactIds().getFirst());
+            SemanticRevision.Fact fact = facts.get(plan.inputFactIds().get(0));
             if (fact == null) throw failure(OplGenerationCode.TEXT_TRACE_INCOMPLETE, "Sentence plan fact does not exist");
             OplSentence sentence = sentence(plan.sentenceId(), composeText(plan), ordinal, fact, plan.templateId(), grammar,
                     plan.occurrenceIds(), elements, Map.of(), states, occurrences, "SINGLE");
@@ -93,7 +93,7 @@ public final class OplTextGenerationService {
         for (OplParagraph paragraph : generated.artifact().paragraphs()) {
             List<OplSentence> sentences = new ArrayList<>();
             for (OplSentence sentence : paragraph.sentences()) {
-                SemanticRevision.Fact fact = facts.get(sentence.inputFactIds().getFirst());
+                SemanticRevision.Fact fact = facts.get(sentence.inputFactIds().get(0));
                 if (fact == null) throw failure(OplGenerationCode.TEXT_TRACE_INCOMPLETE, "Sentence fact does not exist");
                 List<String> ruleIds = rulesByFact.get(fact.id());
                 OplSentence rewritten = new OplSentence(sentence.sentenceId(), sentence.text(), sentence.ordinal(),
@@ -105,8 +105,8 @@ public final class OplTextGenerationService {
         }
         List<OplTextTrace> traces = new ArrayList<>();
         for (OplTextTrace trace : generated.traces()) {
-            SemanticRevision.Fact fact = facts.get(trace.factIds().getFirst());
-            OplSentence sentence = rewrittenSentences.get(trace.sentenceIds().getFirst());
+            SemanticRevision.Fact fact = facts.get(trace.factIds().get(0));
+            OplSentence sentence = rewrittenSentences.get(trace.sentenceIds().get(0));
             if (fact == null || sentence == null) throw failure(OplGenerationCode.TEXT_TRACE_INCOMPLETE, "Trace sentence or fact does not exist");
             List<String> ruleIds = rulesByFact.get(fact.id());
             OplGrammar.Template template = assets.grammar().template(templateId(sentence))
@@ -153,15 +153,15 @@ public final class OplTextGenerationService {
                 continue;
             }
             ControlComposition control = controlComposition(fact);
-            validateProceduralEndpoints(fact, elements, states);
+            validateProceduralEndpoints(fact, elements, features, states);
             if (control != null && grammar.template(control.templateId()).isEmpty() && isLegacyGrammar(grammar)) {
                 control = null;
             }
             String templateId = control == null ? proceduralTemplate(fact.capability().capabilityId()) : control.templateId();
             OplGrammar.Template template = grammar.template(templateId).orElseThrow(() -> failure(OplGenerationCode.TEXT_TEMPLATE_MISSING, "Grammar does not provide " + templateId));
             List<String> occurrenceIds = occurrenceIds(fact, occurrencesByTarget, elements, features, states);
-            List<String> inputElementIds = proceduralElementIds(fact, elements, states);
-            String text = control == null ? proceduralText(fact, elements, states) : controlText(fact, control.controlCapabilityId(), elements, states);
+            List<String> inputElementIds = OplTraceValidator.finalInputElementIds(fact, elements, features, states);
+            String text = control == null ? proceduralText(fact, elements, features, states) : controlText(fact, control.controlCapabilityId(), elements, features, states);
             String primaryProcessId = fact.endpoints().stream().filter(endpoint -> endpoint.role().contains("PROCESS"))
                     .map(SemanticRevision.Endpoint::targetId).findFirst().orElse(fact.id());
             plans.add(new GenericPlan(fact, templateId, template.precedence(), sentenceSlotRank(template), text, inputElementIds, List.copyOf(new LinkedHashSet<>(occurrenceIds)), primaryProcessId));
@@ -259,22 +259,9 @@ public final class OplTextGenerationService {
                 plan.occurrenceIds(), List.of(sentence.sentenceId()), List.of(plan.templateId()), bindingDigest, ranges, traceSources(sentence, plan.fact(), plan.templateId(), grammar));
     }
 
-    private List<String> proceduralElementIds(SemanticRevision.Fact fact, Map<String, SemanticRevision.Element> elements, Map<String, SemanticRevision.State> states) {
-        LinkedHashSet<String> ids = new LinkedHashSet<>();
-        for (SemanticRevision.Endpoint endpoint : fact.endpoints()) {
-            if (endpoint.targetKind() == SemanticRevision.TargetKind.ELEMENT && elements.containsKey(endpoint.targetId())) ids.add(endpoint.targetId());
-            if (endpoint.targetKind() == SemanticRevision.TargetKind.STATE) {
-                SemanticRevision.State state = states.get(endpoint.targetId());
-                if (state == null || !elements.containsKey(state.ownerElementId())) throw failure(OplGenerationCode.TEXT_PLAN_UNSUPPORTED, "State endpoint owner does not exist");
-                ids.add(state.ownerElementId());
-            }
-        }
-        if (ids.isEmpty()) throw failure(OplGenerationCode.TEXT_TRACE_INCOMPLETE, "Procedural trace has no input elements");
-        return List.copyOf(ids);
-    }
-
-    private String proceduralText(SemanticRevision.Fact fact, Map<String, SemanticRevision.Element> elements, Map<String, SemanticRevision.State> states) {
-        java.util.function.Function<String, String> label = role -> endpointName(endpoint(fact, role), elements, states);
+    private String proceduralText(SemanticRevision.Fact fact, Map<String, SemanticRevision.Element> elements,
+            Map<String, SemanticRevision.Feature> features, Map<String, SemanticRevision.State> states) {
+        java.util.function.Function<String, String> label = role -> endpointName(endpoint(fact, role), elements, features, states);
         return switch (fact.capability().capabilityId()) {
             case "CAP-ISO-PROC-001" -> label.apply("CONSUMING_PROCESS") + " consumes " + label.apply("CONSUMED_OBJECT") + ".";
             case "CAP-ISO-PROC-002" -> label.apply("RESULT_PROCESS") + " yields " + label.apply("RESULT_OBJECT") + ".";
@@ -284,7 +271,7 @@ public final class OplTextGenerationService {
             case "CAP-ISO-PROC-006" -> label.apply("CONSUMING_PROCESS") + " consumes " + label.apply("CONSUMED_STATE") + ".";
             case "CAP-ISO-PROC-007" -> label.apply("RESULT_PROCESS") + " yields " + label.apply("RESULT_STATE") + ".";
             case "CAP-ISO-PROC-008" -> label.apply("AFFECTING_PROCESS") + " changes "
-                    + ownerName(endpoint(fact, "AFFECTEE_INPUT_STATE"), states, elements) + " from "
+                    + ownerName(endpoint(fact, "AFFECTEE_INPUT_STATE"), states, elements, features) + " from "
                     + stateName(endpoint(fact, "AFFECTEE_INPUT_STATE"), states) + " to "
                     + stateName(endpoint(fact, "AFFECTED_OUTPUT_STATE"), states) + ".";
             case "CAP-ISO-PROC-009" -> label.apply("AFFECTING_PROCESS") + " changes "
@@ -328,6 +315,7 @@ public final class OplTextGenerationService {
     private void validateProceduralEndpoints(
             SemanticRevision.Fact fact,
             Map<String, SemanticRevision.Element> elements,
+            Map<String, SemanticRevision.Feature> features,
             Map<String, SemanticRevision.State> states) {
         List<ProceduralEndpointExpectation> expected = switch (fact.capability().capabilityId()) {
             case "CAP-ISO-PROC-001" -> List.of(objectEndpoint("CONSUMED_OBJECT"), processEndpoint("CONSUMING_PROCESS"));
@@ -354,11 +342,11 @@ public final class OplTextGenerationService {
         for (int ordinal = 0; ordinal < expected.size(); ordinal++) {
             SemanticRevision.Endpoint endpoint = actual.get(ordinal);
             ProceduralEndpointExpectation expectation = expected.get(ordinal);
-            if (endpoint.ordinal() != ordinal || !expectation.role().equals(endpoint.role()) || !matchesEndpoint(expectation.kind(), endpoint, elements, states)) {
+            if (endpoint.ordinal() != ordinal || !expectation.role().equals(endpoint.role()) || !matchesEndpoint(expectation.kind(), endpoint, elements, features, states)) {
                 throw endpointMismatch(fact, "endpoint " + ordinal + " does not match " + expectation.role());
             }
         }
-        if ("CAP-ISO-PROC-014".equals(fact.capability().capabilityId()) && !actual.getFirst().targetId().equals(actual.get(1).targetId())) {
+        if ("CAP-ISO-PROC-014".equals(fact.capability().capabilityId()) && !actual.get(0).targetId().equals(actual.get(1).targetId())) {
             throw endpointMismatch(fact, "self-invocation endpoints must target the same Process");
         }
     }
@@ -367,19 +355,27 @@ public final class OplTextGenerationService {
             ProceduralEndpointKind expected,
             SemanticRevision.Endpoint endpoint,
             Map<String, SemanticRevision.Element> elements,
+            Map<String, SemanticRevision.Feature> features,
             Map<String, SemanticRevision.State> states) {
         return switch (expected) {
-            case OBJECT -> endpoint.targetKind() == SemanticRevision.TargetKind.ELEMENT
-                    && elements.containsKey(endpoint.targetId()) && elements.get(endpoint.targetId()).coreKind() == SemanticRevision.CoreKind.OBJECT;
+            case OBJECT -> valueTarget(endpoint.targetKind(), endpoint.targetId(), elements, features);
             case PROCESS -> endpoint.targetKind() == SemanticRevision.TargetKind.ELEMENT
                     && elements.containsKey(endpoint.targetId()) && elements.get(endpoint.targetId()).coreKind() == SemanticRevision.CoreKind.PROCESS;
             case OBJECT_STATE -> {
                 SemanticRevision.State state = endpoint.targetKind() == SemanticRevision.TargetKind.STATE ? states.get(endpoint.targetId()) : null;
-                SemanticRevision.Element owner = state == null || state.ownerTargetKind() != SemanticRevision.TargetKind.ELEMENT
-                        ? null : elements.get(state.ownerElementId());
-                yield owner != null && owner.coreKind() == SemanticRevision.CoreKind.OBJECT;
+                yield state != null && valueTarget(state.ownerTargetKind(), state.ownerElementId(), elements, features);
             }
         };
+    }
+
+    private boolean valueTarget(SemanticRevision.TargetKind kind, String id,
+            Map<String, SemanticRevision.Element> elements, Map<String, SemanticRevision.Feature> features) {
+        if (kind == SemanticRevision.TargetKind.ELEMENT)
+            return elements.containsKey(id) && elements.get(id).coreKind() == SemanticRevision.CoreKind.OBJECT;
+        if (kind != SemanticRevision.TargetKind.FEATURE) return false;
+        var feature = features.get(id);
+        return feature != null && feature.kind() == SemanticRevision.FeatureKind.ATTRIBUTE
+                && elements.containsKey(feature.ownerElementId());
     }
 
     private ProceduralEndpointExpectation objectEndpoint(String role) {
@@ -415,10 +411,10 @@ public final class OplTextGenerationService {
         if (capabilityValues.size() != 1 || segmentValues.size() != 1) {
             throw failure(OplGenerationCode.MODIFIER_COMBINATION_INVALID, "Control requires exactly one capability and segment modifier");
         }
-        if (!"PROCESS_INPUT".equals(segmentValues.getFirst())) {
+        if (!"PROCESS_INPUT".equals(segmentValues.get(0))) {
             throw failure(OplGenerationCode.MODIFIER_COMBINATION_INVALID, "Control is only valid for PROCESS_INPUT");
         }
-        String control = capabilityValues.getFirst();
+        String control = capabilityValues.get(0);
         String base = fact.capability().capabilityId();
         String template = switch (control + ":" + base) {
             case "CAP-ISO-CTRL-001:CAP-ISO-PROC-001" -> "opl.control.event.transforming.consumption.v1";
@@ -450,8 +446,9 @@ public final class OplTextGenerationService {
             SemanticRevision.Fact fact,
             String controlCapabilityId,
             Map<String, SemanticRevision.Element> elements,
+            Map<String, SemanticRevision.Feature> features,
             Map<String, SemanticRevision.State> states) {
-        java.util.function.Function<String, String> label = role -> endpointName(endpoint(fact, role), elements, states);
+        java.util.function.Function<String, String> label = role -> endpointName(endpoint(fact, role), elements, features, states);
         java.util.function.Function<String, String> state = role -> stateName(endpoint(fact, role), states);
         String capability = fact.capability().capabilityId();
         return switch (controlCapabilityId + ":" + capability) {
@@ -459,22 +456,22 @@ public final class OplTextGenerationService {
             case "CAP-ISO-CTRL-001:CAP-ISO-PROC-003" -> label.apply("AFFECTEE") + " initiates " + label.apply("AFFECTING_PROCESS") + ", which affects " + label.apply("AFFECTED") + ".";
             case "CAP-ISO-CTRL-002:CAP-ISO-PROC-004" -> label.apply("AGENT_OBJECT") + " initiates and handles " + label.apply("ENABLED_PROCESS") + ".";
             case "CAP-ISO-CTRL-002:CAP-ISO-PROC-005" -> label.apply("INSTRUMENT_OBJECT") + " initiates " + label.apply("ENABLED_PROCESS") + ", which requires " + label.apply("INSTRUMENT_OBJECT") + ".";
-            case "CAP-ISO-CTRL-003:CAP-ISO-PROC-006" -> state.apply("CONSUMED_STATE") + " " + ownerName(endpoint(fact, "CONSUMED_STATE"), states, elements) + " initiates " + label.apply("CONSUMING_PROCESS") + ", which consumes " + ownerName(endpoint(fact, "CONSUMED_STATE"), states, elements) + ".";
-            case "CAP-ISO-CTRL-003:CAP-ISO-PROC-008" -> state.apply("AFFECTEE_INPUT_STATE") + " " + ownerName(endpoint(fact, "AFFECTEE_INPUT_STATE"), states, elements) + " initiates " + label.apply("AFFECTING_PROCESS") + ", which changes " + ownerName(endpoint(fact, "AFFECTEE_INPUT_STATE"), states, elements) + " from " + state.apply("AFFECTEE_INPUT_STATE") + " to " + state.apply("AFFECTED_OUTPUT_STATE") + ".";
-            case "CAP-ISO-CTRL-003:CAP-ISO-PROC-009" -> state.apply("AFFECTEE_INPUT_STATE") + " " + ownerName(endpoint(fact, "AFFECTEE_INPUT_STATE"), states, elements) + " initiates " + label.apply("AFFECTING_PROCESS") + ", which changes " + ownerName(endpoint(fact, "AFFECTED_OBJECT"), states, elements) + " from " + state.apply("AFFECTEE_INPUT_STATE") + ".";
+            case "CAP-ISO-CTRL-003:CAP-ISO-PROC-006" -> state.apply("CONSUMED_STATE") + " " + ownerName(endpoint(fact, "CONSUMED_STATE"), states, elements, features) + " initiates " + label.apply("CONSUMING_PROCESS") + ", which consumes " + ownerName(endpoint(fact, "CONSUMED_STATE"), states, elements, features) + ".";
+            case "CAP-ISO-CTRL-003:CAP-ISO-PROC-008" -> state.apply("AFFECTEE_INPUT_STATE") + " " + ownerName(endpoint(fact, "AFFECTEE_INPUT_STATE"), states, elements, features) + " initiates " + label.apply("AFFECTING_PROCESS") + ", which changes " + ownerName(endpoint(fact, "AFFECTEE_INPUT_STATE"), states, elements, features) + " from " + state.apply("AFFECTEE_INPUT_STATE") + " to " + state.apply("AFFECTED_OUTPUT_STATE") + ".";
+            case "CAP-ISO-CTRL-003:CAP-ISO-PROC-009" -> state.apply("AFFECTEE_INPUT_STATE") + " " + ownerName(endpoint(fact, "AFFECTEE_INPUT_STATE"), states, elements, features) + " initiates " + label.apply("AFFECTING_PROCESS") + ", which changes " + ownerName(endpoint(fact, "AFFECTED_OBJECT"), states, elements, features) + " from " + state.apply("AFFECTEE_INPUT_STATE") + ".";
             case "CAP-ISO-CTRL-003:CAP-ISO-PROC-010" -> label.apply("AFFECTEE_OBJECT") + " in any state initiates " + label.apply("AFFECTING_PROCESS") + ", which changes " + label.apply("AFFECTEE_OBJECT") + " to " + state.apply("AFFECTED_OUTPUT_STATE") + ".";
-            case "CAP-ISO-CTRL-004:CAP-ISO-PROC-011" -> state.apply("AGENT_STATE") + " " + ownerName(endpoint(fact, "AGENT_STATE"), states, elements) + " initiates and handles " + label.apply("ENABLED_PROCESS") + ".";
-            case "CAP-ISO-CTRL-004:CAP-ISO-PROC-012" -> state.apply("INSTRUMENT_STATE") + " " + ownerName(endpoint(fact, "INSTRUMENT_STATE"), states, elements) + " initiates " + label.apply("ENABLED_PROCESS") + ", which requires " + state.apply("INSTRUMENT_STATE") + " " + ownerName(endpoint(fact, "INSTRUMENT_STATE"), states, elements) + ".";
+            case "CAP-ISO-CTRL-004:CAP-ISO-PROC-011" -> state.apply("AGENT_STATE") + " " + ownerName(endpoint(fact, "AGENT_STATE"), states, elements, features) + " initiates and handles " + label.apply("ENABLED_PROCESS") + ".";
+            case "CAP-ISO-CTRL-004:CAP-ISO-PROC-012" -> state.apply("INSTRUMENT_STATE") + " " + ownerName(endpoint(fact, "INSTRUMENT_STATE"), states, elements, features) + " initiates " + label.apply("ENABLED_PROCESS") + ", which requires " + state.apply("INSTRUMENT_STATE") + " " + ownerName(endpoint(fact, "INSTRUMENT_STATE"), states, elements, features) + ".";
             case "CAP-ISO-CTRL-005:CAP-ISO-PROC-001" -> label.apply("CONSUMING_PROCESS") + " occurs if " + label.apply("CONSUMED_OBJECT") + " exists, in which case " + label.apply("CONSUMED_OBJECT") + " is consumed, otherwise " + label.apply("CONSUMING_PROCESS") + " is skipped.";
             case "CAP-ISO-CTRL-005:CAP-ISO-PROC-003" -> label.apply("AFFECTING_PROCESS") + " occurs if " + label.apply("AFFECTEE") + " exists, in which case " + label.apply("AFFECTING_PROCESS") + " affects " + label.apply("AFFECTED") + ", otherwise " + label.apply("AFFECTING_PROCESS") + " is skipped.";
             case "CAP-ISO-CTRL-006:CAP-ISO-PROC-004" -> label.apply("ENABLED_PROCESS") + " occurs if " + label.apply("AGENT_OBJECT") + " exists, else " + label.apply("ENABLED_PROCESS") + " is skipped.";
             case "CAP-ISO-CTRL-006:CAP-ISO-PROC-005" -> label.apply("ENABLED_PROCESS") + " occurs if " + label.apply("INSTRUMENT_OBJECT") + " exists, else " + label.apply("ENABLED_PROCESS") + " is skipped.";
-            case "CAP-ISO-CTRL-007:CAP-ISO-PROC-006" -> label.apply("CONSUMING_PROCESS") + " occurs if " + ownerName(endpoint(fact, "CONSUMED_STATE"), states, elements) + " is " + state.apply("CONSUMED_STATE") + ", in which case " + ownerName(endpoint(fact, "CONSUMED_STATE"), states, elements) + " is consumed, otherwise " + label.apply("CONSUMING_PROCESS") + " is skipped.";
-            case "CAP-ISO-CTRL-007:CAP-ISO-PROC-008" -> label.apply("AFFECTING_PROCESS") + " occurs if there is " + state.apply("AFFECTEE_INPUT_STATE") + " " + ownerName(endpoint(fact, "AFFECTEE_INPUT_STATE"), states, elements) + ", in which case " + label.apply("AFFECTING_PROCESS") + " changes " + ownerName(endpoint(fact, "AFFECTEE_INPUT_STATE"), states, elements) + " from " + state.apply("AFFECTEE_INPUT_STATE") + " to " + state.apply("AFFECTED_OUTPUT_STATE") + ", else " + label.apply("AFFECTING_PROCESS") + " is skipped.";
-            case "CAP-ISO-CTRL-007:CAP-ISO-PROC-009" -> label.apply("AFFECTING_PROCESS") + " occurs if there is " + state.apply("AFFECTEE_INPUT_STATE") + " " + ownerName(endpoint(fact, "AFFECTEE_INPUT_STATE"), states, elements) + " in which case " + label.apply("AFFECTING_PROCESS") + " changes " + ownerName(endpoint(fact, "AFFECTED_OBJECT"), states, elements) + " from " + state.apply("AFFECTEE_INPUT_STATE") + ", else " + label.apply("AFFECTING_PROCESS") + " is skipped.";
+            case "CAP-ISO-CTRL-007:CAP-ISO-PROC-006" -> label.apply("CONSUMING_PROCESS") + " occurs if " + ownerName(endpoint(fact, "CONSUMED_STATE"), states, elements, features) + " is " + state.apply("CONSUMED_STATE") + ", in which case " + ownerName(endpoint(fact, "CONSUMED_STATE"), states, elements, features) + " is consumed, otherwise " + label.apply("CONSUMING_PROCESS") + " is skipped.";
+            case "CAP-ISO-CTRL-007:CAP-ISO-PROC-008" -> label.apply("AFFECTING_PROCESS") + " occurs if there is " + state.apply("AFFECTEE_INPUT_STATE") + " " + ownerName(endpoint(fact, "AFFECTEE_INPUT_STATE"), states, elements, features) + ", in which case " + label.apply("AFFECTING_PROCESS") + " changes " + ownerName(endpoint(fact, "AFFECTEE_INPUT_STATE"), states, elements, features) + " from " + state.apply("AFFECTEE_INPUT_STATE") + " to " + state.apply("AFFECTED_OUTPUT_STATE") + ", else " + label.apply("AFFECTING_PROCESS") + " is skipped.";
+            case "CAP-ISO-CTRL-007:CAP-ISO-PROC-009" -> label.apply("AFFECTING_PROCESS") + " occurs if there is " + state.apply("AFFECTEE_INPUT_STATE") + " " + ownerName(endpoint(fact, "AFFECTEE_INPUT_STATE"), states, elements, features) + " in which case " + label.apply("AFFECTING_PROCESS") + " changes " + ownerName(endpoint(fact, "AFFECTED_OBJECT"), states, elements, features) + " from " + state.apply("AFFECTEE_INPUT_STATE") + ", else " + label.apply("AFFECTING_PROCESS") + " is skipped.";
             case "CAP-ISO-CTRL-007:CAP-ISO-PROC-010" -> label.apply("AFFECTING_PROCESS") + " occurs if " + label.apply("AFFECTEE_OBJECT") + " exists, in which case " + label.apply("AFFECTING_PROCESS") + " changes " + label.apply("AFFECTEE_OBJECT") + " to " + state.apply("AFFECTED_OUTPUT_STATE") + ", otherwise " + label.apply("AFFECTING_PROCESS") + " is skipped.";
-            case "CAP-ISO-CTRL-008:CAP-ISO-PROC-011" -> label.apply("ENABLED_PROCESS") + " occurs if " + state.apply("AGENT_STATE") + " " + ownerName(endpoint(fact, "AGENT_STATE"), states, elements) + " exists, else " + label.apply("ENABLED_PROCESS") + " is skipped.";
-            case "CAP-ISO-CTRL-008:CAP-ISO-PROC-012" -> label.apply("ENABLED_PROCESS") + " occurs if " + state.apply("INSTRUMENT_STATE") + " " + ownerName(endpoint(fact, "INSTRUMENT_STATE"), states, elements) + " exists, else " + label.apply("ENABLED_PROCESS") + " is skipped.";
+            case "CAP-ISO-CTRL-008:CAP-ISO-PROC-011" -> label.apply("ENABLED_PROCESS") + " occurs if " + state.apply("AGENT_STATE") + " " + ownerName(endpoint(fact, "AGENT_STATE"), states, elements, features) + " exists, else " + label.apply("ENABLED_PROCESS") + " is skipped.";
+            case "CAP-ISO-CTRL-008:CAP-ISO-PROC-012" -> label.apply("ENABLED_PROCESS") + " occurs if " + state.apply("INSTRUMENT_STATE") + " " + ownerName(endpoint(fact, "INSTRUMENT_STATE"), states, elements, features) + " exists, else " + label.apply("ENABLED_PROCESS") + " is skipped.";
             default -> throw failure(OplGenerationCode.TEXT_PLAN_UNSUPPORTED, "Control capability does not match its base fact");
         };
     }
@@ -486,23 +483,30 @@ public final class OplTextGenerationService {
         return state.name().localName();
     }
 
-    private String ownerName(SemanticRevision.Endpoint endpoint, Map<String, SemanticRevision.State> states, Map<String, SemanticRevision.Element> elements) {
+    private String ownerName(SemanticRevision.Endpoint endpoint, Map<String, SemanticRevision.State> states,
+            Map<String, SemanticRevision.Element> elements, Map<String, SemanticRevision.Feature> features) {
         if (endpoint.targetKind() == SemanticRevision.TargetKind.ELEMENT) return requireElement(endpoint, elements, endpoint.role()).name().localName();
+        if (endpoint.targetKind() == SemanticRevision.TargetKind.FEATURE) return features.get(endpoint.targetId()).name().localName();
         SemanticRevision.State state = states.get(endpoint.targetId());
+        if (state != null && state.ownerTargetKind() == SemanticRevision.TargetKind.FEATURE) {
+            var feature = features.get(state.ownerElementId());
+            if (feature != null) return feature.name().localName();
+        }
         SemanticRevision.Element owner = state == null ? null : elements.get(state.ownerElementId());
         if (owner == null) throw failure(OplGenerationCode.TEXT_PLAN_UNSUPPORTED, "Control state owner is missing");
         return owner.name().localName();
     }
 
-    private String endpointName(SemanticRevision.Endpoint endpoint, Map<String, SemanticRevision.Element> elements, Map<String, SemanticRevision.State> states) {
+    private String endpointName(SemanticRevision.Endpoint endpoint, Map<String, SemanticRevision.Element> elements,
+            Map<String, SemanticRevision.Feature> features, Map<String, SemanticRevision.State> states) {
         if (endpoint.targetKind() == SemanticRevision.TargetKind.ELEMENT) return requireElement(endpoint, elements, endpoint.role()).name().localName();
+        if (endpoint.targetKind() == SemanticRevision.TargetKind.FEATURE) return ownerName(endpoint, states, elements, features);
         if (endpoint.targetKind() == SemanticRevision.TargetKind.STATE) {
             SemanticRevision.State state = states.get(endpoint.targetId());
-            SemanticRevision.Element owner = state == null ? null : elements.get(state.ownerElementId());
-            if (state == null || owner == null) throw failure(OplGenerationCode.TEXT_PLAN_UNSUPPORTED, "State endpoint does not exist");
-            return state.name().localName() + " " + owner.name().localName();
+            if (state == null) throw failure(OplGenerationCode.TEXT_PLAN_UNSUPPORTED, "State endpoint does not exist");
+            return state.name().localName() + " " + ownerName(endpoint, states, elements, features);
         }
-        throw failure(OplGenerationCode.TEXT_PLAN_UNSUPPORTED, "Procedural endpoint must be an Element or State");
+        throw failure(OplGenerationCode.TEXT_PLAN_UNSUPPORTED, "Procedural endpoint must be an Element, Attribute or State");
     }
 
     private String duration(SemanticRevision.Fact fact) {
@@ -563,7 +567,7 @@ public final class OplTextGenerationService {
                 source.stateId() == null ? "" : source.stateId(), source.stateName() == null ? "" : source.stateName());
         return new SentencePlan(
                 sentenceId,
-                occurrencesByTarget.get(fact.id()).getFirst().contextId(),
+                occurrencesByTarget.get(fact.id()).get(0).contextId(),
                 templateId,
                 List.of(fact.id()),
                 elementIds,
@@ -613,16 +617,16 @@ public final class OplTextGenerationService {
     private OplTextTrace trace(SentencePlan plan, OplSentence sentence, OplGrammar grammar, String bindingDigest) {
         List<OplTextTrace.TokenRange> ranges = new ArrayList<>();
         int processEnd = plan.processName().length();
-        ranges.add(new OplTextTrace.TokenRange(plan.inputElementIds().getFirst(), 0, utf8Offset(sentence.text(), processEnd)));
+        ranges.add(new OplTextTrace.TokenRange(plan.inputElementIds().get(0), 0, utf8Offset(sentence.text(), processEnd)));
         int objectStart = sentence.text().lastIndexOf(plan.objectName());
         ranges.add(new OplTextTrace.TokenRange(plan.inputElementIds().get(1), utf8Offset(sentence.text(), objectStart), utf8Offset(sentence.text(), objectStart + plan.objectName().length())));
         if (plan.stateName() != null) {
             int stateStart = sentence.text().indexOf(plan.stateName(), processEnd);
             ranges.add(new OplTextTrace.TokenRange(plan.stateId(), utf8Offset(sentence.text(), stateStart), utf8Offset(sentence.text(), stateStart + plan.stateName().length())));
         }
-        ranges.add(new OplTextTrace.TokenRange(plan.inputFactIds().getFirst(), 0, sentence.text().getBytes(StandardCharsets.UTF_8).length));
+        ranges.add(new OplTextTrace.TokenRange(plan.inputFactIds().get(0), 0, sentence.text().getBytes(StandardCharsets.UTF_8).length));
         return new OplTextTrace(
-                identifier("trace", sentence.sentenceId(), plan.inputFactIds().getFirst()),
+                identifier("trace", sentence.sentenceId(), plan.inputFactIds().get(0)),
                 plan.contextId(),
                 plan.inputFactIds(),
                 plan.inputElementIds(),

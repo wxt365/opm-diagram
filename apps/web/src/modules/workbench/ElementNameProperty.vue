@@ -1,8 +1,25 @@
 <template>
   <div class="element-name-property">
     <label class="element-name-property__row">
-      <span>名称</span>
+      <span>{{ fieldLabel }}</span>
+      <textarea
+        v-if="field === 'remark'"
+        ref="input"
+        v-model="value"
+        data-testid="p03-inspector-remark"
+        aria-label="备注"
+        rows="5"
+        placeholder="请输入备注"
+        :readonly="readonly || submitting"
+        :aria-busy="submitting"
+        :aria-invalid="!!error"
+        @keydown="keydown"
+        @blur="blur"
+        @compositionstart="composing = true"
+        @compositionend="compositionEnd"
+      />
       <input
+        v-else
         ref="input"
         v-model="value"
         data-testid="p03-inspector-name"
@@ -22,16 +39,18 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 
 const props = defineProps<{
   elementId: string;
   name: string;
   readonly: boolean;
+  field?: "name" | "remark";
   failureMessage?: string;
   submitNameEdit: (id: string, value: string) => Promise<boolean>;
 }>();
-const input = ref<HTMLInputElement>();
+const fieldLabel = computed(() => props.field === "remark" ? "备注" : "名称");
+const input = ref<HTMLInputElement | HTMLTextAreaElement>();
 const value = ref(props.name);
 const original = ref(props.name);
 const error = ref("");
@@ -57,13 +76,13 @@ function finishNameEdit(): Promise<boolean> {
   const work = (async () => {
     let succeeded = false;
     try { succeeded = await props.submitNameEdit(id, name); }
-    catch { if (!disposed) error.value = "名称未保存，请重试。"; }
+    catch { if (!disposed) error.value = `${fieldLabel.value}未保存，请重试。`; }
     if (disposed) return false;
     submitting.value = false;
     if (succeeded) {
       value.value = props.name; original.value = props.name;
     } else {
-      error.value ||= props.failureMessage || "名称未保存，请检查输入后重试。";
+      error.value ||= props.failureMessage || `${fieldLabel.value}未保存，请检查输入后重试。`;
       await nextTick();
       if (!disposed) input.value?.focus();
     }
@@ -75,7 +94,7 @@ function finishNameEdit(): Promise<boolean> {
 
 function keydown(event: KeyboardEvent) {
   if (event.isComposing || event.keyCode === 229 || composing.value || submitting.value) return;
-  if (event.key === "Enter") { event.preventDefault(); void finishNameEdit(); }
+  if (event.key === "Enter" && (props.field !== "remark" || event.ctrlKey || event.metaKey)) { event.preventDefault(); void finishNameEdit(); }
   else if (event.key === "Escape") {
     event.preventDefault(); event.stopPropagation();
     value.value = props.name; original.value = props.name; error.value = "";
@@ -98,12 +117,15 @@ defineExpose({ finishNameEdit });
 .element-name-property { padding: 8px 0; border-bottom: 1px solid #edf0f3; }
 .element-name-property__row { display: flex; align-items: center; gap: 10px; font-size: 12px; color: #53616d; }
 .element-name-property__row span { flex: 0 0 30px; }
-.element-name-property__row input {
+.element-name-property__row input, .element-name-property__row textarea {
   width: 100%; min-width: 0; height: 28px; padding: 3px 6px;
   color: #25323d; font: inherit; font-size: 13px; line-height: 20px; background: #fff;
   border: 1px solid #dbe3e9; border-radius: 3px;
 }
-.element-name-property__row input:focus-visible { border-color: #2f7abf; outline: none; box-shadow: none; }
-.element-name-property__row input:read-only { background: #f7f9fb; color: #53616d; }
+.element-name-property__row textarea { height: auto; min-height: 112px; resize: vertical; white-space: pre-wrap; }
+.element-name-property__row:has(textarea) { align-items: flex-start; }
+.element-name-property__row:has(textarea) span { padding-top: 4px; }
+.element-name-property__row input:focus-visible, .element-name-property__row textarea:focus-visible { border-color: #2f7abf; outline: none; box-shadow: none; }
+.element-name-property__row input:read-only, .element-name-property__row textarea:read-only { background: #f7f9fb; color: #53616d; }
 .element-name-property__error { margin: 5px 0 0; color: #b42318; font-size: 12px; }
 </style>

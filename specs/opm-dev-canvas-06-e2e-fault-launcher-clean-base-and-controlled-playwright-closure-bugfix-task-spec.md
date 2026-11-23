@@ -1,5 +1,7 @@
 # Spec: DEV-CANVAS-06 E2E Fault Launcher Clean Base与受控Playwright闭包修正
 
+> 上游历史参考：本仓库仅迁入 OPM、SQLite 与桌面相关部分；业务建模、PostgreSQL 和内网部署不在范围内。原文状态及验证结果不自动适用于本仓库，实际迁移验证见 README 的迁移策略与本次迁移报告。
+
 文档状态：`FROZEN`
 
 设计修正状态：`COMPLETE`
@@ -75,8 +77,6 @@ git show --format= --no-ext-diff --binary 0dcaa27a92693feaf28b731ebed2f81a9ccea0
 `0dcaa27...`恰有一个parent且等于`e598...`。`git diff --name-status e598... 0dcaa27...`必须保持既有`17=14 M+3 A`集成Source集合，不由本规格重解释。
 
 ### 4.2 活动输入指纹
-
-下表保留本规格指定历史 controlled source 的精确指纹。现行源码的 Fault Schema pin 已由[合并后修正规格](./opm-integrated-failed-items-bugfix-task-spec.md)及[实现规格第 4.1 节](./opm-dev-canvas-06-e2e-fault-launcher-implementation-task-spec.md#41-生产java与构建文件7-read_only_baseline)升级；不得把本表或旧发布证据套用于当前源码，也不得回写历史指纹。
 
 | 输入 | byte_length | SHA-256 |
 | --- | ---: | --- |

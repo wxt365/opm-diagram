@@ -17,7 +17,7 @@ test("真实 DeepSeek 多轮提案、画布预览、应用、保存重开与只�
   await page.getByTestId("p03-bottom-toggle").click();
   if (await page.getByTestId("p03-right-panel-close").isVisible()) await page.getByTestId("p03-right-panel-close").click();
   await page.getByTestId("left-tab-assistant").click();
-  const panel = page.getByTestId("assistant-panel"); await expect(panel).toBeVisible();
+  const panel = page.locator('[data-testid=assistant-panel]:visible'); await expect(panel).toBeVisible();
   await expect(page.getByTestId("p03-bottom-content")).toBeHidden();
   await expect(page.getByTestId("p03-tab-assistant")).toHaveCount(0);
   await expect(panel.getByRole("combobox")).toHaveCount(0);
@@ -27,24 +27,16 @@ test("真实 DeepSeek 多轮提案、画布预览、应用、保存重开与只�
   await page.getByTestId("left-tab-assistant").click();
   await expect(panel.getByTestId("assistant-input")).toHaveValue("尚未发送的咖啡建模需求");
   await prompt(page, "创建名为咖啡豆的对象，x=120,y=160。");
-  await page.getByRole("button", { name: "退出预览", exact: true }).click();
-  const token = await page.getByTestId("hs-draft-identity").innerText();
-  if (await panel.getByTestId("assistant-preview").last().isVisible()) await panel.getByTestId("assistant-preview").last().click();
-  await expect(page.getByTestId("assistant-canvas-preview")).toBeVisible();
   await expect(node(page, "咖啡豆")).toBeVisible();
-  expect(await page.getByTestId("hs-draft-identity").innerText()).toBe(token);
-  await page.getByRole("button", { name: "退出预览", exact: true }).click();
-  await expect(node(page, "咖啡豆")).toHaveCount(0);
-  await apply(page); await expect(node(page, "咖啡豆")).toBeVisible();
   for (const [request, label] of [
     ["为咖啡豆添加待烘焙状态，放在对象内部合适位置，名称为待烘焙。", "待烘焙"],
     ["再为同一个咖啡豆对象添加已烘焙状态，放在对象内部避免与待烘焙重叠。", "已烘焙"],
     ["添加名为烘焙的过程，x=500,y=160。", "烘焙"],
-    ["连接待烘焙状态、烘焙过程和已烘焙状态，使烘焙将咖啡豆从待烘焙变为已烘焙。只提出对应的一个状态变化关系提案。", ""],
+    ["连接待烘焙状态、烘焙过程和已烘焙状态，使烘焙将咖啡豆从待烘焙变为已烘焙。只添加对应的一个状态变化关系。", ""],
     ["将烘焙过程重命名为咖啡烘焙，不新增过程。", "咖啡烘焙"],
     ["移动咖啡烘焙过程到 x=480,y=220，只调整本图位置。", "咖啡烘焙"],
   ]) {
-    await prompt(page, request!); await apply(page);
+    await prompt(page, request!);
     if (label) await expect(node(page, label)).toBeVisible();
   }
   expect(await page.locator('.x6-node').filter({ hasText: "咖啡豆" }).count()).toBeGreaterThan(0);
@@ -84,18 +76,11 @@ test("真实 DeepSeek 多轮提案、画布预览、应用、保存重开与只�
 });
 function node(page: Page, name: string) { return page.locator(".x6-node").filter({ has: page.locator("text", { hasText: new RegExp(`^${name}$`) }) }).last(); }
 async function prompt(page: Page, text: string) {
-  const panel = page.getByTestId("assistant-panel"), count = await panel.getByTestId("assistant-proposal").count();
+  const panel = page.locator('[data-testid=assistant-panel]:visible'), count = await panel.getByTestId("assistant-proposal").count();
   await panel.getByTestId("assistant-input").fill(text); await panel.getByTestId("assistant-send").click();
   await expect(panel.getByTestId("assistant-running")).toBeVisible();
   await expect(panel.getByTestId("assistant-running")).toHaveCount(0, { timeout: 120_000 });
   await expect(panel.getByTestId("assistant-proposal")).toHaveCount(count + 1);
-  await expect(panel.getByTestId("assistant-proposal").last()).toContainText("待应用");
-  if (await panel.getByTestId("assistant-preview").last().isVisible()) await panel.getByTestId("assistant-preview").last().click(); await expect(page.getByTestId("assistant-canvas-preview")).toBeVisible();
-}
-async function apply(page: Page) {
-  const before = await page.getByTestId("hs-draft-identity").innerText();
-  await page.getByTestId("assistant-apply").last().click();
-  await expect(page.getByTestId("hs-draft-identity")).not.toHaveText(before, { timeout: 20_000 });
-  await expect(page.getByTestId("assistant-proposal").last()).toContainText("已应用");
+  await expect(panel.getByTestId("assistant-proposal").last()).toContainText("已保存");
   await expect(page.getByTestId("assistant-canvas-preview")).toHaveCount(0);
 }

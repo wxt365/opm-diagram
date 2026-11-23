@@ -274,12 +274,12 @@ class LocalApiControllerTest {
                 .map(item -> (Map<String, Object>) item).toList();
 
         assertEquals(34, items.size());
-        assertEquals("CAP-ISO-PROC-001", items.getFirst().get("capability_id"));
-        assertEquals("CAP-ISO-STRUCT-010", items.getLast().get("capability_id"));
+        assertEquals("CAP-ISO-PROC-001", items.get(0).get("capability_id"));
+        assertEquals("CAP-ISO-STRUCT-010", items.get(items.size() - 1).get("capability_id"));
         assertEquals(16, items.stream().filter(item -> "PROCEDURAL".equals(item.get("family"))).count());
         assertEquals(8, items.stream().filter(item -> "CONTROL".equals(item.get("family"))).count());
         assertEquals(10, items.stream().filter(item -> "STRUCTURAL".equals(item.get("family"))).count());
-        Map<String, Object> consumption = items.getFirst();
+        Map<String, Object> consumption = items.get(0);
         assertEquals("CREATE_FACT", consumption.get("interaction_mode"));
         assertEquals("symbol.link.consumption", ((Map<?, ?>) consumption.get("symbol_descriptor")).get("id"));
         assertEquals(2, ((Map<?, ?>) consumption.get("endpoint_summary")).get("min_endpoints"));
@@ -304,7 +304,7 @@ class LocalApiControllerTest {
         Map<String, Object> transformingEvent = selectedItems.stream()
                 .filter(item -> "CAP-ISO-CTRL-001".equals(item.get("capability_id"))).findFirst().orElseThrow();
         assertEquals("UPDATE_SELECTED_FACT", transformingEvent.get("interaction_mode"));
-        assertEquals("BASE_PROCEDURAL_FACT", ((Map<?, ?>) ((List<?>) ((Map<?, ?>) transformingEvent.get("endpoint_summary")).get("roles")).getFirst()).get("role"));
+        assertEquals("BASE_PROCEDURAL_FACT", ((Map<?, ?>) ((List<?>) ((Map<?, ?>) transformingEvent.get("endpoint_summary")).get("roles")).get(0)).get("role"));
     }
 
     @Test

@@ -15,7 +15,6 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-
 class VisualCommonRuntimeReadyWriterTest {
 
     private static final long EPOCH = 1782864000L;
@@ -55,7 +54,7 @@ class VisualCommonRuntimeReadyWriterTest {
 
     @Test
     void resolvesOuterJarFromSpringBootNestedCodeSource() {
-        assertEquals(Path.of("/private/tmp/runtime.jar"), VisualCommonRuntimeReadyWriter.runtimeJarFromCodeSourceLocation(
+        assertEquals(Path.of("/private/tmp/runtime.jar").toAbsolutePath().normalize(), VisualCommonRuntimeReadyWriter.runtimeJarFromCodeSourceLocation(
                 "jar:nested:/private/tmp/runtime.jar/!BOOT-INF/classes/!/org/opm/localruntime/LocalRuntimeApplication.class"));
     }
 

@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OPM 工作台：地址与自动关联</title>
+  <link rel="stylesheet" href="../dist-workbench/style.css">
+  <script type="importmap">{"imports":{"vue":"/node_modules/vue/dist/vue.runtime.esm-browser.prod.js"}}</script>
+  <style>body { margin: 0; } #canvas { height: 850px; } output { display: block; padding: 8px; }</style>
+</head>
+<body>
+  <output id="status">正在加载</output>
+  <div id="canvas"></div>
+  <script type="module">
+    import { init } from '../dist-workbench/index.js';
+    const params = new URLSearchParams(location.search);
+    const storageKey = 'opm-connected-example';
+    const source = { systemId: 'connected-example', projectId: '123-external-project', projectName: '宿主项目',
+      modelId: '456-external-model', modelName: '宿主模型' };
+    const options = {
+      backendUrl: params.get('backend') ?? 'http://127.0.0.1:17850',
+      assistantUrl: params.get('assistant') ?? 'http://127.0.0.1:17860',
+      accessToken: params.get('token') ?? undefined, source, showHeader: true,
+      binding: params.has('binding') ? JSON.parse(localStorage.getItem(storageKey) ?? 'null') ?? undefined : undefined,
+    };
+    const workbench = init(document.getElementById('canvas'), options);
+    workbench.on('bound', value => {
+      localStorage.setItem(storageKey, JSON.stringify(value));
+      document.getElementById('status').textContent = JSON.stringify(value);
+    });
+    workbench.on('error', error => { document.getElementById('status').textContent = error; });
+    window.connectedExample = { workbench, source };
+  </script>
+</body>
+</html>

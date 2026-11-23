@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { copyWorkbenchPermalink } from "./helpers/workbench-revision";
+import { localLayout } from './helpers/local-layout';
 
 async function createWorkbench(page: Page) {
   await page.goto("/projects");
@@ -32,7 +33,7 @@ test("HEAD 连续编辑地址不变，永久链接只读，刷新与前进后退
   const box = await node.boundingBox();
   if (!box) throw new Error("对象未进入画布");
   const canvasBounds = await page.locator(".canvas-frame").boundingBox();
-  await commit(page, async () => {
+  await localLayout(page, async () => {
     await page.mouse.move(box.x + 30, box.y + 30);
     await page.mouse.down();
     await page.mouse.move(box.x + 110, box.y + 80, { steps: 8 });
@@ -43,13 +44,15 @@ test("HEAD 连续编辑地址不变，永久链接只读，刷新与前进后退
   await commit(page, () => page.getByTestId("p03-tool-process").click());
   expect(page.url()).toBe(headUrl);
   expect(await page.evaluate(() => history.length)).toBe(historyLength);
+  await page.getByTestId('hs-save').click(); await expect(page.getByTestId('hs-save-state')).toHaveText('已手动保存');
   const { permalink, revision } = await copyWorkbenchPermalink(page);
   expect(page.url()).toBe(headUrl);
 
   await page.getByTestId("p03-version-select").selectOption(revision);
   await expect(page.getByTestId("p03-readonly-banner")).toBeVisible();
   await expect(page.getByTestId("p03-tool-object")).toBeDisabled();
-  expect(page.url()).toBe(permalink);
+  expect(new URL(page.url()).pathname).toBe(new URL(permalink).pathname);
+  expect(Object.fromEntries(new URL(page.url()).searchParams)).toEqual(Object.fromEntries(new URL(permalink).searchParams));
   await page.reload();
   await expect(page.locator(".revision-tag")).toHaveText(`固定版本 ${revision}`);
   const beforeReadonlyDrag = await node.boundingBox();

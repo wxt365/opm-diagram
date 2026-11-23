@@ -4,7 +4,7 @@ import java.nio.file.Path;
 import java.util.Objects;
 import java.util.Optional;
 
-public sealed interface ProjectDatabaseOpenResult permits ProjectDatabaseOpenResult.Ready, ProjectDatabaseOpenResult.RecoveryRequired {
+public interface ProjectDatabaseOpenResult {
 
     record Ready(ProjectDatabase database, Optional<Path> recoveryPoint) implements ProjectDatabaseOpenResult {
 
@@ -14,7 +14,7 @@ public sealed interface ProjectDatabaseOpenResult permits ProjectDatabaseOpenRes
         }
     }
 
-    record RecoveryRequired(Path databasePath, Optional<Path> recoveryPoint, Path markerPath) implements ProjectDatabaseOpenResult {
+    record RecoveryRequired(ProjectScope databasePath, Optional<Path> recoveryPoint, Path markerPath) implements ProjectDatabaseOpenResult {
 
         public RecoveryRequired {
             Objects.requireNonNull(databasePath, "databasePath must not be null");

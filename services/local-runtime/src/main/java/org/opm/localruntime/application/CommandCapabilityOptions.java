@@ -107,7 +107,7 @@ final class CommandCapabilityOptions {
                     || selected.stream().anyMatch(item -> item.targetKind() != SemanticRevision.TargetKind.ELEMENT
                     && item.targetKind() != SemanticRevision.TargetKind.FEATURE)) return java.util.Optional.empty();
             List<ApiEdtContract.NormalizedEndpoint> endpoints = new ArrayList<>();
-            endpoints.add(endpoint("EXHIBITOR_THING", exhibitors.getFirst(), 0));
+            endpoints.add(endpoint("EXHIBITOR_THING", exhibitors.get(0), 0));
             selected.stream().filter(item -> item.targetKind() == SemanticRevision.TargetKind.FEATURE)
                     .forEach(item -> endpoints.add(endpoint("FEATURE_THING", item, endpoints.size())));
             return java.util.Optional.of(List.copyOf(endpoints));
@@ -116,20 +116,20 @@ final class CommandCapabilityOptions {
             List<StructuralTarget> valueStates = selected.stream().filter(StructuralTarget::featureValueState).toList();
             List<StructuralTarget> exhibitors = selected.stream().filter(item -> !item.featureValueState()).toList();
             if (selected.size() != 2 || valueStates.size() != 1 || exhibitors.size() != 1
-                    || (exhibitors.getFirst().targetKind() != SemanticRevision.TargetKind.ELEMENT
-                    && exhibitors.getFirst().targetKind() != SemanticRevision.TargetKind.STATE)) return java.util.Optional.empty();
-            return java.util.Optional.of(List.of(endpoint("EXHIBITOR_THING_OR_STATE", exhibitors.getFirst(), 0),
-                    endpoint("VALUE_STATE", valueStates.getFirst(), 1)));
+                    || (exhibitors.get(0).targetKind() != SemanticRevision.TargetKind.ELEMENT
+                    && exhibitors.get(0).targetKind() != SemanticRevision.TargetKind.STATE)) return java.util.Optional.empty();
+            return java.util.Optional.of(List.of(endpoint("EXHIBITOR_THING_OR_STATE", exhibitors.get(0), 0),
+                    endpoint("VALUE_STATE", valueStates.get(0), 1)));
         }
         if (descriptor.shape() == StructuralLinkCatalog.Shape.BINARY_SAME_THING) {
             if (selected.size() != 2 || selected.stream().anyMatch(item -> item.targetKind() != SemanticRevision.TargetKind.ELEMENT)
-                    || selected.getFirst().coreKind() != selected.get(1).coreKind()) return java.util.Optional.empty();
-            return java.util.Optional.of(List.of(endpoint("STRUCTURAL_SOURCE", selected.getFirst(), 0), endpoint("STRUCTURAL_TARGET", selected.get(1), 1)));
+                    || selected.get(0).coreKind() != selected.get(1).coreKind()) return java.util.Optional.empty();
+            return java.util.Optional.of(List.of(endpoint("STRUCTURAL_SOURCE", selected.get(0), 0), endpoint("STRUCTURAL_TARGET", selected.get(1), 1)));
         }
         if (descriptor.shape() == StructuralLinkCatalog.Shape.STATE_TAGGED) {
             if (selected.size() != 2 || selected.stream().anyMatch(StructuralTarget::featureValueState) || selected.stream().noneMatch(item -> item.targetKind() == SemanticRevision.TargetKind.STATE)
-                    || selected.getFirst().coreKind() != selected.get(1).coreKind()) return java.util.Optional.empty();
-            return java.util.Optional.of(List.of(endpoint("STATE_TAGGED_SOURCE", selected.getFirst(), 0), endpoint("STATE_TAGGED_TARGET", selected.get(1), 1)));
+                    || selected.get(0).coreKind() != selected.get(1).coreKind()) return java.util.Optional.empty();
+            return java.util.Optional.of(List.of(endpoint("STATE_TAGGED_SOURCE", selected.get(0), 0), endpoint("STATE_TAGGED_TARGET", selected.get(1), 1)));
         }
         if (selected.size() < 2 || selected.stream().anyMatch(item -> item.targetKind() != SemanticRevision.TargetKind.ELEMENT)
                 || selected.stream().map(StructuralTarget::coreKind).distinct().count() != 1) return java.util.Optional.empty();
@@ -146,7 +146,7 @@ final class CommandCapabilityOptions {
             default -> throw new IllegalStateException("Unsupported structural fan shape");
         };
         List<ApiEdtContract.NormalizedEndpoint> endpoints = new ArrayList<>();
-        endpoints.add(endpoint(rootRole, selected.getFirst(), 0));
+        endpoints.add(endpoint(rootRole, selected.get(0), 0));
         for (int index = 1; index < selected.size(); index++) endpoints.add(endpoint(memberRole, selected.get(index), index));
         return java.util.Optional.of(List.copyOf(endpoints));
     }
@@ -174,7 +174,7 @@ final class CommandCapabilityOptions {
             ProceduralTarget target = remaining.remove(index);
             normalized.add(new ApiEdtContract.NormalizedEndpoint(role.role(), new ApiEdtContract.TargetLocator(target.targetKind().name(), target.id(), null), ordinal, null));
         }
-        if (descriptor.sameProcessRequired() && !normalized.getFirst().targetRef().targetId().equals(normalized.get(1).targetRef().targetId())) {
+        if (descriptor.sameProcessRequired() && !normalized.get(0).targetRef().targetId().equals(normalized.get(1).targetRef().targetId())) {
             return java.util.Optional.empty();
         }
         return java.util.Optional.of(List.copyOf(normalized));

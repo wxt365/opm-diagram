@@ -46,7 +46,7 @@ final class SemanticElementEditor {
         states.add(new SemanticRevision.State(stateId, SemanticRevision.TargetKind.valueOf(ownerKind), ownerId, capability(stateCapability), qualifiedName(required(payload, "name_or_value")), stateRoles(payload), source(owner == null ? "FeatureValueState" : "ObjectState"), core()));
         if (owner != null) replaceElementStateIds(elements, ownerId, append(owner.stateIds(), stateId));
         appendOccurrence(base, stateId, SemanticRevision.TargetKind.STATE, owner == null ? "FEATURE_STATE_NODE" : "STATE_NODE", payload, contexts, occurrences, layouts);
-        containState(states.getLast(), occurrences.getLast(), occurrences, layouts, true);
+        containState(states.get(states.size() - 1), occurrences.get(occurrences.size() - 1), occurrences, layouts, true);
         String contextId = optional(payload, "context_id");
         presentations.add(new SemanticRevision.StatePresentation(contextId == null ? base.rootContextId() : contextId,
                 stateId, SemanticRevision.StateExplicitness.EXPLICIT, SemanticRevision.StateFoldState.UNFOLDED));
@@ -88,7 +88,7 @@ final class SemanticElementEditor {
                 && occurrence.targetKind() == SemanticRevision.TargetKind.STATE && occurrence.targetId().equals(stateId))) {
             String role = states.stream().filter(state -> state.id().equals(stateId)).findFirst().orElseThrow().ownerTargetKind() == SemanticRevision.TargetKind.FEATURE ? "FEATURE_STATE_NODE" : "STATE_NODE";
             appendOccurrence(base, stateId, SemanticRevision.TargetKind.STATE, role, payload, contexts, occurrences, layouts);
-            containState(states.stream().filter(state -> state.id().equals(stateId)).findFirst().orElseThrow(), occurrences.getLast(), occurrences, layouts, true);
+            containState(states.stream().filter(state -> state.id().equals(stateId)).findFirst().orElseThrow(), occurrences.get(occurrences.size() - 1), occurrences, layouts, true);
         }
     }
 

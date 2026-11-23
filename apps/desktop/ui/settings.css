@@ -1,0 +1,12 @@
+:root { font-family: -apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif; color:#24354a; background:#f5f7fb; font-size:14px; }
+* { box-sizing:border-box; } body { margin:0; } main { max-width:820px; margin:auto; padding:28px 32px 36px; }
+header,.section-heading { display:flex; align-items:center; justify-content:space-between; gap:16px; } h1 { margin:4px 0 12px; font-size:24px; } h2 { margin:0; font-size:16px; } p { line-height:1.65; }
+.eyebrow { margin:0; font-size:11px; color:#78879b; letter-spacing:.12em; } .muted { color:#66768a; font-size:13px; } .badge { border:1px solid #dce4ef; border-radius:20px; padding:4px 10px; font-size:12px; white-space:nowrap; color:#5d7087; }
+section { margin-top:18px; padding:22px; background:#fff; border:1px solid #e0e7ef; border-radius:10px; } label { display:flex; flex-direction:column; gap:7px; margin-top:16px; font-size:13px; }
+input,select,button { font:inherit; } input,select { width:100%; padding:9px 10px; border:1px solid #cad5e2; border-radius:5px; color:inherit; background:white; }
+input:focus,select:focus,button:focus-visible { outline:2px solid #4c9ce5; outline-offset:2px; } .columns { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+.check { flex-direction:row; align-items:center; } .check input { width:auto; } .actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:16px; }
+button { padding:8px 14px; border:1px solid #ccd7e3; border-radius:5px; color:#3a526d; background:#fff; cursor:pointer; } button:hover { background:#f0f5fb; } button.primary { background:#196bc3; color:white; border-color:#196bc3; } button:disabled { opacity:.55; cursor:wait; }
+.path { font-size:12px; overflow-wrap:anywhere; background:#f7f9fc; padding:10px; border-radius:5px; } #message:empty { display:none; } #message { background:#edf5ff; color:#225c97; border-radius:5px; padding:10px 12px; } #message.error { background:#fff1ef; color:#ad312b; }
+.startup { height:100vh; display:grid; place-items:center; text-align:center; } .brand { display:inline-block; width:88px; height:88px; margin-bottom:12px; }
+.client-brand { display:flex; align-items:center; gap:12px; } .client-brand img { flex-shrink:0; }

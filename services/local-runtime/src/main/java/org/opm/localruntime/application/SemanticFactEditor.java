@@ -33,7 +33,7 @@ final class SemanticFactEditor {
         if (selected.stream().anyMatch(java.util.Objects::isNull)) throw domain("过程关系端点必须引用当前修订中的 Object、State 或 Process");
         List<ApiEdtContract.NormalizedEndpoint> normalized = normalizeProceduralEndpoints(descriptor, selected)
                 .orElseThrow(() -> domain("过程关系端点不符合 Capability"));
-        if (descriptor.sameProcessRequired() && !normalized.getFirst().targetRef().targetId().equals(normalized.get(1).targetRef().targetId())) {
+        if (descriptor.sameProcessRequired() && !normalized.get(0).targetRef().targetId().equals(normalized.get(1).targetRef().targetId())) {
             throw domain("Self-invocation 必须引用同一稳定 Process 标识");
         }
         String requestedId = optional(payload, "fact_id");
@@ -227,7 +227,7 @@ final class SemanticFactEditor {
                 .map(modifier -> required(modifier, "value"))
                 .toList();
         if (values.size() != 1) throw modifierCombinationInvalid("Control Modifier 必须包含唯一 control.capability");
-        return ControlLinkCatalog.find(values.getFirst()).orElseThrow(() -> modifierCombinationInvalid("Control Capability 不受当前 Profile 支持"));
+        return ControlLinkCatalog.find(values.get(0)).orElseThrow(() -> modifierCombinationInvalid("Control Capability 不受当前 Profile 支持"));
     }
 
     static List<SemanticRevision.Modifier> controlModifiers(Map<String, Object> replacement, ControlLinkCatalog.Descriptor control) {

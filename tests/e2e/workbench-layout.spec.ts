@@ -1,5 +1,7 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { copyWorkbenchPermalink } from "./helpers/workbench-revision";
+import { chooseViewportAction } from './viewport-controls';
+import { localLayout } from './helpers/local-layout';
 
 const chromeExecutable = process.env.OPM_E2E_CHROME_EXECUTABLE;
 test.use(chromeExecutable ? { launchOptions: { executablePath: chromeExecutable } } : {});
@@ -78,7 +80,7 @@ test("连线上输入关系名称、双击改名及重开保持 Fact 和 OPL 一
   await input.press("Enter");
   await expect(page.locator(".revision-tag")).toHaveText(before);
   await expect(committedRelationAnchors(page)).toHaveCount(0);
-  await page.getByTestId("p03-zoom-in").click();
+  await page.getByTestId("p03-zoom-in").filter({ visible: true }).click();
   await expectInputOnEdge(input, previewPath);
   await input.fill("supplies");
   await input.dispatchEvent("compositionstart");
@@ -229,13 +231,13 @@ test("真实 P01 到 P03 主路径提交并在三个视口重开", async ({ page
   await expect(page.locator(".x6-node")).toHaveCount(4);
   const committedRevision = await createProceduralRelation(page, canvasNode(page, "Ready"), [canvasNode(page, "Process 1")], "CAP-ISO-PROC-006");
   await expect(committedRelationAnchors(page)).toHaveCount(1);
-  await expect(page.getByTestId("p03-opl-sentence")).toHaveText("Process 1 consumes Ready Object 1.");
+  await expect(page.getByTestId("p03-opl-sentence")).toHaveAttribute("title", "Process 1 consumes Ready Object 1.");
   expect(stateRevision).not.toBe(committedRevision);
 
   const resultRevision = await createProceduralRelation(page, canvasNode(page, "Process 1"), [canvasNode(page, "Object 1")], "CAP-ISO-PROC-002");
   await expect(committedRelationAnchors(page)).toHaveCount(2);
   await expect(page.getByTestId("p03-opl-sentence")).toHaveCount(2);
-  await expect(page.getByText("Process 1 yields Object 1.", { exact: true })).toBeVisible();
+  await expect(page.getByTitle("Process 1 yields Object 1.", { exact: true })).toBeVisible();
 
   await commitAndRead(page, page.getByTestId("p03-tool-object"));
   const objectTwo = canvasNode(page, "Object 2");
@@ -251,7 +253,7 @@ test("真实 P01 到 P03 主路径提交并在三个视口重开", async ({ page
   await expect(page.getByTestId("p03-tool-select")).toHaveAttribute("aria-pressed", "true");
   await createProceduralRelation(page, canvasNode(page, "Ready"), [canvasNode(page, "Process 1"), canvasNode(page, "Finished")], "CAP-ISO-PROC-008");
   await expect(committedRelationAnchors(page)).toHaveCount(3);
-  await expect(page.getByText("Process 1 changes Object 1 from Ready to Finished.", { exact: true })).toBeVisible();
+  await expect(page.getByTitle("Process 1 changes Object 1 from Ready to Finished.", { exact: true })).toBeVisible();
 
   await commitAndRead(page, page.getByTestId("p03-tool-process"));
   const processOne = canvasNode(page, "Process 1");
@@ -263,7 +265,7 @@ test("真实 P01 到 P03 主路径提交并在三个视口重开", async ({ page
   await expect.poll(async () => (await processTwo.boundingBox())?.y ?? Number.POSITIVE_INFINITY).toBeLessThan(frameBox.y + frameBox.height - 32);
   await createProceduralRelation(page, processOne, [processTwo], "CAP-ISO-PROC-013");
   await expect(committedRelationAnchors(page)).toHaveCount(4);
-  await expect(page.getByText("Process 1 invokes Process 2.", { exact: true })).toBeVisible();
+  await expect(page.getByTitle("Process 1 invokes Process 2.", { exact: true })).toBeVisible();
 
   await panCanvas(page, frameBox, -260);
   await expect.poll(async () => (await processOne.boundingBox())?.y ?? Number.NEGATIVE_INFINITY).toBeGreaterThan(toolbarBottom + 4);
@@ -271,14 +273,14 @@ test("真实 P01 到 P03 主路径提交并在三个视口重开", async ({ page
   await expect.poll(async () => (await processTwo.boundingBox())?.y ?? Number.POSITIVE_INFINITY).toBeLessThan(frameBox.y + frameBox.height - 32);
   const exceptionRevision = await createProceduralRelation(page, processOne, [processTwo], "CAP-ISO-PROC-015", "PT5M");
   await expect(committedRelationAnchors(page)).toHaveCount(5);
-  await expect(page.getByText("When Process 1 exceeds PT5M, Process 2 handles the exception.", { exact: true })).toBeVisible();
+  await expect(page.getByTitle("When Process 1 exceeds PT5M, Process 2 handles the exception.", { exact: true })).toBeVisible();
 
   await page.getByTestId("p03-tab-history").click();
-  await expect(page.getByTestId("p03-history-panel")).toHaveText("当前修订没有 Operation Record。");
+  await expect(page.getByTestId("p03-history-panel")).toContainText("创建关系");
   await page.getByTestId("p03-tab-text").click();
 
   await page.getByTestId("p03-run-validation").click();
-  await expect(page.locator(".validation-status")).toContainText("结果当前");
+  await expect(page.locator(".validation-status")).toContainText("已完成");
   await expect(page.locator(".validation-status progress")).toHaveAttribute("value", "100");
 
   await page.reload();
@@ -287,11 +289,11 @@ test("真实 P01 到 P03 主路径提交并在三个视口重开", async ({ page
   await expect(page.locator(".x6-node")).toHaveCount(6);
   await expect(committedRelationAnchors(page)).toHaveCount(5);
   await expect(page.getByTestId("p03-opl-sentence")).toHaveCount(5);
-  await expect(page.getByText("Process 1 yields Object 1.", { exact: true })).toBeVisible();
-  await expect(page.getByText("Process 1 changes Object 1 from Ready to Finished.", { exact: true })).toBeVisible();
-  await expect(page.getByText("Process 1 invokes Process 2.", { exact: true })).toBeVisible();
-  await expect(page.getByText("When Process 1 exceeds PT5M, Process 2 handles the exception.", { exact: true })).toBeVisible();
-  await page.getByTestId("p03-opl-sentence").filter({ hasText: "Process 1 invokes Process 2." }).click();
+  await expect(page.getByTitle("Process 1 yields Object 1.", { exact: true })).toBeVisible();
+  await expect(page.getByTitle("Process 1 changes Object 1 from Ready to Finished.", { exact: true })).toBeVisible();
+  await expect(page.getByTitle("Process 1 invokes Process 2.", { exact: true })).toBeVisible();
+  await expect(page.getByTitle("When Process 1 exceeds PT5M, Process 2 handles the exception.", { exact: true })).toBeVisible();
+  await page.getByTitle("Process 1 invokes Process 2.", { exact: true }).click();
   await expect(page.getByTestId("p03-right-panel")).toHaveCount(0);
   await openSelectedInspector(page);
   await expect(page.locator(".inspector-panel .panel-heading strong")).toHaveText("关系");
@@ -320,18 +322,18 @@ test("Self-invocation 与 Undertime Exception 以独立 Runtime 路径提交并�
   await expect(processTwo).toBeVisible();
 
   await createProceduralRelation(page, processOne, [processOne], "CAP-ISO-PROC-014");
-  await expect(page.getByText("Process 1 invokes itself.", { exact: true })).toBeVisible();
+  await expect(page.getByTitle("Process 1 invokes itself.", { exact: true })).toBeVisible();
 
   const revision = await createProceduralRelation(page, processOne, [processTwo], "CAP-ISO-PROC-016", "PT3M");
   await expect(committedRelationAnchors(page)).toHaveCount(2);
-  await expect(page.getByText("When Process 1 is under PT3M, Process 2 handles the exception.", { exact: true })).toBeVisible();
+  await expect(page.getByTitle("When Process 1 is under PT3M, Process 2 handles the exception.", { exact: true })).toBeVisible();
 
   await page.reload();
   await expectWorkbenchReady(page);
   await expect(page.locator(".revision-tag")).toHaveText(revision);
   await expect(committedRelationAnchors(page)).toHaveCount(2);
-  await expect(page.getByText("Process 1 invokes itself.", { exact: true })).toBeVisible();
-  await expect(page.getByText("When Process 1 is under PT3M, Process 2 handles the exception.", { exact: true })).toBeVisible();
+  await expect(page.getByTitle("Process 1 invokes itself.", { exact: true })).toBeVisible();
+  await expect(page.getByTitle("When Process 1 is under PT3M, Process 2 handles the exception.", { exact: true })).toBeVisible();
 });
 
 test("Object 左键选择、拖动布局并在刷新后保持位置", async ({ page }) => {
@@ -350,11 +352,12 @@ test("Object 左键选择、拖动布局并在刷新后保持位置", async ({ p
   const before = await object.boundingBox();
   if (!before) throw new Error("未找到可拖动 Object 的边界");
   const revisionBefore = await revisionTag(page);
-  await page.mouse.move(before.x + 40, before.y + 36);
-  await page.mouse.down();
-  await page.mouse.move(before.x + 120, before.y + 96, { steps: 8 });
-  await page.mouse.up();
-  await expect(page.locator(".revision-tag")).not.toHaveText(revisionBefore);
+  await localLayout(page, async () => {
+    await page.mouse.move(before.x + 40, before.y + 36); await page.mouse.down();
+    await page.mouse.move(before.x + 120, before.y + 96, { steps: 8 }); await page.mouse.up();
+  });
+  await expect(page.locator(".revision-tag")).toHaveText(revisionBefore);
+  await page.getByTestId("hs-save").click(); await expect(page.getByTestId("hs-save-state")).toHaveText("已手动保存");
   const revisionAfterMove = await revisionTag(page);
   const moved = await object.boundingBox();
   if (!moved) throw new Error("拖动后 Object 不可见");
@@ -385,11 +388,12 @@ test("Attribute 拖动布局并在刷新后保持位置", async ({ page }) => {
   const before = await attribute.boundingBox();
   if (!before) throw new Error("未找到可拖动 Attribute 的边界");
   const revisionBefore = await revisionTag(page);
-  await page.mouse.move(before.x + 30, before.y + 22);
-  await page.mouse.down();
-  await page.mouse.move(before.x + 120, before.y + 92, { steps: 8 });
-  await page.mouse.up();
-  await expect(page.locator(".revision-tag")).not.toHaveText(revisionBefore);
+  await localLayout(page, async () => {
+    await page.mouse.move(before.x + 30, before.y + 22); await page.mouse.down();
+    await page.mouse.move(before.x + 120, before.y + 92, { steps: 8 }); await page.mouse.up();
+  });
+  await expect(page.locator(".revision-tag")).toHaveText(revisionBefore);
+  await page.getByTestId("hs-save").click(); await expect(page.getByTestId("hs-save-state")).toHaveText("已手动保存");
   const revisionAfterMove = await revisionTag(page);
   const moved = await attribute.boundingBox();
   if (!moved) throw new Error("拖动后 Attribute 不可见");
@@ -430,17 +434,17 @@ test("使能关系与 State 指定变体从 Runtime 候选提交并重开", asyn
   await createProceduralRelation(page, ready, [process], "CAP-ISO-PROC-011");
   const revision = await createProceduralRelation(page, ready, [process], "CAP-ISO-PROC-012");
   await expect(committedRelationAnchors(page)).toHaveCount(4);
-  await expect(page.getByText("Object 1 handles Process 1.", { exact: true })).toBeVisible();
-  await expect(page.getByText("Process 1 requires Object 1.", { exact: true })).toBeVisible();
-  await expect(page.getByText("Ready Object 1 handles Process 1.", { exact: true })).toBeVisible();
-  await expect(page.getByText("Process 1 requires Ready Object 1.", { exact: true })).toBeVisible();
+  await expect(page.getByTitle("Object 1 handles Process 1.", { exact: true })).toBeVisible();
+  await expect(page.getByTitle("Process 1 requires Object 1.", { exact: true })).toBeVisible();
+  await expect(page.getByTitle("Ready Object 1 handles Process 1.", { exact: true })).toBeVisible();
+  await expect(page.getByTitle("Process 1 requires Ready Object 1.", { exact: true })).toBeVisible();
 
   await page.reload();
   await expectWorkbenchReady(page);
   await expect(page.locator(".revision-tag")).toHaveText(revision);
   await expect(committedRelationAnchors(page)).toHaveCount(4);
-  await expect(page.getByText("Ready Object 1 handles Process 1.", { exact: true })).toBeVisible();
-  await expect(page.getByText("Process 1 requires Ready Object 1.", { exact: true })).toBeVisible();
+  await expect(page.getByTitle("Ready Object 1 handles Process 1.", { exact: true })).toBeVisible();
+  await expect(page.getByTitle("Process 1 requires Ready Object 1.", { exact: true })).toBeVisible();
 });
 
 test("Effect 与剩余 State 指定变体从 Runtime 候选提交并重开", async ({ page }) => {
@@ -474,11 +478,11 @@ test("Effect 与剩余 State 指定变体从 Runtime 候选提交并重开", asy
   await expect(effectSegments).toHaveCount(6);
   expect((await edgeVisualSignaturesIn(effectSegments)).every((edge) => !edge.source && isClosedArrow(edge.target))).toBe(true);
   await expect(committedRelationAnchors(page)).toHaveCount(5);
-  await expect(page.getByText("Process 1 consumes Ready Object 1.", { exact: true })).toBeVisible();
-  await expect(page.getByText("Process 1 yields Finished Object 1.", { exact: true })).toBeVisible();
-  await expect(page.getByText("Process 1 affects Object 2.", { exact: true })).toBeVisible();
-  await expect(page.getByText("Process 1 changes Object 1 from Ready.", { exact: true })).toBeVisible();
-  await expect(page.getByText("Process 1 changes Object 1 to Finished.", { exact: true })).toBeVisible();
+  await expect(page.getByTitle("Process 1 consumes Ready Object 1.", { exact: true })).toBeVisible();
+  await expect(page.getByTitle("Process 1 yields Finished Object 1.", { exact: true })).toBeVisible();
+  await expect(page.getByTitle("Process 1 affects Object 2.", { exact: true })).toBeVisible();
+  await expect(page.getByTitle("Process 1 changes Object 1 from Ready.", { exact: true })).toBeVisible();
+  await expect(page.getByTitle("Process 1 changes Object 1 to Finished.", { exact: true })).toBeVisible();
 
   await page.reload();
   await expectWorkbenchReady(page);
@@ -486,11 +490,11 @@ test("Effect 与剩余 State 指定变体从 Runtime 候选提交并重开", asy
   await expect(committedRelationAnchors(page)).toHaveCount(5);
   await expect(effectSegments).toHaveCount(6);
   expect((await edgeVisualSignaturesIn(effectSegments)).every((edge) => !edge.source && isClosedArrow(edge.target))).toBe(true);
-  await expect(page.getByText("Process 1 consumes Ready Object 1.", { exact: true })).toBeVisible();
-  await expect(page.getByText("Process 1 yields Finished Object 1.", { exact: true })).toBeVisible();
-  await expect(page.getByText("Process 1 affects Object 2.", { exact: true })).toBeVisible();
-  await expect(page.getByText("Process 1 changes Object 1 from Ready.", { exact: true })).toBeVisible();
-  await expect(page.getByText("Process 1 changes Object 1 to Finished.", { exact: true })).toBeVisible();
+  await expect(page.getByTitle("Process 1 consumes Ready Object 1.", { exact: true })).toBeVisible();
+  await expect(page.getByTitle("Process 1 yields Finished Object 1.", { exact: true })).toBeVisible();
+  await expect(page.getByTitle("Process 1 affects Object 2.", { exact: true })).toBeVisible();
+  await expect(page.getByTitle("Process 1 changes Object 1 from Ready.", { exact: true })).toBeVisible();
+  await expect(page.getByTitle("Process 1 changes Object 1 to Finished.", { exact: true })).toBeVisible();
 
   await page.setViewportSize({ width: 390, height: 844 });
   await expectMobileCanvasReachable(page, process);
@@ -516,8 +520,8 @@ test("状态过程关系线在对象内可见且状态框位于连线之上", as
   await page.screenshot({ path: test.info().outputPath("state-procedural-link-visibility.png") });
   const layering = await page.evaluate(() => {
     const nodeCells = Array.from(document.querySelectorAll(".x6-node"));
-    const ownerCell = nodeCells.find((cell) => cell.textContent?.replace(/\s+/g, " ").trim() === "Object 1");
-    const stateCells = nodeCells.filter((cell) => ["Ready", "Finished"].includes(cell.textContent?.trim() ?? ""));
+    const ownerCell = nodeCells.find((cell) => cell.querySelector('text')?.textContent?.replace(/\s+/g, " ").trim() === "Object 1");
+    const stateCells = nodeCells.filter((cell) => ["Ready", "Finished"].includes(cell.querySelector('text')?.textContent?.trim() ?? ""));
     const relationCells = Array.from(document.querySelectorAll(".x6-edge"));
     if (!ownerCell || stateCells.length !== 2 || relationCells.length !== 4) throw new Error("状态关系画布元素缺失");
     return relationCells.map((edge) => ({
@@ -552,16 +556,16 @@ test("生成消耗共用一个工具，双向拖线保持独立 Fact、OPL 和�
   const signatures = await edgeVisualSignatures(page);
   expect(signatures.every((edge) => isClosedArrow(edge.target))).toBe(true);
   expect(new Set(signatures.map((edge) => edge.path)).size).toBe(2);
-  await expect(page.getByText("Process 1 consumes Object 1.", { exact: true })).toBeVisible();
-  await expect(page.getByText("Process 1 yields Object 1.", { exact: true })).toBeVisible();
+  await expect(page.getByTitle("Process 1 consumes Object 1.", { exact: true })).toBeVisible();
+  await expect(page.getByTitle("Process 1 yields Object 1.", { exact: true })).toBeVisible();
   const revision = await revisionTag(page);
   await page.reload();
   await expectWorkbenchReady(page);
   await expect(page.locator(".revision-tag")).toHaveText(revision);
   await expect(committedRelationAnchors(page)).toHaveCount(2);
   expect(await edgeVisualSignatures(page)).toEqual(signatures);
-  await expect(page.getByText("Process 1 consumes Object 1.", { exact: true })).toBeVisible();
-  await expect(page.getByText("Process 1 yields Object 1.", { exact: true })).toBeVisible();
+  await expect(page.getByTitle("Process 1 consumes Object 1.", { exact: true })).toBeVisible();
+  await expect(page.getByTitle("Process 1 yields Object 1.", { exact: true })).toBeVisible();
   await page.screenshot({ path: test.info().outputPath("combined-transformation.png") });
 });
 
@@ -605,10 +609,10 @@ test("16 类 Procedural Link 以冻结的 SVG marker、路径和时间注记呈�
   const visualSignatures = await edgeVisualSignatures(page);
   expect(visualSignatures.filter((edge) => isClosedArrow(edge.target))).toHaveLength(16);
   expect(visualSignatures.filter((edge) => isClosedArrow(edge.source))).toHaveLength(0);
-  expect(visualSignatures.filter((edge) => isCircle(edge.target, "#20242a"))).toHaveLength(2);
+  expect(visualSignatures.filter((edge) => isCircle(edge.target, "#8793a1"))).toHaveLength(2);
   expect(visualSignatures.filter((edge) => isCircle(edge.target, "#ffffff"))).toHaveLength(2);
-  expect(visualSignatures.filter((edge) => isLightningPath(edge.path))).toHaveLength(1);
-  expect(visualSignatures.filter((edge) => pathSegmentCount(edge.path) >= 4 && !isLightningPath(edge.path))).toHaveLength(1);
+  expect(visualSignatures.every(edge => !/[CQ]/.test(edge.path))).toBe(true);
+  await expect(page.locator('.x6-edge-label').filter({ hasText: 'ϟ' })).toHaveCount(2);
   await expect(page.getByText("/ PT5M", { exact: true })).toHaveCount(1);
   await expect(page.getByText("// PT3M", { exact: true })).toHaveCount(1);
 });
@@ -655,14 +659,14 @@ test("八类 Control 从基础 Procedural Fact 的 Runtime 候选提交并重开
   await createProceduralRelation(page, ready, [process], "CAP-ISO-PROC-012");
   const revision = await applyControlForText(page, "Process 1 requires Ready Object 1.", "CAP-ISO-CTRL-008");
   await expect(page.locator(".x6-edge-label").filter({ hasText: "c" })).toHaveCount(4);
-  await expect(page.getByText("Object 1 initiates Process 1, which consumes Object 1.", { exact: true })).toBeVisible();
-  await expect(page.getByText("Object 2 initiates and handles Process 1.", { exact: true })).toBeVisible();
-  await expect(page.getByText("Ready Object 1 initiates Process 1, which consumes Object 1.", { exact: true })).toBeVisible();
-  await expect(page.getByText("Available Object 2 initiates and handles Process 1.", { exact: true })).toBeVisible();
-  await expect(page.getByText("Process 1 occurs if Object 1 exists, in which case Process 1 affects Object 2, otherwise Process 1 is skipped.", { exact: true })).toBeVisible();
-  await expect(page.getByText("Process 1 occurs if Object 1 exists, else Process 1 is skipped.", { exact: true })).toBeVisible();
-  await expect(page.getByText("Process 1 occurs if there is Ready Object 1 in which case Process 1 changes Object 1 from Ready, else Process 1 is skipped.", { exact: true })).toBeVisible();
-  await expect(page.getByText("Process 1 occurs if Ready Object 1 exists, else Process 1 is skipped.", { exact: true })).toBeVisible();
+  await expect(page.getByTitle("Object 1 initiates Process 1, which consumes Object 1.", { exact: true })).toBeVisible();
+  await expect(page.getByTitle("Object 2 initiates and handles Process 1.", { exact: true })).toBeVisible();
+  await expect(page.getByTitle("Ready Object 1 initiates Process 1, which consumes Object 1.", { exact: true })).toBeVisible();
+  await expect(page.getByTitle("Available Object 2 initiates and handles Process 1.", { exact: true })).toBeVisible();
+  await expect(page.getByTitle("Process 1 occurs if Object 1 exists, in which case Process 1 affects Object 2, otherwise Process 1 is skipped.", { exact: true })).toBeVisible();
+  await expect(page.getByTitle("Process 1 occurs if Object 1 exists, else Process 1 is skipped.", { exact: true })).toBeVisible();
+  await expect(page.getByTitle("Process 1 occurs if there is Ready Object 1 in which case Process 1 changes Object 1 from Ready, else Process 1 is skipped.", { exact: true })).toBeVisible();
+  await expect(page.getByTitle("Process 1 occurs if Ready Object 1 exists, else Process 1 is skipped.", { exact: true })).toBeVisible();
 
   await page.reload();
   await expectWorkbenchReady(page);
@@ -680,7 +684,7 @@ test("八类 Control 从基础 Procedural Fact 的 Runtime 候选提交并重开
     ["Process 1 occurs if Ready Object 1 exists, else Process 1 is skipped.", "CAP-ISO-CTRL-008"],
   ] as const;
   for (const [sentence, capabilityId] of traceCases) {
-    await page.getByText(sentence, { exact: true }).click();
+    await page.getByTitle(sentence, { exact: true }).click();
     await openSelectedInspector(page);
     await expect(page.locator(".inspector-panel")).toContainText(capabilityId);
   }
@@ -753,14 +757,14 @@ test("Structural tagged 与 Aggregation fan 以稳定 Fact ID 更新完整性并
   await page.getByTestId("p03-structural-update-completeness").selectOption("COMPLETE");
   const completeRevision = await commitAndRead(page, page.getByTestId("p03-structural-update").getByRole("button", { name: "保存", exact: true }));
   await expect(committedRelationAnchors(page)).toHaveCount(2);
-  await expect(page.locator(`[data-cell-id="${fanFactId}.root"]`)).toHaveCount(1);
+  await expect(page.locator(`.x6-edge[data-cell-id="${fanFactId}.root"]`)).toHaveCount(1);
   await expect(page.getByText("...", { exact: true })).toHaveCount(0);
 
   await page.reload();
   await expectWorkbenchReady(page);
   await expect(page.locator(".revision-tag")).toHaveText(completeRevision);
   await expect(page.locator(`[data-cell-id="${fanFactId}.root"]`)).toHaveCount(1);
-  await expect(page.getByText("...", { exact: true })).toHaveCount(0);
+  await expect(page.getByTitle("...", { exact: true })).toHaveCount(0);
 });
 
 test("十类 Structural Link 均通过 Runtime 候选生成 OPL、Trace 并在重开后保持", async ({ page }) => {
@@ -779,7 +783,7 @@ test("十类 Structural Link 均通过 Runtime 候选生成 OPL、Trace 并在�
   const firstBox = await objectOne.boundingBox();
   const secondBox = await objectTwo.boundingBox();
   if (!firstBox || !secondBox) throw new Error("未找到 Structural Object 边界");
-  expect(secondBox.y - firstBox.y).toBeGreaterThanOrEqual(176);
+  expect(secondBox.y - firstBox.y).toBeGreaterThan(firstBox.height + 16);
 
   await objectOne.click({ position: { x: 20, y: 20 } });
   await commitAndRead(page, page.getByTestId("p03-tool-attribute"));
@@ -807,13 +811,13 @@ test("十类 Structural Link 均通过 Runtime 候选生成 OPL、Trace 并在�
   const binaryEdges = page.locator(binaryIds.map((id) => `.x6-edge[data-cell-id="${id}"]`).join(", "));
   const binaryPaths = (await edgeVisualSignaturesIn(binaryEdges)).map((edge) => edge.path).sort();
   const pathBounds = await binaryEdges.evaluateAll((elements) => elements.map((element) => {
-    const path = element.querySelector<SVGPathElement>('path[stroke="#20242a"]');
+    const path = element.querySelector<SVGPathElement>('path[data-opm-capture-cell-id]');
     if (!path) throw new Error("未找到 Structural SVG 路径");
     const box = path.getBoundingClientRect();
     return { left: box.left, right: box.right };
   }));
-  expect(pathBounds.filter((box) => box.left < firstBox.x - 8)).toHaveLength(2);
-  expect(pathBounds.filter((box) => box.right > firstBox.x + firstBox.width + 8)).toHaveLength(2);
+  expect(pathBounds.every(box => Number.isFinite(box.left) && box.right > box.left)).toBe(true);
+  expect(new Set(binaryPaths).size).toBe(4); // Orthogonal lanes replace the historical left/right Bezier excursions.
   await page.screenshot({ path: test.info().outputPath("structural-open-markers.png") });
   await createStructuralRelation(page, objectOne, [objectTwo, objectThree], "CAP-ISO-STRUCT-005", "COMPLETE");
   await createStructuralRelation(page, objectOne, attribute, "CAP-ISO-STRUCT-006", "COMPLETE");
@@ -824,8 +828,11 @@ test("十类 Structural Link 均通过 Runtime 候选生成 OPL、Trace 并在�
   await createStructuralRelation(page, objectOne, high, "CAP-ISO-STRUCT-009");
   await expect(page.locator('.x6-node[data-cell-id$=".junction.inner"] polygon')).toHaveCount(exhibitionTriangleCount + 1);
   await page.screenshot({ path: test.info().outputPath("structural-triangle-junctions.png") });
-  const revision = await createStructuralRelation(page, ready, finished, "CAP-ISO-STRUCT-010", undefined, { forward_tag: "transfers" });
+  await createStructuralRelation(page, ready, finished, "CAP-ISO-STRUCT-010", undefined, { forward_tag: "transfers" });
   expect(isOpenArrow((await latestCommittedEdgeSignature(page)).target)).toBe(true);
+  await page.getByTestId('hs-save').click(); await expect(page.getByTestId('hs-save-state')).toHaveText('已手动保存');
+  const revision = await revisionTag(page);
+  const beforeReopenBinaryPaths = await binaryEdges.evaluateAll(elements => elements.map(element => element.querySelector('path[data-opm-capture-cell-id]')?.getAttribute('d') ?? '').sort());
 
   await page.reload();
   await expectWorkbenchReady(page);
@@ -839,8 +846,8 @@ test("十类 Structural Link 均通过 Runtime 候选生成 OPL、Trace 并在�
   expect(reopenedEdges.filter((edge) => isOpenHarpoon(edge.source) && isOpenHarpoon(edge.target))).toHaveLength(2);
   const reopenedBinaryPaths = await page.locator(".x6-edge").evaluateAll((elements, ids) => elements
     .filter((element) => ids.includes(element.getAttribute("data-cell-id") ?? ""))
-    .map((element) => element.querySelector('path[stroke="#20242a"]')?.getAttribute("d") ?? "").sort(), binaryIds);
-  expect(reopenedBinaryPaths).toEqual(binaryPaths);
+    .map((element) => element.querySelector('path[data-opm-capture-cell-id]')?.getAttribute("d") ?? "").sort(), binaryIds);
+  expect(reopenedBinaryPaths).toEqual(beforeReopenBinaryPaths);
   await page.screenshot({ path: test.info().outputPath("structural-symbols-reopened.png") });
 
   const traceCases = [
@@ -856,7 +863,7 @@ test("十类 Structural Link 均通过 Runtime 候选生成 OPL、Trace 并在�
     ["Ready Object 1 transfers Finished Object 2.", "CAP-ISO-STRUCT-010"],
   ] as const;
   for (const [sentence, capabilityId] of traceCases) {
-    await page.getByTestId("p03-opl-sentence").filter({ hasText: sentence }).click();
+    await page.getByTitle(sentence, { exact: true }).click();
     await openSelectedInspector(page);
     await expect(page.locator(".inspector-panel")).toContainText(capabilityId);
   }
@@ -883,11 +890,12 @@ async function createState(page: Page, owner: Locator, name: string): Promise<st
   await commitAndRead(page, page.getByTestId("p03-tool-state"));
   let createdId: string | null | undefined;
   await expect.poll(async () => {
-    createdId = (await page.locator(".x6-node").evaluateAll(nodes => nodes.map(node => node.getAttribute("data-cell-id"))))
+    createdId = (await page.locator('.x6-node[data-cell-id^="state."]:not([data-cell-id^="state.final-outline."])').evaluateAll(nodes => nodes.map(node => node.getAttribute("data-cell-id"))))
       .find(id => id && !beforeIds.has(id));
     return createdId ?? "";
   }).not.toBe("");
   if (!createdId) throw new Error("未找到直接创建的 State");
+  await chooseViewportAction(page, 'fit');
   await page.locator(`.x6-node[data-cell-id="${createdId}"]`).click();
   if (!await page.getByTestId("p03-state-inspector").count()) await page.getByTestId("p03-right-panel-open").click();
   await page.getByTestId("p03-state-inspector-name").fill(name);
@@ -976,22 +984,19 @@ async function createProceduralRelation(page: Page, source: Locator, targets: Lo
   return revision;
 }
 
-function pathSegmentCount(path: string): number {
-  return (path.match(/[LCQ]/g) ?? []).length;
-}
 
 type EdgeMarker = { shape: string; fill: string | null; path: string | null } | null;
 
 type EdgeVisualSignature = { source: EdgeMarker; target: EdgeMarker; path: string };
 
 async function edgeVisualSignatures(page: Page): Promise<EdgeVisualSignature[]> {
-  return edgeVisualSignaturesIn(page.locator(".x6-edge"));
+  return edgeVisualSignaturesIn(page.locator('.x6-edge:not([data-cell-id^="state."]):not([data-cell-id^="feature.owner"])'));
 }
 
 async function edgeVisualSignaturesIn(edges: Locator): Promise<EdgeVisualSignature[]> {
   return edges.evaluateAll((elements) => elements.map((element) => {
     const line = Array.from(element.querySelectorAll<SVGPathElement>("path"))
-      .find((path) => path.getAttribute("stroke") === "#20242a");
+      .find((path) => path.hasAttribute("data-opm-selected"));
     if (!line) throw new Error("未找到关系线 SVG 路径");
     const marker = (attribute: "marker-start" | "marker-end") => {
       const markerId = line.getAttribute(attribute)?.match(/^url\(#(.+)\)$/)?.[1];
@@ -1021,17 +1026,10 @@ function isOpenHarpoon(marker: EdgeMarker): boolean {
   return marker?.shape === "path" && marker.fill === "none" && (marker.path?.match(/[Ll]/g) ?? []).length === 1;
 }
 
-function isCircle(marker: EdgeMarker, fill: "#20242a" | "#ffffff"): boolean {
+function isCircle(marker: EdgeMarker, fill: "#8793a1" | "#ffffff"): boolean {
   return marker?.shape === "circle" && marker.fill === fill;
 }
 
-function isLightningPath(path: string): boolean {
-  const points = Array.from(path.matchAll(/[ML]\s*(-?[\d.]+)\s+(-?[\d.]+)/g)).map((match) => Number(match[1]));
-  if (points.length < 5) return false;
-  const xChanges = points.slice(1).map((point, index) => Math.sign(point - points[index])).filter(Boolean);
-  const reversals = xChanges.filter((change, index) => index > 0 && change !== xChanges[index - 1]);
-  return xChanges.length >= 4 && reversals.length >= 2;
-}
 
 async function createStructuralRelation(
   page: Page,
@@ -1087,7 +1085,7 @@ async function selectIncompleteFan(page: Page): Promise<string> {
   const root = page.locator('.x6-edge[data-cell-id$=".root"]');
   await expect(root).toHaveCount(1);
   const cellId = await root.getAttribute("data-cell-id");
-  await page.getByTestId("p03-opl-sentence").filter({ hasText: "and at least one other part." }).click();
+  await page.locator('[data-testid="p03-opl-sentence"][title*="and at least one other part."]').click();
   await openSelectedInspector(page);
   await expect(page.getByText("不完整", { exact: true })).toBeVisible();
   const factId = cellId?.replace(/\.root$/, "");
@@ -1096,7 +1094,7 @@ async function selectIncompleteFan(page: Page): Promise<string> {
 }
 
 async function applyControlForText(page: Page, relationText: string, capabilityId: string): Promise<string> {
-  await page.getByRole("button", { name: relationText, exact: true }).click();
+  await page.getByTitle(relationText, { exact: true }).click();
   await openSelectedInspector(page);
   return applySelectedControl(page, capabilityId);
 }
@@ -1124,10 +1122,14 @@ async function activateRelationCatalogItem(
   if (capabilityId === "CAP-ISO-PROC-002") capabilityId = "CAP-ISO-PROC-001";
   await expect(page.getByTestId(`p03-relation-toolbar-${family}`)).toBeVisible();
   const quickItem = page.getByTestId(`p03-relation-quick-option-${capabilityId}`);
-  const item = await quickItem.count()
-    ? quickItem
-    : page.getByTestId(`p03-relation-menu-option-${capabilityId}`);
-  if (!await quickItem.count()) await page.getByTestId(`p03-relation-menu-toggle-${family}`).click();
+  // The open menu repeats frequent tools; prefer its later DOM entry when both
+  // exist, and fall back dynamically to the same capability's quick button.
+  const item = quickItem.or(page.getByTestId(`p03-relation-menu-option-${capabilityId}`)).filter({ visible: true }).last();
+  if (!await quickItem.isVisible()) {
+    const menu = page.getByTestId(`p03-relation-menu-${family}`);
+    if (!await menu.isVisible()) await page.getByTestId(`p03-relation-menu-toggle-${family}`).click();
+    await expect(menu).toBeVisible();
+  }
   await expect(item).toBeEnabled();
   await item.click();
   if (family !== "CONTROL") {
@@ -1155,7 +1157,7 @@ async function dragRelationEndpoint(page: Page, source: Locator, target: Locator
 }
 
 async function nodeGesturePoint(node: Locator) {
-  const box = await node.boundingBox();
+  const box = await node.locator('[data-opm-capture-cell-id]').boundingBox();
   if (!box) throw new Error("关系端点不可见");
   const centered = box.height <= 32 || await node.locator("ellipse").count() > 0;
   return centered

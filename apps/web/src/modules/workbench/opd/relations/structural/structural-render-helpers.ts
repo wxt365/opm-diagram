@@ -2,6 +2,7 @@ import type { ConsumptionRelation, OpdNode } from "@/shared/types/modeling";
 
 import { OpdRelationRenderError } from "../../core/relation-definition-registry";
 import { nodeDimensions } from "../../core/node-geometry";
+import { clearTrunkCoordinate } from "../../core/relation-routing";
 import type { OpdRelationDefinition, RelationCellSpec, RelationEdgeSpec, RelationRenderContext, RelationRenderSpec } from "../../core/relation-render-spec";
 
 type StructuralMode = "DIRECTED" | "BIDIRECTIONAL" | "FAN_FILLED" | "FAN_OPEN" | "FAN_EXHIBITION" | "FAN_CLASSIFICATION";
@@ -51,26 +52,50 @@ function fanSpec(relation: ConsumptionRelation, context: RelationRenderContext, 
   const averageY = memberNodes.reduce((total, node) => total + node.y + nodeDimensions(node).height / 2, 0) / memberNodes.length;
   const rootX = rootNode.x + nodeDimensions(rootNode).width / 2, rootY = rootNode.y + nodeDimensions(rootNode).height / 2;
   const junctionId = `${relation.id}.junction`;
-  const junctionX = (rootX + averageX) / 2;
-  const junctionY = (rootY + averageY) / 2;
-  const angle = Math.atan2(rootY - junctionY, rootX - junctionX) * 180 / Math.PI + 90;
+  const horizontal = Math.abs(averageX - rootX) / nodeDimensions(rootNode).width >= Math.abs(averageY - rootY) / nodeDimensions(rootNode).height;
+  const sign = (horizontal ? averageX - rootX : averageY - rootY) >= 0 ? 1 : -1;
+  let junctionX = horizontal ? rootX + sign * Math.max(nodeDimensions(rootNode).width / 2 + 36, Math.abs(averageX - rootX) / 2) : rootX;
+  let junctionY = horizontal ? rootY : rootY + sign * Math.max(nodeDimensions(rootNode).height / 2 + 36, Math.abs(averageY - rootY) / 2);
+  const memberCenters = memberNodes.map(node => ({ x: node.x + nodeDimensions(node).width / 2, y: node.y + nodeDimensions(node).height / 2 }));
+  const values = [horizontal ? rootY : rootX, ...memberCenters.map(p => horizontal ? p.y : p.x)];
+  const ancestors = new Set<string>();
+  for (const endpoint of [rootNode, ...memberNodes]) {
+    let node = endpoint;
+    while (node.ownerId && !ancestors.has(node.ownerId)) { ancestors.add(node.ownerId); const owner = context.nodes.find(n => n.id === node.ownerId); if (!owner) break; node = owner; }
+  }
+  const obstacles = context.nodes.filter(node => !ancestors.has(node.id)).map(node => ({ ...node, ...nodeDimensions(node) }));
+  const trunk = clearTrunkCoordinate((horizontal ? junctionX : junctionY) + sign * 48, horizontal, [Math.min(...values), Math.max(...values)], obstacles);
+  if (memberNodes.length === 1) {
+    const rootSize = nodeDimensions(rootNode), memberSize = nodeDimensions(memberNodes[0]!);
+    const rootHalf = (horizontal ? rootSize.width : rootSize.height) / 2, memberHalf = (horizontal ? memberSize.width : memberSize.height) / 2;
+    const free = Math.abs(horizontal ? averageX - rootX : averageY - rootY) - rootHalf - memberHalf;
+    const offset = rootHalf + (free > 24 ? Math.min(32, free / 2) : 32);
+    if (horizontal) junctionX = rootX + sign * offset; else junctionY = rootY + sign * offset;
+  } else if (horizontal) junctionX = trunk - sign * 48; else junctionY = trunk - sign * 48;
+  const branchSide = horizontal ? sign > 0 ? "right" : "left" : sign > 0 ? "bottom" : "top";
+  const rootSide = horizontal ? sign > 0 ? "left" : "right" : sign > 0 ? "top" : "bottom";
+  const angle = horizontal ? sign > 0 ? 270 : 90 : sign > 0 ? 0 : 180;
   const rootEdge: RelationEdgeSpec = {
-    kind: "edge", id: `${relation.id}.root`, source: root.targetId, target: junctionId, data: relationData(relation), labels: [],
+    kind: "edge", id: `${relation.id}.root`, source: root.targetId, target: junctionId,
+    data: { ...relationData(relation), routeSourceSide: branchSide, routeTargetSide: rootSide }, labels: [],
     line: { stroke: "#20242a", strokeWidth: 2, captureAnchor: relation.occurrenceId, findingHighlighted: relation.id === context.highlightedFindingTargetId },
   };
   const cells: RelationCellSpec[] = [
     {
-      kind: "node", id: junctionId, shape: "polygon", x: junctionX - 12, y: junctionY - 12, width: 24, height: 24, zIndex: 3, angle,
+      kind: "node", id: junctionId, shape: "polygon", x: junctionX - 8, y: junctionY - 8, width: 16, height: 16, zIndex: 3, angle,
       body: { refPoints: "0,24 12,0 24,24", fill: mode === "FAN_FILLED" ? "#20242a" : "#ffffff", stroke: "#20242a", strokeWidth: 1.5 }, label: { text: "" },
     },
     rootEdge,
     ...members.map((member, index): RelationEdgeSpec => ({
-      kind: "edge", id: `${relation.id}.member.${index}`, source: junctionId, target: member.targetId, data: relationData(relation),
+      kind: "edge", id: `${relation.id}.member.${index}`, source: junctionId, target: member.targetId,
+      data: { ...relationData(relation), routeSourceSide: branchSide, routeTargetSide: rootSide },
+      vertices: memberNodes.length === 1 ? [] : horizontal ? [{ x: trunk, y: junctionY }, { x: trunk, y: memberNodes[index]!.y + nodeDimensions(memberNodes[index]!).height / 2 }]
+        : [{ x: junctionX, y: trunk }, { x: memberNodes[index]!.x + nodeDimensions(memberNodes[index]!).width / 2, y: trunk }],
       labels: index === 0 ? structuralLabels(relation) : [], line: { stroke: "#20242a", strokeWidth: 2 },
     })),
   ];
   if (mode === "FAN_EXHIBITION") cells.push({
-    kind: "node", id: `${junctionId}.inner`, shape: "polygon", x: junctionX - 6, y: junctionY - 6, width: 12, height: 12, zIndex: 4, angle,
+    kind: "node", id: `${junctionId}.inner`, shape: "polygon", x: junctionX - 4, y: junctionY - 4, width: 8, height: 8, zIndex: 4, angle,
     body: { refPoints: "0,12 6,0 12,12", fill: "#20242a", stroke: "#20242a", strokeWidth: 1, pointerEvents: "none" }, label: { text: "" },
   });
   if (mode === "FAN_CLASSIFICATION") cells.push({

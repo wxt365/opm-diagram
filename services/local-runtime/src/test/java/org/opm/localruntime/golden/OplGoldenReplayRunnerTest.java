@@ -13,7 +13,6 @@ import org.opm.localruntime.text.OplTextTrace;
 import org.opm.localruntime.text.OplToken;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-
 class OplGoldenReplayRunnerTest {
 
     @Test
@@ -46,8 +45,8 @@ class OplGoldenReplayRunnerTest {
         assertEquals(expectedBlocked, report.cases().stream().filter(item -> item.observedStatus() == OplGoldenReplayReportWriter.ObservedStatus.BLOCKED_MATCHED).count());
         assertEquals(0, report.cases().stream().filter(item -> item.observedStatus() == OplGoldenReplayReportWriter.ObservedStatus.FAILED).count());
         report.cases().stream().filter(item -> "PASS".equals(item.expectation())).forEach(item -> {
-            assertEquals(item.attempts().getFirst().traceSha256(), item.attempts().get(1).traceSha256());
-            assertEquals(64, item.attempts().getFirst().traceSha256().length());
+            assertEquals(item.attempts().get(0).traceSha256(), item.attempts().get(1).traceSha256());
+            assertEquals(64, item.attempts().get(0).traceSha256().length());
         });
         OplGoldenReplayReportWriter.CaseResult blocked = report.cases().stream()
                 .filter(item -> item.caseId().equals("G-OPL-CTRL-001.RESULT.BLOCKED")).findFirst().orElseThrow();

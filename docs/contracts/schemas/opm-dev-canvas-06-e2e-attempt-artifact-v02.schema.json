@@ -361,7 +361,7 @@
           "$ref": "#/$defs/digest"
         },
         "storage_schema_version": {
-          "const": "1.0"
+          "enum": ["1.0", "2.0"]
         },
         "sqlite_quick_check": {
           "const": "ok"

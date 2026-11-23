@@ -8,7 +8,8 @@
     "build": "vue-tsc -b && vite build",
     "lint": "eslint src --max-warnings=0",
     "typecheck": "vue-tsc -b --pretty false",
-    "test": "vitest run"
+    "test": "vitest run",
+    "build:workbench": "vite build --config vite.workbench.config.ts && vue-tsc -p tsconfig.workbench.json && node scripts/package-workbench.mjs"
   },
   "dependencies": {
     "@antv/x6": "2.18.1",

@@ -23,7 +23,7 @@ import java.util.function.Consumer;
 public final class DraftJournalRepository {
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final DateTimeFormatter TIME = new DateTimeFormatterBuilder().appendInstant(3).toFormatter();
-    private final Path database;
+    private final ProjectScope database;
     private final Clock clock;
     private final Consumer<String> stage;
     @FunctionalInterface public interface Edit { Proposal apply(ObjectNode currentDocument); }
@@ -38,15 +38,19 @@ public final class DraftJournalRepository {
     }
     public record Snapshot(DraftToken token, String documentJson, String contentDigest, String dirtySince, String deadline,
                            DraftToken checkpointToken, String lastManualRevision) { }
+    public record StateSnapshot(DraftToken token, String dirtySince, String deadline,
+                                DraftToken checkpointToken, String lastManualRevision) { }
     public static final class Failure extends RuntimeException {
         private final String code;
         private Failure(String code, Throwable cause) { super(code, cause); this.code = code; }
         public String code() { return code; }
     }
-    public DraftJournalRepository(Path database, Clock clock) { this(database, clock, ignored -> { }); }
-    DraftJournalRepository(Path database, Clock clock, Consumer<String> stage) {
-        require(database != null && Files.isRegularFile(database, LinkOption.NOFOLLOW_LINKS), "INPUT_INVALID");
-        this.database = database.toAbsolutePath().normalize(); this.clock = Objects.requireNonNull(clock); this.stage = Objects.requireNonNull(stage);
+    public DraftJournalRepository(ProjectScope database, Clock clock) { this(database, clock, ignored -> { }); }
+    public DraftJournalRepository(Path snapshot, Clock clock) { this(SqliteSnapshots.scope(snapshot), clock); }
+    DraftJournalRepository(Path snapshot, Clock clock, Consumer<String> stage) { this(SqliteSnapshots.scope(snapshot), clock, stage); }
+    DraftJournalRepository(ProjectScope database, Clock clock, Consumer<String> stage) {
+        require(database != null, "INPUT_INVALID");
+        this.database = database; this.clock = Objects.requireNonNull(clock); this.stage = Objects.requireNonNull(stage);
     }
 
     public DraftWorkspaceContract.Document commit(String projectId, String modelId, DraftWorkspaceContract.Document request, Edit effect) {
@@ -74,7 +78,11 @@ public final class DraftJournalRepository {
             String context = input.at("/scope/context_id").asText(); boolean contextExists = false;
             for (var item : before.get("contexts")) if (item.path("context_id").asText().equals(context)) contextExists = true;
             require(contextExists, "NOT_FOUND");
-            Proposal proposal = effect.apply(before.deepCopy());
+            boolean restore = input.at("/command/command_type").asText().equals("RESTORE_OPERATION");
+            ObjectNode recovery = restore && input.at("/command/payload/action").asText().equals("REDO")
+                    ? DraftOperationRecovery.redo(connection, modelId) : DraftOperationRecovery.read(connection, modelId);
+            ObjectNode candidate = restore ? DraftOperationRecovery.target(recovery, current, input.at("/command/payload")) : before.deepCopy();
+            Proposal proposal = effect.apply(candidate);
             ObjectNode after;
             JsonNode validationSummary;
             try {
@@ -97,7 +105,7 @@ public final class DraftJournalRepository {
             var instant = clock.instant(); String now = TIME.format(instant);
             if (changed) {
                 var oldParts = SaveContentDigestV1.split(before); var newParts = SaveContentDigestV1.split(after);
-                update(connection, "INSERT INTO draft_journal VALUES (?,?,?,?,?,?,?,?,?)", modelId, resultToken.draft_id(), resultSeq,
+                update(connection, "INSERT INTO draft_journal(model_id,draft_id,edit_seq,command_id,request_digest,delta_json,artifact_delta_json,result_digest,occurred_at) VALUES (?,?,?,?,?,?,?,?,?)", modelId, resultToken.draft_id(), resultSeq,
                         commandId, requestDigest, DraftJsonDelta.between(oldParts.content(), newParts.content()).toString(),
                         DraftJsonDelta.between(oldParts.metadata(), newParts.metadata()).toString(), contentDigest, now);
                 stage.accept("JOURNAL");
@@ -107,13 +115,24 @@ public final class DraftJournalRepository {
                         """, resultSeq, now, TIME.format(instant.plusSeconds(10)), modelId, current.token().draft_id(), current.token().edit_seq(), current.token().binding_digest());
                 stage.accept("STREAM");
             }
-            update(connection, "INSERT INTO draft_receipt VALUES (?,'EDIT',?,?,?,?)", modelId, commandId, requestDigest, result.toString(), now);
+            update(connection, "INSERT INTO draft_receipt(model_id,operation,idempotency_id,request_digest,result_json,created_at,receipt_order) VALUES (?,'EDIT',?,?,?,?,?)", modelId, commandId, requestDigest, result.toString(), now, JdbcDialect.nextOrder(connection, "draft_receipt"));
             if (input.has("analysis_source")) {
                 require(proposal.analysisMappingsJson() != null, "INPUT_INVALID");
                 MindmapRepository.record(connection, modelId, commandId, context, input.get("analysis_source"), proposal.analysisMappingsJson());
             }
-            if (proposal.historyDetailJson() != null) OperationHistoryRepository.append(connection, modelId, "EDIT." + commandId,
-                    requestDigest, resultToken, now, (ObjectNode) DraftJsonDelta.read(proposal.historyDetailJson()), result.path("status").asText());
+            ObjectNode historyDetail = proposal.historyDetailJson() == null ? JSON.createObjectNode().put("title", "编辑模型")
+                    .put("operation", input.at("/command/command_type").asText()).put("context_id", context)
+                    : (ObjectNode) DraftJsonDelta.read(proposal.historyDetailJson());
+            if (restore) {
+                historyDetail.put("title", (recovery.path("action").asText().equals("UNDO") ? "撤销：" : "重做：") + recovery.path("title").asText());
+                for (var item : before.path("contexts")) if (item.path("context_id").asText().equals(context))
+                    historyDetail.put("context_name", item.at("/name/text").asText(item.at("/name/local_name").asText(null)));
+                if (changed) DraftOperationRecovery.markUndone(connection, modelId, recovery);
+            }
+            OperationHistoryRepository.append(connection, modelId, "EDIT." + commandId,
+                    requestDigest, resultToken, now, historyDetail, result.path("status").asText());
+            if (changed) DraftOperationRecovery.replace(connection, modelId, commandId, now, current, after, historyDetail, recovery, restore,
+                    before.path("schema_version").equals(after.path("schema_version")));
             stage.accept("RECEIPT");
             Snapshot verified = load(connection, modelId);
             require(verified.token().equals(resultToken) && verified.contentDigest().equals(contentDigest), "DRAFT_RECOVERY_REQUIRED");
@@ -123,6 +142,38 @@ public final class DraftJournalRepository {
     }
 
     public Snapshot read(String projectId, String modelId) { return transaction(false, connection -> { scope(connection, projectId, modelId); return load(connection, modelId); }); }
+
+    /** 仅供状态/期限查询；文档与日志完整性仍在打开、编辑及保存时验证。 */
+    public StateSnapshot readState(String projectId, String modelId) {
+        return transaction(false, connection -> {
+            scope(connection, projectId, modelId);
+            try (var statement = connection.prepareStatement("""
+                    SELECT s.draft_id,s.edit_seq,s.binding_digest,s.dirty_since,s.deadline,c.covered_seq,
+                           (SELECT revision_id FROM draft_savepoint WHERE model_id=s.model_id AND purpose='MANUAL'
+                            ORDER BY history_sequence DESC LIMIT 1) AS last_manual_revision
+                    FROM draft_stream s JOIN draft_checkpoint c
+                      ON c.model_id=s.model_id AND c.draft_id=s.draft_id AND c.checkpoint_id=s.checkpoint_id
+                    WHERE s.model_id=?
+                    """)) {
+                statement.setString(1, modelId);
+                try (var rows = statement.executeQuery()) {
+                    require(rows.next(), "DRAFT_RECOVERY_REQUIRED");
+                    String draft = rows.getString("draft_id"), binding = rows.getString("binding_digest");
+                    long head = rows.getLong("edit_seq"), covered = rows.getLong("covered_seq");
+                    String dirty = rows.getString("dirty_since"), deadline = rows.getString("deadline");
+                    require(draft != null && !draft.isBlank() && binding != null && binding.matches("[0-9a-f]{64}")
+                            && head >= 0 && head <= 9007199254740991L && covered >= 0 && covered <= head, "DRAFT_RECOVERY_REQUIRED");
+                    require((dirty == null) == (deadline == null) && (head == covered || dirty != null), "DRAFT_RECOVERY_REQUIRED");
+                    if (dirty != null) require(TIME.format(java.time.Instant.parse(dirty)).equals(dirty)
+                            && TIME.format(java.time.Instant.parse(deadline)).equals(deadline)
+                            && java.time.Duration.between(java.time.Instant.parse(dirty), java.time.Instant.parse(deadline)).toMillis() == 10000,
+                            "DRAFT_RECOVERY_REQUIRED");
+                    return new StateSnapshot(new DraftToken(draft, head, binding), dirty, deadline,
+                            new DraftToken(draft, covered, binding), rows.getString("last_manual_revision"));
+                }
+            } catch (Exception exception) { throw failure("DRAFT_RECOVERY_REQUIRED", exception); }
+        });
+    }
 
     public DraftWorkspaceContract.Document receipt(String projectId, String modelId, DraftWorkspaceContract.Document request) {
         require(request != null && request.type() == DraftWorkspaceContract.Type.DraftReceiptRequest, "INPUT_INVALID");
@@ -149,7 +200,7 @@ public final class DraftJournalRepository {
                 SELECT s.*,c.checkpoint_id AS selected_checkpoint,c.covered_seq,d.content_digest,d.model_json,d.artifact_json,d.artifact_digest,d.digest_version,
                        m.profile_binding_json FROM draft_stream s
                 JOIN draft_checkpoint c ON c.model_id=s.model_id AND c.draft_id=s.draft_id AND c.checkpoint_id=
-                  CASE WHEN ? IS NULL THEN s.checkpoint_id ELSE
+                  CASE WHEN CAST(? AS BIGINT) IS NULL THEN s.checkpoint_id ELSE
                     (SELECT checkpoint_id FROM draft_checkpoint WHERE model_id=s.model_id AND draft_id=s.draft_id AND covered_seq<=?
                      ORDER BY covered_seq DESC,created_at DESC,checkpoint_id DESC LIMIT 1) END
                 JOIN draft_content d ON d.model_id=s.model_id AND d.content_digest=c.content_digest
@@ -164,13 +215,13 @@ public final class DraftJournalRepository {
                 long replayTarget = target == null ? head : target;
                 DraftToken checkpointToken = new DraftToken(draft, covered, binding);
                 String dirty = rows.getString("dirty_since"), deadline = rows.getString("deadline");
-                require(covered <= head && List.of("SaveContentDigest/1", "SaveContentDigest/2").contains(rows.getString("digest_version")), "DRAFT_RECOVERY_REQUIRED");
+                require(covered <= head && List.of("SaveContentDigest/1", "SaveContentDigest/2", "SaveContentDigest/3", "SaveContentDigest/4", "SaveContentDigest/5").contains(rows.getString("digest_version")), "DRAFT_RECOVERY_REQUIRED");
                 require((dirty == null) == (deadline == null), "DRAFT_RECOVERY_REQUIRED");
                 require(target != null || head == covered || dirty != null, "DRAFT_RECOVERY_REQUIRED");
                 if (dirty != null) require(TIME.format(java.time.Instant.parse(dirty)).equals(dirty) && TIME.format(java.time.Instant.parse(deadline)).equals(deadline)
                         && java.time.Duration.between(java.time.Instant.parse(dirty), java.time.Instant.parse(deadline)).toMillis() == 10000, "DRAFT_RECOVERY_REQUIRED");
                 String artifact = rows.getString("artifact_json");
-                require(HybridSavePreparation.hash(artifact).equals(rows.getString("artifact_digest")), "DRAFT_RECOVERY_REQUIRED");
+                require(StorageDigests.hash(artifact).equals(rows.getString("artifact_digest")), "DRAFT_RECOVERY_REQUIRED");
                 ObjectNode content = (ObjectNode) DraftJsonDelta.read(rows.getString("model_json"));
                 ObjectNode metadata = (ObjectNode) DraftJsonDelta.read(artifact);
                 var checkpointDocument = SaveContentDigestV1.join(new SaveContentDigestV1.Parts(content, metadata));
@@ -195,7 +246,7 @@ public final class DraftJournalRepository {
                         && rows.getString("base_revision_id").equals(document.path("revision_id").asText())
                         && binding.equals(document.at("/profile_binding/binding_digest/digest").asText())
                         && DraftJsonDelta.digest(document.get("profile_binding")).equals(DraftJsonDelta.digest(DraftJsonDelta.read(rows.getString("profile_binding_json")))), "DRAFT_RECOVERY_REQUIRED");
-                try (var journal = connection.prepareStatement("SELECT * FROM draft_journal WHERE model_id=? AND draft_id=? AND edit_seq>? AND (? IS NULL OR edit_seq<=?) ORDER BY edit_seq")) {
+                try (var journal = connection.prepareStatement("SELECT * FROM draft_journal WHERE model_id=? AND draft_id=? AND edit_seq>? AND (CAST(? AS BIGINT) IS NULL OR edit_seq<=?) ORDER BY edit_seq")) {
                     journal.setString(1, modelId); journal.setString(2, draft); journal.setLong(3, covered);
                     journal.setObject(4, target); journal.setObject(5, target);
                     try (var entries = journal.executeQuery()) {
@@ -230,7 +281,9 @@ public final class DraftJournalRepository {
             require(left.isMissingNode() ? right.isMissingNode() : !right.isMissingNode() && DraftJsonDelta.digest(left).equals(DraftJsonDelta.digest(right)), "INPUT_INVALID");
         }
         String oldVersion = before.path("schema_version").asText(), nextVersion = after.path("schema_version").asText();
-        require(oldVersion.equals(nextVersion) || List.of("0.2", "0.3", "0.4").contains(oldVersion) && nextVersion.equals("0.5")
+        require(oldVersion.equals(nextVersion) || List.of("0.2", "0.3", "0.4", "0.5", "0.6").contains(oldVersion) && nextVersion.equals("0.7")
+                || List.of("0.2", "0.3", "0.4", "0.5").contains(oldVersion) && nextVersion.equals("0.6")
+                || List.of("0.2", "0.3", "0.4").contains(oldVersion) && nextVersion.equals("0.5")
                 && after.path("contexts").findValues("architecture_links").stream().anyMatch(links -> links.isArray() && !links.isEmpty())
                 || List.of("0.2", "0.3").contains(oldVersion) && nextVersion.equals("0.4")
                 && after.path("contexts").findValues("architecture_level").size() > 0
@@ -252,14 +305,14 @@ public final class DraftJournalRepository {
         }
     }
     static boolean hasOverlayTable(Connection connection) throws SQLException {
-        try (var statement = connection.createStatement(); var rows = statement.executeQuery("SELECT 1 FROM sqlite_master WHERE type='table' AND name='draft_checkpoint_overlay'")) { return rows.next(); }
+        return ProjectConnectionFactory.hasTable(connection, "draft_checkpoint_overlay");
     }
 
     static void scope(Connection connection, String project, String model) throws SQLException {
         try (var statement = connection.prepareStatement("SELECT 1 FROM model_catalog m JOIN project_metadata p ON p.project_id=m.project_id WHERE m.model_id=? AND m.project_id=? AND p.status='ACTIVE' AND m.status='ACTIVE'")) {
             statement.setString(1, model); statement.setString(2, project); try (var rows = statement.executeQuery()) { require(rows.next(), "NOT_FOUND"); }
         }
-        try (var statement = connection.createStatement(); var rows = statement.executeQuery("SELECT 1 FROM sqlite_master WHERE type='table' AND name='model_save_mode'")) { require(rows.next(), "DRAFT_MODE_REQUIRED"); }
+        require(ProjectConnectionFactory.hasTable(connection, "model_save_mode"), "DRAFT_MODE_REQUIRED");
         try (var statement = connection.prepareStatement("SELECT 1 FROM model_save_mode m JOIN draft_stream s ON s.model_id=m.model_id AND s.draft_id=m.active_draft_id WHERE m.model_id=? AND m.mode='JOURNALED_DRAFT_V2'")) {
             statement.setString(1, model); try (var rows = statement.executeQuery()) { require(rows.next(), "DRAFT_MODE_REQUIRED"); }
         }
@@ -267,9 +320,9 @@ public final class DraftJournalRepository {
 
     @FunctionalInterface interface Transaction<T> { T run(Connection connection) throws Exception; }
     <T> T transaction(boolean write, Transaction<T> action) {
-        require(Files.isRegularFile(database, LinkOption.NOFOLLOW_LINKS), "INPUT_INVALID");
-        try (Connection connection = SqliteConnectionFactory.create(database).getConnection()) {
-            try (var statement = connection.createStatement()) { statement.execute(write ? "BEGIN IMMEDIATE" : "BEGIN"); }
+        try (Connection connection = ProjectConnectionFactory.create(database).getConnection()) {
+            JdbcDialect.begin(connection, write);
+            if (write) ProjectConnectionFactory.lockProject(connection);
             try {
                 T result = action.run(connection);
                 try (var statement = connection.createStatement()) { statement.execute("COMMIT"); }

@@ -12,7 +12,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-
 class GoldenFixtureAttemptCloneVerifierTest {
 
     @TempDir
@@ -28,12 +27,14 @@ class GoldenFixtureAttemptCloneVerifierTest {
 
         var cloneOne = verifier.cloneStorage(baseStorage, materialized.projectId(), baseSha256, temporaryDirectory.resolve("attempt-one"));
         var cloneTwo = verifier.cloneStorage(baseStorage, materialized.projectId(), baseSha256, temporaryDirectory.resolve("attempt-two"));
-        try (var connection = DriverManager.getConnection("jdbc:sqlite:" + cloneOne.databasePath())) {
+        try (var connection = org.opm.localruntime.storage.SqliteTestSupport.connection(cloneOne.databasePath())) {
             connection.createStatement().executeUpdate("UPDATE project_metadata SET description = 'attempt one mutation'");
         }
 
         assertEquals(baseSha256, sha256(materialized.databasePath()));
         assertEquals(baseSha256, sha256(cloneTwo.databasePath()));
+        try(var c=org.opm.localruntime.storage.SqliteSnapshots.connection(materialized.databasePath());var r=c.createStatement().executeQuery("SELECT description FROM project_metadata")) {assertTrue(r.next());assertFalse("attempt one mutation".equals(r.getString(1)));}
+        try(var c=org.opm.localruntime.storage.SqliteSnapshots.connection(cloneTwo.databasePath());var r=c.createStatement().executeQuery("SELECT description FROM project_metadata")) {assertTrue(r.next());assertFalse("attempt one mutation".equals(r.getString(1)));}
         assertFalse(baseSha256.equals(sha256(cloneOne.databasePath())));
         assertFalse(Files.exists(materialized.databasePath().resolveSibling("project.db-wal")));
         assertFalse(Files.exists(materialized.databasePath().resolveSibling("project.db-shm")));

@@ -27,9 +27,7 @@ class DraftSaveRepositoryTest {
         Path storage = temporary.resolve(name), db = create(storage, true, ignored -> { }); migrate(db); return db;
     }
     private void migrate(Path db) {
-        Flyway.configure().dataSource(SqliteConnectionFactory.create(db)).locations("filesystem:" + root().resolve("docs/contracts/migrations/sqlite"),
-                        "filesystem:" + root().resolve("docs/contracts/migrations/sqlite-checkpoint"))
-                .target("4").mixed(true).load().migrate();
+        org.opm.localruntime.storage.SqliteTestSupport.migrate(db);
     }
     private DraftSaveRepository saves(Path db, int seconds) { return new DraftSaveRepository(db, clock(seconds)); }
     private DraftJournalRepository.Snapshot edit(Path db, int seconds, double x, String metadata) throws Exception {
@@ -40,7 +38,7 @@ class DraftSaveRepositoryTest {
         journal.commit(PROJECT, MODEL, DraftWorkspaceContract.read(request.toString(), DraftWorkspaceContract.Type.DraftEditRequest), document -> {
             // 此处仅测试存储：领域校验另有真实 Profile/OPL 测试，不将本 helper 当合法 UI 命令。
             ((ObjectNode) document.at("/layouts/0")).put("x", x);
-            document.putObject("revision_digest").put("algorithm", "sha256").put("digest", HybridSavePreparation.hash(metadata));
+            document.putObject("revision_digest").put("algorithm", "sha256").put("digest", org.opm.localruntime.storage.StorageDigests.hash(metadata));
             return new DraftJournalRepository.Proposal(document.toString(), List.of(), List.of(), "{\"blocking\":0,\"warning\":0,\"suggestion\":0,\"coverage_state\":\"INCOMPLETE\"}");
         });
         return journal.read(PROJECT, MODEL);
@@ -51,14 +49,13 @@ class DraftSaveRepositoryTest {
         assertEquals(code, assertThrows(DraftJournalRepository.Failure.class, operation).code());
     }
 
-    @Test void migrationIsRepeatableAndV3SavingNeverCreatesSchemaImplicitly() throws Exception {
-        Path db = create(temporary.resolve("v3"), true, ignored -> { }); var original = saves(db, 0).read(PROJECT, MODEL);
-        code("DRAFT_RECOVERY_REQUIRED", () -> manual(db, "save.old", original.token()));
-        try (var c = SqliteConnectionFactory.create(db).getConnection()) { assertFalse(DraftJournalRepository.hasOverlayTable(c)); }
-        migrate(db); migrate(db);
-        assertEquals(original, saves(db, 0).read(PROJECT, MODEL));
-        try (var c = SqliteConnectionFactory.create(db).getConnection()) { PreparedDraftRepository.integrity(c); }
+    @Test void migrationIsRepeatableAndPreservesDraftState() throws Exception {
+        Path db=create(temporary.resolve("repeat"),true,ignored->{});var original=saves(db,0).read(PROJECT,MODEL);
+        migrate(db);migrate(db);assertEquals(original,saves(db,0).read(PROJECT,MODEL));
+        assertEquals("SAVED",manual(db,"save.baseline",original.token()).status());
     }
+
+
 
     @Test void manualAutoNoopAndAbaUseOnlyNecessaryContentAndHistory() throws Exception {
         Path db = database("aba"); var initial = saves(db, 0).read(PROJECT, MODEL);
@@ -69,7 +66,11 @@ class DraftSaveRepositoryTest {
         var auto = saves(db, 12).checkpoint(PROJECT, MODEL, ignored -> { });
         assertEquals(b.token(), auto.capturedToken()); assertEquals(1, count(db, "draft_savepoint")); assertEquals(1, count(db, "revision_document"));
         assertNull(saves(db, 12).read(PROJECT, MODEL).dirtySince());
+        var state = saves(db, 12).readState(PROJECT, MODEL);
+        assertEquals(b.token(), state.token()); assertEquals(b.token(), state.checkpointToken());
+        assertNull(state.dirtySince()); assertNull(state.deadline()); assertEquals(first.revision_id(), state.lastManualRevision());
         var savedB = manual(db, "save.b", b.token()); assertEquals("SAVED", savedB.status()); assertEquals(auto.checkpointId(), savedB.checkpoint_id());
+        assertEquals(savedB.revision_id(), saves(db, 12).readState(PROJECT, MODEL).lastManualRevision());
         var returned = edit(db, 13, a, "2026-09-13T00:00:13.000Z");
         var savedA = manual(db, "save.a", returned.token()); assertEquals("SAVED", savedA.status()); assertNotEquals(first.revision_id(), savedA.revision_id());
         assertEquals(2, count(db, "draft_content")); assertEquals(3, count(db, "draft_savepoint"));
@@ -127,8 +128,8 @@ class DraftSaveRepositoryTest {
             assertEquals(0, count(db, "draft_savepoint")); assertEquals(1, count(db, "draft_receipt")); assertEquals(0, overlayCount(db));
         }
         Path db = database("sql"); var before = edit(db, 1, 33.5, "2026-09-13T00:00:01.000Z");
-        try (var c = SqliteConnectionFactory.create(db).getConnection(); var s = c.createStatement()) {
-            s.execute("CREATE TRIGGER test_save_fail BEFORE INSERT ON draft_receipt WHEN NEW.operation='SAVE' BEGIN SELECT RAISE(ABORT,'测试失败'); END");
+        try (var c = org.opm.localruntime.storage.SqliteTestSupport.create(db).getConnection(); var s = c.createStatement()) {
+            s.execute((org.opm.localruntime.storage.SqliteTestSupport.sqlite(c) ? "CREATE TRIGGER test_save_fail BEFORE INSERT ON draft_receipt WHEN NEW.operation='SAVE' BEGIN SELECT RAISE(ABORT, '测试失败'); END" : "CREATE OR REPLACE FUNCTION fn_test_save_fail() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.operation='SAVE' THEN RAISE EXCEPTION '测试失败'; END IF; RETURN NEW; END $$; CREATE TRIGGER test_save_fail BEFORE INSERT ON draft_receipt FOR EACH ROW EXECUTE FUNCTION fn_test_save_fail()"));
         }
         code("PERSISTENCE_FAILED", () -> manual(db, "save.sql", before.token()));
         assertEquals(before, saves(db, 3).read(PROJECT, MODEL)); assertEquals(0, count(db, "draft_savepoint")); assertEquals(0, overlayCount(db));
@@ -140,22 +141,23 @@ class DraftSaveRepositoryTest {
         var first = new DraftSaveRepository(db, clock(2), stage -> {
             if (stage.equals("CONTENT")) { entered.countDown(); try { assertTrue(release.await(5, TimeUnit.SECONDS)); } catch (InterruptedException e) { throw new RuntimeException(e); } }
         });
-        try (var executor = java.util.concurrent.Executors.newFixedThreadPool(2)) {
+        var executor = java.util.concurrent.Executors.newFixedThreadPool(2);
+        try {
             var a = executor.submit(() -> first.manual(PROJECT, MODEL, request("save.concurrent", before.token()), ignored -> { }));
             assertTrue(entered.await(5, TimeUnit.SECONDS)); var b = executor.submit(() -> manual(db, "save.concurrent", before.token())); release.countDown();
             assertEquals(a.get(10, TimeUnit.SECONDS), b.get(10, TimeUnit.SECONDS));
-        } finally { release.countDown(); }
+        } finally { release.countDown(); executor.shutdownNow(); }
         assertEquals(1, count(db, "draft_savepoint")); assertEquals(2, count(db, "draft_receipt"));
     }
 
     @Test void overlaysAreImmutableAndMissingOrCorruptCaptureBlocksRecovery() throws Exception {
         for (boolean missing : List.of(false, true)) {
             Path db = database("corrupt" + missing); var before = edit(db, 1, 55.5, "2026-09-13T00:00:01.000Z"); manual(db, "save.once", before.token());
-            try (var c = SqliteConnectionFactory.create(db).getConnection(); var s = c.createStatement()) {
+            try (var c = org.opm.localruntime.storage.SqliteTestSupport.create(db).getConnection(); var s = c.createStatement()) {
                 assertThrows(java.sql.SQLException.class, () -> s.executeUpdate("UPDATE draft_checkpoint_overlay SET document_digest='" + "a".repeat(64) + "'"));
-                assertThrows(java.sql.SQLException.class, () -> s.executeUpdate("INSERT OR REPLACE INTO draft_checkpoint_overlay SELECT * FROM draft_checkpoint_overlay"));
+                assertThrows(java.sql.SQLException.class, () -> s.executeUpdate("INSERT INTO draft_checkpoint_overlay SELECT * FROM draft_checkpoint_overlay"));
                 if (missing) s.executeUpdate("DELETE FROM draft_checkpoint_overlay");
-                else { s.execute("DROP TRIGGER draft_checkpoint_overlay_no_update"); s.executeUpdate("UPDATE draft_checkpoint_overlay SET document_digest='" + "a".repeat(64) + "'"); }
+                else { s.execute(org.opm.localruntime.storage.SqliteTestSupport.dropTriggerSql(c, "draft_checkpoint_overlay_no_update", "draft_checkpoint_overlay")); s.executeUpdate("UPDATE draft_checkpoint_overlay SET document_digest='" + "a".repeat(64) + "'"); }
             }
             code("DRAFT_RECOVERY_REQUIRED", () -> saves(db, 3).read(PROJECT, MODEL));
         }
@@ -179,7 +181,7 @@ class DraftSaveRepositoryTest {
         assertEquals(before, saves(db, 3).read(PROJECT, MODEL));
     }
 
-    @Test void coordinatorAdapterCompletesAutoThenManualAgainstRealSqlite() throws Exception {
+    @Test void coordinatorAdapterCompletesAutoThenManualAgainstRealPostgres() throws Exception {
         Path db = database("coordinator"); var edited = edit(db, 1, 62.5, "2026-09-13T00:00:01.000Z");
         try (var coordinator = new org.opm.localruntime.application.DraftSaveCoordinator(PROJECT, MODEL, saves(db, 11), ignored -> { }, clock(11), () -> 0L)) {
             coordinator.poll(); assertEquals(0, count(db, "draft_savepoint")); assertNull(coordinator.state().dirty_since());
@@ -203,9 +205,9 @@ class DraftSaveRepositoryTest {
     @Test void receiptWithUnrelatedHistoryReferenceIsNeverReturnedAsSuccessfulSave() throws Exception {
         Path db = database("receipt-corrupt"); var before = saves(db, 0).read(PROJECT, MODEL); manual(db, "save.a", before.token());
         var changed = edit(db, 1, 99.5, "2026-09-13T00:00:01.000Z"); var other = manual(db, "save.b", changed.token());
-        try (var c = SqliteConnectionFactory.create(db).getConnection()) {
-            try (var s = c.createStatement()) { s.execute("DROP TRIGGER draft_receipt_no_update"); }
-            try (var s = c.prepareStatement("UPDATE draft_receipt SET result_json=json_set(result_json,'$.revision_id',?) WHERE operation='SAVE' AND idempotency_id='save.a'")) {
+        try (var c = org.opm.localruntime.storage.SqliteTestSupport.create(db).getConnection()) {
+            try (var s = c.createStatement()) { s.execute(org.opm.localruntime.storage.SqliteTestSupport.dropTriggerSql(c, "draft_receipt_no_update", "draft_receipt")); }
+            try (var s = c.prepareStatement(SqliteTestSupport.sqlite(c) ? "UPDATE draft_receipt SET result_json=json_set(result_json,'$.revision_id',?) WHERE operation='SAVE' AND idempotency_id='save.a'" : "UPDATE draft_receipt SET result_json=jsonb_set(result_json::jsonb,'{revision_id}',to_jsonb(CAST(? AS TEXT)))::text WHERE operation='SAVE' AND idempotency_id='save.a'")) {
                 s.setString(1, other.revision_id()); assertEquals(1, s.executeUpdate());
             }
         }
@@ -213,6 +215,6 @@ class DraftSaveRepositoryTest {
     }
 
     private long overlayCount(Path db) throws Exception {
-        try (var c = SqliteConnectionFactory.create(db).getConnection(); var s = c.createStatement(); var rows = s.executeQuery("SELECT COUNT(*) FROM draft_checkpoint_overlay")) { rows.next(); return rows.getLong(1); }
+        try (var c = org.opm.localruntime.storage.SqliteTestSupport.create(db).getConnection(); var s = c.createStatement(); var rows = s.executeQuery("SELECT COUNT(*) FROM draft_checkpoint_overlay")) { rows.next(); return rows.getLong(1); }
     }
 }

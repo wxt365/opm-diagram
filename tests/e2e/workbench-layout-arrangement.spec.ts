@@ -1,3 +1,4 @@
+import { localLayout } from './helpers/local-layout';
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
 const useContextMenu = process.env.OPM_ARRANGEMENT_CONTEXT_MENU === "true";
@@ -43,7 +44,7 @@ test("真实画布六种对齐、两种分布、状态随动及保存重开", as
     for (const [index, item] of nodes.entries()) {
       await item.click({ position: { x: 20, y: 14 } });
       const box = (await item.boundingBox())!;
-      await edit(page, () => drag(page, item, Math.round(([450, 750, 1120][index]! - box.x) / 16) * 16,
+      await localLayout(page, () => drag(page, item, Math.round(([450, 750, 1120][index]! - box.x) / 16) * 16,
         Math.round(([450, 650, 920][index]! - box.y) / 16) * 16));
     }
     await owner.click({ position: { x: 20, y: 14 } });
@@ -64,8 +65,8 @@ test("真实画布六种对齐、两种分布、状态随动及保存重开", as
     for (const action of ["left", "center-x", "right", "top", "center-y", "bottom"] as const) {
       const count = requests.length, seq = await editSeq(page);
       await arrange(page, action);
-      expect(requests).toHaveLength(count + 1); expect(await editSeq(page)).toBe(seq + 1);
-      expect(requests.at(-1)!.command.command_type).toBe("UPDATE_LAYOUT_BATCH");
+      expect(requests).toHaveLength(count); expect(await editSeq(page)).toBe(seq);
+      expect(requests.length).toBe(count);
       const after = await geometry([...nodes, ...states]), reference = before[2]!;
       expect(after[2]).toEqual(reference);
       for (let index = 0; index < 2; index++) {
@@ -83,7 +84,7 @@ test("真实画布六种对齐、两种分布、状态随动及保存重开", as
       // 重复执行没有编辑请求，也没有虚假历史。
       await page.getByTestId("opd-layout-menu-toggle").click(); await page.getByTestId(`opd-layout-${action}`).click();
       await expect(page.getByTestId("p03-command-feedback")).toContainText("已符合该布局");
-      expect(requests).toHaveLength(count + 1);
+      expect(requests).toHaveLength(count);
       if (action === "left") {
         await page.getByTestId("opd-layout-menu-toggle").click();
         await page.screenshot({ path: info.outputPath("align-menu.png") });
@@ -93,26 +94,25 @@ test("真实画布六种对齐、两种分布、状态随动及保存重开", as
         await expect(page.getByTestId("p03-command-feedback")).toContainText("空间不足");
         expect(requests).toHaveLength(negativeCount); expect(await geometry([...nodes, ...states])).toEqual(after);
       }
-      await edit(page, () => layoutHistory(page, false));
+      await localLayout(page, () => layoutHistory(page, false));
       expect(await geometry([...nodes, ...states])).toEqual(before);
     }
     for (const action of ["distribute-x", "distribute-y"] as const) {
-      const count = requests.length; await arrange(page, action); expect(requests).toHaveLength(count + 1);
+      const count = requests.length; await arrange(page, action); expect(requests).toHaveLength(count);
       const after = await geometry(nodes), axis = action === "distribute-x" ? "x" : "y", size = axis === "x" ? "width" : "height";
       expect(after[0]).toEqual(before[0]); expect(after[2]).toEqual(before[2]);
       expect(after[1]![axis] - after[0]![axis] - after[0]![size]).toBeCloseTo(after[2]![axis] - after[1]![axis] - after[1]![size], 1);
-      await edit(page, () => layoutHistory(page, false)); expect(await geometry([...nodes, ...states])).toEqual(before);
-      await edit(page, () => layoutHistory(page, true)); expect(await geometry(nodes)).toEqual(after);
-      await edit(page, () => layoutHistory(page, false));
+      await localLayout(page, () => layoutHistory(page, false)); expect(await geometry([...nodes, ...states])).toEqual(before);
+      await localLayout(page, () => layoutHistory(page, true)); expect(await geometry(nodes)).toEqual(after);
+      await localLayout(page, () => layoutHistory(page, false));
     }
     // 独立状态在同一所属节点内进行合法对齐；混选时提供原因。
     await states[0]!.click(); await states[1]!.click({ modifiers: ["Shift"] });
     const stateBefore = await geometry([owner, ...states]);
-    await arrange(page, "top");
+    await arrange(page, "top", false);
     const stateAfter = await geometry([owner, ...states]);
     expect(stateAfter[0]).toEqual(stateBefore[0]);
-    expect(stateAfter[1]!.y).toBeCloseTo(stateAfter[2]!.y, 1);
-    await edit(page, () => layoutHistory(page, false));
+    expect(stateAfter).toEqual(stateBefore); // Same-column State alignment would overlap, so reject the batch.
     expect(await geometry([owner, ...states])).toEqual(stateBefore);
     await arrange(page, "left", false);
     await expect(page.getByTestId("p03-command-feedback")).toContainText("已符合该布局");
@@ -130,7 +130,7 @@ test("真实画布六种对齐、两种分布、状态随动及保存重开", as
     await page.getByTestId("hs-save").click(); await expect(page.getByTestId("hs-save-state")).toHaveText("已手动保存");
     await page.reload(); await expect(page.getByTestId("hs-save")).toBeEnabled();
     expect(await geometry([...nodes, ...states])).toEqual(saved);
-    await expect(page.getByTestId("opd-undo-layout")).toBeDisabled();
+    await expect(page.getByTestId("opd-undo-layout")).toHaveAttribute('title', /撤销：/); // Saved layout is part of unified persisted history.
     const versions = await page.getByTestId("p03-version-select").locator("option").evaluateAll(options => options.map(option => (option as HTMLOptionElement).value));
     await page.getByTestId("p03-version-select").selectOption(versions[1]!);
     await expect(page.getByTestId("p03-readonly-banner")).toBeVisible();
@@ -167,7 +167,7 @@ async function arrange(page: Page, action: string, changed = true) {
       await page.getByTestId("opd-blank-arrange").click(); await page.getByTestId(`opd-blank-layout-${action}`).click();
     } else { await page.getByTestId("opd-layout-menu-toggle").click(); await page.getByTestId(`opd-layout-${action}`).click(); }
   };
-  if (changed) await edit(page, invoke); else await invoke();
+  if (changed) await localLayout(page, invoke); else await invoke();
 }
 async function layoutHistory(page: Page, redo: boolean) {
   if (useContextMenu) {

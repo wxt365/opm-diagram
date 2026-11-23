@@ -38,8 +38,7 @@ class DraftSaveServiceTest {
 
     @Test void lazyRegistrationAutoCheckpointAndRestartUseDurableDeadline() throws Exception {
         Path database = create(temporary, true, ignored -> { });
-        Flyway.configure().dataSource("jdbc:sqlite:" + database, "", "").locations("filesystem:" + root().resolve("docs/contracts/migrations/sqlite"),
-                "filesystem:" + root().resolve("docs/contracts/migrations/sqlite-checkpoint")).target("4").mixed(true).load().migrate();
+        org.opm.localruntime.storage.SqliteTestSupport.migrate(database);
         var factory = new ProjectDatabaseFactory(temporary); var loader = new FileProfilePackageLoader(root().resolve("packages/profiles"));
         var workspace = new DraftWorkspaceService(factory, new LocalApiService(factory, loader), loader, EDIT_CLOCK);
         var token = rename(workspace, new DraftJournalRepository(database, EDIT_CLOCK).read(PROJECT, MODEL).token(), "自动保存对象");

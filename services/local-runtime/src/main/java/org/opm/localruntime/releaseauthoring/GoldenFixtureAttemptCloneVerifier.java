@@ -40,7 +40,7 @@ public final class GoldenFixtureAttemptCloneVerifier {
                     || !expectedDatabaseSha256.equals(sha256(clonedDatabase))) {
                 throw failure("GFM_STORAGE_VERIFY_FAILED", "Attempt clone differs from its immutable base database.");
             }
-            return new AttemptClone(clonedDatabase, expectedDatabaseSha256);
+            return new AttemptClone(clonedDatabase, sha256(clonedDatabase));
         } catch (GoldenFixtureMaterializationException exception) {
             throw exception;
         } catch (Exception exception) {
@@ -75,7 +75,7 @@ public final class GoldenFixtureAttemptCloneVerifier {
     }
 
     private Path database(Path storage, String projectId) {
-        return storage.resolve("projects").resolve(projectId).resolve("project.db");
+        return org.opm.localruntime.storage.SqliteSnapshots.path(storage,projectId);
     }
 
     private Path sidecar(Path database, String suffix) {

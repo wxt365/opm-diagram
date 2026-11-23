@@ -68,11 +68,11 @@ public final class RevisionCompatibilityRunner {
                 attempt(manifestRoot, item, workRoot.resolve(item.required("case_id").asText()).resolve("2"), 2));
         RevisionCompatibilityReportWriter.Status expected = "PASS".equals(item.required("expectation").asText())
                 ? RevisionCompatibilityReportWriter.Status.PASS_MATCHED : RevisionCompatibilityReportWriter.Status.BLOCKED_MATCHED;
-        boolean deterministic = attempts.getFirst().status() == attempts.get(1).status()
-                && same(attempts.getFirst().outputSha256(), attempts.get(1).outputSha256()) && same(attempts.getFirst().availability(), attempts.get(1).availability())
-                && same(attempts.getFirst().errorCode(), attempts.get(1).errorCode()) && same(attempts.getFirst().detailCode(), attempts.get(1).detailCode())
-                && attempts.getFirst().transaction().equals(attempts.get(1).transaction())
-                && same(attempts.getFirst().headBefore(), attempts.get(1).headBefore()) && same(attempts.getFirst().headAfter(), attempts.get(1).headAfter());
+        boolean deterministic = attempts.get(0).status() == attempts.get(1).status()
+                && same(attempts.get(0).outputSha256(), attempts.get(1).outputSha256()) && same(attempts.get(0).availability(), attempts.get(1).availability())
+                && same(attempts.get(0).errorCode(), attempts.get(1).errorCode()) && same(attempts.get(0).detailCode(), attempts.get(1).detailCode())
+                && attempts.get(0).transaction().equals(attempts.get(1).transaction())
+                && same(attempts.get(0).headBefore(), attempts.get(1).headBefore()) && same(attempts.get(0).headAfter(), attempts.get(1).headAfter());
         RevisionCompatibilityReportWriter.Status result = deterministic && attempts.stream().allMatch(value -> value.status() == expected
                 && matchesTransaction(item.required("expected_transaction"), value.transaction()))
                 ? expected : RevisionCompatibilityReportWriter.Status.FAILED;
@@ -90,6 +90,7 @@ public final class RevisionCompatibilityRunner {
                 HistoricalRevisionReplayService.HistoricalRevisionReplayResult replay = historical(input, false);
                 return matched(ordinal, inputSha, replay.textSha256(), replay.textEvidenceAvailability().name());
             }
+            // 冻结用例 ID 保持兼容，实际重开校验使用 SQLite。
             if (caseId.equals("COMPAT-004.V01_SQLITE_REOPEN.PASS")) {
                 Path fixture = attemptRoot.resolve("historical-revision.json");
                 Files.write(fixture, input);
@@ -245,7 +246,7 @@ public final class RevisionCompatibilityRunner {
     }
 
     private byte[] storedRevision(Path database, String revisionId) throws Exception {
-        try (var connection = DriverManager.getConnection("jdbc:sqlite:" + database.toAbsolutePath());
+        try (var connection = org.opm.localruntime.storage.SqliteSnapshots.connection(database);
              var statement = connection.prepareStatement("SELECT document_json FROM revision_document WHERE revision_id = ?")) {
             statement.setString(1, revisionId);
             try (var result = statement.executeQuery()) {
@@ -263,7 +264,7 @@ public final class RevisionCompatibilityRunner {
 
     private SemanticRevision layoutCandidate(SemanticRevision base, String revisionId) {
         List<SemanticRevision.Layout> layouts = new ArrayList<>(base.layouts());
-        SemanticRevision.Layout first = layouts.getFirst();
+        SemanticRevision.Layout first = layouts.get(0);
         layouts.set(0, new SemanticRevision.Layout(first.id(), first.x() + 1, first.y(), first.width(), first.height(), first.zOrder()));
         return new SemanticRevision(revisionId, base.modelId(), base.revisionSequence() + 1, base.profileBinding(), base.rootContextId(),
                 base.elements(), base.features(), base.states(), base.facts(), base.contexts(), base.occurrences(), layouts, base.statePresentations());
@@ -303,11 +304,11 @@ public final class RevisionCompatibilityRunner {
     private OplGenerationResult rewriteFirstToken(OplGenerationResult source, java.util.function.UnaryOperator<OplToken> replacement) {
         OplTextArtifact artifact = source.artifact();
         List<OplParagraph> paragraphs = new ArrayList<>(artifact.paragraphs());
-        OplParagraph firstParagraph = paragraphs.getFirst();
+        OplParagraph firstParagraph = paragraphs.get(0);
         List<OplSentence> sentences = new ArrayList<>(firstParagraph.sentences());
-        OplSentence firstSentence = sentences.getFirst();
+        OplSentence firstSentence = sentences.get(0);
         List<OplToken> tokens = new ArrayList<>(firstSentence.tokens());
-        tokens.set(0, replacement.apply(tokens.getFirst()));
+        tokens.set(0, replacement.apply(tokens.get(0)));
         sentences.set(0, new OplSentence(firstSentence.sentenceId(), firstSentence.text(), firstSentence.ordinal(), tokens,
                 firstSentence.generationRuleIds(), firstSentence.inputFactIds()));
         paragraphs.set(0, new OplParagraph(firstParagraph.paragraphId(), firstParagraph.contextId(), firstParagraph.ordinal(), sentences));
@@ -351,7 +352,7 @@ public final class RevisionCompatibilityRunner {
         return new RevisionCompatibilityReportWriter.Transaction(0, 0, 0, 0, 0, 0, 0, false);
     }
     private Snapshot snapshot(Path database, String modelId) throws Exception {
-        try (var connection = DriverManager.getConnection("jdbc:sqlite:" + database.toAbsolutePath())) {
+        try (var connection = org.opm.localruntime.storage.SqliteSnapshots.connection(database)) {
             return new Snapshot(count(connection, "revision_document"), count(connection, "revision_parent"), count(connection, "text_trace_index"),
                     count(connection, "finding_index"), count(connection, "operation_record"), count(connection, "idempotency_record"),
                     text(connection, "SELECT draft_head_revision_id FROM model_head WHERE model_id = ?", modelId),

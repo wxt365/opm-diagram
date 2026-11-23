@@ -15,14 +15,14 @@ public final class OperationHistoryRepository {
     private static final ObjectMapper JSON = new ObjectMapper();
     static final String NAMESPACE = "DRAFT_OPERATION_HISTORY_V1";
     private final DraftJournalRepository journal;
-    public OperationHistoryRepository(Path database, Clock clock) { journal = new DraftJournalRepository(database, clock); }
+    public OperationHistoryRepository(ProjectScope database, Clock clock) { journal = new DraftJournalRepository(database, clock); }
 
     static void append(Connection connection, String model, String key, String digest, DraftToken token, String time, ObjectNode detail, String status) throws Exception {
         detail.put("draft_id", token.draft_id()).put("edit_seq", token.edit_seq()).put("status", status);
-        try (var statement = connection.createStatement(); var rows = statement.executeQuery("SELECT COALESCE(MAX(rowid),0) FROM draft_receipt")) {
+        try (var statement = connection.createStatement(); var rows = statement.executeQuery("SELECT COALESCE(MAX(receipt_order),0) FROM draft_receipt")) {
             rows.next(); detail.put("receipt_order", rows.getLong(1)).put("after_receipt", key.startsWith("AUTO."));
         }
-        update(connection, "INSERT INTO idempotency_record VALUES (?,?,?,?,?,NULL,?,?,NULL)",
+        update(connection, "INSERT INTO idempotency_record(operation_id,aggregate_id,command_id,request_digest,result_status,result_revision_id,result_json,created_at,expires_at) VALUES (?,?,?,?,?,NULL,?,?,NULL)",
                 NAMESPACE, model, key, digest, status, detail.toString(), time);
     }
 
@@ -33,6 +33,10 @@ public final class OperationHistoryRepository {
                 try (var rows = statement.executeQuery()) { require(rows.next(), "NOT_FOUND"); }
             }
             boolean draftTables = table(connection, "draft_receipt");
+            ObjectNode recovery = draftTables && revision.equals("HEAD") ? DraftOperationRecovery.read(connection, model) : null;
+            if (recovery != null && !DraftOperationRecovery.current(recovery, DraftJournalRepository.load(connection, model))) recovery = null;
+            ObjectNode redo = draftTables && revision.equals("HEAD") ? DraftOperationRecovery.redo(connection, model) : null;
+            if (redo != null && !DraftOperationRecovery.current(redo, DraftJournalRepository.load(connection, model))) redo = null;
             String draft = null, cutoff = "9999-12-31T23:59:59.999Z";
             long seq = Long.MAX_VALUE, legacySequence = Long.MAX_VALUE, receiptLimit = Long.MAX_VALUE;
             if (!revision.equals("HEAD")) {
@@ -45,7 +49,7 @@ public final class OperationHistoryRepository {
                 }
                 if (found) {
                     // 保存收据可能比 savepoint 晚一个时钟刻度；以产生该版本的第一条收据为截止。
-                    try (var statement = connection.prepareStatement("SELECT MIN(created_at),MIN(rowid) FROM draft_receipt WHERE model_id=? AND operation IN ('SAVE','PIN') AND json_extract(result_json,'$.revision_id')=?")) {
+                    try (var statement = connection.prepareStatement("SELECT MIN(created_at),MIN(receipt_order) FROM draft_receipt WHERE model_id=? AND operation IN ('SAVE','PIN') AND " + JdbcDialect.jsonText(connection, "result_json", "revision_id") + "=?")) {
                         statement.setString(1, model); statement.setString(2, revision);
                         try (var rows = statement.executeQuery()) { if (rows.next() && rows.getString(1) != null) {
                             receiptLimit = rows.getLong(2);
@@ -72,30 +76,43 @@ public final class OperationHistoryRepository {
                     java.time.Instant.parse(cursorTime); require(!cursorId.isBlank(), "INPUT_INVALID");
                 } catch (Exception error) { throw failure("INPUT_INVALID", error); }
             }
+            String legacyBody = JdbcDialect.sqlite(connection)
+                    ? "json_object('operation',o.operation_id,'status',o.result_status,'revision_id',o.result_revision_id)"
+                    : "json_build_object('operation',o.operation_id,'status',o.result_status,'revision_id',o.result_revision_id)::text";
             String sources = """
                 SELECT 'history.legacy.'||o.operation_record_id AS id,o.occurred_at AS time,'LEGACY' AS source,
-                  json_object('operation',o.operation_id,'status',o.result_status,'revision_id',o.result_revision_id) AS body,NULL AS draft,NULL AS seq,NULL AS receipt_order,0 AS after_receipt
+                  %s AS body,CAST(NULL AS TEXT) AS draft,CAST(NULL AS BIGINT) AS seq,CAST(NULL AS BIGINT) AS receipt_order,0 AS after_receipt
                 FROM operation_record o LEFT JOIN revision_document r ON r.revision_id=COALESCE(o.result_revision_id,o.input_revision_id)
                 WHERE o.project_id=? AND o.model_id=? AND COALESCE(r.revision_sequence,0)<=?
-                """;
+                """.formatted(legacyBody);
             if (draftTables) sources += """
                 UNION ALL SELECT 'history.'||command_id,created_at,'DETAIL',result_json,
-                  json_extract(result_json,'$.draft_id'),json_extract(result_json,'$.edit_seq'),json_extract(result_json,'$.receipt_order'),COALESCE(json_extract(result_json,'$.after_receipt'),0)
+                  %s,CAST(CAST(%s AS NUMERIC) AS BIGINT),CAST(CAST(%s AS NUMERIC) AS BIGINT),CASE WHEN CAST(%s AS BOOLEAN) THEN 1 ELSE 0 END
                 FROM idempotency_record WHERE aggregate_id=? AND operation_id='DRAFT_OPERATION_HISTORY_V1'
                 UNION ALL SELECT 'history.'||operation||'.'||idempotency_id,created_at,operation,result_json,
-                  COALESCE(json_extract(result_json,'$.result_token.draft_id'),json_extract(result_json,'$.captured_token.draft_id')),
-                  COALESCE(json_extract(result_json,'$.result_token.edit_seq'),json_extract(result_json,'$.captured_token.edit_seq')),d.rowid,0
+                  COALESCE(%s,%s),CAST(CAST(COALESCE(%s,%s) AS NUMERIC) AS BIGINT),d.receipt_order,0
                 FROM draft_receipt d WHERE model_id=? AND NOT EXISTS (SELECT 1 FROM idempotency_record i
                   WHERE i.operation_id='DRAFT_OPERATION_HISTORY_V1' AND i.aggregate_id=d.model_id AND i.command_id=d.operation||'.'||d.idempotency_id)
-                """;
-            String sql = "SELECT * FROM (" + sources + ") WHERE time<=? AND (seq IS NULL OR seq<=? AND (? IS NULL OR draft=?)) AND (receipt_order IS NULL OR receipt_order<? OR receipt_order=? AND after_receipt=0) AND (time<? OR time=? AND id<?) ORDER BY time DESC,id DESC LIMIT 101";
+                """.formatted(JdbcDialect.jsonText(connection, "result_json", "draft_id"),
+                    JdbcDialect.jsonText(connection, "result_json", "edit_seq"), JdbcDialect.jsonText(connection, "result_json", "receipt_order"),
+                    JdbcDialect.jsonText(connection, "result_json", "after_receipt"), JdbcDialect.jsonText(connection, "result_json", "result_token,draft_id"),
+                    JdbcDialect.jsonText(connection, "result_json", "captured_token,draft_id"), JdbcDialect.jsonText(connection, "result_json", "result_token,edit_seq"),
+                    JdbcDialect.jsonText(connection, "result_json", "captured_token,edit_seq"));
+            String sql = "SELECT * FROM (" + sources + ") history WHERE time<=? AND (seq IS NULL OR seq<=? AND (CAST(? AS TEXT) IS NULL OR draft=?)) AND (receipt_order IS NULL OR receipt_order<? OR receipt_order=? AND after_receipt=0) AND (time<? OR time=? AND id<?) ORDER BY time DESC,id DESC LIMIT 101";
+            sql = sql.replace(" ORDER BY time DESC", " AND COALESCE(" + JdbcDialect.jsonText(connection, "body", "operation") + ",'')<>'AUTO_SAVE' ORDER BY time DESC");
+            if (revision.equals("HEAD")) {
+                String visible = " AND (COALESCE(" + JdbcDialect.jsonText(connection, "body", "status") + ",'')<>'UNDONE' OR id=?) AND COALESCE("
+                        + JdbcDialect.jsonText(connection, "body", "operation") + ",'')<>'RESTORE_OPERATION'";
+                sql = sql.replace(" ORDER BY time DESC", visible + " ORDER BY time DESC");
+            }
             var data = JSON.createObjectNode(); var items = data.putArray("items"); data.putNull("next_before");
             try (var statement = connection.prepareStatement(sql)) {
                 int i = 1; statement.setString(i++, project); statement.setString(i++, model); statement.setLong(i++, legacySequence);
                 if (draftTables) { statement.setString(i++, model); statement.setString(i++, model); }
                 statement.setString(i++, cutoff); statement.setLong(i++, seq); statement.setString(i++, draft); statement.setString(i++, draft);
                 statement.setLong(i++, receiptLimit); statement.setLong(i++, receiptLimit);
-                statement.setString(i++, cursorTime); statement.setString(i++, cursorTime); statement.setString(i, cursorId);
+                statement.setString(i++, cursorTime); statement.setString(i++, cursorTime); statement.setString(i++, cursorId);
+                if (revision.equals("HEAD")) statement.setString(i, redo == null ? "" : redo.path("record_id").asText());
                 try (var rows = statement.executeQuery()) {
                     while (rows.next()) {
                         if (items.size() == 100) {
@@ -124,6 +141,39 @@ public final class OperationHistoryRepository {
                         item.put("context_name", detail ? body.path("context_name").asText(null) : null);
                         String saved = body.path("revision_id").asText(null);
                         item.put("revision_id", saved);
+                        if (recovery != null && recovery.path("record_id").asText().equals(rows.getString("id")))
+                            item.put("recovery_action", recovery.path("action").asText());
+                        if (redo != null && redo.path("record_id").asText().equals(rows.getString("id"))) item.put("recovery_action", "REDO");
+                    }
+                }
+            }
+            return data;
+        });
+    }
+    /** 工具栏只读取当前恢复槽及对应详情，不扫描历史分页。 */
+    public ObjectNode recovery(String project, String model, com.fasterxml.jackson.databind.JsonNode token) {
+        return journal.transaction(false, connection -> {
+            scope(connection, project, model);
+            var snapshot = DraftJournalRepository.load(connection, model);
+            require(snapshot.token().binding_digest().equals(token.path("binding_digest").asText()), "RULE_VERSION_CONFLICT");
+            require(snapshot.token().draft_id().equals(token.path("draft_id").asText())
+                    && snapshot.token().edit_seq() == token.path("edit_seq").asLong(-1), "DRAFT_CONFLICT");
+            var data = JSON.createObjectNode(); var items = data.putArray("items"); data.putNull("next_before");
+            for (var action : java.util.List.of("UNDO", "REDO")) {
+                var slot = action.equals("UNDO") ? DraftOperationRecovery.read(connection, model) : DraftOperationRecovery.redo(connection, model);
+                if (!DraftOperationRecovery.current(slot, snapshot)) continue;
+                String record = slot.path("record_id").asText();
+                require(record.startsWith("history."), "DRAFT_RECOVERY_REQUIRED");
+                try (var statement = connection.prepareStatement("SELECT result_json,created_at FROM idempotency_record WHERE operation_id=? AND aggregate_id=? AND command_id=?")) {
+                    statement.setString(1, NAMESPACE); statement.setString(2, model); statement.setString(3, record.substring("history.".length()));
+                    try (var rows = statement.executeQuery()) {
+                        require(rows.next(), "DRAFT_RECOVERY_REQUIRED");
+                        var body = DraftJsonDelta.read(rows.getString(1));
+                        var item = items.addObject().put("record_id", record).put("occurred_at", rows.getString(2))
+                                .put("title", body.path("title").asText()).put("operation", body.path("operation").asText())
+                                .put("status", body.path("status").asText()).put("detail_available", true).put("recovery_action", action);
+                        item.put("context_id", body.path("context_id").asText(null)); item.put("context_name", body.path("context_name").asText(null));
+                        item.put("revision_id", body.path("revision_id").asText(null));
                     }
                 }
             }
@@ -131,8 +181,6 @@ public final class OperationHistoryRepository {
         });
     }
     private static boolean table(Connection connection, String name) throws Exception {
-        try (var statement = connection.prepareStatement("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?")) {
-            statement.setString(1, name); try (var rows = statement.executeQuery()) { return rows.next(); }
-        }
+        return ProjectConnectionFactory.hasTable(connection, name);
     }
 }

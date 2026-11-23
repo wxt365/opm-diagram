@@ -23,6 +23,7 @@
             <groupId>org.opm</groupId>
             <artifactId>local-runtime</artifactId>
             <version>${project.version}</version>
+            <classifier>plain</classifier>
             <scope>provided</scope>
         </dependency>
         <dependency>

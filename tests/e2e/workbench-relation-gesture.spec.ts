@@ -21,13 +21,13 @@ test("关系拖线在空白释放时零提交，合法端点松开后只提交�
   const committedRevision = await revisionTag(page);
   await expect(page.getByTestId("p03-relation-preview")).toHaveCount(0);
   await expect(page.locator(".x6-edge")).toHaveCount(1);
-  await expect(page.getByTestId("p03-opl-sentence")).toHaveText("Process 1 consumes Object 1.");
+  await expect(page.getByTestId("p03-opl-sentence")).toHaveAttribute("title", "Process 1 consumes Object 1.");
 
   await page.reload();
   await expectWorkbenchReady(page);
   await expect(page.locator(".revision-tag")).toHaveText(committedRevision);
   await expect(page.locator(".x6-edge")).toHaveCount(1);
-  await expect(page.getByTestId("p03-opl-sentence")).toHaveText("Process 1 consumes Object 1.");
+  await expect(page.getByTestId("p03-opl-sentence")).toHaveAttribute("title", "Process 1 consumes Object 1.");
 });
 
 test("同一对元素的多条普通二元关系使用不同稳定轨道", async ({ page }) => {
@@ -167,7 +167,7 @@ async function dragToBlank(page: Page, source: Locator) {
 }
 
 async function nodeGesturePoint(node: Locator) {
-  const box = await node.boundingBox();
+  const box = await node.locator('[data-opm-capture-cell-id]').boundingBox();
   if (!box) throw new Error("关系端点不可见");
   const centered = box.height <= 32 || await node.locator("ellipse").count() > 0;
   return centered

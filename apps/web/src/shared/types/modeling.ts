@@ -41,11 +41,16 @@ export interface ModelSummary {
   lastSavedAt: string;
 }
 
+export interface NodeAppearance { stroke?: string; fill?: string }
+
 export interface OpdNode {
   id: string;
   occurrenceId: string;
   label: string;
   kind: "object" | "process" | "attribute" | "operation" | "state";
+  domainTypeLabel?: string;
+  remark?: string;
+  appearance?: NodeAppearance;
   x: number;
   y: number;
   width?: number;
@@ -59,6 +64,7 @@ export interface OpdNode {
   stateRoles?: Array<"INITIAL" | "DEFAULT" | "FINAL">;
   explicitness?: "EXPLICIT" | "SUPPRESSED";
   foldState?: "UNFOLDED" | "FOLDED";
+  edgeRoutes?: EdgeRoute[];
 }
 
 export interface ProceduralEndpoint {
@@ -77,6 +83,8 @@ export interface ConsumptionRelation {
   targetOccurrenceId: string;
   symbolRef: string;
   layoutRef: string;
+  layout?: { x: number; y: number; width: number; height: number; edge_routes?: EdgeRoute[] };
+  edgeRoutes?: EdgeRoute[];
   capabilityId?: string;
   direction?: "DIRECTED" | "BIDIRECTIONAL" | "UNDIRECTED";
   endpoints?: ProceduralEndpoint[];
@@ -85,6 +93,13 @@ export interface ConsumptionRelation {
   controlSegment?: "PROCESS_INPUT";
   labels?: Array<{ slotId: string; text: string }>;
   collectionCompleteness?: "COMPLETE" | "INCOMPLETE" | "NOT_APPLICABLE";
+}
+
+export interface EdgeRoute {
+  segment: string;
+  style: "STRAIGHT" | "ROUNDED" | "CURVE";
+  mode: "AUTO" | "MANUAL";
+  points: Array<{ x: number; y: number }>;
 }
 
 export interface TextTrace {

@@ -46,6 +46,7 @@ public final class ExchangePackageImportService {
     private static final ObjectMapper JSON = new ObjectMapper();
 
     private final Path storageRoot;
+    private final org.opm.localruntime.storage.RuntimeStore store;
     private final ExchangePackageReader reader;
     private final RevisionDocumentReaderRouter revisionReader;
     private final ProfilePackageAssembler profilePackageAssembler;
@@ -56,10 +57,19 @@ public final class ExchangePackageImportService {
         this(storageRoot, new ExchangePackageReader(), new RevisionDocumentReaderRouter(), profilePackageAssembler,
                 new SemanticRevisionValidator(), new OplTextGenerationService());
     }
+    public ExchangePackageImportService(Path storageRoot, ProfilePackageAssembler assembler, org.opm.localruntime.storage.RuntimeStore store) {
+        this(storageRoot,new ExchangePackageReader(),new RevisionDocumentReaderRouter(),assembler,new SemanticRevisionValidator(),new OplTextGenerationService(),store);
+    }
 
     ExchangePackageImportService(Path storageRoot, ExchangePackageReader reader, RevisionDocumentReaderRouter revisionReader,
                                  ProfilePackageAssembler profilePackageAssembler, SemanticRevisionValidator semanticValidator,
                                  OplTextGenerationService textGenerationService) {
+        this(storageRoot,reader,revisionReader,profilePackageAssembler,semanticValidator,textGenerationService,org.opm.localruntime.storage.StorageStores.tools(storageRoot));
+    }
+    private ExchangePackageImportService(Path storageRoot, ExchangePackageReader reader, RevisionDocumentReaderRouter revisionReader,
+                                 ProfilePackageAssembler profilePackageAssembler, SemanticRevisionValidator semanticValidator,
+                                 OplTextGenerationService textGenerationService, org.opm.localruntime.storage.RuntimeStore store) {
+        this.store=Objects.requireNonNull(store);
         this.storageRoot = Objects.requireNonNull(storageRoot, "storageRoot must not be null").toAbsolutePath().normalize();
         this.reader = Objects.requireNonNull(reader, "reader must not be null");
         this.revisionReader = Objects.requireNonNull(revisionReader, "revisionReader must not be null");
@@ -72,6 +82,18 @@ public final class ExchangePackageImportService {
         if (!Files.isDirectory(storageRoot, LinkOption.NOFOLLOW_LINKS) || Files.isSymbolicLink(storageRoot)) {
             throw failure("EXCHANGE_PERSISTENCE_FAILED", "Storage root must be an existing regular directory.");
         }
+        // 目录事务串行化跨项目导入；SQLite 使用目录库写锁，PG 使用事务 advisory lock。
+        try (var guard = store.catalogConnection()) {
+            guard.setAutoCommit(false);
+            org.opm.localruntime.storage.ProjectConnectionFactory.lockProject(guard);
+            var result = importLocked(packageFile);
+            guard.commit();
+            return result;
+        } catch (ExchangeException error) { throw error; }
+        catch (Exception error) { throw failure("EXCHANGE_PERSISTENCE_FAILED", "Cannot lock package import.", error); }
+    }
+
+    private ExchangeImportResult importLocked(Path packageFile) {
         ExchangePackageInspection inspection = reader.inspect(packageFile);
         ImportPackage source = parse(inspection);
         if (alreadyImported(inspection.manifest().packageDigest())) {
@@ -80,47 +102,15 @@ public final class ExchangePackageImportService {
         validate(source);
 
         String targetProjectId = "project.import." + UUID.randomUUID().toString().replace("-", "");
-        Path stagingProject = storageRoot.resolve(".exchange-staging").resolve(inspection.manifest().packageDigest())
-                .resolve("projects").resolve(targetProjectId).normalize();
-        Path targetProject = storageRoot.resolve("projects").resolve(targetProjectId).normalize();
-        if (!stagingProject.startsWith(storageRoot) || !targetProject.startsWith(storageRoot) || Files.exists(targetProject)) {
-            throw failure("EXCHANGE_PERSISTENCE_FAILED", "Import target path is invalid or already exists.");
-        }
         try {
-            requireRegularDirectoryOrAbsent(storageRoot.resolve(".exchange-staging"), "Exchange staging parent");
-            requireRegularDirectoryOrAbsent(targetProject.getParent(), "Project storage parent");
-            Files.createDirectories(storageRoot.resolve(".exchange-staging"));
-            if (Files.exists(stagingProject.getParent().getParent())) {
-                throw failure("EXCHANGE_PERSISTENCE_FAILED", "Package staging root already exists.");
-            }
-            ProjectDatabaseFactory stagingFactory = new ProjectDatabaseFactory(stagingProject.getParent().getParent());
-            ProjectDatabaseOpenResult opened = stagingFactory.open(targetProjectId);
-            if (!(opened instanceof ProjectDatabaseOpenResult.Ready ready)) {
-                throw failure("EXCHANGE_PERSISTENCE_FAILED", "Staging SQLite migration requires recovery.");
-            }
-            writeStaging(ready.database().databasePath(), source, targetProjectId);
-            verifyStaging(ready.database().databasePath(), source, targetProjectId);
-            force(ready.database().databasePath());
-            Files.createDirectories(targetProject.getParent());
-            try {
-                Files.move(stagingProject, targetProject, StandardCopyOption.ATOMIC_MOVE);
-            } catch (AtomicMoveNotSupportedException exception) {
-                throw failure("EXCHANGE_PERSISTENCE_FAILED", "Storage filesystem does not support atomic project install.", exception);
-            }
-            forceDirectoryWhenSupported(targetProject.getParent());
-            cleanup(stagingProject.getParent().getParent());
-            deleteIfEmpty(storageRoot.resolve(".exchange-staging"));
+            var scope=store.project(targetProjectId);
+            writeStaging(scope, source, targetProjectId);
             return new ExchangeImportResult(inspection.manifest().packageId(), inspection.manifest().packageDigest(),
                     inspection.manifest().identityNamespace(), targetProjectId, source.models().keySet().stream().sorted().toList(),
                     source.revisions().stream().map(RevisionEntry::id).sorted().toList(), source.baselines().stream().map(BaselineEntry::id).sorted().toList(),
-                    targetProject.resolve("project.db"));
-        } catch (ExchangeException exception) {
-            cleanup(stagingProject.getParent().getParent());
-            throw exception;
-        } catch (Exception exception) {
-            cleanup(stagingProject.getParent().getParent());
-            throw failure("EXCHANGE_PERSISTENCE_FAILED", "Cannot import exchange package.", exception);
-        }
+                    org.opm.localruntime.storage.SqliteSnapshots.write(storageRoot,scope));
+        } catch(ExchangeException exception){throw exception;}
+        catch(Exception exception){throw failure("EXCHANGE_PERSISTENCE_FAILED","Cannot import exchange package.",exception);}
     }
 
     private ImportPackage parse(ExchangePackageInspection inspection) {
@@ -165,11 +155,11 @@ public final class ExchangePackageImportService {
         if (!manifest.source().modelId().equals(modelId)) throw semantic("MODEL_CATALOG model_id differs from Manifest source.");
         Map<String, ModelEntry> models = Map.of(modelId, new ModelEntry(modelId, catalog));
         List<RevisionEntry> revisions = revisions(inspection, entries, models);
-        if (revisions.size() != 1 || !manifest.source().revisionId().equals(revisions.getFirst().id())) throw semantic("BASELINE_ASSET revision differs from Manifest source.");
+        if (revisions.size() != 1 || !manifest.source().revisionId().equals(revisions.get(0).id())) throw semantic("BASELINE_ASSET revision differs from Manifest source.");
         List<BaselineEntry> baselines = baselines(inspection, entries, models, revisions);
-        if (baselines.size() != 1 || !manifest.source().baselineId().equals(baselines.getFirst().id())) throw semantic("BASELINE_ASSET baseline differs from Manifest source.");
+        if (baselines.size() != 1 || !manifest.source().baselineId().equals(baselines.get(0).id())) throw semantic("BASELINE_ASSET baseline differs from Manifest source.");
         requireNoOtherRoles(entries, "MODEL_CATALOG", "SEMANTIC_REVISION", "CAPABILITY_REPORT", "BASELINE");
-        RevisionEntry revision = revisions.getFirst();
+        RevisionEntry revision = revisions.get(0);
         return new ImportPackage(manifest, projectForBaseline(catalog, revision), models, revisions,
                 Map.of(modelId, new HeadEntry(modelId, revision.id(), revision.revision().revisionSequence(), revision.createdAt())), baselines);
     }
@@ -285,10 +275,11 @@ public final class ExchangePackageImportService {
         }
     }
 
-    private void writeStaging(Path database, ImportPackage source, String targetProjectId) throws Exception {
+    private void writeStaging(org.opm.localruntime.storage.ProjectScope database, ImportPackage source, String targetProjectId) throws Exception {
         try (Connection connection = connect(database)) {
             connection.setAutoCommit(false);
             try {
+                if(alreadyImported(source.manifest().packageDigest()))throw failure("EXCHANGE_DUPLICATE_PACKAGE","Package digest has already been imported.");
                 insertPackages(connection, source.revisions());
                 insertProject(connection, source.project(), targetProjectId);
                 for (ModelEntry model : source.models().values()) insertModel(connection, model, targetProjectId);
@@ -299,6 +290,7 @@ public final class ExchangePackageImportService {
                 for (RevisionEntry revision : source.revisions()) insertIndexes(connection, revision);
                 insertOrigin(connection, source.manifest(), targetProjectId);
                 insertIdentityMap(connection, source.manifest(), source, targetProjectId);
+                verifyConnection(connection, source, targetProjectId);
                 connection.commit();
             } catch (Exception exception) {
                 connection.rollback();
@@ -417,38 +409,20 @@ public final class ExchangePackageImportService {
         statement.setString(1, manifest.packageDigest()); statement.setString(2, manifest.identityNamespace()); statement.setString(3, sourceId); statement.setString(4, targetId); statement.setString(5, reason); statement.executeUpdate();
     }
 
-    private void verifyStaging(Path database, ImportPackage source, String targetProjectId) throws Exception {
-        try (Connection connection = connect(database)) {
-            try (ResultSet result = connection.createStatement().executeQuery("PRAGMA integrity_check")) { if (!result.next() || !"ok".equals(result.getString(1))) throw failure("EXCHANGE_PERSISTENCE_FAILED", "SQLite integrity check failed."); }
-            try (ResultSet result = connection.createStatement().executeQuery("PRAGMA foreign_key_check")) { if (result.next()) throw failure("EXCHANGE_PERSISTENCE_FAILED", "SQLite foreign key check failed."); }
-            try (PreparedStatement statement = connection.prepareStatement("SELECT project_id FROM project_metadata WHERE project_id = ?")) { statement.setString(1, targetProjectId); try (ResultSet result = statement.executeQuery()) { if (!result.next()) throw failure("EXCHANGE_PERSISTENCE_FAILED", "Imported Project is missing."); } }
-            for (RevisionEntry revision : source.revisions()) try (PreparedStatement statement = connection.prepareStatement("SELECT document_json,document_digest FROM revision_document WHERE revision_id=?")) {
-                statement.setString(1, revision.id()); try (ResultSet result = statement.executeQuery()) { if (!result.next() || !sha256(revision.raw()).equals(result.getString(2)) || !revisionReader.read(result.getString(1).getBytes(java.nio.charset.StandardCharsets.UTF_8)).revision().revisionId().equals(revision.id())) throw failure("EXCHANGE_PERSISTENCE_FAILED", "Imported Revision readback differs."); }
-            }
+    private void verifyConnection(Connection connection, ImportPackage source, String targetProjectId) throws Exception {
+        try(var statement=connection.prepareStatement("SELECT COUNT(*) FROM model_catalog WHERE project_id=?")) {
+            statement.setString(1,targetProjectId);try(var rows=statement.executeQuery()){rows.next();if(rows.getInt(1)!=source.models().size())throw failure("EXCHANGE_PERSISTENCE_FAILED","Imported model count mismatch.");}
         }
     }
 
-    private boolean alreadyImported(String packageDigest) {
-        Path projects = storageRoot.resolve("projects");
-        if (!Files.isDirectory(projects, LinkOption.NOFOLLOW_LINKS) || Files.isSymbolicLink(projects)) return false;
-        try (var directories = Files.list(projects)) {
-            for (Path directory : directories.toList()) {
-                Path database = directory.resolve("project.db");
-                if (Files.isSymbolicLink(directory) || !Files.isRegularFile(database, LinkOption.NOFOLLOW_LINKS)) continue;
-                try (Connection connection = connect(database);
-                     PreparedStatement statement = connection.prepareStatement("SELECT 1 FROM sqlite_master WHERE type='table' AND name='exchange_import_origin'")) {
-                    try (ResultSet table = statement.executeQuery()) {
-                        if (!table.next()) continue;
-                    }
-                    try (PreparedStatement origin = connection.prepareStatement("SELECT 1 FROM exchange_import_origin WHERE package_digest=?")) {
-                        origin.setString(1, packageDigest); try (ResultSet result = origin.executeQuery()) { if (result.next()) return true; }
-                    }
-                }
-            }
-            return false;
-        } catch (Exception exception) {
-            throw failure("EXCHANGE_PERSISTENCE_FAILED", "Cannot inspect installed import origins.", exception);
+    private boolean alreadyImported(String digest) {
+        for (var project : store.projects()) {
+            try (var connection = project.getConnection();
+                 var statement = connection.prepareStatement("SELECT 1 FROM exchange_import_origin WHERE package_digest=?")) {
+                statement.setString(1, digest); try (var rows = statement.executeQuery()) { if (rows.next()) return true; }
+            } catch (Exception error) { throw failure("EXCHANGE_PERSISTENCE_FAILED", "Cannot check package import.", error); }
         }
+        return false;
     }
 
     private ObjectNode projectForBaseline(ObjectNode model, RevisionEntry revision) {
@@ -461,7 +435,7 @@ public final class ExchangePackageImportService {
     private ExchangePackageManifest.Entry only(Map<String, ExchangePackageManifest.Entry> entries, String role) {
         List<ExchangePackageManifest.Entry> values = entries.values().stream().filter(entry -> role.equals(entry.entryRole())).toList();
         if (values.size() != 1) throw layout(role + " must occur exactly once.");
-        return values.getFirst();
+        return values.get(0);
     }
 
     private ExchangePackageManifest.Entry find(Map<String, ExchangePackageManifest.Entry> entries, String role, String path) {
@@ -481,7 +455,7 @@ public final class ExchangePackageImportService {
     private int positive(ObjectNode node, String field) { JsonNode value = node.get(field); if (value == null || !value.canConvertToInt() || value.intValue() < 1) throw layout(field + " must be a positive integer."); return value.intValue(); }
     private String canonical(JsonNode value) { if (value == null) throw layout("Required JSON value is absent."); return Rfc8785JsonCanonicalizer.canonicalize(value); }
     private void nullable(PreparedStatement statement, int index, JsonNode value) throws Exception { if (value == null || value.isNull()) statement.setNull(index, java.sql.Types.VARCHAR); else if (value.isTextual()) statement.setString(index, value.asText()); else throw layout("Description must be text or null."); }
-    private Connection connect(Path database) throws Exception { Connection connection = DriverManager.getConnection("jdbc:sqlite:" + database.toAbsolutePath() + "?foreign_keys=on"); connection.createStatement().execute("PRAGMA foreign_keys=ON"); return connection; }
+    private Connection connect(org.opm.localruntime.storage.ProjectScope database) throws Exception {return database.getConnection();}
     private String sha256(byte[] raw) { try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(raw)); } catch (Exception exception) { throw new IllegalStateException("SHA-256 is unavailable", exception); } }
     private void requireRegularDirectoryOrAbsent(Path path, String owner) { if (Files.exists(path, LinkOption.NOFOLLOW_LINKS) && (!Files.isDirectory(path, LinkOption.NOFOLLOW_LINKS) || Files.isSymbolicLink(path))) throw failure("EXCHANGE_PERSISTENCE_FAILED", owner + " must be a regular directory."); }
     private void force(Path path) throws IOException { try (FileChannel channel = FileChannel.open(path, StandardOpenOption.WRITE)) { channel.force(true); } }

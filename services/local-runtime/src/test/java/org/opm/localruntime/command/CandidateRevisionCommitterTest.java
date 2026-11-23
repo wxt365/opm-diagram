@@ -144,7 +144,7 @@ class CandidateRevisionCommitterTest {
     }
 
     private SemanticRevision invalidStateCandidate(SemanticRevision base) {
-        SemanticRevision.State state = base.states().getFirst();
+        SemanticRevision.State state = base.states().get(0);
         SemanticRevision.State invalid = new SemanticRevision.State(state.id(), "element.processing", state.capability(), state.name(),
                 state.roles(), state.source(), state.normalization());
         return new SemanticRevision("revision.demo.0002", base.modelId(), 2, base.profileBinding(), base.rootContextId(),

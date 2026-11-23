@@ -3,6 +3,15 @@ import { describe, expect, it, vi } from "vitest";
 import CanvasContextMenu from "./CanvasContextMenu.vue";
 
 describe("画布空白菜单", () => {
+  it("统一名称开关可在只读布局状态使用，显示当前状态并关闭菜单", async () => {
+    const wrapper = mount(CanvasContextMenu, { attachTo: document.body, props: { anchor: { clientX: 100, clientY: 120 }, disabled: true, actionsDisabled: true } });
+    const button = document.querySelector<HTMLButtonElement>('[data-testid="opd-toggle-relation-names"]')!;
+    expect(button.textContent).toContain("显示过程关系名称"); expect(button.disabled).toBe(false);
+    button.click(); expect(wrapper.emitted("toggleRelationNames")).toEqual([[]]); expect(wrapper.emitted("close")).toEqual([[]]);
+    await wrapper.setProps({ showRelationNames: true });
+    expect(button.textContent).toContain("隐藏过程关系名称"); expect(button.getAttribute("aria-checked")).toBe("true");
+    wrapper.unmount();
+  });
   const state = { canAlign: true, canDistribute: true, reason: "", referenceLabel: "基准对象", count: 3 };
   it("历史选项发送撤销或重做意图，禁用时不可触发", async () => {
     const wrapper = mount(CanvasContextMenu, { attachTo: document.body, props: { anchor: { clientX: 100, clientY: 120 }, disabled: false, canUndo: true, canRedo: true, state } });
@@ -44,7 +53,7 @@ describe("画布空白菜单", () => {
     const underlyingKey = vi.fn(); window.addEventListener("keydown", underlyingKey);
     menu.dispatchEvent(new Event("pointerdown", { bubbles: true })); expect(wrapper.emitted("close")).toBeUndefined();
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown" }));
-    expect(document.activeElement?.getAttribute("data-testid")).toBe("opd-blank-auto-layout");
+    expect(document.activeElement?.getAttribute("data-testid")).toBe("opd-toggle-relation-names");
     document.body.dispatchEvent(new Event("pointerdown", { bubbles: true }));
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "Delete" }));

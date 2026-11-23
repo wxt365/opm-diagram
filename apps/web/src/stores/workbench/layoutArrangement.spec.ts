@@ -36,6 +36,17 @@ describe("元素排列", () => {
     const rejected = arrangeLayouts([owner, wide, small], ["wide", "small"], "left");
     expect(rejected.reason).toContain("超出所属节点"); expect(rejected.layouts).toEqual([]);
   });
+  it("对齐对象携带属性和属性状态，多选同组特征不重复作为基准", () => {
+    const feature = node("f", 316, 176, 160, 108, "attribute", a.id);
+    const state = node("s", 324, 204, 88, 28, "state", feature.id);
+    const nodes = [a, feature, state, b], selected = [a.id, feature.id, state.id, b.id];
+    expect(arrangementSelection(nodes, selected).targets.map(node => node.id)).toEqual([a.id, b.id]);
+    expect(arrangeLayouts(nodes, selected, "right")).toEqual({ reason: "", layouts: [
+      { occurrence_id: a.id, layout: { x: 240, y: 80, width: 160, height: 72 } },
+      { occurrence_id: feature.id, layout: { x: 456, y: 176, width: 160, height: 108 } },
+      { occurrence_id: state.id, layout: { x: 464, y: 204, width: 88, height: 28 } },
+    ] });
+  });
   it("独立状态与外部元素或不同 owner 混选、reference 元素均拒绝", () => {
     const owner = node("owner", 0, 0, 200, 200), state = node("s", 20, 40, 88, 28, "state", "owner");
     expect(arrangementSelection([owner, state, a], ["s", "a"]).reason).toContain("同一所属节点");

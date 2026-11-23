@@ -77,8 +77,8 @@ public final class DraftSaveService implements AutoCloseable {
         DraftWorkspaceSchema.validate(json.valueToTree(project), "StableId"); DraftWorkspaceSchema.validate(json.valueToTree(model), "StableId");
         if (closed) throw new DraftWorkspaceService.Failure("PERSISTENCE_FAILED", null);
         var key = new Key(project, model); var existing = coordinators.get(key); if (existing != null) return existing;
-        var path = databases.databasePath(project);
-        if (!Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)) throw new DraftWorkspaceService.Failure("NOT_FOUND", null);
+        var path = databases.databaseScope(project);
+        if (!path.exists()) throw new DraftWorkspaceService.Failure("NOT_FOUND", null);
         if (databases.usesJournaledDrafts()
                 && !(databases.open(project) instanceof ProjectDatabaseOpenResult.Ready))
             throw new DraftWorkspaceService.Failure("DRAFT_RECOVERY_REQUIRED", null);

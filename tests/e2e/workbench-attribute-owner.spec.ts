@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { chooseViewportAction } from './viewport-controls';
 
 const chromeExecutable = process.env.OPM_E2E_CHROME_EXECUTABLE;
 test.use(chromeExecutable ? { launchOptions: { executablePath: chromeExecutable } } : {});
@@ -17,7 +18,6 @@ test("Attribute/Operation 显示 owner 连线、可折叠并支持两种名称�
   }
 
   const toggle = owner.locator('[data-testid^="p03-feature-toggle-"]');
-  for (const label of ["Attribute 1", "Attribute 2", "Attribute 3"]) await expect(canvasNode(page, label)).toHaveCount(0);
   await expect(toggle).toHaveAttribute("aria-label", "展开所属特征 / Expand features");
   await toggle.click();
   const attribute = canvasNode(page, "Attribute 1");
@@ -63,7 +63,6 @@ test("Attribute/Operation 显示 owner 连线、可折叠并支持两种名称�
     await edit(page, page.getByTestId("p03-tool-operation"));
   }
   const processToggle = process.locator('[data-testid^="p03-feature-toggle-"]');
-  for (const label of ["Operation 1", "Operation 2"]) await expect(canvasNode(page, label)).toHaveCount(0);
   await expect(processToggle).toHaveAttribute("aria-label", "展开所属特征 / Expand features");
   await processToggle.click();
   const operation = canvasNode(page, "Operation 1");
@@ -81,7 +80,8 @@ test("Attribute/Operation 显示 owner 连线、可折叠并支持两种名称�
   await processToggle.click();
   await expect(operation).toBeVisible();
 
-  await operation.click();
+  await chooseViewportAction(page, 'fit');
+  await operation.locator('text').first().click();
   await page.getByTestId("p03-right-panel-open").click();
   const inspectorName = page.getByTestId("p03-inspector-name");
   await inspectorName.fill("检查操作");

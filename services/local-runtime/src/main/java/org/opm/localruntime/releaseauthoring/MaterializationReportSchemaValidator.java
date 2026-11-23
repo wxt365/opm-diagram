@@ -83,7 +83,9 @@ final class MaterializationReportSchemaValidator {
 
     private static void targetStorage(JsonNode value) {
         object(value, Set.of("storage_root", "database_ref", "storage_schema_version", "database_sha256", "semantic_state_sha256"), "storage_root", "database_ref", "storage_schema_version", "database_sha256", "semantic_state_sha256");
-        path(value, "storage_root"); fileRef(value.required("database_ref")); constant(value, "storage_schema_version", "1.0"); digest(value, "database_sha256"); digest(value, "semantic_state_sha256");
+        path(value, "storage_root"); fileRef(value.required("database_ref"));
+        if (!Set.of("1.0", "2.0").contains(value.path("storage_schema_version").asText())) throw new IllegalArgumentException("Unsupported storage schema version");
+        digest(value, "database_sha256"); digest(value, "semantic_state_sha256");
     }
 
     private static void persistence(JsonNode value) {

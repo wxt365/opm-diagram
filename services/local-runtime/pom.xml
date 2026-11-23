@@ -24,6 +24,10 @@
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
         <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-jdbc</artifactId>
+        </dependency>
+        <dependency>
             <groupId>org.flywaydb</groupId>
             <artifactId>flyway-core</artifactId>
         </dependency>
@@ -49,34 +53,7 @@
     <build>
         <resources>
             <resource>
-                <directory>../../docs/contracts/migrations/sqlite-mindmap</directory>
-                <targetPath>db/mindmap</targetPath>
-                <includes><include>V8__mindmap_analysis.sql</include></includes>
-            </resource>
-            <resource>
                 <directory>src/main/resources</directory>
-            </resource>
-            <resource>
-                <directory>../../docs/contracts/migrations/sqlite</directory>
-                <targetPath>db/migration</targetPath>
-                <includes>
-                    <include>V*__*.sql</include>
-                </includes>
-            </resource>
-            <resource>
-                <directory>../../docs/contracts/migrations/sqlite/hybrid-save</directory>
-                <targetPath>db/hybrid-save</targetPath>
-                <includes><include>V3__hybrid_save_foundation.sql</include></includes>
-            </resource>
-            <resource>
-                <directory>../../docs/contracts/migrations/sqlite-checkpoint</directory>
-                <targetPath>db/checkpoint</targetPath>
-                <includes><include>V4__checkpoint_capture_overlay.sql</include></includes>
-            </resource>
-            <resource>
-                <directory>../../docs/contracts/migrations/sqlite-pin</directory>
-                <targetPath>db/pin</targetPath>
-                <includes><include>V5__pin_retention_nullable_sequence.sql</include></includes>
             </resource>
             <resource>
                 <directory>../../docs/contracts/schemas</directory>
@@ -87,6 +64,18 @@
             </resource>
         </resources>
         <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>plain-runtime-for-tools</id>
+                        <phase>package</phase>
+                        <goals><goal>jar</goal></goals>
+                        <configuration><classifier>plain</classifier></configuration>
+                    </execution>
+                </executions>
+            </plugin>
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>

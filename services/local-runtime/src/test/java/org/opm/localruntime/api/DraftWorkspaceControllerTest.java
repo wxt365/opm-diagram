@@ -41,6 +41,45 @@ class DraftWorkspaceControllerTest {
                 .setControllerAdvice(new DraftWorkspaceExceptionHandler(), new ApiExceptionHandler()).addInterceptors(new DraftWriteRequestGuard(new LocalSessionToken("test-session"))).build();
     }
 
+    @Test void cascadeDeletionUndoRedoRestoresPersistentModelThroughHttpAndRejectsStaleRecord() throws Exception {
+        var initial = open().get("draft_token"); var before = snapshot();
+        var deletion = deletion(initial, "occurrence.raw", "CASCADE").put("command_id", "command.recovery.delete");
+        var deletedToken = call("commands", deletion, 200, "DraftEditResult").get("result_token"); var deleted = snapshot();
+        assertNotEquals(before, deleted);
+        var undo = restoreRequest(deletedToken, "command.recovery.undo", "history.EDIT.command.recovery.delete", "UNDO");
+        var undone = call("commands", undo, 200, "DraftEditResult").get("result_token");
+        var recoveryQuery = JSON.createObjectNode().put("request_id", "query.recovery-state"); recoveryQuery.set("draft_token", undone);
+        var recoveryState = call("recovery-state", recoveryQuery, 200, "RecoveryStateResult");
+        assertEquals(undone, recoveryState.at("/meta/draft_token"));
+        assertEquals("REDO", recoveryState.at("/data/items/0/recovery_action").asText());
+        recoveryQuery.set("draft_token", deletedToken);
+        error("recovery-state", recoveryQuery, 409, "DRAFT_CONFLICT");
+        assertEquals(before, snapshot());
+        assertEquals(undone, call("commands", undo, 200, "DraftEditResult").get("result_token"));
+        var query = JSON.createObjectNode().put("request_id", "query.recovery").put("revision", "HEAD").putNull("before");
+        var records = call("operation-history", query, 200, "OperationHistoryResult").at("/data/items");
+        for (var record : records) {
+            assertNotEquals("RESTORE_OPERATION", record.path("operation").asText());
+            if (record.path("record_id").asText().equals("history.EDIT.command.recovery.delete")) assertEquals("REDO", record.path("recovery_action").asText());
+        }
+        error("commands", restoreRequest(undone, "command.recovery.stale", "history.EDIT.command.recovery.delete", "UNDO"), 409, "DRAFT_CONFLICT");
+        assertEquals(before, snapshot());
+        var redo = restoreRequest(undone, "command.recovery.redo", "history.EDIT.command.recovery.delete", "REDO");
+        var redone = call("commands", redo, 200, "DraftEditResult").get("result_token");
+        assertEquals(deleted, snapshot());
+        assertEquals(redone, call("commands", redo, 200, "DraftEditResult").get("result_token"));
+        call("commands", restoreRequest(redone, "command.recovery.undo-again", "history.EDIT.command.recovery.delete", "UNDO"), 200, "DraftEditResult");
+        assertEquals(before, snapshot());
+    }
+    private ObjectNode restoreRequest(JsonNode token, String command, String record, String action) {
+        var request = JSON.createObjectNode().put("request_id", "request.recovery").put("command_id", command);
+        request.set("expected_draft_token", token);
+        request.putObject("scope").put("context_id", CONTEXT).putNull("selection_id").put("intent", "RESTORE_OPERATION").putArray("endpoints");
+        request.putObject("authorization").put("capability_query_id", "recovery.latest").put("selected_option_id", record);
+        request.putObject("command").put("command_type", "RESTORE_OPERATION").putObject("payload").put("record_id", record).put("action", action);
+        return request;
+    }
+
     private com.fasterxml.jackson.databind.node.ArrayNode planSteps() throws Exception {
         return (com.fasterxml.jackson.databind.node.ArrayNode) JSON.readTree("""
           [
@@ -61,16 +100,86 @@ class DraftWorkspaceControllerTest {
         var payload = JSON.createObjectNode().put("context_id", CONTEXT); payload.set("steps", steps);
         return authorizedEdit(token, scope.get("scope"), option, payload).put("command_id", "command.plan.http");
     }
+    @Test void repeatedQueriesKeepProjectionImmutableAndObserveNextDraftToken() throws Exception {
+        var token = open().get("draft_token");
+        var before = call("projection", query(token), 200, "DraftProjectionResult").get("data");
+        for(var operation:List.of("text","navigation","findings","relation-catalog","projection")) {
+            var request = query(token);
+            if(operation.equals("relation-catalog"))request.putNull("selection_id");
+            var type = switch(operation) {
+                case "text" -> "DraftTextResult";
+                case "navigation" -> "DraftNavigationResult";
+                case "findings" -> "DraftFindingsResult";
+                case "relation-catalog" -> "DraftRelationCatalogResult";
+                default -> "DraftProjectionResult";
+            };
+            call(operation, request, 200, type);
+        }
+        assertEquals(before, call("projection", query(token), 200, "DraftProjectionResult").get("data"));
+        var steps = JSON.createArrayNode().add(planSteps().get(0));
+        var next = call("commands", planEdit(token, steps), 200, "DraftEditResult").get("result_token");
+        var after = call("projection", query(next), 200, "DraftProjectionResult").get("data");
+        assertTrue(after.toString().contains("咖啡豆"));
+        assertEquals(before.get("constructs").size()+1, after.get("constructs").size());
+        error("projection", query(token), 409, "DRAFT_CONFLICT");
+    }
+    @Test void aggregatedReadsMatchIndividualQueriesAndRejectStaleTokens() throws Exception {
+        var token = open().get("draft_token");
+        var canvas = aggregate("canvas", token);
+        assertEquals(token.path("draft_id"), canvas.at("/opened/draft_token/draft_id"));
+        assertEquals(token.path("binding_digest"), canvas.at("/opened/draft_token/binding_digest"));
+        assertEquals(token.path("edit_seq").asLong(), canvas.at("/opened/draft_token/edit_seq").asLong());
+        assertEquals(canvas.at("/opened/draft_token"), canvas.at("/opened/save_state/durable_token"));
+        DraftWorkspaceSchema.validate(canvas.get("opened"), "OpenDraftResult");
+        DraftWorkspaceSchema.validate(canvas.get("projection"), "DraftProjectionResult");
+        assertEquals(call("projection", query(token), 200, "DraftProjectionResult").get("data"), canvas.at("/projection/data"));
+        var details = aggregate("details", token);
+        for (String part : List.of("text", "navigation", "findings", "catalog")) {
+            String operation = part.equals("catalog") ? "relation-catalog" : part;
+            String type = switch(part) { case "text" -> "DraftTextResult"; case "navigation" -> "DraftNavigationResult"; case "findings" -> "DraftFindingsResult"; default -> "DraftRelationCatalogResult"; };
+            DraftWorkspaceSchema.validate(details.get(part), type);
+            var request = query(token); if (part.equals("catalog")) request.putNull("selection_id");
+            assertEquals(call(operation, request, 200, type).get("data"), details.path(part).get("data"));
+            assertEquals(token.path("draft_id"), details.path(part).at("/meta/draft_token/draft_id"));
+            assertEquals(token.path("edit_seq").asLong(), details.path(part).at("/meta/draft_token/edit_seq").asLong());
+        }
+        var steps = JSON.createArrayNode().add(planSteps().get(0));
+        var next = call("commands", planEdit(token, steps), 200, "DraftEditResult").get("result_token");
+        assertTrue(aggregate("canvas", next).toString().contains("咖啡豆"));
+        error("canvas", query(token), 409, "DRAFT_CONFLICT");
+        error("details", query(token), 409, "DRAFT_CONFLICT");
+        error("details", query(next).put("unknown", true), 400, "INPUT_INVALID");
+    }
+    private JsonNode aggregate(String operation, JsonNode token) throws Exception {
+        var response = mvc.perform(authorized(operation).content(query(token).toString())).andReturn().getResponse();
+        assertEquals(200, response.getStatus(), response.getContentAsString());
+        return JSON.readTree(response.getContentAsString());
+    }
     @Test void modelPlanPreviewsProgressivelyThenCommitsAtomicallyAndRetriesOnce() throws Exception {
         var token = open().get("draft_token"); var before = snapshot(); var steps = planSteps();
         var first = JSON.createArrayNode().add(steps.get(0));
         var partial = call("plan-preview", planPreview(token, first), 200, "DraftModelPlanPreviewResult");
-        assertTrue(partial.toString().contains("咖啡豆")); assertEquals(before, snapshot());
+        assertTrue(partial.toString().contains("咖啡豆")); assertEquals(before, snapshot()); assertTrue(partial.get("text").isNull());
         var full = call("plan-preview", planPreview(token, steps), 200, "DraftModelPlanPreviewResult");
         assertEquals(partial.at("/data/constructs/0/occurrence_id"), full.at("/data/constructs/0/occurrence_id"));
         assertEquals(full.get("data"), call("plan-preview", planPreview(token, steps), 200, "DraftModelPlanPreviewResult").get("data"));
         assertTrue(full.toString().contains("待烘焙")); assertTrue(full.toString().contains("已烘焙"));
         assertTrue(full.toString().contains("CAP-ISO-PROC-008")); assertEquals(before, snapshot()); assertEquals(0, count(database, "draft_journal"));
+        var finalized = call("plan-preview", planPreview(token, steps).put("finalize", true), 200, "DraftModelPlanPreviewResult");
+        assertEquals(token, finalized.at("/meta/draft_token")); assertEquals(full.get("data"), finalized.get("data"));
+        assertTrue(finalized.get("text").toString().contains("烘焙 changes 咖啡豆 from 待烘焙 to 已烘焙"));
+        assertFalse(call("text", query(token), 200, "DraftTextResult").toString().contains("烘焙 changes 咖啡豆"));
+        var occurrenceIds = new java.util.HashSet<String>(); var factIds = new java.util.HashSet<String>();
+        for (var construct : finalized.at("/data/constructs")) {
+            occurrenceIds.add(construct.path("occurrence_id").asText());
+            if (construct.path("target_kind").asText().equals("FACT")) factIds.add(construct.path("target_id").asText());
+        }
+        assertEquals(finalized.at("/text/sentences").size(), finalized.at("/text/traces").size());
+        for (var trace : finalized.at("/text/traces")) {
+            for (var id : trace.get("fact_ids")) assertTrue(factIds.contains(id.asText()));
+            for (var id : trace.get("occurrence_ids")) assertTrue(occurrenceIds.contains(id.asText()));
+        }
+        assertEquals(before, snapshot()); assertEquals(0, count(database, "draft_journal")); assertEquals(0, count(database, "draft_receipt"));
         var lookup = planPreview(token, first); var next = capabilities(token, "CREATE_STATE", "local.beans").get("scope"); lookup.set("next_scope", next);
         assertFalse(call("plan-preview", lookup, 200, "DraftModelPlanPreviewResult").at("/capabilities/options").isEmpty());
         var request = planEdit(token, steps); var result = call("commands", request, 200, "DraftEditResult");
@@ -78,10 +187,210 @@ class DraftWorkspaceControllerTest {
         assertEquals(full.get("data"), call("projection", query(result.get("result_token")), 200, "DraftProjectionResult").get("data"));
         assertEquals(before.get("elements").size() + 2, snapshot().get("elements").size());
         assertEquals(before.get("states").size() + 2, snapshot().get("states").size()); assertEquals(before.get("facts").size() + 1, snapshot().get("facts").size());
-        assertTrue(call("text", query(result.get("result_token")), 200, "DraftTextResult").toString().contains("烘焙 changes 咖啡豆 from 待烘焙 to 已烘焙"));
+        assertEquals(finalized.get("text"), call("text", query(result.get("result_token")), 200, "DraftTextResult").get("data"));
         request.put("request_id", "request.plan.retry"); assertEquals(result.get("result_token"), call("commands", request, 200, "DraftEditResult").get("result_token"));
         assertEquals(1, count(database, "draft_journal"));
         mvc = mvc(temporary, root().resolve("packages/profiles")); assertEquals(result.get("result_token"), open().get("draft_token"));
+    }
+    @Test void modelPlanCreatesSevenDirectedStructuralLinksAndCommitsOnce() throws Exception {
+        var token = open().get("draft_token"); var before = snapshot(); var steps = JSON.createArrayNode();
+        String[] names = {"船舶", "船舶公司", "公司员工", "行政区划", "船舶类型", "员工类型", "AIS观测记录"};
+        for (int i = 0; i < names.length; i++) {
+            var step = steps.addObject().put("local_id", "local.node." + i).put("command_type", "CREATE_ELEMENT").put("kind", "OBJECT").put("name", names[i]);
+            step.putObject("layout").put("x", 150 + i * 200).put("y", 300);
+        }
+        int[][] pairs = {{0, 1}, {2, 1}, {1, 3}, {0, 3}, {0, 4}, {2, 5}, {6, 0}};
+        for (int i = 0; i < pairs.length; i++) steps.addObject().put("local_id", "local.link." + i)
+                .put("command_type", "CREATE_FACT").put("capability_id", "CAP-ISO-STRUCT-002")
+                .putArray("endpoints").add("local.node." + pairs[i][0]).add("local.node." + pairs[i][1]);
+        var input = planPreview(token, steps).put("finalize", true);
+        var preview = call("plan-preview", input, 200, "DraftModelPlanPreviewResult");
+        assertEquals("MODEL", preview.at("/findings/validation_scope").asText());
+        assertEquals(0, preview.at("/findings/validation_summary/blocking").asInt());
+        assertEquals(before, snapshot()); assertEquals(0, count(database, "draft_journal"));
+        var request = planEdit(token, steps); var result = call("commands", request, 200, "DraftEditResult");
+        var after = snapshot(); assertEquals(before.get("facts").size() + 7, after.get("facts").size());
+        int links = 0;
+        for (var fact : after.get("facts")) if (fact.at("/capability_ref/capability_id").asText().equals("CAP-ISO-STRUCT-002")) {
+            assertEquals("DIRECTED", fact.path("direction").asText()); links++;
+        }
+        assertEquals(7, links);
+        assertEquals(preview.get("data"), call("projection", query(result.get("result_token")), 200, "DraftProjectionResult").get("data"));
+        request.put("request_id", "request.structural.retry");
+        assertEquals(result.get("result_token"), call("commands", request, 200, "DraftEditResult").get("result_token"));
+        assertEquals(after, snapshot()); assertEquals(1, count(database, "draft_journal"));
+    }
+    @Test void childPlanOplContainsOnlyCurrentCandidateAndLeavesParentTextUnchanged() throws Exception {
+        var token = open().get("draft_token");
+        var create = JSON.createObjectNode().put("context_id", CONTEXT).put("refinee_element_id", "element.raw.material").put("name", "局部子图");
+        token = call("commands", edit(token, "CREATE_CONTEXT", "occurrence.raw", create, 0), 200, "DraftEditResult").get("result_token");
+        String child = snapshot().at("/refinement_edges/0/child_context_id").asText();
+        var before = snapshot(); long journalCount = count(database, "draft_journal");
+        var parentText = call("text", query(token), 200, "DraftTextResult").get("data");
+        var steps = planSteps();
+        var preview = call("plan-preview", planPreview(token, steps).put("context_id", child).put("finalize", true), 200, "DraftModelPlanPreviewResult");
+        assertEquals(child, preview.at("/meta/context_id").asText()); assertEquals(token, preview.at("/meta/draft_token"));
+        assertEquals(1, preview.at("/text/sentences").size());
+        assertTrue(preview.at("/text/sentences/0/text").asText().contains("烘焙 changes 咖啡豆"));
+        for (var trace : preview.at("/text/traces")) for (var parentTrace : parentText.get("traces"))
+            assertNotEquals(parentTrace.get("fact_ids"), trace.get("fact_ids"));
+        assertEquals(before, snapshot()); assertEquals(journalCount, count(database, "draft_journal"));
+        var scope = capabilitiesAt(token, child, "APPLY_MODEL_PLAN", null);
+        var option = call("capabilities", scope, 200, "DraftCapabilitiesResult").at("/data/options/0");
+        var payload = JSON.createObjectNode().put("context_id", child); payload.set("steps", steps);
+        var result = call("commands", authorizedEdit(token, scope.get("scope"), option, payload).put("command_id", "command.plan.http"), 200, "DraftEditResult");
+        assertEquals(preview.get("text"), call("text", query(result.get("result_token")).put("context_id", child), 200, "DraftTextResult").get("data"));
+        assertEquals(parentText, call("text", query(result.get("result_token")), 200, "DraftTextResult").get("data"));
+    }
+
+    @Test void subdiagramReorganizationPreviewsBothGraphsPreservesIdentitiesAndCommitsOnce() throws Exception {
+        var token = open().get("draft_token"); var steps = JSON.createArrayNode();
+        for (int i = 0; i < 4; i++) {
+            var step = steps.addObject().put("local_id", "local.split." + i).put("command_type", "CREATE_ELEMENT")
+                    .put("kind", i == 0 ? "PROCESS" : "OBJECT").put("name", "重组" + i);
+            step.putObject("layout").put("x", 200 * i).put("y", 200);
+        }
+        steps.addObject().put("local_id", "local.split.fact").put("command_type", "CREATE_FACT").put("capability_id", "CAP-ISO-STRUCT-002")
+                .putArray("endpoints").add("local.split.1").add("local.split.2");
+        var base = snapshot();
+        var creation = call("commands", planEdit(token, steps), 200, "DraftEditResult");
+        token = creation.get("result_token"); var before = snapshot();
+        var projection = call("projection", query(token), 200, "DraftProjectionResult").path("data");
+        var occurrenceIds = new java.util.HashMap<String, String>();
+        for (var construct : projection.path("constructs")) occurrenceIds.put(construct.path("label").asText(), construct.path("occurrence_id").asText());
+        var split = JSON.createArrayNode(); split.addObject().put("local_id", "local.split.child").put("command_type", "REORGANIZE_SUBGRAPH")
+                .put("target", occurrenceIds.get("重组0")).put("name", "内部实现")
+                .putArray("members").add(occurrenceIds.get("重组1")).add(occurrenceIds.get("重组2"));
+        var input = planPreview(token, split).put("plan_id", "command.split.http").put("finalize", true);
+        var invalidBefore = split.deepCopy(); ((ObjectNode) invalidBefore.get(0)).putArray("members").add(occurrenceIds.get("重组0"));
+        error("plan-preview", planPreview(token, invalidBefore), 422, "DRAFT_EDIT_REJECTED"); assertEquals(before, snapshot());
+        var preview = call("plan-preview", input, 200, "DraftModelPlanPreviewResult");
+        assertEquals(2, preview.path("affected_views").size()); assertEquals(before, snapshot());
+        assertEquals(0, preview.at("/findings/validation_summary/blocking").asInt());
+        assertEquals(preview, call("plan-preview", input, 200, "DraftModelPlanPreviewResult"));
+        var invalidLater = split.deepCopy(); invalidLater.addObject().put("local_id", "local.invalid.after.split")
+                .put("command_type", "UPDATE_PROPERTY").put("target", "occurrence.missing").put("name", "不应写入");
+        var rejected = planEdit(token, invalidLater).put("command_id", "command.split.invalid");
+        error("commands", rejected, 422, "DRAFT_EDIT_REJECTED"); assertEquals(before, snapshot());
+        assertEquals(1, count(database, "draft_journal"));
+        var request = planEdit(token, split).put("command_id", "command.split.http");
+        var result = call("commands", request, 200, "DraftEditResult"); var after = snapshot();
+        assertEquals(before.get("elements"), after.get("elements")); assertEquals(before.get("facts"), after.get("facts"));
+        assertEquals(before.path("contexts").size() + 1, after.path("contexts").size());
+        assertEquals(before.path("occurrences").size(), after.path("occurrences").size());
+        request.put("request_id", "request.split.retry");
+        assertEquals(result.get("result_token"), call("commands", request, 200, "DraftEditResult").get("result_token"));
+        assertEquals(after, snapshot()); assertEquals(2, count(database, "draft_journal"));
+        assertTrue(after.path("elements").size() > base.path("elements").size());
+        var invalid = split.deepCopy(); ((ObjectNode) invalid.get(0)).putArray("members").add(occurrenceIds.get("重组0"));
+        error("plan-preview", planPreview(token, invalid), 409, "DRAFT_CONFLICT"); assertEquals(after, snapshot());
+    }
+    @Test void subdiagramBoundaryKeepsExternalLinksAndOwnedStatesWithoutSemanticLoss() throws Exception {
+        var token = open().get("draft_token"); var steps = planSteps();
+        // parent过程不属于成员，Effect 留在父图；所有者与限定状态必须继续可见。
+        var owner = steps.addObject().put("local_id", "local.coordinator").put("command_type", "CREATE_ELEMENT").put("kind", "PROCESS").put("name", "协调烘焙");
+        owner.putObject("layout").put("x", 200).put("y", 500);
+        steps.addObject().put("local_id", "local.boundary.child").put("command_type", "REORGANIZE_SUBGRAPH").put("target", "local.coordinator").put("name", "物料细节")
+                .putArray("members").add("local.beans");
+        var before = snapshot(); var preview = call("plan-preview", planPreview(token, steps).put("finalize", true), 200, "DraftModelPlanPreviewResult");
+        assertEquals(before, snapshot()); assertEquals(2, preview.path("affected_views").size());
+        var parent = preview.path("affected_views").get(0).path("data"); var child = preview.path("affected_views").get(1).path("data");
+        assertTrue(parent.toString().contains("CAP-ISO-PROC-008")); assertFalse(child.toString().contains("CAP-ISO-PROC-008"));
+        assertTrue(parent.toString().contains("待烘焙")); assertTrue(child.toString().contains("待烘焙"));
+        var parentTargets = new java.util.HashSet<String>(); for (var construct : parent.path("constructs")) parentTargets.add(construct.path("target_id").asText());
+        for (var construct : child.path("constructs")) assertTrue(parentTargets.contains(construct.path("target_id").asText()));
+        assertEquals(0, preview.at("/findings/validation_summary/blocking").asInt());
+        call("commands", planEdit(token, steps), 200, "DraftEditResult"); assertEquals(1, count(database, "draft_journal"));
+    }
+    @Test void processBoundaryAbstractionMovesDetailsAndKeepsTraceableParentInputsOutputs() throws Exception {
+        var token = open().get("draft_token"); var steps = JSON.createArrayNode();
+        String[] names = {"协调查询", "内部查询", "查询条件", "查询结果"};
+        for (int i = 0; i < names.length; i++) {
+            var step = steps.addObject().put("local_id", "local.boundary." + i).put("command_type", "CREATE_ELEMENT")
+                    .put("kind", i < 2 ? "PROCESS" : "OBJECT").put("name", names[i]);
+            step.putObject("layout").put("x", i * 200).put("y", 300);
+        }
+        steps.addObject().put("local_id", "local.boundary.input").put("command_type", "CREATE_FACT").put("capability_id", "CAP-ISO-PROC-005")
+                .putArray("endpoints").add("local.boundary.2").add("local.boundary.1");
+        steps.addObject().put("local_id", "local.boundary.output").put("command_type", "CREATE_FACT").put("capability_id", "CAP-ISO-PROC-002")
+                .putArray("endpoints").add("local.boundary.1").add("local.boundary.3");
+        steps.addObject().put("local_id", "local.boundary.child").put("command_type", "REORGANIZE_SUBGRAPH").put("target", "local.boundary.0")
+                .put("name", "查询细节").put("abstract_boundary", true).putArray("members").add("local.boundary.1");
+        var before = snapshot(); var input = planPreview(token, steps).put("finalize", true);
+        var preview = call("plan-preview", input, 200, "DraftModelPlanPreviewResult"); assertEquals(before, snapshot());
+        assertEquals(0, preview.at("/findings/validation_summary/blocking").asInt());
+        var parent = preview.path("affected_views").get(0).path("data"); var child = preview.path("affected_views").get(1).path("data");
+        assertFalse(parent.toString().contains("内部查询")); assertTrue(child.toString().contains("内部查询"));
+        int traced = 0; var sources = new java.util.HashSet<String>();
+        for (var construct : parent.path("constructs")) if (construct.has("boundary_source_fact_id")) { traced++; sources.add(construct.path("boundary_source_fact_id").asText()); }
+        assertEquals(2, traced);
+        for (var construct : child.path("constructs")) if (construct.path("target_kind").asText().equals("FACT")) assertTrue(sources.contains(construct.path("target_id").asText()));
+        assertEquals(preview, call("plan-preview", input, 200, "DraftModelPlanPreviewResult"));
+        var request = planEdit(token, steps); var committed = call("commands", request, 200, "DraftEditResult"); var after = snapshot();
+        assertEquals(before.path("facts").size() + 4, after.path("facts").size());
+        request.put("request_id", "request.boundary.retry"); assertEquals(committed.get("result_token"), call("commands", request, 200, "DraftEditResult").get("result_token"));
+        assertEquals(after, snapshot()); assertEquals(1, count(database, "draft_journal"));
+    }
+    @Test void boundaryDoesNotPromoteInternalGeneratedResultToParentPrerequisite() throws Exception {
+        var token = open().get("draft_token"); var steps = JSON.createArrayNode();
+        String[] names = {"查询协调", "解析问题", "生成SQL", "自然语言问题", "结构化条件", "SQL指令"};
+        for (int i = 0; i < names.length; i++) {
+            var step = steps.addObject().put("local_id", "local.internal." + i).put("command_type", "CREATE_ELEMENT")
+                    .put("kind", i < 3 ? "PROCESS" : "OBJECT").put("name", names[i]);
+            step.putObject("layout").put("x", i * 180).put("y", 300);
+        }
+        String[][] links = {{"005", "3", "1"}, {"002", "1", "4"}, {"005", "4", "2"}, {"002", "2", "5"}};
+        for (int i = 0; i < links.length; i++) steps.addObject().put("local_id", "local.internal.fact." + i)
+                .put("command_type", "CREATE_FACT").put("capability_id", "CAP-ISO-PROC-" + links[i][0])
+                .putArray("endpoints").add("local.internal." + links[i][1]).add("local.internal." + links[i][2]);
+        steps.addObject().put("local_id", "local.internal.child").put("command_type", "REORGANIZE_SUBGRAPH")
+                .put("target", "local.internal.0").put("name", "查询细节").put("abstract_boundary", true)
+                .putArray("members").add("local.internal.1").add("local.internal.2");
+        var before = snapshot(); var preview = call("plan-preview", planPreview(token, steps).put("finalize", true), 200, "DraftModelPlanPreviewResult");
+        assertEquals(before, snapshot()); assertEquals(0, preview.at("/findings/validation_summary/blocking").asInt());
+        var parent = preview.path("affected_views").get(0); var child = preview.path("affected_views").get(1);
+        int parentInputs = 0, parentOutputs = 0, childFacts = 0;
+        for (var construct : parent.path("data").path("constructs")) if (construct.has("boundary_source_fact_id")) {
+            if (construct.path("capability_id").asText().equals("CAP-ISO-PROC-005")) parentInputs++;
+            if (construct.path("capability_id").asText().equals("CAP-ISO-PROC-002")) parentOutputs++;
+        }
+        for (var construct : child.path("data").path("constructs")) if (construct.path("target_kind").asText().equals("FACT")) childFacts++;
+        assertEquals(1, parentInputs); assertEquals(2, parentOutputs); assertEquals(4, childFacts);
+        assertTrue(parent.path("text").toString().contains("查询协调 requires 自然语言问题"));
+        assertFalse(parent.path("text").toString().contains("查询协调 requires 结构化条件"));
+        assertTrue(child.path("text").toString().contains("生成SQL requires 结构化条件"));
+        call("commands", planEdit(token, steps), 200, "DraftEditResult"); assertEquals(before.path("facts").size() + 7, snapshot().path("facts").size());
+    }
+    @Test void refinedParentRenameMatchesCapabilitiesForStagedAndPersistedSubdiagram() throws Exception {
+        var token = open().get("draft_token"); var before = snapshot(); var steps = JSON.createArrayNode();
+        for (int i = 0; i < 2; i++) {
+            var item = steps.addObject().put("local_id", "local.rename." + i).put("command_type", "CREATE_ELEMENT").put("kind", "PROCESS").put("name", i == 0 ? "父过程" : "内部过程");
+            item.putObject("layout").put("x", i * 200).put("y", 200);
+        }
+        steps.addObject().put("local_id", "local.rename.child").put("command_type", "REORGANIZE_SUBGRAPH").put("target", "local.rename.0")
+                .put("name", "内部细节").putArray("members").add("local.rename.1");
+        var candidate = planPreview(token, steps);
+        candidate.set("next_scope", capabilities(token, "UPDATE_PROPERTY", "local.rename.0").get("scope"));
+        assertTrue(call("plan-preview", candidate, 200, "DraftModelPlanPreviewResult").at("/capabilities/options/0/enabled").asBoolean());
+        steps.addObject().put("local_id", "local.rename.appended").put("command_type", "UPDATE_PROPERTY").put("target", "local.rename.0").put("name", "协调业务");
+        var preview = call("plan-preview", planPreview(token, steps).put("finalize", true), 200, "DraftModelPlanPreviewResult");
+        assertEquals(before, snapshot()); assertEquals(2, preview.path("affected_views").size()); assertTrue(preview.path("data").toString().contains("协调业务"));
+        var result = call("commands", planEdit(token, steps), 200, "DraftEditResult"); var stored = snapshot();
+        String childId = stored.path("contexts").get(stored.path("contexts").size() - 1).path("context_id").asText();
+        String parentOccurrence = "";
+        for (var construct : preview.path("data").path("constructs")) if (construct.path("label").asText().equals("协调业务")) parentOccurrence = construct.path("occurrence_id").asText();
+        assertFalse(parentOccurrence.isEmpty()); token = result.get("result_token");
+        assertTrue(call("capabilities", capabilities(token, "UPDATE_PROPERTY", parentOccurrence), 200, "DraftCapabilitiesResult").at("/data/options/0/enabled").asBoolean());
+        var rename = JSON.createArrayNode(); rename.addObject().put("local_id", "local.rename.saved").put("command_type", "UPDATE_PROPERTY").put("target", parentOccurrence).put("name", "协调新业务");
+        var nextPreview = call("plan-preview", planPreview(token, rename).put("plan_id", "command.rename.persisted").put("finalize", true), 200, "DraftModelPlanPreviewResult");
+        assertEquals(2, nextPreview.path("affected_views").size()); assertEquals(childId, nextPreview.path("affected_views").get(1).path("context_id").asText());
+        var request = planEdit(token, rename).put("command_id", "command.rename.persisted");
+        var renamed = call("commands", request, 200, "DraftEditResult"); var after = snapshot();
+        assertEquals(stored.path("facts"), after.path("facts")); assertEquals(stored.path("occurrences"), after.path("occurrences"));
+        assertEquals(stored.path("refinement_edges"), after.path("refinement_edges")); assertEquals(stored.path("contexts"), after.path("contexts"));
+        assertTrue(after.path("elements").toString().contains("协调新业务"));
+        request.put("request_id", "request.rename.retry"); assertEquals(renamed.get("result_token"), call("commands", request, 200, "DraftEditResult").get("result_token"));
+        assertEquals(2, count(database, "draft_journal"));
     }
     @Test void modelPlanRejectsInvalidLaterStepAndConflictsWithoutPartialWrites() throws Exception {
         var token = open().get("draft_token"); var before = snapshot();
@@ -103,12 +412,13 @@ class DraftWorkspaceControllerTest {
         call("commands", edit(token, "CREATE_ELEMENT", null, manual, 0), 200, "DraftEditResult"); var afterManual = snapshot();
         error("commands", request, 409, "DRAFT_CONFLICT"); error("plan-preview", planPreview(token, planSteps()), 409, "DRAFT_CONFLICT"); assertEquals(afterManual, snapshot());
     }
-    @Test void modelPlanForbidsRefinedSharedRenameAndAcceptsLocalMove() throws Exception {
+    @Test void modelPlanPreviewsRefinedParentRenameAndAcceptsLocalMove() throws Exception {
         var token = open().get("draft_token");
         var create = JSON.createObjectNode().put("context_id", CONTEXT).put("refinee_element_id", "element.raw.material").put("name", "对象子图");
         token = call("commands", edit(token, "CREATE_CONTEXT", "occurrence.raw", create, 0), 200, "DraftEditResult").get("result_token");
         var before = snapshot(); var rename = JSON.createArrayNode().addObject().put("local_id", "local.rename").put("command_type", "UPDATE_PROPERTY").put("target", "occurrence.raw").put("name", "新名称");
-        error("plan-preview", planPreview(token, JSON.createArrayNode().add(rename)), 422, "DRAFT_EDIT_REJECTED"); assertEquals(before, snapshot());
+        var renamed = call("plan-preview", planPreview(token, JSON.createArrayNode().add(rename)), 200, "DraftModelPlanPreviewResult");
+        assertEquals(2, renamed.path("affected_views").size()); assertTrue(renamed.path("data").toString().contains("新名称")); assertEquals(before, snapshot());
         var move = JSON.createArrayNode().addObject().put("local_id", "local.move").put("command_type", "UPDATE_LAYOUT").put("target", "occurrence.raw");
         move.putObject("layout").put("x", 200).put("y", 200);
         call("plan-preview", planPreview(token, JSON.createArrayNode().add(move)), 200, "DraftModelPlanPreviewResult"); assertEquals(before, snapshot());
@@ -126,6 +436,7 @@ class DraftWorkspaceControllerTest {
         assertEquals("MODEL", checked.at("/findings/validation_scope").asText());
         assertTrue(checked.at("/findings/validation_summary/blocking").asInt() > 0);
         assertTrue(checked.at("/findings/items").toString().contains("STATE_OWNER_MISMATCH"));
+        assertTrue(checked.get("text").isNull());
         error("commands", planEdit(token, steps), 422, "DRAFT_EDIT_REJECTED");
         assertEquals(before, snapshot()); assertEquals(0, count(database, "draft_journal"));
         var valid = call("plan-preview", planPreview(token, planSteps()).put("finalize", true), 200, "DraftModelPlanPreviewResult");
@@ -197,7 +508,7 @@ class DraftWorkspaceControllerTest {
             error("commands", request, List.of("size", "wrongIntent").contains(fault) ? 400 : 422, List.of("size", "wrongIntent").contains(fault) ? "INPUT_INVALID" : "DRAFT_EDIT_REJECTED");
             assertEquals(before, snapshot()); assertEquals(0, count(database, "draft_journal")); assertEquals(0, count(database, "draft_receipt"));
         }
-        for (String forbidden : List.of("occurrence.fact", "context.other.occurrence.raw", "occurrence.absent")) {
+        for (String forbidden : List.of("context.other.occurrence.raw", "occurrence.absent")) {
             var query = capabilities(token, "UPDATE_LAYOUT_BATCH", null);
             ((com.fasterxml.jackson.databind.node.ArrayNode) query.at("/scope/endpoints")).add("occurrence.raw").add(forbidden);
             assertTrue(call("capabilities", query, 200, "DraftCapabilitiesResult").at("/data/options").isEmpty());
@@ -215,6 +526,87 @@ class DraftWorkspaceControllerTest {
         });
         mvc = mvc(storage, root().resolve("packages/profiles"));
     }
+
+    @Test void relationRoutesAreOccurrenceScopedDurableAndResettableWithoutChangingSemantics() throws Exception {
+        prepareBatch(); var token = open().get("draft_token"); var original = snapshot();
+        var payload = JSON.createObjectNode(); var item = payload.putArray("layouts").addObject().put("occurrence_id", "occurrence.fact");
+        var layout = ((ObjectNode) layoutFor(original, "occurrence.fact")).deepCopy(); layout.remove(List.of("layout_id", "z_order"));
+        var routes = layout.putArray("edge_routes");
+        var route = routes.addObject().put("segment", "main").put("style", "CURVE").put("mode", "MANUAL");
+        route.putArray("points").addObject().put("x", 80d).put("y", 320.5);
+        item.set("layout", layout);
+        var result = call("commands", batchEdit(token, payload), 200, "DraftEditResult"); token = result.get("result_token");
+        assertEquals(routes, layoutFor(snapshot(), "occurrence.fact").get("edge_routes"));
+        assertFalse(layoutFor(snapshot(), "context.other.occurrence.fact").has("edge_routes"));
+        for (String field : List.of("elements", "features", "states", "facts", "occurrences")) assertEquals(original.get(field), snapshot().get(field));
+        mvc = mvc(temporary.resolve("batch"), root().resolve("packages/profiles"));
+        assertEquals(token, open().get("draft_token"));
+        assertTrue(call("projection", query(token), 200, "DraftProjectionResult").toString().contains("edge_routes"));
+        var duplicate = payload.deepCopy(); ((com.fasterxml.jackson.databind.node.ArrayNode) duplicate.at("/layouts/0/layout/edge_routes")).add(route.deepCopy());
+        error("commands", batchEdit(token, duplicate), 422, "DRAFT_EDIT_REJECTED");
+        assertEquals(routes, layoutFor(snapshot(), "occurrence.fact").get("edge_routes"));
+        layout.putArray("edge_routes");
+        call("commands", batchEdit(token, payload), 200, "DraftEditResult");
+        assertFalse(layoutFor(snapshot(), "occurrence.fact").has("edge_routes"));
+    }
+    @Test void featureOwnerRoutesSurviveReopenAndRejectUnrelatedSegments() throws Exception {
+        prepareBatch(); var token = open().get("draft_token");
+        token = submit(token, "CREATE_FEATURE", "element.raw.material", feature("element.raw.material", "ATTRIBUTE"), 0);
+        String featureId = snapshot().at("/features/0/feature_id").asText();
+        String featureOccurrence = "";
+        for (var occurrence : snapshot().get("occurrences")) if (occurrence.path("target_id").asText().equals(featureId)
+                && occurrence.path("context_id").asText().equals(CONTEXT)) featureOccurrence = occurrence.get("occurrence_id").asText();
+        assertFalse(featureOccurrence.isBlank());
+        var original = snapshot(); var payload = JSON.createObjectNode(); var items = payload.putArray("layouts");
+        for (String id : List.of("occurrence.raw", "occurrence.process", featureOccurrence)) {
+            var layout = ((ObjectNode) layoutFor(original, id)).deepCopy(); layout.remove(List.of("layout_id", "z_order", "route_points"));
+            var route = layout.putArray("edge_routes").addObject().put("segment", id.equals("occurrence.raw")
+                    ? "feature.characterization" : id.equals("occurrence.process") ? "feature.composition" : "feature.owner")
+                    .put("style", "CURVE").put("mode", "MANUAL");
+            route.putArray("points").addObject().put("x", 150.5).put("y", 240d);
+            if (!id.equals(featureOccurrence)) {
+                var junction = layout.withArray("edge_routes").addObject().put("segment", id.equals("occurrence.raw")
+                        ? "feature.characterization.junction" : "feature.composition.junction").put("style", "CURVE").put("mode", "MANUAL");
+                junction.putArray("points").addObject().put("x", 280.5).put("y", 300d);
+            }
+            items.addObject().put("occurrence_id", id).set("layout", layout);
+        }
+        token = call("commands", batchEdit(token, payload), 200, "DraftEditResult").get("result_token");
+        for (var item : items) assertEquals(item.at("/layout/edge_routes"), layoutFor(snapshot(), item.get("occurrence_id").asText()).get("edge_routes"));
+        assertFalse(layoutFor(snapshot(), "context.other.occurrence.raw").has("edge_routes"));
+        for (String field : List.of("elements", "features", "states", "facts", "occurrences")) assertEquals(original.get(field), snapshot().get(field));
+        mvc = mvc(temporary.resolve("batch"), root().resolve("packages/profiles"));
+        assertEquals(token, open().get("draft_token"));
+        var projection = call("projection", query(token), 200, "DraftProjectionResult");
+        assertTrue(projection.toString().contains("feature.owner"));
+        var saved = snapshot();
+        for (String segment : List.of("main", "feature.owner", "feature.composition", "feature.composition.junction")) {
+            var invalid = payload.deepCopy(); ((ObjectNode) invalid.at("/layouts/0/layout/edge_routes/0")).put("segment", segment);
+            error("commands", batchEdit(token, invalid), 422, "DRAFT_EDIT_REJECTED"); assertEquals(saved, snapshot());
+        }
+        for (String mode : List.of("MANUAL", "AUTO")) {
+            var invalid = payload.deepCopy(); var junction = (ObjectNode) invalid.at("/layouts/0/layout/edge_routes/1");
+            junction.put("mode", mode);
+            if (mode.equals("MANUAL")) junction.putArray("points");
+            error("commands", batchEdit(token, invalid), 422, "DRAFT_EDIT_REJECTED"); assertEquals(saved, snapshot());
+        }
+        var extraPoint = payload.deepCopy(); var points = (com.fasterxml.jackson.databind.node.ArrayNode) extraPoint.at("/layouts/0/layout/edge_routes/1/points");
+        points.add(points.get(0).deepCopy());
+        error("commands", batchEdit(token, extraPoint), 422, "DRAFT_EDIT_REJECTED"); assertEquals(saved, snapshot());
+        var featureJunction = payload.deepCopy(); ((ObjectNode) featureJunction.at("/layouts/2/layout/edge_routes/0")).put("segment", "feature.characterization.junction");
+        error("commands", batchEdit(token, featureJunction), 422, "DRAFT_EDIT_REJECTED"); assertEquals(saved, snapshot());
+        var stateRoute = payload.deepCopy(); ((ObjectNode) stateRoute.at("/layouts/0")).put("occurrence_id", "occurrence.state");
+        error("commands", batchEdit(token, stateRoute), 422, "DRAFT_EDIT_REJECTED"); assertEquals(saved, snapshot());
+        for (int i : List.of(0, 1)) {
+            var junction = (ObjectNode) items.get(i).at("/layout/edge_routes/1"); junction.put("mode", "AUTO"); junction.putArray("points");
+        }
+        token = call("commands", batchEdit(token, payload), 200, "DraftEditResult").get("result_token");
+        for (var item : items) assertEquals(item.at("/layout/edge_routes"), layoutFor(snapshot(), item.get("occurrence_id").asText()).get("edge_routes"));
+        for (var item : items) ((ObjectNode) item.get("layout")).putArray("edge_routes");
+        call("commands", batchEdit(token, payload), 200, "DraftEditResult");
+        for (var item : items) assertFalse(layoutFor(snapshot(), item.get("occurrence_id").asText()).has("edge_routes"));
+    }
+
     private ObjectNode batchPayload(JsonNode document, double dx, double dy) {
         var payload = JSON.createObjectNode(); var layouts = payload.putArray("layouts");
         for (String id : List.of("occurrence.raw", "occurrence.process", "occurrence.state")) {
@@ -357,6 +749,58 @@ class DraftWorkspaceControllerTest {
         assertEquals("FOUND", call("receipts", receipt, 200, "DraftReceiptResult").get("status").asText());
         receipt.put("idempotency_id", "command.absent"); assertEquals("NOT_FOUND", call("receipts", receipt, 200, "DraftReceiptResult").get("status").asText());
         assertEquals(1, count(database, "draft_journal")); assertEquals(2, count(database, "draft_receipt"));
+    }
+
+    @Test void occurrenceColorsPersistProjectRecoverAndClearWithoutChangingSemanticContent() throws Exception {
+        prepareBatch();
+        var token = open().get("draft_token");
+        var original = snapshot();
+        var payload = batchPayload(original, 0, 0);
+        for (var entry : payload.path("layouts")) ((ObjectNode) entry.get("layout")).putObject("appearance").put("stroke", "#123456").put("fill", "#222222");
+        token = call("commands", batchEdit(token, payload), 200, "DraftEditResult").get("result_token");
+        assertEquals("0.7", snapshot().path("schema_version").asText());
+        assertEquals("SaveContentDigest/5", SaveContentDigestV1.version(snapshot()));
+        for (String collection : List.of("elements", "features", "states", "facts")) assertEquals(original.get(collection), snapshot().get(collection));
+        var projection = call("projection", query(token), 200, "DraftProjectionResult");
+        assertTrue(projection.toString().contains("#123456"));
+        mvc = mvc(temporary.resolve("batch"), root().resolve("packages/profiles"));
+        assertEquals(token, open().get("draft_token"));
+        token = call("commands", edit(token, "UPDATE_PROPERTY", "element.raw.material", name("element.raw.material", "备注保留颜色").put("property_name", "remark"), 0), 200, "DraftEditResult").get("result_token");
+        assertEquals("0.7", snapshot().path("schema_version").asText());
+        var moved = batchPayload(snapshot(), 20, 15);
+        token = call("commands", batchEdit(token, moved), 200, "DraftEditResult").get("result_token");
+        assertEquals("#123456", layoutFor(snapshot(), "occurrence.raw").at("/appearance/stroke").asText());
+        for (var entry : moved.path("layouts")) ((ObjectNode) entry.get("layout")).putObject("appearance");
+        token = call("commands", batchEdit(token, moved), 200, "DraftEditResult").get("result_token");
+        assertFalse(layoutFor(snapshot(), "occurrence.raw").has("appearance"));
+        var invalid = moved.deepCopy(); ((ObjectNode) invalid.at("/layouts/0/layout/appearance")).put("fill", "red");
+        error("commands", batchEdit(token, invalid), 400, "INPUT_INVALID");
+    }
+
+    @Test void remarksPersistForElementsFeaturesAndStatesAndSurviveRenameRecoveryAndClear() throws Exception {
+        var token = open().get("draft_token");
+        var originalName = snapshot().at("/elements/0/name").deepCopy();
+        token = submit(token, "CREATE_FEATURE", "element.raw.material", feature("element.raw.material", "ATTRIBUTE"), 0);
+        String featureId = snapshot().at("/features/0/feature_id").asText();
+        for (var target : List.of(new String[]{"ELEMENT", "element.raw.material"}, new String[]{"STATE", snapshot().at("/states/0/state_id").asText()}, new String[]{"FEATURE", featureId})) {
+            String id = target[1];
+            var payload = name(id, target[0], "第一行\n<b>备注文本</b>").put("property_name", "remark");
+            token = call("commands", edit(token, "UPDATE_PROPERTY", id, payload, 0), 200, "DraftEditResult").get("result_token");
+            var projection = call("projection", query(token), 200, "DraftProjectionResult");
+            assertTrue(projection.path("data").path("constructs").toString().contains("备注文本"));
+        }
+        assertEquals(originalName, snapshot().at("/elements/0/name"));
+        assertEquals("0.6", snapshot().path("schema_version").asText());
+        var payload = name("element.raw.material", "Renamed after remark");
+        token = call("commands", edit(token, "UPDATE_PROPERTY", "element.raw.material", payload, 0), 200, "DraftEditResult").get("result_token");
+        assertEquals("第一行\n<b>备注文本</b>", snapshot().at("/elements/0/remark").asText());
+        mvc = mvc(temporary, root().resolve("packages/profiles"));
+        assertEquals(token, open().get("draft_token"));
+        payload = name("element.raw.material", "").put("property_name", "remark");
+        token = call("commands", edit(token, "UPDATE_PROPERTY", "element.raw.material", payload, 0), 200, "DraftEditResult").get("result_token");
+        assertFalse(snapshot().at("/elements/0").has("remark"));
+        assertEquals("0.6", snapshot().path("schema_version").asText());
+        assertEquals(token, open().get("draft_token"));
     }
 
     @Test void wrongScopeBindingUnsupportedCommandsAndNamesNeverWrite() throws Exception {
@@ -512,6 +956,10 @@ class DraftWorkspaceControllerTest {
         var findings = call("findings", query(token), 200, "DraftFindingsResult");
         assertFalse(findings.at("/data/items").isEmpty());
         assertTrue(findings.at("/data/items/0/rule_id").asText().startsWith("rule.opl."));
+        var details = aggregate("details", token);
+        assertTrue(details.path("text").isNull());
+        assertEquals(findings.get("data"), details.at("/findings/data"));
+        assertFalse(aggregate("canvas", token).at("/projection/data/constructs").isEmpty());
         error("commands", edit(token, "UPDATE_PROPERTY", "element.raw.material", name("element.raw.material", "New name"), 0), 422, "DRAFT_EDIT_REJECTED");
         assertEquals(before, snapshot()); assertEquals(0, count(database, "draft_journal")); assertEquals(0, count(database, "draft_receipt"));
         Path wide = temporary.resolve("wide-integer"); create(wide, true, document -> ((ObjectNode) document.at("/layouts/0")).put("z_order", 2147483648L));
@@ -1287,8 +1735,8 @@ class DraftWorkspaceControllerTest {
         var token = open().path("draft_token"); var before = snapshot(); var request = classification(token, CONTEXT, "PRODUCT");
         var query = JSON.createObjectNode().put("request_id", "query.history.atomic").put("revision", "HEAD").putNull("before");
         var history = call("operation-history", query, 200, "OperationHistoryResult").path("data");
-        try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + database); var statement = connection.createStatement()) {
-            statement.execute("CREATE TRIGGER test_method_failure BEFORE INSERT ON draft_receipt BEGIN SELECT RAISE(ABORT,'测试分类存储失败'); END");
+        try (var connection = org.opm.localruntime.storage.SqliteTestSupport.connection(database); var statement = connection.createStatement()) {
+            statement.execute((org.opm.localruntime.storage.SqliteTestSupport.sqlite(connection) ? "CREATE TRIGGER test_method_failure BEFORE INSERT ON draft_receipt BEGIN SELECT RAISE(ABORT, '测试分类存储失败'); END" : "CREATE OR REPLACE FUNCTION fn_test_method_failure() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION '测试分类存储失败'; RETURN NEW; END $$; CREATE TRIGGER test_method_failure BEFORE INSERT ON draft_receipt FOR EACH ROW EXECUTE FUNCTION fn_test_method_failure()"));
         }
         error("commands", request, 503, "PERSISTENCE_FAILED");
         assertEquals(before, snapshot()); assertEquals(token, open().path("draft_token")); assertQueryCounts(0);
@@ -1369,8 +1817,8 @@ class DraftWorkspaceControllerTest {
         var query = JSON.createObjectNode().put("request_id", "query.trace.atomic").put("revision", "HEAD").putNull("before");
         var history = call("operation-history", query, 200, "OperationHistoryResult").path("data");
         var request = architectureLink(token, CONTEXT, child, "INPUT");
-        try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + database); var statement = connection.createStatement()) {
-            statement.execute("CREATE TRIGGER test_trace_failure BEFORE INSERT ON draft_receipt BEGIN SELECT RAISE(ABORT,'测试关联存储失败'); END");
+        try (var connection = org.opm.localruntime.storage.SqliteTestSupport.connection(database); var statement = connection.createStatement()) {
+            statement.execute((org.opm.localruntime.storage.SqliteTestSupport.sqlite(connection) ? "CREATE TRIGGER test_trace_failure BEFORE INSERT ON draft_receipt BEGIN SELECT RAISE(ABORT, '测试关联存储失败'); END" : "CREATE OR REPLACE FUNCTION fn_test_trace_failure() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION '测试关联存储失败'; RETURN NEW; END $$; CREATE TRIGGER test_trace_failure BEFORE INSERT ON draft_receipt FOR EACH ROW EXECUTE FUNCTION fn_test_trace_failure()"));
         }
         error("commands", request, 503, "PERSISTENCE_FAILED"); assertEquals(before, snapshot()); assertEquals(token, open().path("draft_token"));
         assertEquals(history, call("operation-history", query, 200, "OperationHistoryResult").path("data"));

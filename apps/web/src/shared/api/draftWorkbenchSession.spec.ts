@@ -23,28 +23,109 @@ function setup() {
   const draftQuery = vi.fn(async (_p, _m, operation, request) => {
     if (operation === "open") return { ...message("OpenDraftResult"), request_id: request.request_id };
     const meta = { request_id: request.request_id, draft_token: request.draft_token, context_id: request.scope?.context_id ?? request.context_id };
+    if (operation === "canvas") return {
+      opened: { ...message("OpenDraftResult"), request_id: request.request_id, draft_token: request.draft_token, save_state: { ...message("OpenDraftResult").save_state, durable_token: request.draft_token } },
+      projection: { ...message("DraftProjectionResult"), meta },
+    };
+    if (operation === "details") return Object.fromEntries(Object.entries({ text: "DraftTextResult", navigation: "DraftNavigationResult", findings: "DraftFindingsResult", catalog: "DraftRelationCatalogResult" }).map(([key, type]) => [key, { ...message(type), meta }]));
     if (operation === "capabilities") return { meta, data: { scope: request.scope, allowed: [request.scope.intent], forbidden: [], capability_query_id: "query.1", options: [option(request.scope, request.draft_token)] } };
     const type = { projection: "DraftProjectionResult", text: "DraftTextResult", navigation: "DraftNavigationResult", findings: "DraftFindingsResult", "relation-catalog": "DraftRelationCatalogResult" }[operation];
     return { ...message(type!), meta };
   });
-  const api = { draftQuery, getProject: vi.fn(async () => ({ name: "项目" })), listModels: vi.fn(async () => [{ project_id: "project.1", model_id: "model.1", name: "模型" }]), revisions: vi.fn(async () => []) };
+  const api = { draftQuery, draftSaveState: vi.fn(async () => message("OpenDraftResult").save_state), getProject: vi.fn(async () => ({ name: "项目" })), listModels: vi.fn(async () => [{ project_id: "project.1", model_id: "model.1", name: "模型" }]), revisions: vi.fn(async () => []) };
   const session = new DraftWorkbenchSession("project.1", "model.1", delivery, api as never);
   return { session, api, submit, delivery };
 }
 
 describe("DraftWorkbenchSession", () => {
+  it("历史恢复复用幂等 EDIT 通道，绑定模型、草稿、记录和方向", async () => {
+    const { session, submit, api } = setup();
+    await session.edit(token, "context.1", { commandType: "RESTORE_OPERATION", payload: { record_id: "history.EDIT.latest", action: "UNDO" } });
+    expect(api.draftQuery).not.toHaveBeenCalled();
+    expect(submit).toHaveBeenCalledWith("project.1", "model.1", { operation: "EDIT", request: expect.objectContaining({
+      expected_draft_token: token, scope: { context_id: "context.1", selection_id: null, intent: "RESTORE_OPERATION", endpoints: [] },
+      command: { command_type: "RESTORE_OPERATION", payload: { record_id: "history.EDIT.latest", action: "UNDO" } },
+    }) });
+  });
+  it("画布读取不等待辅助面板，也不重新查询项目、模型和历史", async () => {
+    const { session, api } = setup();
+    const opened = await session.open();
+    api.draftQuery.mockClear();
+    const canvas = await session.readCanvas(opened);
+    expect(canvas.constructs).toHaveLength(1);
+    expect(api.draftQuery.mock.calls.map(call => call[2])).toEqual(["projection"]);
+    expect(api.getProject).not.toHaveBeenCalled();
+    expect(api.listModels).not.toHaveBeenCalled();
+    expect(api.revisions).not.toHaveBeenCalled();
+    await session.readDetails(opened);
+    expect(api.draftQuery.mock.calls.map(call => call[2])).toEqual(["projection", "details"]);
+  });
+  it("编辑后一个请求获取同token画布和真实保存状态，不再重新open", async () => {
+    const { session, api } = setup();
+    const canvas = await session.readEditedCanvas(token, "context.1");
+    expect(canvas.opened.draft_token).toEqual(token);
+    expect(api.draftQuery.mock.calls.map(call => call[2])).toEqual(["canvas"]);
+  });
+  it.each(["token", "state", "context", "request"])("聚合画布%s不一致时拒绝", async fault => {
+    const { session, api } = setup(), implementation = api.draftQuery.getMockImplementation()!;
+    api.draftQuery.mockImplementation(async (...args) => {
+      const result = await implementation(...args);
+      if (fault === "token") result.opened.draft_token = { ...token, edit_seq: 10 };
+      if (fault === "state") result.opened.save_state.durable_token = { ...token, edit_seq: 10 };
+      if (fault === "context") result.projection.meta.context_id = "context.wrong";
+      if (fault === "request") result.opened.request_id = "request.wrong";
+      return result;
+    });
+    await expect(session.readEditedCanvas(token, "context.1")).rejects.toMatchObject({ code: "DRAFT_RESPONSE_INVALID" });
+  });
+  it("状态读取复用轻量接口，不打开或读取模型", async () => {
+    const { session, api } = setup();
+    expect(await session.saveState()).toEqual(message("OpenDraftResult").save_state);
+    expect(api.draftSaveState).toHaveBeenCalledWith("project.1", "model.1");
+    expect(api.draftQuery).not.toHaveBeenCalled(); expect(api.getProject).not.toHaveBeenCalled();
+  });
+  it("重复候选按token和scope复用，失败可重试，新token重新查询", async () => {
+    const { session, api } = setup();
+    await Promise.all([session.capabilities(token, "context.1", undefined, "CREATE_ELEMENT"), session.capabilities(token, "context.1", undefined, "CREATE_ELEMENT")]);
+    expect(api.draftQuery).toHaveBeenCalledTimes(1);
+    await session.capabilities({ ...token, edit_seq: 1 }, "context.1", undefined, "CREATE_ELEMENT");
+    expect(api.draftQuery).toHaveBeenCalledTimes(2);
+    api.draftQuery.mockRejectedValueOnce(new LocalRuntimeApiError("UNAVAILABLE", "网络错误"));
+    await expect(session.capabilities(token, "context.1", "element.1", "CREATE_STATE")).rejects.toThrow();
+    await session.capabilities(token, "context.1", "element.1", "CREATE_STATE");
+    expect(api.draftQuery).toHaveBeenCalledTimes(4);
+  });
+  it("同token聚合目录可复用，选中关系和下一token分别读取", async () => {
+    const { session, api } = setup();
+    await session.readDetails(await session.open()); api.draftQuery.mockClear();
+    await session.catalog(token, "context.1");
+    expect(api.draftQuery).not.toHaveBeenCalled();
+    await Promise.all([session.catalog(token, "context.1", "fact.1"), session.catalog(token, "context.1", "fact.1")]);
+    expect(api.draftQuery).toHaveBeenCalledTimes(1);
+    await session.catalog({ ...token, edit_seq: 1 }, "context.1");
+    expect(api.draftQuery).toHaveBeenCalledTimes(2);
+  });
+  it.each(["token", "checkpoint", "pending", "deadline", "mode"])("拒绝无效状态：%s", async fault => {
+    const { session, api } = setup(), state = message("OpenDraftResult").save_state;
+    if (fault === "token") state.durable_token.edit_seq = -1;
+    if (fault === "checkpoint") state.checkpoint_token = { ...state.durable_token, draft_id: "draft.other" };
+    if (fault === "pending") state.pending_manual_target = { ...state.durable_token, edit_seq: state.durable_token.edit_seq + 1 };
+    if (fault === "deadline") { state.dirty_since = "invalid"; state.deadline = null; }
+    if (fault === "mode") state.in_flight = "INVALID";
+    api.draftSaveState.mockResolvedValueOnce(state);
+    await expect(session.saveState()).rejects.toMatchObject({ code: "DRAFT_RESPONSE_INVALID" });
+  });
   it("OPL模型错误已有诊断时仍加载画布，网络故障不能被问题列表掩盖", async () => {
     const { session, api } = setup(); const implementation = api.draftQuery.getMockImplementation()!;
     api.draftQuery.mockImplementation(async (...args) => {
-      if (args[2] === "text") throw new LocalRuntimeApiError("DRAFT_EDIT_REJECTED", "文本错误");
       const value = await implementation(...args);
-      if (args[2] === "findings") value.data.items = [{ finding_id: "finding.1", rule_id: "rule.opl.INVALID_ENDPOINT" }];
+      if (args[2] === "details") { value.text = null; value.findings.data.items = [{ finding_id: "finding.1", rule_id: "rule.opl.INVALID_ENDPOINT" }]; }
       return value;
     });
     const snapshot = await session.read(await session.open());
     expect(snapshot.text.sentences).toEqual([]); expect(snapshot.textError).toContain("问题");
     api.draftQuery.mockImplementation(async (...args) => {
-      if (args[2] === "text") throw new LocalRuntimeApiError("UNAVAILABLE", "网络错误");
+      if (args[2] === "details") throw new LocalRuntimeApiError("UNAVAILABLE", "网络错误");
       return implementation(...args);
     });
     await expect(session.read(await session.open())).rejects.toMatchObject({ code: "UNAVAILABLE" });
@@ -86,7 +167,7 @@ describe("DraftWorkbenchSession", () => {
     const opened = await session.open(); const snapshot = await session.read(opened);
     expect(snapshot.constructs[0]?.layout.x).toBe(0.1);
     expect(snapshot.findings.validation_summary.coverage_state).toBe("INCOMPLETE");
-    expect(api.draftQuery.mock.calls.map(call => call[2])).toEqual(["open", "projection", "text", "navigation", "findings", "relation-catalog"]);
+    expect(api.draftQuery.mock.calls.map(call => call[2])).toEqual(["open", "projection", "details"]);
   });
 
   it.each(["request", "token", "context", "projection"])("快照 %s 不一致整批拒绝", async fault => {

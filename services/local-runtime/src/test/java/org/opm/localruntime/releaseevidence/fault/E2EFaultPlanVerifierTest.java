@@ -18,7 +18,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class E2EFaultPlanVerifierTest {
     @TempDir Path temporaryDirectory;
-
     @Test
     void bundledSchemaMatchesTheCurrentFrozenSourceBytes() throws Exception {
         byte[] source = Files.readAllBytes(repositoryRoot().resolve("docs/contracts/schemas/opm-dev-canvas-06-e2e-attempt-artifact-v02.schema.json"));
@@ -72,6 +71,8 @@ class E2EFaultPlanVerifierTest {
             }
         }
     }
+
+
 
     @Test
     void acceptsAllThreeFaultPlansWithNodeAjvAndTheJarValidator() throws Exception {

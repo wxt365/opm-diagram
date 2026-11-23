@@ -1,0 +1,11 @@
+@import "../shared/styles/foundation.css";
+@import "../shared/styles/shell.css";
+@import "../shared/styles/pages.css";
+@import "../shared/styles/forms.css";
+@import "../shared/styles/workbench-layout.css";
+@import "../shared/styles/workbench-assistant.css";
+@import "../shared/styles/workbench-tools.css";
+@import "../shared/styles/workbench-canvas.css";
+@import "../shared/styles/workbench-panels.css";
+@import "../shared/styles/feedback.css";
+@import "../shared/styles/responsive.css";

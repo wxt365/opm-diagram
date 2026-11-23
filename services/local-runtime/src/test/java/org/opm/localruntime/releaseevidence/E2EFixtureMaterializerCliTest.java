@@ -22,7 +22,6 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-
 class E2EFixtureMaterializerCliTest {
 
     private static final ObjectMapper JSON = new ObjectMapper();
@@ -31,7 +30,7 @@ class E2EFixtureMaterializerCliTest {
     Path temporaryDirectory;
 
     @Test
-    void acceptsClosedFamilyInputsBeforeAnySqliteIsCreated() throws Exception {
+    void acceptsClosedFamilyInputsBeforeAnySnapshotIsCreated() throws Exception {
         Fixture fixture = Fixture.create(temporaryDirectory);
 
         E2EFixtureMaterializerCli.PreflightResult result = E2EFixtureMaterializerCli.preflight(fixture.arguments());
@@ -43,7 +42,7 @@ class E2EFixtureMaterializerCliTest {
     }
 
     @Test
-    void acceptsClosedCommonInputsWithoutFamilyCatalogBeforeAnySqliteIsCreated() throws Exception {
+    void acceptsClosedCommonInputsWithoutFamilyCatalogBeforeAnySnapshotIsCreated() throws Exception {
         Fixture fixture = Fixture.createCommonMaterializable(temporaryDirectory.resolve("common"));
         String caseId = "E2E-CANVAS-001.STATE_MOBILE_CREATE_REOPEN";
 
@@ -57,7 +56,7 @@ class E2EFixtureMaterializerCliTest {
     }
 
     @Test
-    void rejectsProfileRawDriftBeforeCreatingSqlite() throws Exception {
+    void rejectsProfileRawDriftBeforeCreatingSnapshot() throws Exception {
         Fixture fixture = Fixture.create(temporaryDirectory);
         Files.writeString(fixture.profileRoot().resolve("rules/rules.json"), "{\"changed\":true}", StandardCharsets.UTF_8);
 
@@ -70,7 +69,7 @@ class E2EFixtureMaterializerCliTest {
     }
 
     @Test
-    void rejectsFamilyIdentityFromGoldenNamespaceBeforeCreatingSqlite() throws Exception {
+    void rejectsFamilyIdentityFromGoldenNamespaceBeforeCreatingSnapshot() throws Exception {
         Fixture fixture = Fixture.create(temporaryDirectory);
         ObjectNode catalog = readObject(fixture.catalog());
         ((ObjectNode) ((ArrayNode) catalog.get("entries")).get(0)).put("project_id", "project.golden.fixture.forbidden");
@@ -86,7 +85,7 @@ class E2EFixtureMaterializerCliTest {
     }
 
     @Test
-    void rejectsMissingReleaseGuardBeforeCreatingSqlite() throws Exception {
+    void rejectsMissingReleaseGuardBeforeCreatingSnapshot() throws Exception {
         Fixture fixture = Fixture.create(temporaryDirectory);
         String[] arguments = fixture.arguments();
         arguments[1] = "NOT_RELEASE_E2E_ONLY";
@@ -97,7 +96,7 @@ class E2EFixtureMaterializerCliTest {
     }
 
     @Test
-    void rejectsManifestRootOutsideAttemptBeforeCreatingSqlite() throws Exception {
+    void rejectsManifestRootOutsideAttemptBeforeCreatingSnapshot() throws Exception {
         Fixture fixture = Fixture.create(temporaryDirectory.resolve("outside-manifest"));
         String[] arguments = fixture.arguments();
         arguments[indexOf(arguments, "--manifest-root") + 1] = temporaryDirectory.toString();
@@ -111,7 +110,7 @@ class E2EFixtureMaterializerCliTest {
     }
 
     @Test
-    void rejectsFaultPlanOrdinalBeforeCreatingSqlite() throws Exception {
+    void rejectsFaultPlanOrdinalBeforeCreatingSnapshot() throws Exception {
         Fixture fixture = Fixture.create(temporaryDirectory);
         ObjectNode plan = readObject(fixture.faultPlan);
         plan.put("attempt_ordinal", 3);
@@ -126,7 +125,7 @@ class E2EFixtureMaterializerCliTest {
     }
 
     @Test
-    void rejectsInputRawDriftBeforeCreatingSqlite() throws Exception {
+    void rejectsInputRawDriftBeforeCreatingSnapshot() throws Exception {
         Fixture fixture = Fixture.create(temporaryDirectory);
         Files.writeString(fixture.inputCopy(), "{\"changed\":true}", StandardCharsets.UTF_8);
 
@@ -139,7 +138,7 @@ class E2EFixtureMaterializerCliTest {
     }
 
     @Test
-    void rejectsNonCanonicalManifestTimesBeforeCreatingSqlite() throws Exception {
+    void rejectsNonCanonicalManifestTimesBeforeCreatingSnapshot() throws Exception {
         for (String generatedAt : List.of("2026-07-01T00:00:00.000Z", "2026-07-01T00:00:00.001Z",
                 "2026-07-01T00:00:00+00:00", " 2026-07-01T00:00:00Z", "2026-07-01T00:00:00z", "not-a-time")) {
             Fixture fixture = Fixture.create(temporaryDirectory.resolve("time-" + generatedAt.hashCode()));
@@ -157,7 +156,7 @@ class E2EFixtureMaterializerCliTest {
     }
 
     @Test
-    void rejectsTestClasspathBeforeCreatingSqliteOrArtifact() throws Exception {
+    void rejectsTestClasspathBeforeCreatingSnapshotOrArtifact() throws Exception {
         Fixture fixture = Fixture.create(temporaryDirectory);
 
         assertEquals(3, E2EFixtureMaterializerCli.run(fixture.arguments()));

@@ -14,7 +14,8 @@ import java.util.UUID;
 public final class MindmapRepository {
     private static final ObjectMapper JSON = new ObjectMapper();
     private final DraftJournalRepository journal;
-    public MindmapRepository(Path database, Clock clock) { journal = new DraftJournalRepository(database, clock); }
+    public MindmapRepository(ProjectScope database, Clock clock) { journal = new DraftJournalRepository(database, clock); }
+    public MindmapRepository(Path snapshot, Clock clock) { this(SqliteSnapshots.scope(snapshot),clock); }
     public JsonNode execute(String project, String model, JsonNode input) {
         return journal.transaction(true, connection -> {
             DraftJournalRepository.scope(connection, project, model);
@@ -25,7 +26,7 @@ public final class MindmapRepository {
             var current = find(connection, model);
             if (current == null) {
                 var document = initial(model);
-                DraftJournalRepository.update(connection, "INSERT INTO mindmap_document VALUES (?,?,?,?,?)", model, document.get("id").asText(), 0,
+                DraftJournalRepository.update(connection, "INSERT INTO mindmap_document(model_id,mindmap_id,revision,document_json,digest) VALUES (?,?,?,?,?)", model, document.get("id").asText(), 0,
                         document.toString(), DraftJsonDelta.digest(document));
                 current = document;
             }
@@ -41,8 +42,15 @@ public final class MindmapRepository {
             }
             var result = JSON.createObjectNode().put("request_id", input.get("request_id").asText()).put("digest", DraftJsonDelta.digest(current));
             result.set("document", current); var conversions = result.putArray("conversions");
-            try (var query = connection.prepareStatement("SELECT * FROM mindmap_conversion WHERE model_id=? ORDER BY rowid")) {
-                query.setString(1, model); try (var rows = query.executeQuery()) { while (rows.next()) {
+            // 撤销后保留来源记录供重做恢复，同时在当前模型中停用这次绑定。
+            String status = JdbcDialect.jsonText(connection, "h.result_json", "status");
+            try (var query = connection.prepareStatement("""
+                    SELECT c.* FROM mindmap_conversion c
+                    LEFT JOIN idempotency_record h ON h.operation_id=? AND h.aggregate_id=c.model_id AND h.command_id='EDIT.'||c.command_id
+                    WHERE c.model_id=? AND COALESCE(%s,'')<>'UNDONE' ORDER BY c.conversion_order
+                    """.formatted(status))) {
+                query.setString(1, OperationHistoryRepository.NAMESPACE);
+                query.setString(2, model); try (var rows = query.executeQuery()) { while (rows.next()) {
                     var item = conversions.addObject().put("command_id", rows.getString("command_id")).put("context_id", rows.getString("context_id")).put("revision", rows.getLong("source_revision"));
                     item.set("mappings", DraftJsonDelta.read(rows.getString("mappings_json")));
                     var savedSource = DraftJsonDelta.read(rows.getString("source_json"));
@@ -67,8 +75,8 @@ public final class MindmapRepository {
     static void record(Connection connection, String model, String command, String context, JsonNode source, String mappings) throws Exception {
         var document = checkSource(connection, model, source);
         var snapshot = JSON.createObjectNode(); snapshot.set("document", document); snapshot.set("analysis_source", source);
-        DraftJournalRepository.update(connection, "INSERT INTO mindmap_conversion VALUES (?,?,?,?,?,?,?)", model, command, context,
-                source.get("mindmap_id").asText(), source.get("revision").asLong(), snapshot.toString(), mappings);
+        DraftJournalRepository.update(connection, "INSERT INTO mindmap_conversion(model_id,command_id,context_id,mindmap_id,source_revision,source_json,mappings_json,conversion_order) VALUES (?,?,?,?,?,?,?,?)", model, command, context,
+                source.get("mindmap_id").asText(), source.get("revision").asLong(), snapshot.toString(), mappings, JdbcDialect.nextOrder(connection, "mindmap_conversion"));
     }
     private static ObjectNode find(Connection connection, String model) throws Exception {
         try (var query = connection.prepareStatement("SELECT document_json FROM mindmap_document WHERE model_id=?")) {

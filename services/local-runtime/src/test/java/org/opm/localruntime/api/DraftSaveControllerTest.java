@@ -48,6 +48,78 @@ class DraftSaveControllerTest {
                 .addMappedInterceptors(new String[]{"/api/v2/**"}, new DraftWriteRequestGuard(new LocalSessionToken("test-session"))).build();
     }
 
+    @Test void statusResponsesAreNotCacheable() throws Exception {
+        var response = mvc.perform(authorized(get(URL + "save-state"))).andReturn().getResponse();
+        assertEquals(200, response.getStatus()); assertEquals("no-store", response.getHeader("Cache-Control"));
+        assertNotNull(DraftSaveContract.read(response.getContentAsString(), DraftSaveContract.SaveState.class).durable_token());
+    }
+
+    @Test void appearanceSaveKeepsIndependentOccurrencesAndRestoresHistoricalColorsAcrossRestart() throws Exception {
+        Path storage = temporary.resolve("colors");
+        database = create(storage, true, document -> addOwnedContext(document, "context.other", "OBJECT_REFINEMENT"));
+        migrate(database); setupMvc(storage, root().resolve("packages/profiles"));
+        var token = open().get("draft_token");
+        var document = SaveContentDigestV1.read(new DraftJournalRepository(database, CLOCK).read(PROJECT, MODEL).documentJson());
+        var occurrence = document.path("occurrences").findValues("occurrence_id");
+        assertFalse(occurrence.isEmpty());
+        var raw = document.path("occurrences");
+        String layoutId = "";
+        for (var item : raw) if (item.path("occurrence_id").asText().equals("occurrence.raw")) layoutId = item.path("layout_id").asText();
+        JsonNode layout = null;
+        for (var item : document.path("layouts")) if (item.path("layout_id").asText().equals(layoutId)) layout = item;
+        assertNotNull(layout);
+        var query = JSON.createObjectNode().put("request_id", "request.color.capabilities"); query.set("draft_token", token);
+        query.putObject("scope").put("context_id", CONTEXT).putNull("selection_id").put("intent", "UPDATE_LAYOUT_BATCH").putArray("endpoints").add("occurrence.raw");
+        var option = postCall("capabilities", query, 200).at("/data/options/0"); assertTrue(option.isObject());
+        var edit = JSON.createObjectNode().put("request_id", "request.color.edit").put("command_id", "command.color");
+        edit.set("expected_draft_token", token); edit.set("scope", query.get("scope"));
+        edit.putObject("authorization").set("capability_query_id", option.get("capability_query_id"));
+        ((ObjectNode) edit.get("authorization")).set("selected_option_id", option.get("option_id"));
+        var geometry = edit.putObject("command").put("command_type", "UPDATE_LAYOUT_BATCH").putObject("payload")
+                .putArray("layouts").addObject().put("occurrence_id", "occurrence.raw").putObject("layout");
+        for (String field : List.of("x", "y", "width", "height")) geometry.set(field, layout.get(field));
+        geometry.putObject("appearance").put("stroke", "#123456").put("fill", "#222222");
+        token = postCall("commands", edit, 200).get("result_token");
+        var saved = postCall("save", saveRequest("save.colors", token), 200);
+        String revision = saved.get("revision_id").asText();
+        assertTrue(historical("projection", revision).toString().contains("#123456"));
+        assertFalse(historicalContext("projection", revision, "context.other").toString().contains("#123456"));
+        setupMvc(storage, root().resolve("packages/profiles"));
+        assertEquals(token, open().get("draft_token"));
+        token = updateProperty(token, "调色后的备注", "remark");
+        assertTrue(historical("projection", revision).toString().contains("#123456"));
+        var next = postCall("save", saveRequest("save.colors.remark", token), 200);
+        assertTrue(historical("projection", next.path("revision_id").asText()).toString().contains("#123456"));
+    }
+
+    @Test void remarkSaveReopenAndHistoricalProjectionKeepTheSamePlainText() throws Exception {
+        var token = open().get("draft_token");
+        token = updateProperty(token, "第一行\n<b>备注文本</b>", "remark");
+        assertTrue(history("HEAD", null, 200).toString().contains("修改备注"));
+        var saved = postCall("save", saveRequest("save.remark", token), 200);
+        String revision = saved.get("revision_id").asText();
+        assertTrue(historical("projection", revision).toString().contains("备注文本"));
+        setupMvc(root().resolve("packages/profiles"));
+        assertEquals(token, open().get("draft_token"));
+        assertTrue(historical("projection", revision).toString().contains("备注文本"));
+        var query = JSON.createObjectNode().put("request_id", "request.remark").put("context_id", CONTEXT); query.set("draft_token", token);
+        assertTrue(postCall("projection", query, 200).toString().contains("备注文本"));
+        token = rename(token, "备注后的改名");
+        assertTrue(historical("projection", revision).toString().contains("备注文本"));
+        postCall("save", saveRequest("save.remark.rename", token), 200);
+    }
+
+    @Test void statusReadAcceptsBrowserRefererButStillRequiresTrustedSourceAndSession() throws Exception {
+        assertTrue(perform(get(URL + "save-state").header("Referer", "http://localhost:5173/projects")
+                .header("X-OPM-Session", "test-session"), 200).has("durable_token"));
+        for (String source : List.of("http://evil.invalid/projects", "http://localhost:5173@evil.invalid/projects", "invalid")) {
+            assertEquals("LOCAL_SESSION_INVALID", perform(get(URL + "save-state").header("Referer", source)
+                    .header("X-OPM-Session", "test-session"), 403).get("code").asText());
+        }
+        assertEquals("LOCAL_SESSION_INVALID", perform(get(URL + "save-state").header("Referer", "http://localhost:5173/projects")
+                .header("X-OPM-Session", "wrong"), 403).get("code").asText());
+    }
+
     @Test void operationHistoryCapturesNamesAndSavedCutoffAcrossRestart() throws Exception {
         var token = rename(open().get("draft_token"), "历史第一名称");
         var first = history("HEAD", null, 200);
@@ -72,7 +144,7 @@ class DraftSaveControllerTest {
         assertEquals(atSave, history(revision, null, 200).get("data"));
         assertTrue(history("HEAD", null, 200).toString().contains("历史第一名称 → 历史第二名称"));
         new DraftSaveRepository(database, CLOCK).checkpoint(PROJECT, MODEL, ignored -> { });
-        assertTrue(history("HEAD", null, 200).toString().contains("自动保存草稿"));
+        assertFalse(history("HEAD", null, 200).toString().contains("自动保存草稿"));
         int count = history("HEAD", null, 200).at("/data/items").size();
         new DraftSaveRepository(database, CLOCK).checkpoint(PROJECT, MODEL, ignored -> { });
         assertEquals(count, history("HEAD", null, 200).at("/data/items").size());
@@ -85,21 +157,21 @@ class DraftSaveControllerTest {
 
     @Test void operationHistoryAuditFailureRollsBackEntireEditAndRetryWorks() throws Exception {
         var token = open().get("draft_token");
-        try (var c = java.sql.DriverManager.getConnection("jdbc:sqlite:" + database); var s = c.createStatement()) {
-            s.execute("CREATE TRIGGER test_history_failure BEFORE INSERT ON idempotency_record WHEN NEW.operation_id='DRAFT_OPERATION_HISTORY_V1' BEGIN SELECT RAISE(ABORT,'测试历史事务失败'); END");
+        try (var c = org.opm.localruntime.storage.SqliteTestSupport.connection(database); var s = c.createStatement()) {
+            s.execute((org.opm.localruntime.storage.SqliteTestSupport.sqlite(c) ? "CREATE TRIGGER test_history_failure BEFORE INSERT ON idempotency_record WHEN NEW.operation_id='DRAFT_OPERATION_HISTORY_V1' BEGIN SELECT RAISE(ABORT, '测试历史事务失败'); END" : "CREATE OR REPLACE FUNCTION fn_test_history_failure() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.operation_id='DRAFT_OPERATION_HISTORY_V1' THEN RAISE EXCEPTION '测试历史事务失败'; END IF; RETURN NEW; END $$; CREATE TRIGGER test_history_failure BEFORE INSERT ON idempotency_record FOR EACH ROW EXECUTE FUNCTION fn_test_history_failure()"));
         }
         assertThrows(AssertionError.class, () -> rename(token, "不得留下的名称"));
         assertEquals(token, open().get("draft_token"));
         assertEquals(0, history("HEAD", null, 200).at("/data/items").size());
         assertEquals(0, count(database, "draft_journal")); assertEquals(0, count(database, "draft_receipt"));
-        try (var c = java.sql.DriverManager.getConnection("jdbc:sqlite:" + database); var s = c.createStatement()) { s.execute("DROP TRIGGER test_history_failure"); }
+        try (var c = org.opm.localruntime.storage.SqliteTestSupport.connection(database); var s = c.createStatement()) { s.execute(org.opm.localruntime.storage.SqliteTestSupport.dropTriggerSql(c, "test_history_failure", "idempotency_record")); }
         postCall("commands", lastHistoryEdit, 200);
         assertEquals(1, history("HEAD", null, 200).at("/data/items").size());
     }
 
     @Test void operationHistoryFallsBackToHonestLegacyEditWithoutGuessingName() throws Exception {
         rename(open().get("draft_token"), "旧名称不可反推");
-        try (var c = java.sql.DriverManager.getConnection("jdbc:sqlite:" + database); var s = c.createStatement()) {
+        try (var c = org.opm.localruntime.storage.SqliteTestSupport.connection(database); var s = c.createStatement()) {
             s.execute("DELETE FROM idempotency_record WHERE operation_id='DRAFT_OPERATION_HISTORY_V1'");
         }
         var row = history("HEAD", null, 200).at("/data/items/0");
@@ -113,10 +185,10 @@ class DraftSaveControllerTest {
     }
 
     @Test void operationHistoryPaginationIsStableWhenTimesTieAndRejectsCrossScopeCursor() throws Exception {
-        try (var c = java.sql.DriverManager.getConnection("jdbc:sqlite:" + database); var s = c.prepareStatement("INSERT INTO idempotency_record VALUES ('DRAFT_OPERATION_HISTORY_V1',?,?,?,'DURABLE',NULL,?,?,NULL)")) {
+        try (var c = org.opm.localruntime.storage.SqliteTestSupport.connection(database); var s = c.prepareStatement("INSERT INTO idempotency_record(operation_id,aggregate_id,command_id,request_digest,result_status,result_revision_id,result_json,created_at,expires_at) VALUES ('DRAFT_OPERATION_HISTORY_V1',?,?,?,'DURABLE',NULL,?,?,NULL)")) {
             for (int i = 0; i < 105; i++) {
                 s.setString(1, MODEL); s.setString(2, "EDIT.command.pagination." + i); s.setString(3, "a".repeat(64));
-                s.setString(4, JSON.createObjectNode().put("draft_id", "draft.http").put("edit_seq", 0).put("operation", "UPDATE_LAYOUT")
+                s.setString(4, JSON.createObjectNode().put("draft_id", "draft.http").put("edit_seq", 0.0).put("receipt_order", 0.0).put("operation", "UPDATE_LAYOUT")
                         .put("title", "移动对象 " + i).put("context_id", CONTEXT).put("context_name", "根图").put("status", "DURABLE").toString());
                 s.setString(5, NOW); s.executeUpdate();
             }
@@ -188,13 +260,13 @@ class DraftSaveControllerTest {
     @Test void pinSqlFailureRetainsDirtyDraftAndRetryReturnsProtectedVersion() throws Exception {
         var request = pinRequest("pin.sql", rename(open().get("draft_token"), "待固定"), "EXPORT");
         var before = perform(authorized(get(URL + "save-state")), 200);
-        try (var c = java.sql.DriverManager.getConnection("jdbc:sqlite:" + database); var s = c.createStatement()) {
-            s.execute("CREATE TRIGGER test_pin_failure BEFORE INSERT ON draft_receipt WHEN NEW.operation='PIN' BEGIN SELECT RAISE(ABORT,'测试故障'); END");
+        try (var c = org.opm.localruntime.storage.SqliteTestSupport.connection(database); var s = c.createStatement()) {
+            s.execute((org.opm.localruntime.storage.SqliteTestSupport.sqlite(c) ? "CREATE TRIGGER test_pin_failure BEFORE INSERT ON draft_receipt WHEN NEW.operation='PIN' BEGIN SELECT RAISE(ABORT, '测试故障'); END" : "CREATE OR REPLACE FUNCTION fn_test_pin_failure() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.operation='PIN' THEN RAISE EXCEPTION '测试故障'; END IF; RETURN NEW; END $$; CREATE TRIGGER test_pin_failure BEFORE INSERT ON draft_receipt FOR EACH ROW EXECUTE FUNCTION fn_test_pin_failure()"));
         }
         var error = postCall("pin", request, 503); assertEquals("PERSISTENCE_FAILED", error.get("code").asText()); assertTrue(error.get("retryable").asBoolean());
         var after = perform(authorized(get(URL + "save-state")), 200); assertEquals(before.get("checkpoint_token"), after.get("checkpoint_token")); assertEquals(before.get("dirty_since"), after.get("dirty_since"));
         assertEquals(0, count(database, "draft_savepoint")); assertEquals(0, count(database, "draft_retention"));
-        try (var c = java.sql.DriverManager.getConnection("jdbc:sqlite:" + database); var s = c.createStatement()) { s.execute("DROP TRIGGER test_pin_failure"); }
+        try (var c = org.opm.localruntime.storage.SqliteTestSupport.connection(database); var s = c.createStatement()) { s.execute(org.opm.localruntime.storage.SqliteTestSupport.dropTriggerSql(c, "test_pin_failure", "draft_receipt")); }
         assertTrue(postCall("pin", request, 200).hasNonNull("revision_id"));
     }
 
@@ -241,7 +313,7 @@ class DraftSaveControllerTest {
         assertEquals(CONTEXT, navigation.at("/object_forest/0/parent_context_id").asText());
         assertTrue(historicalContext("projection", revision, child).at("/data/constructs").isEmpty());
         assertTrue(historicalContext("text", revision, child).at("/data/sentences").isEmpty());
-        try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + database);
+        try (var connection = org.opm.localruntime.storage.SqliteTestSupport.connection(database);
              var statement = connection.createStatement();
              var rows = statement.executeQuery("SELECT digest_version FROM draft_content WHERE content_digest='" + SaveContentDigestV1.sha256(document) + "'")) {
             assertTrue(rows.next()); assertEquals("SaveContentDigest/2", rows.getString(1));
@@ -294,22 +366,23 @@ class DraftSaveControllerTest {
         assertEquals("DRAFT_MODE_REQUIRED", postCall("pin", pinRequest("pin.inactive", initial, "PERMALINK"), 409).get("code").asText());
         assertEquals("DRAFT_MODE_REQUIRED", perform(authorized(get(URL + "save-state")), 409).get("code").asText());
         Path v3Root = temporary.resolve("v3"); var v3 = create(v3Root, true, ignored -> { });
+        try(var c=org.opm.localruntime.storage.SqliteTestSupport.connection(v3);var statement=c.createStatement()){statement.execute("DROP TABLE draft_checkpoint_overlay");}
         setupMvc(v3Root, root().resolve("packages/profiles"));
         error(saveRequest("save.v3", open().get("draft_token")), 503, "DRAFT_RECOVERY_REQUIRED");
         assertEquals("DRAFT_RECOVERY_REQUIRED", postCall("pin", pinRequest("pin.v3", open().get("draft_token"), "PERMALINK"), 503).get("code").asText());
         assertEquals(0, count(v3, "draft_savepoint"));
-        try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + v3); var s = connection.createStatement(); var r = s.executeQuery("SELECT COUNT(*) FROM sqlite_master WHERE name='draft_checkpoint_overlay'")) { r.next(); assertEquals(0, r.getInt(1)); }
+        try (var connection = org.opm.localruntime.storage.SqliteTestSupport.connection(v3); var s = connection.createStatement(); var r = s.executeQuery(org.opm.localruntime.storage.SqliteTestSupport.sqlite(connection) ? "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='draft_checkpoint_overlay'" : "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=current_schema() AND table_name='draft_checkpoint_overlay'")) { r.next(); assertEquals(0, r.getInt(1)); }
         assertEquals(0, count(inactive, "draft_savepoint"));
     }
 
     @Test void sqlFailureReturnsRetryableErrorAndSameRequestCanRecover() throws Exception {
         var request = saveRequest("save.sql", rename(open().get("draft_token"), "待保存"));
-        try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + database); var statement = connection.createStatement()) {
-            statement.execute("CREATE TRIGGER test_save_failure BEFORE INSERT ON draft_receipt WHEN NEW.operation='SAVE' BEGIN SELECT RAISE(ABORT,'测试失败'); END");
+        try (var connection = org.opm.localruntime.storage.SqliteTestSupport.connection(database); var statement = connection.createStatement()) {
+            statement.execute((org.opm.localruntime.storage.SqliteTestSupport.sqlite(connection) ? "CREATE TRIGGER test_save_failure BEFORE INSERT ON draft_receipt WHEN NEW.operation='SAVE' BEGIN SELECT RAISE(ABORT, '测试失败'); END" : "CREATE OR REPLACE FUNCTION fn_test_save_failure() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.operation='SAVE' THEN RAISE EXCEPTION '测试失败'; END IF; RETURN NEW; END $$; CREATE TRIGGER test_save_failure BEFORE INSERT ON draft_receipt FOR EACH ROW EXECUTE FUNCTION fn_test_save_failure()"));
         }
         var result = postCall("save", request, 503); assertEquals("PERSISTENCE_FAILED", result.get("code").asText()); assertTrue(result.get("retryable").asBoolean());
         assertEquals(0, count(database, "draft_savepoint")); assertEquals(1, count(database, "draft_checkpoint")); assertEquals(1, count(database, "draft_content"));
-        try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + database); var statement = connection.createStatement()) { statement.execute("DROP TRIGGER test_save_failure"); }
+        try (var connection = org.opm.localruntime.storage.SqliteTestSupport.connection(database); var statement = connection.createStatement()) { statement.execute(org.opm.localruntime.storage.SqliteTestSupport.dropTriggerSql(connection, "test_save_failure", "draft_receipt")); }
         assertEquals("SAVED", postCall("save", request, 200).get("status").asText());
         assertTrue(perform(authorized(get(URL + "save-state")), 200).get("last_error").isNull());
     }
@@ -418,13 +491,16 @@ class DraftSaveControllerTest {
     }
     private JsonNode open() throws Exception { return postCall("open", JSON.createObjectNode().put("request_id", "request.open").putNull("context_id"), 200); }
     private JsonNode rename(JsonNode token, String name) throws Exception {
+        return updateProperty(token, name, "name");
+    }
+    private JsonNode updateProperty(JsonNode token, String name, String property) throws Exception {
         var query = JSON.createObjectNode().put("request_id", "request.capabilities"); query.set("draft_token", token);
         query.putObject("scope").put("context_id", CONTEXT).put("selection_id", "element.raw.material").put("intent", "UPDATE_PROPERTY").putArray("endpoints");
         var option = postCall("capabilities", query, 200).at("/data/options/0"); assertTrue(option.isObject());
         var edit = JSON.createObjectNode().put("request_id", "request.edit").put("command_id", "command." + java.util.UUID.randomUUID());
         edit.set("expected_draft_token", token); edit.set("scope", query.get("scope"));
         edit.putObject("authorization").set("capability_query_id", option.get("capability_query_id")); ((ObjectNode) edit.get("authorization")).set("selected_option_id", option.get("option_id"));
-        var payload = edit.putObject("command").put("command_type", "UPDATE_PROPERTY").putObject("payload").put("property_name", "name").put("value", name);
+        var payload = edit.putObject("command").put("command_type", "UPDATE_PROPERTY").putObject("payload").put("property_name", property).put("value", name);
         payload.putObject("target_ref").put("target_kind", "ELEMENT").put("target_id", "element.raw.material");
         lastHistoryEdit = edit.deepCopy();
         return postCall("commands", edit, 200).get("result_token");
@@ -454,9 +530,6 @@ class DraftSaveControllerTest {
         return JSON.readTree(result.getResponse().getContentAsString());
     }
     private static void migrate(Path database) {
-        Flyway.configure().dataSource("jdbc:sqlite:" + database, "", "").locations("filesystem:" + root().resolve("docs/contracts/migrations/sqlite"),
-                "filesystem:" + root().resolve("docs/contracts/migrations/sqlite-checkpoint"),
-                "filesystem:" + root().resolve("docs/contracts/migrations/sqlite-pin"),
-                "classpath:db/digestv2").target("6").mixed(true).load().migrate();
+        org.opm.localruntime.storage.SqliteTestSupport.migrate(database);
     }
 }

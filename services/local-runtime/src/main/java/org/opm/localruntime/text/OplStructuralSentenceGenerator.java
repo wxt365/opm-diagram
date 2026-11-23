@@ -43,12 +43,12 @@ final class OplStructuralSentenceGenerator {
         String capability = fact.capability().capabilityId();
         java.util.function.Function<String, String> name = role -> structuralName(endpoint(fact, role), elements, features, states);
         return switch (capability) {
-            case "CAP-ISO-STRUCT-001" -> { requireSameThingKind(fact, elements); yield List.of(structural(fact, "opl.structural.tagged.unidirectional.v1", name.apply("STRUCTURAL_SOURCE") + " " + label(fact, "forward_tag") + " " + name.apply("STRUCTURAL_TARGET") + ".", name.apply("STRUCTURAL_SOURCE"))); }
-            case "CAP-ISO-STRUCT-002" -> { requireSameThingKind(fact, elements); yield List.of(structural(fact, "opl.structural.null-tagged.unidirectional.v1", name.apply("STRUCTURAL_SOURCE") + " relates to " + name.apply("STRUCTURAL_TARGET") + ".", name.apply("STRUCTURAL_SOURCE"))); }
-            case "CAP-ISO-STRUCT-003" -> { requireSameThingKind(fact, elements); yield List.of(
+            case "CAP-ISO-STRUCT-001" -> { requireSameThingKind(fact, elements, features); yield List.of(structural(fact, "opl.structural.tagged.unidirectional.v1", name.apply("STRUCTURAL_SOURCE") + " " + label(fact, "forward_tag") + " " + name.apply("STRUCTURAL_TARGET") + ".", name.apply("STRUCTURAL_SOURCE"))); }
+            case "CAP-ISO-STRUCT-002" -> { requireSameThingKind(fact, elements, features); yield List.of(structural(fact, "opl.structural.null-tagged.unidirectional.v1", name.apply("STRUCTURAL_SOURCE") + " relates to " + name.apply("STRUCTURAL_TARGET") + ".", name.apply("STRUCTURAL_SOURCE"))); }
+            case "CAP-ISO-STRUCT-003" -> { requireSameThingKind(fact, elements, features); yield List.of(
                     structural(fact, "opl.structural.tagged.bidirectional.forward.v1", name.apply("STRUCTURAL_SOURCE") + " " + label(fact, "forward_tag") + " " + name.apply("STRUCTURAL_TARGET") + ".", name.apply("STRUCTURAL_SOURCE")),
                     structural(fact, "opl.structural.tagged.bidirectional.reverse.v1", name.apply("STRUCTURAL_TARGET") + " " + label(fact, "reverse_tag") + " " + name.apply("STRUCTURAL_SOURCE") + ".", name.apply("STRUCTURAL_TARGET"))); }
-            case "CAP-ISO-STRUCT-004" -> { requireSameThingKind(fact, elements); yield List.of(structural(fact, hasLabel(fact, "reciprocal") ? "opl.structural.tagged.reciprocal.v1" : "opl.structural.null-tagged.reciprocal.v1",
+            case "CAP-ISO-STRUCT-004" -> { requireSameThingKind(fact, elements, features); yield List.of(structural(fact, hasLabel(fact, "reciprocal") ? "opl.structural.tagged.reciprocal.v1" : "opl.structural.null-tagged.reciprocal.v1",
                     name.apply("STRUCTURAL_SOURCE") + " and " + name.apply("STRUCTURAL_TARGET") + (hasLabel(fact, "reciprocal") ? " are " + label(fact, "reciprocal") : " are related") + ".", name.apply("STRUCTURAL_SOURCE"))); }
             case "CAP-ISO-STRUCT-005" -> fundamentalAggregation(fact, name, elements, features, states);
             case "CAP-ISO-STRUCT-006" -> fundamentalCharacterization(fact, name, elements, features, states, profile);
@@ -60,17 +60,30 @@ final class OplStructuralSentenceGenerator {
         };
     }
 
-    static void requireSameThingKind(SemanticRevision.Fact fact, Map<String, SemanticRevision.Element> elements) {
-        SemanticRevision.Element source = requireElement(endpoint(fact, "STRUCTURAL_SOURCE"), elements, "structural source");
-        SemanticRevision.Element target = requireElement(endpoint(fact, "STRUCTURAL_TARGET"), elements, "structural target");
-        if (source.coreKind() != target.coreKind()) {
+    static void requireSameThingKind(SemanticRevision.Fact fact, Map<String, SemanticRevision.Element> elements, Map<String, SemanticRevision.Feature> features) {
+        var source = structuralCoreKind(endpoint(fact, "STRUCTURAL_SOURCE"), elements, features);
+        var target = structuralCoreKind(endpoint(fact, "STRUCTURAL_TARGET"), elements, features);
+        if (source != target) {
             throw structuralEndpointMismatch(fact, "Tagged Structural endpoints must have the same Thing kind");
         }
     }
 
+    private static SemanticRevision.CoreKind structuralCoreKind(SemanticRevision.Endpoint endpoint, Map<String, SemanticRevision.Element> elements, Map<String, SemanticRevision.Feature> features) {
+        if (endpoint.targetKind() == SemanticRevision.TargetKind.FEATURE) {
+            var feature = features.get(endpoint.targetId());
+            if (feature == null) throw failure(OplGenerationCode.TEXT_PLAN_UNSUPPORTED, "Structural Feature does not exist");
+            return switch (feature.kind()) {
+                case ATTRIBUTE -> SemanticRevision.CoreKind.OBJECT;
+                case OPERATION -> SemanticRevision.CoreKind.PROCESS;
+                default -> throw failure(OplGenerationCode.TEXT_PLAN_UNSUPPORTED, "Structural Feature has no supported Thing kind");
+            };
+        }
+        return requireElement(endpoint, elements, "structural endpoint").coreKind();
+    }
+
     static List<StructuralSentence> fundamentalAggregation(SemanticRevision.Fact fact, java.util.function.Function<String, String> name,
                                                               Map<String, SemanticRevision.Element> elements, Map<String, SemanticRevision.Feature> features, Map<String, SemanticRevision.State> states) {
-        List<SemanticRevision.Endpoint> parts = sameThingFanEndpoints(fact, "WHOLE_THING", "PART_THING", elements);
+        List<SemanticRevision.Endpoint> parts = sameThingFanEndpoints(fact, "WHOLE_THING", "PART_THING", elements, features);
         String whole = name.apply("WHOLE_THING");
         String list = joinList(parts.stream().map(endpoint -> structuralName(endpoint, elements, features, states)).toList());
         boolean incomplete = fact.collectionCompleteness() == SemanticRevision.CollectionCompleteness.INCOMPLETE;
@@ -130,7 +143,7 @@ final class OplStructuralSentenceGenerator {
                 throw failure(OplGenerationCode.TEXT_PLAN_UNSUPPORTED, "Structural Exhibition endpoint ordinals are not contiguous");
             }
         }
-        SemanticRevision.Element exhibitor = requireElement(endpoints.getFirst(), elements, "exhibitor");
+        SemanticRevision.Element exhibitor = requireElement(endpoints.get(0), elements, "exhibitor");
         List<SemanticRevision.Endpoint> featureEndpoints = endpoints.subList(1, endpoints.size());
         if (featureEndpoints.stream().map(SemanticRevision.Endpoint::targetId).distinct().count() != featureEndpoints.size()) {
             throw failure(OplGenerationCode.TEXT_PLAN_UNSUPPORTED, "Structural Exhibition feature endpoints must be unique");
@@ -143,7 +156,7 @@ final class OplStructuralSentenceGenerator {
                 throw failure(OplGenerationCode.TEXT_PLAN_UNSUPPORTED, "Structural Exhibition feature endpoint is invalid");
             }
         }
-        SemanticRevision.Endpoint firstFeature = featureEndpoints.getFirst();
+        SemanticRevision.Endpoint firstFeature = featureEndpoints.get(0);
         List<SemanticRevision.Endpoint> values = featureEndpoints.subList(1, featureEndpoints.size());
         List<SemanticRevision.Endpoint> attributes = values.stream().filter(endpoint -> featureKind(endpoint, features) == SemanticRevision.FeatureKind.ATTRIBUTE).toList();
         List<SemanticRevision.Endpoint> operations = values.stream().filter(endpoint -> featureKind(endpoint, features) == SemanticRevision.FeatureKind.OPERATION).toList();
@@ -159,13 +172,13 @@ final class OplStructuralSentenceGenerator {
 
     static List<StructuralSentence> fundamentalGeneralization(SemanticRevision.Fact fact, java.util.function.Function<String, String> name,
                                                                  Map<String, SemanticRevision.Element> elements, Map<String, SemanticRevision.Feature> features, Map<String, SemanticRevision.State> states) {
-        List<SemanticRevision.Endpoint> specialized = sameThingFanEndpoints(fact, "GENERAL_THING", "SPECIALIZED_THING", elements);
+        List<SemanticRevision.Endpoint> specialized = sameThingFanEndpoints(fact, "GENERAL_THING", "SPECIALIZED_THING", elements, features);
         String general = name.apply("GENERAL_THING");
         List<String> values = specialized.stream().map(endpoint -> structuralName(endpoint, elements, features, states)).toList();
         boolean incomplete = fact.collectionCompleteness() == SemanticRevision.CollectionCompleteness.INCOMPLETE;
         String template = incomplete ? "opl.structural.generalization.incomplete.v1" : values.size() == 1
-                ? generalizationSingleTemplate(specialized.getFirst(), endpoint(fact, "GENERAL_THING"), elements) : "opl.structural.generalization.multiple.v1";
-        String text = values.size() == 1 && !incomplete ? values.getFirst() + ("opl.structural.generalization.object.single.v1".equals(template) ? " is a " : " is ") + general + "."
+                ? generalizationSingleTemplate(specialized.get(0), endpoint(fact, "GENERAL_THING"), elements, features) : "opl.structural.generalization.multiple.v1";
+        String text = values.size() == 1 && !incomplete ? values.get(0) + ("opl.structural.generalization.object.single.v1".equals(template) ? " is a " : " is ") + general + "."
                 : joinList(values) + (incomplete ? " and other specializations are " : " are ") + general + ".";
         return List.of(structural(fact, template, text, general));
     }
@@ -173,11 +186,11 @@ final class OplStructuralSentenceGenerator {
     static List<StructuralSentence> fundamentalClassification(SemanticRevision.Fact fact, java.util.function.Function<String, String> name,
                                                                  Map<String, SemanticRevision.Element> elements, Map<String, SemanticRevision.Feature> features, Map<String, SemanticRevision.State> states) {
         if (fact.collectionCompleteness() != SemanticRevision.CollectionCompleteness.NOT_APPLICABLE) throw failure(OplGenerationCode.MODIFIER_COMBINATION_INVALID, "Classification does not support completeness");
-        List<SemanticRevision.Endpoint> instances = sameThingFanEndpoints(fact, "CLASS_THING", "INSTANCE_THING", elements);
+        List<SemanticRevision.Endpoint> instances = sameThingFanEndpoints(fact, "CLASS_THING", "INSTANCE_THING", elements, features);
         String type = name.apply("CLASS_THING");
         List<String> values = instances.stream().map(endpoint -> structuralName(endpoint, elements, features, states)).toList();
         String template = values.size() == 1 ? "opl.structural.classification.single.v1" : "opl.structural.classification.multiple.v1";
-        String text = values.size() == 1 ? values.getFirst() + " is an instance of " + type + "." : joinList(values) + " are instances of " + type + ".";
+        String text = values.size() == 1 ? values.get(0) + " is an instance of " + type + "." : joinList(values) + " are instances of " + type + ".";
         return List.of(structural(fact, template, text, type));
     }
 
@@ -245,13 +258,14 @@ final class OplStructuralSentenceGenerator {
     static String generalizationSingleTemplate(
             SemanticRevision.Endpoint specialized,
             SemanticRevision.Endpoint general,
-            Map<String, SemanticRevision.Element> elements) {
-        SemanticRevision.Element specializedElement = requireElement(specialized, elements, "specialized thing");
-        SemanticRevision.Element generalElement = requireElement(general, elements, "general thing");
-        if (specializedElement.coreKind() != generalElement.coreKind()) {
+            Map<String, SemanticRevision.Element> elements,
+            Map<String, SemanticRevision.Feature> features) {
+        var specializedKind = structuralCoreKind(specialized, elements, features);
+        var generalKind = structuralCoreKind(general, elements, features);
+        if (specializedKind != generalKind) {
             throw failure(OplGenerationCode.TEXT_PLAN_UNSUPPORTED, "Generalization endpoints must have the same Thing kind");
         }
-        return specializedElement.coreKind() == SemanticRevision.CoreKind.OBJECT
+        return specializedKind == SemanticRevision.CoreKind.OBJECT
                 ? "opl.structural.generalization.object.single.v1" : "opl.structural.generalization.process.single.v1";
     }
 
@@ -263,9 +277,19 @@ final class OplStructuralSentenceGenerator {
     }
     static String label(SemanticRevision.Fact fact, String slot) { return fact.labels().stream().filter(item -> slot.equals(item.slotId())).map(SemanticRevision.Label::text).findFirst().orElseThrow(() -> failure(OplGenerationCode.MODIFIER_COMBINATION_INVALID, "Structural label " + slot + " is missing")); }
     static boolean hasLabel(SemanticRevision.Fact fact, String slot) { return fact.labels().stream().anyMatch(item -> slot.equals(item.slotId())); }
-    static List<SemanticRevision.Endpoint> fanEndpoints(SemanticRevision.Fact fact, String rootRole, String memberRole) { List<SemanticRevision.Endpoint> endpoints = fact.endpoints().stream().sorted(Comparator.comparingInt(SemanticRevision.Endpoint::ordinal)).toList(); if (endpoints.size() < 2 || !rootRole.equals(endpoints.getFirst().role()) || endpoints.getFirst().ordinal() != 0 || endpoints.stream().skip(1).anyMatch(endpoint -> !memberRole.equals(endpoint.role()) || endpoint.ordinal() < 1)) throw structuralEndpointMismatch(fact, "Structural fan endpoints are invalid"); for (int i = 0; i < endpoints.size(); i++) if (endpoints.get(i).ordinal() != i) throw structuralEndpointMismatch(fact, "Structural fan endpoint ordinals are not contiguous"); return endpoints.subList(1, endpoints.size()); }
-    static List<SemanticRevision.Endpoint> sameThingFanEndpoints(SemanticRevision.Fact fact, String rootRole, String memberRole, Map<String, SemanticRevision.Element> elements) { List<SemanticRevision.Endpoint> members = fanEndpoints(fact, rootRole, memberRole); SemanticRevision.Element root = requireElement(endpoint(fact, rootRole), elements, rootRole); for (SemanticRevision.Endpoint member : members) if (requireElement(member, elements, memberRole).coreKind() != root.coreKind()) throw structuralEndpointMismatch(fact, "Structural fan endpoints must have the same Thing kind"); return members; }
-    static String joinList(List<String> values) { if (values.isEmpty()) throw failure(OplGenerationCode.TEXT_PLAN_UNSUPPORTED, "Structural list is empty"); if (values.size() == 1) return values.getFirst(); if (values.size() == 2) return values.getFirst() + " and " + values.get(1); return String.join(", ", values.subList(0, values.size() - 1)) + " and " + values.getLast(); }
+    static List<SemanticRevision.Endpoint> fanEndpoints(SemanticRevision.Fact fact, String rootRole, String memberRole) { List<SemanticRevision.Endpoint> endpoints = fact.endpoints().stream().sorted(Comparator.comparingInt(SemanticRevision.Endpoint::ordinal)).toList(); if (endpoints.size() < 2 || !rootRole.equals(endpoints.get(0).role()) || endpoints.get(0).ordinal() != 0 || endpoints.stream().skip(1).anyMatch(endpoint -> !memberRole.equals(endpoint.role()) || endpoint.ordinal() < 1)) throw structuralEndpointMismatch(fact, "Structural fan endpoints are invalid"); for (int i = 0; i < endpoints.size(); i++) if (endpoints.get(i).ordinal() != i) throw structuralEndpointMismatch(fact, "Structural fan endpoint ordinals are not contiguous"); return endpoints.subList(1, endpoints.size()); }
+    static List<SemanticRevision.Endpoint> sameThingFanEndpoints(SemanticRevision.Fact fact, String rootRole, String memberRole,
+            Map<String, SemanticRevision.Element> elements, Map<String, SemanticRevision.Feature> features) {
+        List<SemanticRevision.Endpoint> members = fanEndpoints(fact, rootRole, memberRole);
+        var rootKind = structuralCoreKind(endpoint(fact, rootRole), elements, features);
+        for (SemanticRevision.Endpoint member : members) {
+            if (structuralCoreKind(member, elements, features) != rootKind) {
+                throw structuralEndpointMismatch(fact, "Structural fan endpoints must have the same Thing kind");
+            }
+        }
+        return members;
+    }
+    static String joinList(List<String> values) { if (values.isEmpty()) throw failure(OplGenerationCode.TEXT_PLAN_UNSUPPORTED, "Structural list is empty"); if (values.size() == 1) return values.get(0); if (values.size() == 2) return values.get(0) + " and " + values.get(1); return String.join(", ", values.subList(0, values.size() - 1)) + " and " + values.get(values.size() - 1); }
     static String structuralName(SemanticRevision.Endpoint endpoint, Map<String, SemanticRevision.Element> elements, Map<String, SemanticRevision.Feature> features, Map<String, SemanticRevision.State> states) { if (endpoint.targetKind() == SemanticRevision.TargetKind.ELEMENT) return requireElement(endpoint, elements, endpoint.role()).name().localName(); if (endpoint.targetKind() == SemanticRevision.TargetKind.FEATURE) { SemanticRevision.Feature feature = features.get(endpoint.targetId()); if (feature == null) throw failure(OplGenerationCode.TEXT_PLAN_UNSUPPORTED, "Structural feature does not exist"); return feature.name().localName(); } if (endpoint.targetKind() == SemanticRevision.TargetKind.STATE) { SemanticRevision.State state = states.get(endpoint.targetId()); if (state == null) throw failure(OplGenerationCode.TEXT_PLAN_UNSUPPORTED, "Structural state does not exist"); if (state.ownerTargetKind() == SemanticRevision.TargetKind.ELEMENT) { SemanticRevision.Element owner = elements.get(state.ownerElementId()); if (owner == null) throw failure(OplGenerationCode.TEXT_PLAN_UNSUPPORTED, "Structural state owner does not exist"); return state.name().localName() + " " + owner.name().localName(); } return state.name().localName(); } throw failure(OplGenerationCode.TEXT_PLAN_UNSUPPORTED, "Structural endpoint kind is unsupported"); }
     static String ownerFeatureName(SemanticRevision.Endpoint endpoint, Map<String, SemanticRevision.State> states, Map<String, SemanticRevision.Feature> features) { SemanticRevision.State state = states.get(endpoint.targetId()); SemanticRevision.Feature feature = state == null ? null : features.get(state.ownerElementId()); if (feature == null) throw failure(OplGenerationCode.TEXT_PLAN_UNSUPPORTED, "Value state feature owner does not exist"); return feature.name().localName(); }
 

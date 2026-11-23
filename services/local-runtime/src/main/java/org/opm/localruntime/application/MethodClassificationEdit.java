@@ -18,7 +18,7 @@ final class MethodClassificationEdit {
         if (level.isNull()) target.remove("architecture_level");
         else {
             target.set("architecture_level", level.deepCopy());
-            if (!document.path("schema_version").asText().equals("0.5")) document.put("schema_version", "0.4");
+            if (!java.util.List.of("0.5", "0.6", "0.7").contains(document.path("schema_version").asText())) document.put("schema_version", "0.4");
             if (!document.has("refinement_edges")) document.putArray("refinement_edges");
         }
         boolean unchanged = SaveContentDigestV1.sha256(document).equals(before);

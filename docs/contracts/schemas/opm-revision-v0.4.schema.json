@@ -830,6 +830,61 @@
               }
             }
           }
+        },
+        "edge_routes": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "segment",
+              "style",
+              "mode",
+              "points"
+            ],
+            "properties": {
+              "segment": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9_.-]{1,128}$"
+              },
+              "style": {
+                "type": "string",
+                "enum": [
+                  "STRAIGHT",
+                  "ROUNDED",
+                  "CURVE"
+                ]
+              },
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "AUTO",
+                  "MANUAL"
+                ]
+              },
+              "points": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "x",
+                    "y"
+                  ],
+                  "properties": {
+                    "x": {
+                      "type": "number"
+                    },
+                    "y": {
+                      "type": "number"
+                    }
+                  }
+                },
+                "maxItems": 128
+              }
+            }
+          }
         }
       }
     },

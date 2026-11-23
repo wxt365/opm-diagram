@@ -56,7 +56,7 @@ export type UpdateStatePayload = { state_id: StableId; expected_owner_ref: Targe
 
 export type UpdateFactPayload = { fact_id: StableId; expected_capability_ref: CapabilityReference; replacement: { normalized_endpoints?: Array<NormalizedEndpoint>; direction?: "DIRECTED" | "BIDIRECTIONAL" | "UNDIRECTED"; labels?: Array<LabelInput>; modifiers?: Array<ModifierInput>; condition?: ConditionInput; logical_groups?: Array<LogicalGroupInput>; collection_completeness?: "COMPLETE" | "INCOMPLETE" | "NOT_APPLICABLE"; }; };
 
-export type UpdatePropertyPayload = { target_ref: { target_kind: "ELEMENT" | "FEATURE"; target_id: StableId; }; property_name: "name"; value: string; };
+export type UpdatePropertyPayload = { target_ref: { target_kind: "ELEMENT" | "FEATURE"; target_id: StableId; }; property_name: "name"; value: string; } | { target_ref: { target_kind: "ELEMENT" | "FEATURE" | "STATE"; target_id: StableId; }; property_name: "remark"; value: string; };
 
 export type UpdateLayoutPayload = { occurrence_id: StableId; layout: { x: number; y: number; }; };
 
@@ -64,7 +64,11 @@ export type DeleteConstructPayload = { selection_id: StableId; construct_kind: "
 
 export type StatePresentationPayload = { context_id: StableId; state_id: StableId; layout?: NodeLayoutInput; };
 
-export type LayoutGeometry = { x: number; y: number; width: number; height: number; };
+export type EdgeRoute = { segment: string; style: "STRAIGHT" | "ROUNDED" | "CURVE"; mode: "AUTO" | "MANUAL"; points: Array<Point>; };
+
+export type NodeAppearance = { stroke?: string; fill?: string; };
+
+export type LayoutGeometry = { x: number; y: number; width: number; height: number; edge_routes?: Array<EdgeRoute>; appearance?: NodeAppearance; };
 
 export type UpdateLayoutBatchPayload = { layouts: Array<{ occurrence_id: StableId; layout: LayoutGeometry; }>; };
 
@@ -84,7 +88,7 @@ export type ArchitectureLevel = "MISSION" | "FUNCTION" | "PRODUCT";
 
 export type ArchitectureClassificationPayload = { context_id: StableId; architecture_level: ArchitectureLevel | null; };
 
-export type ModelPlanStep = { local_id: StableId; command_type: "CREATE_ELEMENT"; kind: "OBJECT" | "PROCESS"; name: string; layout: NodeLayoutInput; } | { local_id: StableId; command_type: "CREATE_STATE"; target: StableId; name: string; state_roles?: StateRoles; layout?: NodeLayoutInput; } | { local_id: StableId; command_type: "CREATE_FACT"; endpoints: Array<StableId>; capability_id: StableId; } | { local_id: StableId; command_type: "UPDATE_PROPERTY"; target: StableId; name: string; } | { local_id: StableId; command_type: "UPDATE_STATE"; target: StableId; name: string; state_roles?: StateRoles; } | { local_id: StableId; command_type: "UPDATE_LAYOUT"; target: StableId; layout: NodeLayoutInput; };
+export type ModelPlanStep = { local_id: StableId; command_type: "REORGANIZE_SUBGRAPH"; target: StableId; name: string; abstract_boundary?: boolean; members: Array<StableId>; } | { local_id: StableId; command_type: "CREATE_ELEMENT"; kind: "OBJECT" | "PROCESS"; name: string; layout: NodeLayoutInput; } | { local_id: StableId; command_type: "CREATE_STATE"; target: StableId; name: string; state_roles?: StateRoles; layout?: NodeLayoutInput; } | { local_id: StableId; command_type: "CREATE_FACT"; endpoints: Array<StableId>; capability_id: StableId; } | { local_id: StableId; command_type: "UPDATE_PROPERTY"; target: StableId; name: string; } | { local_id: StableId; command_type: "UPDATE_STATE"; target: StableId; name: string; state_roles?: StateRoles; } | { local_id: StableId; command_type: "UPDATE_LAYOUT"; target: StableId; layout: NodeLayoutInput; };
 
 export type ModelPlanPayload = { context_id: StableId; steps: Array<ModelPlanStep>; };
 
@@ -104,9 +108,11 @@ export type MindmapRequest = { request_id: StableId; action: "OPEN" | "SAVE"; dr
 
 export type MindmapResult = { request_id: StableId; document: MindmapDocument; digest: string; conversions: Array<MindmapConversion>; };
 
-export type DraftCommandType = "APPLY_MODEL_PLAN" | "CREATE_ARCHITECTURE_LINK" | "DELETE_ARCHITECTURE_LINK" | "UPDATE_ARCHITECTURE_CLASSIFICATION" | "CREATE_ELEMENT" | "CREATE_CONTEXT" | "DELETE_CONTEXT" | "CREATE_FEATURE" | "CREATE_FACT" | "CREATE_STATE" | "UPDATE_STATE" | "UPDATE_FACT" | "UPDATE_PROPERTY" | "UPDATE_LAYOUT" | "UPDATE_LAYOUT_BATCH" | "DELETE_CONSTRUCT" | "STATE_EXPLICIT" | "STATE_SUPPRESS" | "UNFOLD" | "FOLD";
+export type RestoreOperationPayload = { record_id: StableId; action: "UNDO" | "REDO"; };
 
-export type DraftCommand = { command_type: "APPLY_MODEL_PLAN"; payload: ModelPlanPayload; } | { command_type: "CREATE_ARCHITECTURE_LINK"; payload: CreateArchitectureLinkPayload; } | { command_type: "DELETE_ARCHITECTURE_LINK"; payload: DeleteArchitectureLinkPayload; } | { command_type: "UPDATE_ARCHITECTURE_CLASSIFICATION"; payload: ArchitectureClassificationPayload; } | { command_type: "CREATE_ELEMENT"; payload: CreateElementPayload; } | { command_type: "CREATE_CONTEXT"; payload: CreateContextPayload; } | { command_type: "DELETE_CONTEXT"; payload: DeleteContextPayload; } | { command_type: "CREATE_FEATURE"; payload: CreateFeaturePayload; } | { command_type: "CREATE_FACT"; payload: CreateFactPayload; } | { command_type: "CREATE_STATE"; payload: CreateStatePayload; } | { command_type: "UPDATE_STATE"; payload: UpdateStatePayload; } | { command_type: "UPDATE_FACT"; payload: UpdateFactPayload; } | { command_type: "UPDATE_PROPERTY"; payload: UpdatePropertyPayload; } | { command_type: "UPDATE_LAYOUT"; payload: UpdateLayoutPayload; } | { command_type: "UPDATE_LAYOUT_BATCH"; payload: UpdateLayoutBatchPayload; } | { command_type: "DELETE_CONSTRUCT"; payload: DeleteConstructPayload; } | { command_type: "STATE_EXPLICIT"; payload: StatePresentationPayload; } | { command_type: "STATE_SUPPRESS"; payload: StatePresentationPayload; } | { command_type: "UNFOLD"; payload: StatePresentationPayload; } | { command_type: "FOLD"; payload: StatePresentationPayload; };
+export type DraftCommandType = "RESTORE_OPERATION" | "APPLY_MODEL_PLAN" | "CREATE_ARCHITECTURE_LINK" | "DELETE_ARCHITECTURE_LINK" | "UPDATE_ARCHITECTURE_CLASSIFICATION" | "CREATE_ELEMENT" | "CREATE_CONTEXT" | "DELETE_CONTEXT" | "CREATE_FEATURE" | "CREATE_FACT" | "CREATE_STATE" | "UPDATE_STATE" | "UPDATE_FACT" | "UPDATE_PROPERTY" | "UPDATE_LAYOUT" | "UPDATE_LAYOUT_BATCH" | "DELETE_CONSTRUCT" | "STATE_EXPLICIT" | "STATE_SUPPRESS" | "UNFOLD" | "FOLD";
+
+export type DraftCommand = { command_type: "RESTORE_OPERATION"; payload: RestoreOperationPayload; } | { command_type: "APPLY_MODEL_PLAN"; payload: ModelPlanPayload; } | { command_type: "CREATE_ARCHITECTURE_LINK"; payload: CreateArchitectureLinkPayload; } | { command_type: "DELETE_ARCHITECTURE_LINK"; payload: DeleteArchitectureLinkPayload; } | { command_type: "UPDATE_ARCHITECTURE_CLASSIFICATION"; payload: ArchitectureClassificationPayload; } | { command_type: "CREATE_ELEMENT"; payload: CreateElementPayload; } | { command_type: "CREATE_CONTEXT"; payload: CreateContextPayload; } | { command_type: "DELETE_CONTEXT"; payload: DeleteContextPayload; } | { command_type: "CREATE_FEATURE"; payload: CreateFeaturePayload; } | { command_type: "CREATE_FACT"; payload: CreateFactPayload; } | { command_type: "CREATE_STATE"; payload: CreateStatePayload; } | { command_type: "UPDATE_STATE"; payload: UpdateStatePayload; } | { command_type: "UPDATE_FACT"; payload: UpdateFactPayload; } | { command_type: "UPDATE_PROPERTY"; payload: UpdatePropertyPayload; } | { command_type: "UPDATE_LAYOUT"; payload: UpdateLayoutPayload; } | { command_type: "UPDATE_LAYOUT_BATCH"; payload: UpdateLayoutBatchPayload; } | { command_type: "DELETE_CONSTRUCT"; payload: DeleteConstructPayload; } | { command_type: "STATE_EXPLICIT"; payload: StatePresentationPayload; } | { command_type: "STATE_SUPPRESS"; payload: StatePresentationPayload; } | { command_type: "UNFOLD"; payload: StatePresentationPayload; } | { command_type: "FOLD"; payload: StatePresentationPayload; };
 
 export type DraftScope = { context_id: StableId; selection_id: StableId | null; intent: DraftCommandType; endpoints: Array<StableId>; };
 
@@ -115,6 +121,20 @@ export type DraftAuthorization = { capability_query_id: StableId; selected_optio
 export type DraftEditRequest = { request_id: StableId; command_id: StableId; expected_draft_token: DraftToken; scope: DraftScope; authorization: DraftAuthorization; command: DraftCommand; analysis_source?: AnalysisSource; };
 
 export type DraftQueryRequest = { request_id: StableId; draft_token: DraftToken; context_id: StableId; };
+
+export type GraphAnalysisRequest = { request_id: StableId; context_id: StableId; scope: "CONTEXT" | "CONTEXT_SUBTREE" | "MODEL"; include_hidden_states: boolean; include_boundary_nodes: boolean; include_state_ownership: boolean; draft_token: DraftToken; };
+
+export type GraphAnalysisRevisionRequest = { request_id: StableId; context_id: StableId; scope: "CONTEXT" | "CONTEXT_SUBTREE" | "MODEL"; include_hidden_states: boolean; include_boundary_nodes: boolean; include_state_ownership: boolean; };
+
+export type GraphSourceRef = { context_id: StableId; context_name: string; occurrence_id: StableId; target_id: StableId; };
+
+export type GraphNode = { id: StableId; kind: "OBJECT" | "PROCESS" | "STATE"; label: string; owner_id: StableId | null; boundary: boolean; source_refs: Array<GraphSourceRef>; };
+
+export type GraphEndpoint = { role: string; target_id: StableId; ordinal: number; };
+
+export type GraphEdge = { id: string; source: StableId; target: StableId; relation_type: string; label: string; direction: "DIRECTED" | "UNDIRECTED" | "BIDIRECTIONAL"; fact_id: StableId | null; group_id: string; derived: boolean; endpoints: Array<GraphEndpoint>; source_refs: Array<GraphSourceRef>; };
+
+export type GraphAnalysisResult = { source: { project_id: StableId; model_id: StableId; request_id: StableId; context_id: StableId; scope: "CONTEXT" | "CONTEXT_SUBTREE" | "MODEL"; draft_token: DraftToken | null; revision_id: StableId | null; binding: string; projection_version: number; }; nodes: Array<GraphNode>; edges: Array<GraphEdge>; relation_types: Array<{ id: string; label: string; count: number; }>; statistics: { node_count: number; fact_count: number; derived_count: number; edge_count: number; excluded_count: number; }; warnings: Array<{ code: string; target_id: StableId; message: string; }>; };
 
 export type MethodSource = { draft_token: DraftToken; } | { revision_id: StableId; };
 
@@ -130,9 +150,15 @@ export type MethodSummaryResult = { meta: { request_id: StableId; context_id: St
 
 export type OperationHistoryRequest = { request_id: StableId; revision: StableId; before: string | null; };
 
-export type OperationHistoryItem = { record_id: StableId; occurred_at: string; operation: string; title: string; context_id: StableId | null; context_name: string | null; status: string; revision_id: StableId | null; detail_available: boolean; };
+export type OperationHistoryItem = { record_id: StableId; occurred_at: string; operation: string; title: string; context_id: StableId | null; context_name: string | null; status: string; revision_id: StableId | null; detail_available: boolean; recovery_action?: "UNDO" | "REDO"; };
 
 export type OperationHistoryResult = { meta: { request_id: StableId; project_id: StableId; model_id: StableId; revision: StableId; }; data: { items: Array<OperationHistoryItem>; next_before: string | null; }; };
+
+export type RecoveryStateRequest = { request_id: StableId; draft_token: DraftToken; };
+
+export type RecoveryStateItem = { record_id: StableId; occurred_at: string; operation: string; title: string; context_id: StableId | null; context_name: string | null; status: string; revision_id: StableId | null; detail_available: boolean; recovery_action: "UNDO" | "REDO"; };
+
+export type RecoveryStateResult = { meta: { request_id: StableId; project_id: StableId; model_id: StableId; draft_token: DraftToken; }; data: { items: Array<RecoveryStateItem>; next_before: null; }; };
 
 export type DraftRelationCatalogRequest = { request_id: StableId; draft_token: DraftToken; context_id: StableId; selection_id: StableId | null; };
 
@@ -148,7 +174,7 @@ export type ValidationSummary = { blocking: number; warning: number; suggestion:
 
 export type DraftEditResult = { request_id: StableId; command_id: StableId; status: "DURABLE" | "UNCHANGED"; base_token: DraftToken; result_token: DraftToken; content_digest: Digest; affected_ids: Array<StableId>; text_trace_ids: Array<StableId>; validation_summary: ValidationSummary; };
 
-export type CommandCapabilityOption = { capability_query_id: StableId; option_id: StableId; command_type: "APPLY_MODEL_PLAN" | "CREATE_ELEMENT" | "CREATE_CONTEXT" | "CREATE_FEATURE" | "CREATE_FACT" | "CREATE_STATE" | "UPDATE_STATE" | "UPDATE_FACT" | "UPDATE_PROPERTY" | "UPDATE_LAYOUT" | "UPDATE_LAYOUT_BATCH" | "STATE_EXPLICIT" | "STATE_SUPPRESS" | "UNFOLD" | "FOLD"; capability_ref: CapabilityReference; base_fact_capability_ref?: CapabilityReference; display_name: string; group_path: Array<string>; normalized_endpoints: Array<NormalizedEndpoint>; required_fields: Array<RequiredField>; allowed_modifiers: Array<AllowedModifier>; symbol_descriptor: AssetReference; template_family: AssetReference; rule_refs: Array<AssetReference>; enabled: boolean; reason_codes: Array<CapabilityReasonCode>; expires_with_token: DraftToken; } | { capability_query_id: StableId; option_id: StableId; command_type: "DELETE_CONSTRUCT"; capability_ref: CapabilityReference; base_fact_capability_ref?: CapabilityReference; display_name: string; group_path: Array<string>; normalized_endpoints: Array<NormalizedEndpoint>; required_fields: Array<RequiredField>; allowed_modifiers: Array<AllowedModifier>; symbol_descriptor: AssetReference; template_family: AssetReference; rule_refs: Array<AssetReference>; enabled: boolean; reason_codes: Array<CapabilityReasonCode>; impact_summary: ImpactSummary; impact_token: string; delete_mode: "REMOVE_OCCURRENCE" | "DELETE_TARGET" | "CASCADE"; delete_target: DeleteTarget; expires_with_token: DraftToken; } | { capability_query_id: StableId; option_id: StableId; command_type: "DELETE_CONTEXT"; capability_ref: CapabilityReference; base_fact_capability_ref?: CapabilityReference; display_name: string; group_path: Array<string>; normalized_endpoints: Array<NormalizedEndpoint>; required_fields: Array<RequiredField>; allowed_modifiers: Array<AllowedModifier>; symbol_descriptor: AssetReference; template_family: AssetReference; rule_refs: Array<AssetReference>; enabled: boolean; reason_codes: Array<CapabilityReasonCode>; expires_with_token: DraftToken; context_impact: ContextDeleteImpact; impact_token: string; } | { capability_query_id: StableId; option_id: StableId; command_type: "UPDATE_ARCHITECTURE_CLASSIFICATION" | "CREATE_ARCHITECTURE_LINK" | "DELETE_ARCHITECTURE_LINK"; option_kind: "METHOD_METADATA"; target_context_id: StableId; display_name: string; required_fields: Array<RequiredField>; enabled: boolean; reason_codes: Array<CapabilityReasonCode>; expires_with_token: DraftToken; };
+export type CommandCapabilityOption = { capability_query_id: StableId; option_id: StableId; command_type: "RESTORE_OPERATION" | "APPLY_MODEL_PLAN" | "CREATE_ELEMENT" | "CREATE_CONTEXT" | "CREATE_FEATURE" | "CREATE_FACT" | "CREATE_STATE" | "UPDATE_STATE" | "UPDATE_FACT" | "UPDATE_PROPERTY" | "UPDATE_LAYOUT" | "UPDATE_LAYOUT_BATCH" | "STATE_EXPLICIT" | "STATE_SUPPRESS" | "UNFOLD" | "FOLD"; capability_ref: CapabilityReference; base_fact_capability_ref?: CapabilityReference; display_name: string; group_path: Array<string>; normalized_endpoints: Array<NormalizedEndpoint>; required_fields: Array<RequiredField>; allowed_modifiers: Array<AllowedModifier>; symbol_descriptor: AssetReference; template_family: AssetReference; rule_refs: Array<AssetReference>; enabled: boolean; reason_codes: Array<CapabilityReasonCode>; expires_with_token: DraftToken; } | { capability_query_id: StableId; option_id: StableId; command_type: "DELETE_CONSTRUCT"; capability_ref: CapabilityReference; base_fact_capability_ref?: CapabilityReference; display_name: string; group_path: Array<string>; normalized_endpoints: Array<NormalizedEndpoint>; required_fields: Array<RequiredField>; allowed_modifiers: Array<AllowedModifier>; symbol_descriptor: AssetReference; template_family: AssetReference; rule_refs: Array<AssetReference>; enabled: boolean; reason_codes: Array<CapabilityReasonCode>; impact_summary: ImpactSummary; impact_token: string; delete_mode: "REMOVE_OCCURRENCE" | "DELETE_TARGET" | "CASCADE"; delete_target: DeleteTarget; expires_with_token: DraftToken; } | { capability_query_id: StableId; option_id: StableId; command_type: "DELETE_CONTEXT"; capability_ref: CapabilityReference; base_fact_capability_ref?: CapabilityReference; display_name: string; group_path: Array<string>; normalized_endpoints: Array<NormalizedEndpoint>; required_fields: Array<RequiredField>; allowed_modifiers: Array<AllowedModifier>; symbol_descriptor: AssetReference; template_family: AssetReference; rule_refs: Array<AssetReference>; enabled: boolean; reason_codes: Array<CapabilityReasonCode>; expires_with_token: DraftToken; context_impact: ContextDeleteImpact; impact_token: string; } | { capability_query_id: StableId; option_id: StableId; command_type: "UPDATE_ARCHITECTURE_CLASSIFICATION" | "CREATE_ARCHITECTURE_LINK" | "DELETE_ARCHITECTURE_LINK"; option_kind: "METHOD_METADATA"; target_context_id: StableId; display_name: string; required_fields: Array<RequiredField>; enabled: boolean; reason_codes: Array<CapabilityReasonCode>; expires_with_token: DraftToken; };
 
 export type EditCommandType = "CREATE_ELEMENT" | "CREATE_FEATURE" | "CREATE_FACT" | "CREATE_STATE" | "UPDATE_STATE" | "UPDATE_FACT" | "UPDATE_PROPERTY" | "DELETE_CONSTRUCT" | "CREATE_CONTEXT" | "UPDATE_LAYOUT" | "UPDATE_SEMANTIC_LAYOUT" | "STATE_EXPLICIT" | "STATE_SUPPRESS" | "UNFOLD" | "FOLD" | "SEMANTIC_IN_ZOOM" | "SEMANTIC_OUT_ZOOM";
 
@@ -172,11 +198,11 @@ export type ContextDeleteImpact = { input_token: DraftToken; context_id: StableI
 
 export type DraftCapabilitiesData = { scope: DraftScope; allowed: Array<DraftCommandType>; forbidden: Array<{ command_type: DraftCommandType; reason_code: CapabilityReasonCode; }>; capability_query_id: StableId; options: Array<CommandCapabilityOption>; };
 
-export type ProjectionLayout = { x: number; y: number; width: number; height: number; z_order: number; route_points?: Array<Point>; label_positions?: Array<Point>; junction_position?: Point; };
+export type ProjectionLayout = { x: number; y: number; width: number; height: number; z_order: number; route_points?: Array<Point>; edge_routes?: Array<EdgeRoute>; appearance?: NodeAppearance; label_positions?: Array<Point>; junction_position?: Point; };
 
 export type ProjectionEndpoint = { role: string; target_kind: "ELEMENT" | "FEATURE" | "STATE" | "FACT" | "CONTEXT"; target_id: StableId; ordinal: number; state_qualification?: StableId; };
 
-export type ProjectionConstruct = { occurrence_id: StableId; target_id: StableId; target_kind: "ELEMENT" | "FEATURE" | "STATE" | "FACT"; construct_role: string; label?: string; owner_id?: StableId; state_roles?: Array<"INITIAL" | "DEFAULT" | "FINAL">; explicitness?: "EXPLICIT" | "SUPPRESSED"; fold_state?: "UNFOLDED" | "FOLDED"; direction?: "DIRECTED" | "BIDIRECTIONAL" | "UNDIRECTED"; capability_id: string; endpoints?: Array<ProjectionEndpoint>; modifiers?: Array<ModifierInput>; labels?: Array<LabelInput>; collection_completeness?: "COMPLETE" | "INCOMPLETE" | "NOT_APPLICABLE"; layout: ProjectionLayout; owner_target_kind?: "ELEMENT" | "FEATURE"; source_id?: StableId; process_id?: StableId; source_occurrence_id?: StableId; target_occurrence_id?: StableId; symbol_ref?: StableId; layout_ref?: StableId; };
+export type ProjectionConstruct = { occurrence_id: StableId; target_id: StableId; target_kind: "ELEMENT" | "FEATURE" | "STATE" | "FACT"; construct_role: string; label?: string; remark?: string; owner_id?: StableId; state_roles?: Array<"INITIAL" | "DEFAULT" | "FINAL">; explicitness?: "EXPLICIT" | "SUPPRESSED"; fold_state?: "UNFOLDED" | "FOLDED"; direction?: "DIRECTED" | "BIDIRECTIONAL" | "UNDIRECTED"; capability_id: string; endpoints?: Array<ProjectionEndpoint>; modifiers?: Array<ModifierInput>; labels?: Array<LabelInput>; collection_completeness?: "COMPLETE" | "INCOMPLETE" | "NOT_APPLICABLE"; layout: ProjectionLayout; owner_target_kind?: "ELEMENT" | "FEATURE"; source_id?: StableId; process_id?: StableId; source_occurrence_id?: StableId; target_occurrence_id?: StableId; symbol_ref?: StableId; layout_ref?: StableId; boundary_source_fact_id?: StableId; };
 
 export type SuppressedState = { state_id: StableId; owner_ref: TargetLocator; name_or_value: string; state_roles: StateRoles; explicitness: "SUPPRESSED"; };
 
@@ -184,7 +210,7 @@ export type DraftProjectionData = { context_id: StableId; constructs: Array<Proj
 
 export type DraftModelPlanPreviewRequest = { request_id: StableId; draft_token: DraftToken; context_id: StableId; plan_id: StableId; steps: Array<ModelPlanStep>; next_scope: DraftScope | null; finalize?: boolean; analysis_source?: AnalysisSource; };
 
-export type DraftModelPlanPreviewResult = { meta: DraftQueryMeta; data: DraftProjectionData; capabilities: DraftCapabilitiesData | null; findings: DraftFindingsData | null; };
+export type DraftModelPlanPreviewResult = { meta: DraftQueryMeta; data: DraftProjectionData; capabilities: DraftCapabilitiesData | null; findings: DraftFindingsData | null; text?: DraftTextData | null; affected_views?: Array<{ context_id: StableId; label: string; parent_context_id: StableId | null; refinee_element_id: StableId | null; data: DraftProjectionData; text: DraftTextData | null; }>; };
 
 export type DraftTextData = { artifact_id: StableId; modality: "OPL" | "OPT"; sentences: Array<{ sentence_id: StableId; text: string; ordinal: number; }>; traces: Array<{ sentence_id: StableId; fact_ids: Array<StableId>; occurrence_ids: Array<StableId>; }>; };
 

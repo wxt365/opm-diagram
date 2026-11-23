@@ -81,7 +81,7 @@ public final class OplProceduralPassGoldenAuthorCli {
     private ObjectNode exportCase(ObjectMapper mapper, Definition definition, JsonNode references, Path profileRoot, String baseFixture) throws Exception {
         Path fixture = profileRoot.resolve(definition.fixturePath());
         SemanticRevision candidate = new SemanticRevisionReader().read(fixture);
-        SemanticRevision.Fact fact = candidate.facts().getFirst();
+        SemanticRevision.Fact fact = candidate.facts().get(0);
         if (!definition.baseCapabilityId().equals(fact.capability().capabilityId())) {
             throw new IllegalStateException("Candidate capability differs from definition: " + definition.caseId());
         }

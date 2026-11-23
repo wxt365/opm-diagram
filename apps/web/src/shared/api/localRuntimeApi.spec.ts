@@ -1,9 +1,54 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { localRuntimeApi } from "./localRuntimeApi";
+import { localRuntimeApi, LocalRuntimeApi } from "./localRuntimeApi";
 import type { DraftQueryContracts } from "./localRuntimeApi";
 
 describe("localRuntimeApi", () => {
+  it('不同项目的未确认创建保留各自原文，不能串用重试身份', async () => {
+    const api = new LocalRuntimeApi({ session: () => 'session.test', binding: () => ({ profile_id: 'profile.test', profile_version: '1', rule_set_id: 'rules.test', rule_version: '1' }) });
+    const requests = new Map<string, string[]>();
+    vi.stubGlobal('fetch', vi.fn(async (path: string, init?: RequestInit) => {
+      const bodies = requests.get(path) ?? []; bodies.push(init!.body as string); requests.set(path, bodies);
+      if (bodies.length === 1) throw new Error('响应丢失');
+      return response(201, { data: { model_id: 'model.test' } });
+    }));
+    await expect(api.createModel('project.a', '模型')).rejects.toThrow();
+    await expect(api.createModel('project.b', '模型')).rejects.toThrow();
+    await api.createModel('project.b', '模型'); await api.createModel('project.a', '模型');
+    const [first, second] = [...requests.values()];
+    expect(first![0]).toBe(first![1]); expect(second![0]).toBe(second![1]); expect(first![0]).not.toBe(second![0]);
+  });
+  it.each(['project', 'model'] as const)('创建 %s 响应丢失后复用完整原文，成功后新操作换身份', async kind => {
+    const api = new LocalRuntimeApi({ session: () => 'session.test', binding: () => ({ profile_id: 'profile.test', profile_version: '1', rule_set_id: 'rules.test', rule_version: '1' }) });
+    const bodies: string[] = [];
+    const fetchMock = vi.fn(async (_path: string, init?: RequestInit) => {
+      bodies.push(init!.body as string);
+      if (bodies.length === 1) throw new Error('已写入但响应丢失');
+      return response(201, { data: kind === 'project' ? project() : { model_id: 'model.test' } });
+    }); vi.stubGlobal('fetch', fetchMock);
+    const create = (name = '名称', target = 'project.a') => kind === 'project' ? api.createProject(name, '说明') : api.createModel(target, name);
+    await expect(create()).rejects.toMatchObject({ code: 'RUNTIME_UNAVAILABLE' });
+    await create(); expect(bodies[1]).toBe(bodies[0]);
+    await create(); expect(JSON.parse(bodies[2]!).command_id).not.toBe(JSON.parse(bodies[0]!).command_id);
+    await create('不同名称'); expect(JSON.parse(bodies[3]!).name).toBe('不同名称');
+  });
+  it("平台代理包装的草稿冲突保留原始错误，损坏包装不会误判为可恢复冲突", async () => {
+    window.__OPM_LOCAL_SESSION__ = "session.proxy";
+    const error = { code: "DRAFT_CONFLICT", message: "草稿已变化，请重新读取", retryable: false, reason_code: "DRAFT_CONFLICT" };
+    const fetchMock = vi.fn(async () => response(409, { code: 1090, message: `OPM_RUNTIME_REQUEST_FAILED: ${JSON.stringify(error)}`, data: null }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(localRuntimeApi.draftMutation("project.1", "model.1", "EDIT", "{}")).rejects.toMatchObject({ code: error.code, message: error.message, retryable: false, reasonCode: "DRAFT_CONFLICT" });
+    fetchMock.mockResolvedValue(response(409, { code: 1090, message: "OPM_RUNTIME_REQUEST_FAILED: invalid", data: null }));
+    await expect(localRuntimeApi.draftMutation("project.1", "model.1", "EDIT", "{}")).rejects.toMatchObject({ code: "REQUEST_FAILED" });
+  });
+  it("状态 GET 保留会话、编码资源路径且禁用浏览器缓存", async () => {
+    window.__OPM_LOCAL_SESSION__ = "session.status";
+    const fetchMock = vi.fn(async () => response(200, { in_flight: "NONE" })); vi.stubGlobal("fetch", fetchMock);
+    await localRuntimeApi.draftSaveState("project/1", "model/1");
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/v2/projects/project%2F1/models/model%2F1/draft/save-state");
+    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({ cache: "no-store", headers: { "X-OPM-Session": "session.status" } });
+    expect(fetchMock.mock.calls[0]?.[1]?.body).toBeUndefined();
+  });
   it("V2 查询使用固定路径和会话，旧 V1 envelope 不混入新错误", async () => {
     window.__OPM_LOCAL_SESSION__ = "session.v2";
     const fetchMock = vi.fn(async () => response(200, { request_id: "request.1" }));

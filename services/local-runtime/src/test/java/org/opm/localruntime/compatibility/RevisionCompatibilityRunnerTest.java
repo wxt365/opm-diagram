@@ -6,7 +6,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-
 class RevisionCompatibilityRunnerTest {
 
     @Test
@@ -31,7 +30,7 @@ class RevisionCompatibilityRunnerTest {
                 .status());
         RevisionCompatibilityReportWriter.Attempt migrated = report.cases().stream()
                 .filter(item -> item.caseId().equals("COMPAT-005.V01_TO_V02_SAME_BINDING.PASS"))
-                .findFirst().orElseThrow().attempts().getFirst();
+                .findFirst().orElseThrow().attempts().get(0);
         assertEquals(new RevisionCompatibilityReportWriter.Transaction(1, 1, 1, 2, 0, 1, 1, true), migrated.transaction());
         assertEquals("revision.base.golden.struct.003", migrated.headBefore());
         assertEquals("revision.compatibility.005.0002", migrated.headAfter());

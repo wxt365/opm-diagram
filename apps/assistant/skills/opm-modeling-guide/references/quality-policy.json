@@ -1,5 +1,5 @@
 {
-  "guide_version": "1.0.0",
+  "guide_version": "1.4.5",
   "policy_version": "1.0.0",
   "coverage": "CURRENT_OPD_HEURISTICS",
   "max_nodes_per_view": 12,

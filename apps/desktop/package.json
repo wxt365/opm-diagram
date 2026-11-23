@@ -1,0 +1,27 @@
+{
+  "name": "@opm/desktop",
+  "productName": "OPM Studio",
+  "version": "0.1.3",
+  "description": "本地优先的 OPM 建模客户端",
+  "private": true,
+  "type": "module",
+  "main": "src/main.mjs",
+  "author": "OPM Studio contributors",
+  "config": {
+    "forge": "./forge.config.cjs"
+  },
+  "scripts": {
+    "dev": "electron .",
+    "prepare:resources": "node scripts/prepare-resources.mjs",
+    "package": "electron-forge package",
+    "make": "electron-forge make",
+    "test": "node --test test/*.test.mjs",
+    "smoke": "node scripts/smoke.mjs"
+  },
+  "devDependencies": {
+    "electron": "45.3.2",
+    "@electron-forge/cli": "8.0.1",
+    "@electron-forge/maker-dmg": "8.0.1",
+    "@electron-forge/maker-squirrel": "8.0.1"
+  }
+}

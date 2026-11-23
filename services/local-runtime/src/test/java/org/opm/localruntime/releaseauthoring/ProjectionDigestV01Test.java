@@ -68,6 +68,19 @@ class ProjectionDigestV01Test {
     }
 
     @Test
+    void apiTargetKindIsValidatedWithoutChangingTheFrozenPreimage() {
+        Map<String, Object> construct = new LinkedHashMap<>(Map.of(
+                "occurrence_id", "occurrence.object", "target_id", "object.owner", "construct_role", "OBJECT",
+                "label", "Object", "layout", Map.of("x", 0, "y", 0, "width", 100, "height", 80, "z_order", 0)));
+        Map<String, Object> frozen = Map.of("context_id", "context.snapshot", "constructs", List.of(new LinkedHashMap<>(construct)));
+        construct.put("target_kind", "ELEMENT");
+        Map<String, Object> current = Map.of("context_id", "context.snapshot", "constructs", List.of(construct), "suppressed_states", List.of());
+        assertEquals(ProjectionDigestV01.sha256(frozen), ProjectionDigestV01.sha256(ProjectionDigestV01.apiProjectionDigestView(current)));
+        construct.put("target_kind", "INVALID");
+        assertThrows(ProjectionDigestV01.ProjectionDigestV01Exception.class, () -> ProjectionDigestV01.apiProjectionDigestView(current));
+    }
+
+    @Test
     void rejectsApiProjectionTopLevelDriftAndInvalidSuppressedState() {
         Map<String, Object> extra = new LinkedHashMap<>();
         extra.put("context_id", "context.snapshot");

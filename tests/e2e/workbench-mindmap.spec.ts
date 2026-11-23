@@ -1,6 +1,11 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page, type Locator } from '@playwright/test';
 import { writeFile, readFile } from 'node:fs/promises';
 import type { MindmapResult } from '../../apps/web/src/shared/api/generated/draftWorkspaceContract';
+
+async function fitMindmap(brain: Locator) {
+  await brain.getByTestId('p03-zoom-menu-toggle').click();
+  await brain.getByTestId('p03-zoom-fit').click();
+}
 
 async function createWorkbench(page: Page, title: string) {
   await page.goto('/projects'); await page.getByTestId('p01-create-project').click();
@@ -44,24 +49,24 @@ test('真实脑图编辑、键盘、拖动、缩放、独立保存、JSON 迁移
   await brain.getByRole('button', { name: '保存关系说明', exact: true }).click(); await page.getByTestId('mindmap-save').click(); await expect(page.getByTestId('mindmap-save-state')).toHaveText('分析已保存');
   expect((await f.brain()).document.relations[0]?.endpoints).toEqual([rawId, roastId, doneId]);
   await brain.getByRole('button', { name: '折叠 咖啡豆', exact: true }).click(); await expect(brain.locator('.mindmap-node').filter({ hasText: '待烘焙' })).toHaveCount(0);
-  await brain.getByRole('textbox', { name: '搜索分析节点' }).fill('待烘焙'); await expect(brain.locator('.mindmap-node').filter({ hasText: '待烘焙' })).toBeVisible();
-  await brain.getByRole('textbox', { name: '搜索分析节点' }).fill('');
+  await brain.getByRole('searchbox', { name: '搜索分析节点' }).fill('待烘焙'); await expect(brain.locator('.mindmap-node').filter({ hasText: '待烘焙' })).toBeVisible();
+  await brain.getByRole('searchbox', { name: '搜索分析节点' }).fill('');
   const group = saved.document.nodes.find(node => node.label === '对象')!;
   await brain.getByTestId(`mindmap-node-${beans.id}`).dragTo(brain.getByTestId(`mindmap-node-${group.id}`));
   await expect.poll(async () => (await f.brain()).document.nodes.find(node => node.id === beans.id)?.parent_id).toBe(group.id);
-  const zoom = await brain.locator('.mindmap-zoom span').innerText(); await canvas.hover(); await page.mouse.wheel(0, -250); await expect(brain.locator('.mindmap-zoom span')).not.toHaveText(zoom);
-  await brain.getByRole('button', { name: '适应', exact: true }).click(); await brain.getByTestId(`mindmap-node-${beans.id}`).click(); await canvas.focus(); await page.keyboard.press('F2'); await expect(page.getByTestId('mindmap-node-label')).toBeFocused();
+  const zoom = await brain.getByTestId('p03-zoom-output').inputValue(); await canvas.hover(); await page.mouse.wheel(0, -250); await expect(brain.getByTestId('p03-zoom-output')).not.toHaveValue(zoom);
+  await fitMindmap(brain); await brain.getByTestId(`mindmap-node-${beans.id}`).click(); await canvas.focus(); await page.keyboard.press('F2'); await expect(page.getByTestId('mindmap-node-label')).toBeFocused();
   await page.getByTestId('mindmap-node-label').fill('生咖啡豆'); await page.getByTestId('mindmap-node-label').press('Tab'); await canvas.focus(); await page.keyboard.press('Control+z');
   await expect(page.getByTestId('mindmap-node-label')).toHaveValue('咖啡豆'); await page.keyboard.press('Control+Shift+z'); await expect(page.getByTestId('mindmap-node-label')).toHaveValue('生咖啡豆');
   await brain.getByRole('button', { name: '保存分析', exact: true }).click(); await expect(page.getByTestId('mindmap-save-state')).toHaveText('分析已保存');
-  const download = page.waitForEvent('download'); await brain.getByRole('button', { name: '导出 JSON', exact: true }).click(); const file = await download; const pack = JSON.parse(await readFile((await file.path())!, 'utf8'));
+  const download = page.waitForEvent('download'); await brain.getByLabel('导出', { exact: true }).click(); await brain.getByRole('button', { name: '脑图 JSON', exact: true }).click(); const file = await download; const pack = JSON.parse(await readFile((await file.path())!, 'utf8'));
   await page.getByTestId('mindmap-import').setInputFiles({ name: 'analysis.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(pack)) });
   await brain.getByRole('button', { name: '保存分析', exact: true }).click(); await expect(page.getByTestId('mindmap-save-state')).toHaveText('分析已保存');
   const imported = await f.brain(); expect(imported.document.id).toBe(pack.document.id); expect(imported.document.nodes.find(node => node.label === '生咖啡豆')?.id).not.toBe(beans.id);
   await page.reload(); await expect(page.getByTestId('hs-save')).toBeEnabled(); await page.getByTestId('editor-mode-analysis').click(); await expect(brain).toContainText('生咖啡豆');
   for (const width of [1600, 1280, 820, 390]) {
     await page.setViewportSize({ width, height: 1000 }); await expect(brain).toBeVisible();
-    await brain.getByRole('button', { name: '适应', exact: true }).click();
+    await fitMindmap(brain);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
     await page.screenshot({ path: info.outputPath(`mindmap-${width}.png`), fullPage: true });
   }
@@ -90,12 +95,12 @@ test('真实 DeepSeek 多轮脑图分析、实时单图预览、一次确认、�
   const omitted = second.document.nodes.filter(node => !['TOPIC', 'OBJECT', 'PROCESS', 'STATE'].includes(node.kind));
   if (omitted.length) { await page.getByTestId('mindmap-panel').getByText('暂不纳入本次转换', { exact: true }).click(); for (const node of omitted) await page.getByTestId('mindmap-panel').getByRole('checkbox', { name: node.label, exact: true }).check(); }
   await page.getByTestId('mindmap-convert').click(); await expect(page.getByTestId('assistant-canvas-preview')).toContainText('实时生成预览', { timeout: 30000 });
-  await expect(panel.getByTestId('assistant-apply').last()).toBeDisabled(); expect((await f.runtime('open', { context_id: f.contextId })).draft_token).toEqual(token);
+  await expect(panel.getByTestId('assistant-apply')).toHaveCount(0); expect((await f.runtime('open', { context_id: f.contextId })).draft_token).toEqual(token);
   await page.screenshot({ path: info.outputPath('mindmap-conversion-progress.png') });
-  await expect(panel.getByTestId('assistant-running')).toHaveCount(0, { timeout: 180000 }); await expect(panel.getByTestId('assistant-apply').last()).toBeEnabled();
-  const proposal = (await assistant('list'))[0].proposals.at(-1); expect(proposal.status).toBe('ready'); expect(proposal.validation.validation_summary.blocking).toBe(0); expect(proposal.review.issues.filter((x: { severity: string }) => x.severity === 'ERROR')).toEqual([]);
+  await expect(panel.getByTestId('assistant-running')).toHaveCount(0, { timeout: 180000 }); await expect(panel.getByTestId('assistant-apply')).toHaveCount(0);
+  const proposal = (await assistant('list'))[0].proposals.at(-1); expect(proposal.status).toBe('applied'); expect(proposal.validation.validation_summary.blocking).toBe(0); expect(proposal.review.issues.filter((x: { severity: string }) => x.severity === 'ERROR')).toEqual([]);
   expect(await page.locator('.x6-edge').count()).toBeGreaterThanOrEqual(3); await page.screenshot({ path: info.outputPath('mindmap-conversion-ready.png') });
-  await panel.getByTestId('assistant-apply').last().click(); await expect(page.getByTestId('assistant-canvas-preview')).toHaveCount(0);
+  await expect(page.getByTestId('assistant-canvas-preview')).toHaveCount(0);
   await expect.poll(async () => (await f.runtime('open', { context_id: f.contextId })).draft_token.edit_seq).toBe(1);
   const applied = await f.brain(); expect(applied.conversions).toHaveLength(1); expect(applied.conversions[0]?.mappings.length).toBe(7);
   await page.getByTestId('hs-save').click(); await expect(page.getByTestId('hs-save-state')).toHaveText('已手动保存'); await page.reload(); await expect(page.getByTestId('hs-save')).toBeEnabled();
@@ -104,6 +109,11 @@ test('真实 DeepSeek 多轮脑图分析、实时单图预览、一次确认、�
   await expect(page.getByTestId('mindmap-locate-source')).toContainText('咖啡豆'); await page.getByTestId('mindmap-locate-source').click();
   await expect(page.getByTestId('mindmap-node-label')).toHaveValue('咖啡豆');
   await page.getByTestId('mindmap-convert').click(); await expect(panel).toContainText('未创建重复元素'); expect((await f.brain()).conversions).toHaveLength(1);
+  // 兼容旧客户端时，用户可以在未提交的方案生成后继续编辑脑图，旧来源随后必须被拒绝。
+  await page.route('**/api/assistant/convert', async route => {
+    const { autoApply: _autoApply, ...legacy } = route.request().postDataJSON();
+    await route.continue({ postData: JSON.stringify(legacy) });
+  });
   await page.getByTestId('mindmap-node-label').fill('烘焙咖啡豆'); await page.getByTestId('mindmap-node-label').press('Tab'); await page.getByTestId('mindmap-save').click(); await expect(page.getByTestId('mindmap-save-state')).toHaveText('分析已保存');
   await page.getByTestId('mindmap-convert').click(); await expect(panel.getByTestId('assistant-running')).toBeVisible(); await expect(panel.getByTestId('assistant-running')).toHaveCount(0, { timeout: 180000 });
   const increment = (await assistant('list'))[0].proposals.at(-1); expect(increment.command.payload.steps).toHaveLength(1); expect(increment.command.payload.steps[0].command_type).toBe('UPDATE_PROPERTY');
@@ -145,7 +155,7 @@ test('重启后分析续聊、增量确认、来源删除、目标子图与停�
   // 之前被版本冲突取消的改名可以重新预览并确认，正式身份保持不变。
   await page.getByTestId('mindmap-convert').click(); await expect(panel.getByTestId('assistant-running')).toBeVisible(); await expect(panel.getByTestId('assistant-running')).toHaveCount(0, { timeout: 180000 });
   const increment = (await list()).proposals.at(-1); expect(increment.command.payload.steps).toHaveLength(1); expect(increment.command.payload.steps[0].command_type).toBe('UPDATE_PROPERTY');
-  await expect(panel.getByTestId('assistant-apply').last()).toBeEnabled(); await panel.getByTestId('assistant-apply').last().click();
+  await expect(panel.getByTestId('assistant-apply')).toHaveCount(0);
   await expect.poll(async () => (await open()).draft_token.edit_seq).toBe(token.edit_seq + 1);
   const converted = await brain(), afterToken = (await open()).draft_token;
   const beansMapping = converted.conversions.at(-1)!.mappings.find(item => item.source_id === before.document.nodes.find(node => node.kind === 'OBJECT' && node.label !== '烘焙机')!.id)!;

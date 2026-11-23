@@ -3,7 +3,7 @@ package org.opm.localruntime.command;
 import java.util.List;
 import java.util.Objects;
 
-public sealed interface CommitResult permits CommitResult.Committed, CommitResult.Replayed, CommitResult.Rejected {
+public interface CommitResult {
 
     record Committed(String committedRevisionId, List<String> traceIds, CommitValidationSummary validation) implements CommitResult {
         public Committed {

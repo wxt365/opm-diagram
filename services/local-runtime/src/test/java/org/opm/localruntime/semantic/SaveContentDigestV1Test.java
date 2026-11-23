@@ -16,6 +16,44 @@ import java.util.function.Consumer;
 import static org.junit.jupiter.api.Assertions.*;
 
 class SaveContentDigestV1Test {
+    @Test void occurrenceColorsHaveTheirOwnDigestAndRejectInvalidColors() throws Exception {
+        var document = input("FULL");
+        document.put("schema_version", "0.7");
+        if (!document.has("refinement_edges")) document.putArray("refinement_edges");
+        String empty = SaveContentDigestV1.sha256(document);
+        var appearance = ((ObjectNode) document.at("/layouts/0")).putObject("appearance").put("stroke", "#123456").put("fill", "#222222");
+        assertEquals("SaveContentDigest/5", SaveContentDigestV1.version(document));
+        assertNotEquals(empty, SaveContentDigestV1.sha256(document));
+        assertEquals(document, SaveContentDigestV1.join(SaveContentDigestV1.split(document)));
+        assertEquals(SaveContentDigestV1.sha256(document), SaveContentDigestV1.sha256(SaveContentDigestV1.read(document.toString())));
+        appearance.put("fill", "url(https://invalid)");
+        assertThrows(SaveContentDigestV1.Invalid.class, () -> SaveContentDigestV1.sha256(document));
+    }
+    @Test void remarksRoundTripWithNewDigestAndLeaveFrozenVersionsUnchanged() throws Exception {
+        var document = input("FULL");
+        String legacy = SaveContentDigestV1.sha256(document);
+        document.put("schema_version", "0.6");
+        if (!document.has("refinement_edges")) document.putArray("refinement_edges");
+        String empty = SaveContentDigestV1.sha256(document);
+        ((ObjectNode) document.at("/elements/0")).put("remark", "第一行\n<b>文本</b>");
+        assertEquals("SaveContentDigest/4", SaveContentDigestV1.version(document));
+        assertNotEquals(empty, SaveContentDigestV1.sha256(document));
+        assertEquals(SaveContentDigestV1.sha256(document), SaveContentDigestV1.sha256(SaveContentDigestV1.read(document.toString())));
+        assertEquals(document, SaveContentDigestV1.join(SaveContentDigestV1.split(document)));
+        ((ObjectNode) document.at("/elements/0")).put("remark", "字".repeat(4001));
+        assertThrows(SaveContentDigestV1.Invalid.class, () -> SaveContentDigestV1.sha256(document));
+        assertEquals(legacy, SaveContentDigestV1.sha256(input("FULL")));
+    }
+    @Test void routedContentUsesVersionThreeAndMatchesNodeBinary64Digest() throws Exception {
+        var vector = JSON.readTree(Files.readString(root().resolve("tests/fixtures/hybrid-save/route-layout-v3-vector.json")));
+        var document = (ObjectNode) JSON.readTree(Files.readString(root().resolve(vector.get("source_fixture").asText())));
+        var legacyDigest = SaveContentDigestV1.sha256(document);
+        ((ObjectNode) document.at("/layouts/0")).putArray("edge_routes").add(vector.get("route"));
+        assertEquals("SaveContentDigest/3", SaveContentDigestV1.version(document));
+        assertEquals(vector.get("expected_digest").asText(), SaveContentDigestV1.sha256(document));
+        ((ObjectNode) document.at("/layouts/0")).remove("edge_routes");
+        assertEquals(legacyDigest, SaveContentDigestV1.sha256(document));
+    }
     private static final ObjectMapper JSON = new ObjectMapper();
     private static Path root() {
         Path path = Path.of(System.getProperty("user.dir")).toAbsolutePath();

@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.opm.localruntime.recovery.SingleShotRecoverySqliteFaultPort;
+import org.opm.localruntime.recovery.SingleShotRecoveryPersistenceFaultPort;
 import org.opm.localruntime.command.CandidateRevisionCommand;
 import org.opm.localruntime.command.CandidateRevisionCommitter;
 import org.opm.localruntime.command.CommitFailureCode;
@@ -48,7 +48,7 @@ class SqliteRevisionCommitRepositoryTest {
     void atomicallyWritesRevisionHeadOperationReceiptAndTraceIndexes() throws Exception {
         Path database = initializedDatabase();
         SemanticRevision base = base();
-        CandidateRevisionCommand command = command(base, candidate(base), "command.sqlite.001", "digest.sqlite.001");
+        CandidateRevisionCommand command = command(base, candidate(base), "command.postgres.001", "digest.postgres.001");
 
         CommitResult.Committed result = assertInstanceOf(CommitResult.Committed.class,
                 new CandidateRevisionCommitter(new SqliteRevisionCommitRepository(database)).commit(command));
@@ -93,10 +93,10 @@ class SqliteRevisionCommitRepositoryTest {
         Path database = initializedDatabase();
         SemanticRevision base = base();
         SqliteRevisionCommitRepository repository = new SqliteRevisionCommitRepository(
-                SqliteConnectionFactory.create(database), (stage, context) -> { throw new java.io.IOException("injected write failure"); });
+                org.opm.localruntime.storage.SqliteTestSupport.create(database), (stage, context) -> { throw new java.io.IOException("injected write failure"); });
 
         CommitResult.Rejected result = assertInstanceOf(CommitResult.Rejected.class,
-                new CandidateRevisionCommitter(repository).commit(command(base, candidate(base), "command.sqlite.fail", "digest.sqlite.fail")));
+                new CandidateRevisionCommitter(repository).commit(command(base, candidate(base), "command.postgres.fail", "digest.postgres.fail")));
 
         assertEquals(CommitFailureCode.PERSISTENCE_FAILED, result.code());
         try (Connection connection = raw(database)) {
@@ -126,7 +126,7 @@ class SqliteRevisionCommitRepositoryTest {
             }
             @Override public RevisionCommitRepository.Head projectCurrentHead(E2EFaultContext context, RevisionCommitRepository.Head head) { return head; }
         };
-        SqliteRevisionCommitRepository repository = new SqliteRevisionCommitRepository(SqliteConnectionFactory.create(database),
+        SqliteRevisionCommitRepository repository = new SqliteRevisionCommitRepository(org.opm.localruntime.storage.SqliteTestSupport.create(database),
                 (stage, context) -> recoveryCalls.incrementAndGet(), e2e);
 
         CommitResult result = new CandidateRevisionCommitter(repository, null, e2e)
@@ -146,8 +146,8 @@ class SqliteRevisionCommitRepositoryTest {
             visualCalls.incrementAndGet();
             throw new CommitPersistenceException(CommitFailureCode.PERSISTENCE_FAILED, "Visual Common persistence fault", null);
         };
-        SqliteRevisionCommitRepository repository = new SqliteRevisionCommitRepository(SqliteConnectionFactory.create(database),
-                RecoverySqliteFaultPort.NOOP, E2EFaultPort.NOOP, visual);
+        SqliteRevisionCommitRepository repository = new SqliteRevisionCommitRepository(org.opm.localruntime.storage.SqliteTestSupport.create(database),
+                RecoveryPersistenceFaultPort.NOOP, E2EFaultPort.NOOP, visual);
 
         CommitResult result = new CandidateRevisionCommitter(repository)
                 .commit(command(base, candidate(base), "command.visual.persistence", "digest-visual-persistence"));
@@ -158,14 +158,14 @@ class SqliteRevisionCommitRepositoryTest {
 
     @Test
     void rollsBackAllPersistedArtifactsForEveryCommitWriteStage() throws Exception {
-        for (RecoverySqliteStage stage : RecoverySqliteStage.values()) {
+        for (RecoveryPersistenceStage stage : RecoveryPersistenceStage.values()) {
             Path database = initializedDatabase(Files.createDirectory(temporaryDirectory.resolve(stage.name().toLowerCase())));
             SemanticRevision base = base();
-            CandidateRevisionCommand command = command(base, candidate(base), "command.sqlite.stage." + stage.name().toLowerCase(), "digest.sqlite.stage." + stage.name().toLowerCase());
-            SingleShotRecoverySqliteFaultPort faultPort = new SingleShotRecoverySqliteFaultPort(stage,
+            CandidateRevisionCommand command = command(base, candidate(base), "command.postgres.stage." + stage.name().toLowerCase(), "digest.postgres.stage." + stage.name().toLowerCase());
+            SingleShotRecoveryPersistenceFaultPort faultPort = new SingleShotRecoveryPersistenceFaultPort(stage,
                     new RecoveryFaultContext(command.projectId(), command.modelId(), command.candidateRevision().revisionId(), command.commandId()));
             SqliteRevisionCommitRepository repository = new SqliteRevisionCommitRepository(
-                    SqliteConnectionFactory.create(database), faultPort);
+                    org.opm.localruntime.storage.SqliteTestSupport.create(database), faultPort);
 
             CommitResult.Rejected result = assertInstanceOf(CommitResult.Rejected.class,
                     new CandidateRevisionCommitter(repository).commit(command));
@@ -185,7 +185,7 @@ class SqliteRevisionCommitRepositoryTest {
     }
 
     @Test
-    void rejectsTextPreconditionsBeforeAnySqliteWrite() throws Exception {
+    void rejectsTextPreconditionsBeforeAnyPostgresWrite() throws Exception {
         SemanticRevision base = base();
 
         Path missingTemplateDatabase = initializedDatabase(Files.createDirectory(temporaryDirectory.resolve("missing-template")));
@@ -193,7 +193,7 @@ class SqliteRevisionCommitRepositoryTest {
                 new OplGrammar.Binding(base.profileBinding().textGrammar().id(), base.profileBinding().textGrammar().version(),
                         base.profileBinding().textGrammar().sha256()),
                 List.of(new OplGrammar.Template("opl.consumption.v1", 10)));
-        CandidateRevisionCommand missingTemplate = command(base, candidate(base), "command.sqlite.missing-template", "digest.sqlite.missing-template",
+        CandidateRevisionCommand missingTemplate = command(base, candidate(base), "command.postgres.missing-template", "digest.postgres.missing-template",
                 grammarWithoutStateTemplate);
         assertRejectedWithoutWrites(missingTemplateDatabase,
                 new CandidateRevisionCommitter(new SqliteRevisionCommitRepository(missingTemplateDatabase)).commit(missingTemplate),
@@ -203,14 +203,14 @@ class SqliteRevisionCommitRepositoryTest {
         OplGrammar grammarWithUnexpectedDigest = new OplGrammar(
                 new OplGrammar.Binding(base.profileBinding().textGrammar().id(), base.profileBinding().textGrammar().version(), "different-digest"),
                 List.of(new OplGrammar.Template("opl.consumption.v1", 10), new OplGrammar.Template("opl.consumption.state.v1", 10)));
-        CandidateRevisionCommand grammarMismatch = command(base, candidate(base), "command.sqlite.grammar-mismatch", "digest.sqlite.grammar-mismatch",
+        CandidateRevisionCommand grammarMismatch = command(base, candidate(base), "command.postgres.grammar-mismatch", "digest.postgres.grammar-mismatch",
                 grammarWithUnexpectedDigest);
         assertRejectedWithoutWrites(grammarMismatchDatabase,
                 new CandidateRevisionCommitter(new SqliteRevisionCommitRepository(grammarMismatchDatabase)).commit(grammarMismatch),
                 CommitFailureCode.TEXT_GENERATION_BLOCKED);
 
         Path traceIncompleteDatabase = initializedDatabase(Files.createDirectory(temporaryDirectory.resolve("trace-incomplete")));
-        CandidateRevisionCommand traceIncomplete = command(base, traceIncompleteCandidate(base), "command.sqlite.trace-incomplete", "digest.sqlite.trace-incomplete");
+        CandidateRevisionCommand traceIncomplete = command(base, traceIncompleteCandidate(base), "command.postgres.trace-incomplete", "digest.postgres.trace-incomplete");
         assertRejectedWithoutWrites(traceIncompleteDatabase,
                 new CandidateRevisionCommitter(new SqliteRevisionCommitRepository(traceIncompleteDatabase)).commit(traceIncomplete),
                 CommitFailureCode.TEXT_GENERATION_BLOCKED);
@@ -224,10 +224,10 @@ class SqliteRevisionCommitRepositoryTest {
         ProjectDatabaseFactory factory = new ProjectDatabaseFactory(storageRoot);
         ProjectDatabaseOpenResult.Ready ready = assertInstanceOf(ProjectDatabaseOpenResult.Ready.class, factory.open("project.demo"));
         SemanticRevision base = base();
-        try (Connection connection = raw(ready.database().databasePath())) {
+        try (Connection connection = raw(ready.database().snapshot())) {
             seed(connection, base);
         }
-        return ready.database().databasePath();
+        return ready.database().snapshot();
     }
 
     private void seed(Connection connection, SemanticRevision revision) throws Exception {
@@ -300,7 +300,7 @@ class SqliteRevisionCommitRepositoryTest {
     }
 
     private SemanticRevision traceIncompleteCandidate(SemanticRevision base) {
-        SemanticRevision.Context root = base.contexts().getFirst();
+        SemanticRevision.Context root = base.contexts().get(0);
         SemanticRevision.Occurrence processing = base.occurrences().stream()
                 .filter(occurrence -> occurrence.id().equals("occurrence.processing"))
                 .findFirst()
@@ -346,8 +346,8 @@ class SqliteRevisionCommitRepositoryTest {
     }
 
     private Connection raw(Path database) throws SQLException {
-        Connection connection = DriverManager.getConnection("jdbc:sqlite:" + database.toAbsolutePath() + "?foreign_keys=on");
-        try (Statement statement = connection.createStatement()) { statement.execute("PRAGMA foreign_keys = ON"); }
+        Connection connection = org.opm.localruntime.storage.SqliteTestSupport.connection(database);
+        try (Statement statement = connection.createStatement()) { statement.execute("SELECT 1"); }
         return connection;
     }
 

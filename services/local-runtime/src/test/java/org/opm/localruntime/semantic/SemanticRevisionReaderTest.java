@@ -15,16 +15,30 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class SemanticRevisionReaderTest {
 
+    @Test void routesRoundTripThroughRevisionWriterAndExactProjectionWithoutChangingOldDocuments() throws Exception {
+        var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        var raw = (com.fasterxml.jackson.databind.node.ObjectNode) mapper.readTree(Files.readString(findFixture()));
+        var layout = (com.fasterxml.jackson.databind.node.ObjectNode) raw.at("/layouts/0");
+        var route = layout.putArray("edge_routes").addObject().put("segment", "output").put("style", "ROUNDED").put("mode", "MANUAL");
+        route.putArray("points").addObject().put("x", -5.5).put("y", 240d);
+        var parsed = new SemanticRevisionReader().read(new ByteArrayInputStream(raw.toString().getBytes(StandardCharsets.UTF_8)));
+        var output = mapper.readTree(new SemanticRevisionJsonWriter().write(parsed));
+        assertEquals(layout.get("edge_routes"), output.at("/layouts/0/edge_routes"));
+        assertEquals(parsed.layouts(), new SemanticRevisionReader().read(new ByteArrayInputStream(output.toString().getBytes(StandardCharsets.UTF_8))).layouts());
+        route.put("style", "INVALID");
+        assertThrows(SemanticReadException.class, () -> new SemanticRevisionReader().read(new ByteArrayInputStream(raw.toString().getBytes(StandardCharsets.UTF_8))));
+    }
+
     @Test
     void readsMinimalContractFixtureAsP0SemanticRevision() {
         SemanticRevision revision = new SemanticRevisionReader().read(findFixture());
 
         assertEquals("revision.demo.0001", revision.revisionId());
         assertEquals(2, revision.elements().size());
-        assertEquals(SemanticRevision.CoreKind.OBJECT, revision.elements().getFirst().coreKind());
+        assertEquals(SemanticRevision.CoreKind.OBJECT, revision.elements().get(0).coreKind());
         assertEquals(1, revision.states().size());
         assertEquals(1, revision.facts().size());
-        assertEquals(SemanticRevision.ContextKind.SYSTEM_DIAGRAM, revision.contexts().getFirst().kind());
+        assertEquals(SemanticRevision.ContextKind.SYSTEM_DIAGRAM, revision.contexts().get(0).kind());
         assertFalse(new SemanticRevisionValidator().validate(revision).iterator().hasNext());
     }
 

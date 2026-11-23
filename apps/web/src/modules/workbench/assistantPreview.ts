@@ -4,8 +4,11 @@ import { nodeDimensions, constrainStatePosition } from "./opd/core/node-geometry
 import { toNode, toConsumption } from "@/stores/workbench/projectionMapping";
 
 /** 只构造展示数据；预览不改变 store 中的真实图元。 */
-export function previewAssistant(proposal: AssistantProposal | null, nodes: OpdNode[], relations: ConsumptionRelation[]) {
+export function previewAssistant(proposal: AssistantProposal | null, nodes: OpdNode[], relations: ConsumptionRelation[], previewContextId?: string) {
   if (!proposal) return { nodes, relations };
+  const selectedContext = previewContextId ?? proposal.contextId;
+  const selectedView = proposal.previewViews?.find(view => view.context_id === selectedContext);
+  if (selectedView) proposal = { ...proposal, previewData: selectedView.data };
   if (proposal.command.command_type === 'APPLY_MODEL_PLAN' && proposal.previewData) {
     const constructs = proposal.previewData.constructs.map(x => ({ ...x, modifiers: x.modifiers?.map(modifier => ({ modifier_id: modifier.modifier_id, value: String(modifier.value ?? '') })), endpoints: x.endpoints?.map(endpoint => {
       if (endpoint.target_kind !== 'ELEMENT' && endpoint.target_kind !== 'STATE' && endpoint.target_kind !== 'FEATURE') throw new Error('方案包含画布暂不支持的关系端点。');

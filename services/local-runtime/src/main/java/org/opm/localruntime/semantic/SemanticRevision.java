@@ -371,10 +371,33 @@ public record SemanticRevision(
         }
     }
 
-    public record Layout(String id, double x, double y, double width, double height, int zOrder) {
+    public record RoutePoint(double x, double y) {
+        public RoutePoint {
+            if (!Double.isFinite(x) || !Double.isFinite(y)) throw new IllegalArgumentException("route points must be finite");
+        }
+    }
+
+    public record EdgeRoute(String segment, String style, String mode, List<RoutePoint> points) {
+        public EdgeRoute {
+            if (segment == null || !segment.matches("[A-Za-z0-9_.-]{1,128}")) throw new IllegalArgumentException("invalid route segment");
+            if (!Set.of("STRAIGHT", "ROUNDED", "CURVE").contains(style)) throw new IllegalArgumentException("invalid route style");
+            if (!Set.of("AUTO", "MANUAL").contains(mode)) throw new IllegalArgumentException("invalid route mode");
+            points = List.copyOf(points);
+            if (points.size() > 128 || (mode.equals("AUTO") && !points.isEmpty())) throw new IllegalArgumentException("invalid route points");
+        }
+    }
+
+    public record Layout(String id, double x, double y, double width, double height, int zOrder, List<EdgeRoute> edgeRoutes) {
+
+        public Layout(String id, double x, double y, double width, double height, int zOrder) {
+            this(id, x, y, width, height, zOrder, List.of());
+        }
 
         public Layout {
             requireStableId(id, "layout id");
+            edgeRoutes = List.copyOf(edgeRoutes);
+            if (edgeRoutes.size() > 64 || edgeRoutes.stream().map(EdgeRoute::segment).distinct().count() != edgeRoutes.size())
+                throw new IllegalArgumentException("invalid or duplicate route segments");
             if (!Double.isFinite(x) || !Double.isFinite(y) || !Double.isFinite(width) || !Double.isFinite(height)) {
                 throw new IllegalArgumentException("layout geometry must be finite");
             }

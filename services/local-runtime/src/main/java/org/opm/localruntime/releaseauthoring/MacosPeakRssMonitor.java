@@ -17,12 +17,13 @@ final class MacosPeakRssMonitor implements PeakRssMonitor {
     private final Thread sampler;
 
     private MacosPeakRssMonitor(long pid) throws GoldenFixtureMaterializationException {
-        if (!"Mac OS X".equals(System.getProperty("os.name"))) {
-            throw failure("RSS probe requires the frozen macOS reference machine.", null);
+        String operatingSystem = System.getProperty("os.name");
+        if (!"Mac OS X".equals(operatingSystem) && !operatingSystem.startsWith("Windows") && !"Linux".equals(operatingSystem)) {
+            throw failure("RSS probe is unavailable on this operating system.", null);
         }
         this.pid = pid;
         sample();
-        this.sampler = Thread.ofPlatform().daemon().name("gfm-rss-monitor").start(() -> {
+        this.sampler = new Thread(() -> {
             while (running.get()) {
                 try {
                     Thread.sleep(SAMPLE_INTERVAL_MILLIS);
@@ -32,7 +33,9 @@ final class MacosPeakRssMonitor implements PeakRssMonitor {
                     return;
                 }
             }
-        });
+        }, "gfm-rss-monitor");
+        sampler.setDaemon(true);
+        sampler.start();
     }
 
     static MacosPeakRssMonitor start() throws GoldenFixtureMaterializationException {
@@ -69,10 +72,13 @@ final class MacosPeakRssMonitor implements PeakRssMonitor {
     }
 
     private void sampleOnce() throws Exception {
-        Process process = new ProcessBuilder("/bin/ps", "-o", "rss=", "-p", Long.toString(pid))
+        boolean windows = System.getProperty("os.name").startsWith("Windows");
+        Process process = (windows ? new ProcessBuilder("powershell.exe", "-NoProfile", "-NonInteractive", "-Command",
+                "(Get-Process -Id " + pid + ").PeakWorkingSet64")
+                : new ProcessBuilder("/bin/ps", "-o", "rss=", "-p", Long.toString(pid)))
                 .redirectErrorStream(true)
                 .start();
-        if (!process.waitFor(1, TimeUnit.SECONDS)) {
+        if (!process.waitFor(windows ? 5 : 1, TimeUnit.SECONDS)) {
             process.destroyForcibly();
             throw new IllegalStateException("RSS probe timed out.");
         }
@@ -80,7 +86,7 @@ final class MacosPeakRssMonitor implements PeakRssMonitor {
         if (process.exitValue() != 0 || !output.matches("[1-9][0-9]*")) {
             throw new IllegalStateException("RSS probe output is invalid.");
         }
-        long bytes = Math.multiplyExact(Long.parseLong(output), 1024L);
+        long bytes = Math.multiplyExact(Long.parseLong(output), windows ? 1L : 1024L);
         peakBytes = Math.max(peakBytes, bytes);
     }
 

@@ -17,7 +17,7 @@ final class DraftModelPlan {
     static final Set<String> TYPES = Set.of("CREATE_ELEMENT", "CREATE_STATE", "CREATE_FACT", "UPDATE_PROPERTY", "UPDATE_STATE", "UPDATE_LAYOUT");
     @FunctionalInterface interface Candidates { JsonNode query(JsonNode scope, SemanticRevision revision); }
     @FunctionalInterface interface Editor { DraftJournalRepository.Proposal edit(JsonNode input, ObjectNode document); }
-    @FunctionalInterface interface Guard { void check(SemanticRevision revision, String context, String target); }
+    @FunctionalInterface interface Guard { void check(SemanticRevision revision, String context, String target, String commandType); }
     record Result(ObjectNode document, DraftJournalRepository.Proposal proposal, Map<String, String> aliases) { }
 
     static Result build(String context, String planId, JsonNode token, JsonNode steps, ObjectNode source,
@@ -29,6 +29,15 @@ final class DraftModelPlan {
             DraftWorkspaceSchema.validate(step, "ModelPlanStep");
             String key = step.path("local_id").asText(), type = step.path("command_type").asText();
             require(keys.add(key));
+            if (type.equals("REORGANIZE_SUBGRAPH")) {
+                var revision = DraftWorkspaceService.semantic(document);
+                String target = resolve(step.get("target").asText(), aliases, revision, context);
+                var members = new ArrayList<String>();
+                for (var member : step.get("members")) members.add(resolve(member.asText(), aliases, revision, context));
+                String child = "context." + generatedId(planId, key);
+                affected.addAll(DraftSubgraphReorganization.apply(document, context, child, target, step.get("name").asText(), members, step.path("abstract_boundary").asBoolean(false)));
+                continue;
+            }
             var revision = DraftWorkspaceService.semantic(document);
             require(revision.occurrences().stream().noneMatch(item -> item.id().equals(key) || item.targetId().equals(key)));
             var scope = JSON.createObjectNode().put("context_id", context).put("intent", type).putNull("selection_id");
@@ -39,7 +48,7 @@ final class DraftModelPlan {
                 String occurrence = scope.get("selection_id").asText();
                 if (!type.equals("UPDATE_LAYOUT")) {
                     var selected = revision.occurrences().stream().filter(item -> item.id().equals(occurrence)).findFirst().orElseThrow();
-                    guard.check(revision, context, selected.targetId());
+                    guard.check(revision, context, selected.targetId(), type);
                 }
             }
             var options = candidates.query(scope, revision); JsonNode chosen = null;
@@ -89,7 +98,7 @@ final class DraftModelPlan {
         var exact = revision.occurrences().stream().filter(item -> item.contextId().equals(context) && item.id().equals(resolved)).findFirst();
         if (exact.isPresent()) return exact.get().id();
         var matches = revision.occurrences().stream().filter(item -> item.contextId().equals(context) && item.targetId().equals(resolved)).toList();
-        require(matches.size() == 1); return matches.getFirst().id();
+        require(matches.size() == 1); return matches.get(0).id();
     }
 
     private static ObjectNode payload(String context, String plan, JsonNode step, SemanticRevision revision, JsonNode scope, JsonNode option) {
@@ -124,7 +133,8 @@ final class DraftModelPlan {
                 String capability = option.at("/capability_ref/capability_id").asText();
                 payload.put("context_id", context).put("fact_id", "fact." + id).set("capability_ref", option.get("capability_ref"));
                 payload.put("fact_family", family(capability)); payload.set("normalized_endpoints", option.get("normalized_endpoints"));
-                payload.put("direction", capability.startsWith("CAP-ISO-STRUCT-") ? "UNDIRECTED" : "DIRECTED");
+                payload.put("direction", StructuralLinkCatalog.find(capability)
+                        .map(descriptor -> descriptor.direction().name()).orElse("DIRECTED"));
                 for (String name : List.of("labels", "modifiers", "logical_groups")) payload.putArray(name);
                 payload.putObject("occurrence").put("ownership", "OWNED").put("construct_role", capability.startsWith("CAP-ISO-STRUCT-") ? "STRUCTURAL_LINK" : "PROCEDURAL_LINK");
                 payload.putObject("layout");

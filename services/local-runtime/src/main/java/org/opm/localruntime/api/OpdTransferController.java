@@ -20,4 +20,8 @@ class OpdTransferController {
     ResponseEntity<Map<String, Object>> importJson(@PathVariable String projectId, @RequestBody Map<String, Object> request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(service.importJson(projectId, request));
     }
+    @PostMapping("/models/{modelId}/model-json/export")
+    ObjectNode exportModelJson(@PathVariable String projectId, @PathVariable String modelId, @RequestBody Map<String, Object> request) {
+        return service.exportModelJson(projectId, modelId, request);
+    }
 }

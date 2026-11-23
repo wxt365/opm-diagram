@@ -79,7 +79,7 @@ for (const scenario of scenarios) test(`关系选中反馈：${scenario.name}`, 
     await page.screenshot({ path: info.outputPath("selected-desktop.png") });
     await source.click({ position: { x: 20, y: 14 } }); await expect.poll(() => appearance(lines)).toEqual(unselected);
     await clickLine(page, lines.first()); await selected(lines);
-    await page.getByTestId("p03-zoom-in").click(); await selected(lines);
+    await page.getByTestId("p03-zoom-in").filter({ visible: true }).click(); await selected(lines);
     await page.setViewportSize({ width: 390, height: 844 }); await chooseViewportAction(page, "fit");
     await page.getByTestId("p03-canvas").scrollIntoViewIfNeeded(); await selected(lines);
     await page.screenshot({ path: info.outputPath("selected-mobile.png") });

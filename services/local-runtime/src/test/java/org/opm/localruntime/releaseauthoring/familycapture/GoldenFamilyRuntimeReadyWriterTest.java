@@ -135,7 +135,7 @@ class GoldenFamilyRuntimeReadyWriterTest {
     private String treeDigest(Path root) throws Exception {
         Map<String, String> entries = new TreeMap<>();
         try (var files = Files.walk(root)) {
-            for (Path file : files.filter(Files::isRegularFile).toList()) entries.put(root.relativize(file).toString(), sha(Files.readAllBytes(file)));
+            for (Path file : files.filter(Files::isRegularFile).toList()) entries.put(root.relativize(file).toString().replace(java.io.File.separatorChar, '/'), sha(Files.readAllBytes(file)));
         }
         return Rfc8785JsonCanonicalizer.sha256(entries);
     }

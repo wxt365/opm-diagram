@@ -26,7 +26,7 @@ class OpdTransferControllerTest {
                 .addInterceptors(new LocalWriteRequestGuard(new LocalSessionToken("test-session"))).build();
         String project = ((Map<?, ?>) domain.createProject(Map.of("request_id", "request.project", "command_id", "command.project", "name", "迁移")).get("data")).get("project_id").toString();
         String model = ((Map<?, ?>) domain.createModel(project, Map.of("request_id", "request.model", "command_id", "command.model", "name", "模型", "binding", domain.activeProfileRuleBinding())).get("data")).get("model_id").toString();
-        var snapshot = new DraftJournalRepository(factory.databasePath(project), Clock.systemUTC()).read(project, model);
+        var snapshot = new DraftJournalRepository(factory.snapshot(project), Clock.systemUTC()).read(project, model);
         var json = new ObjectMapper(); String context = json.readTree(snapshot.documentJson()).at("/model_header/root_context_id").asText();
         String path = "/api/v1/projects/" + project + "/models/" + model + "/opd-json/export";
         var request = Map.of("request_id", "request.export", "context_id", context, "draft_token", snapshot.token()); String body = json.writeValueAsString(request);

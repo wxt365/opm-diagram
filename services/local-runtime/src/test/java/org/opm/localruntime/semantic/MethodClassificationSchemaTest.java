@@ -17,7 +17,7 @@ class MethodClassificationSchemaTest {
         assertNotEquals(before, SaveContentDigestV1.sha256(upgraded));
         assertEquals(upgraded, SaveContentDigestV1.join(SaveContentDigestV1.split(upgraded)));
         var revision = DraftSemanticView.read(upgraded);
-        assertEquals(SemanticRevision.ArchitectureLevel.PRODUCT, revision.contexts().getFirst().architectureLevel());
+        assertEquals(SemanticRevision.ArchitectureLevel.PRODUCT, revision.contexts().get(0).architectureLevel());
         var rewritten = SaveContentDigestV1.read(new SemanticRevisionJsonWriter().write(revision));
         assertEquals("0.4", rewritten.path("schema_version").asText()); assertEquals("PRODUCT", rewritten.at("/contexts/0/architecture_level").asText());
         var wrongVersion = upgraded.deepCopy().put("schema_version", "0.3");

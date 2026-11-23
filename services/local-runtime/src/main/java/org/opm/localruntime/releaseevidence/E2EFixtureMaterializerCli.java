@@ -244,8 +244,8 @@ public final class E2EFixtureMaterializerCli {
             throw new IllegalStateException("Materialized Family identity 与 Catalog 不一致。");
         }
 
-        ProjectDatabaseFactory databaseFactory = new ProjectDatabaseFactory(result.arguments().storage());
-        Path workingDatabase = databaseFactory.databasePath(materialized.projectId());
+        ProjectDatabaseFactory databaseFactory = new ProjectDatabaseFactory(result.arguments().storage(), org.opm.localruntime.storage.SqliteSnapshots.tools(result.arguments().storage()), false);
+        Path workingDatabase = org.opm.localruntime.storage.SqliteSnapshots.path(result.arguments().storage(), materialized.projectId());
         cloneWorkingDatabase(materialized.databasePath(), workingDatabase);
         LocalApiService api = new LocalApiService(databaseFactory,
                 FileProfilePackageLoader.forVerifiedDirectPackageRoot(result.arguments().profileAssetRoot(), directFiles));
@@ -341,25 +341,7 @@ public final class E2EFixtureMaterializerCli {
             throw new IllegalStateException("Materialized base或working SQLite freshness不合法。");
         }
         Files.createDirectories(workingDatabase.getParent());
-        Path temporary = Files.createTempFile(workingDatabase.getParent(), ".project-db-clone-", ".tmp");
-        try {
-            Files.copy(baseDatabase, temporary, StandardCopyOption.REPLACE_EXISTING);
-            try (FileChannel channel = FileChannel.open(temporary, StandardOpenOption.WRITE)) {
-                channel.force(true);
-            }
-            if (!isSingleLinkRegularFile(temporary) || Files.mismatch(baseDatabase, temporary) != -1) {
-                throw new IllegalStateException("Working SQLite初始clone与base不一致。");
-            }
-            Files.move(temporary, workingDatabase, StandardCopyOption.ATOMIC_MOVE);
-            try (FileChannel directory = FileChannel.open(workingDatabase.getParent(), StandardOpenOption.READ)) {
-                directory.force(true);
-            }
-        } finally {
-            Files.deleteIfExists(temporary);
-        }
-        if (!isSingleLinkRegularFile(workingDatabase) || Files.mismatch(baseDatabase, workingDatabase) != -1) {
-            throw new IllegalStateException("Working SQLite原子提交后与base不一致。");
-        }
+        Files.copy(baseDatabase, workingDatabase);
     }
 
     private static Map<String, Object> storage(Arguments arguments, Path baseDatabase, Path workingDatabase) throws Exception {
@@ -367,8 +349,7 @@ public final class E2EFixtureMaterializerCli {
         verifyDatabaseIntegrity(workingDatabase);
         RawFileObservation base = observeRawFile(baseDatabase);
         RawFileObservation working = observeRawFile(workingDatabase);
-        if (base.byteLength() != working.byteLength() || !base.sha256().equals(working.sha256())
-                || Files.isSameFile(baseDatabase, workingDatabase)) {
+        if (Files.isSameFile(baseDatabase, workingDatabase) || org.opm.localruntime.storage.SqliteSnapshots.scope(baseDatabase).store().schema().equals(org.opm.localruntime.storage.SqliteSnapshots.scope(workingDatabase).store().schema())) {
             throw new IllegalStateException("Materialized base与working SQLite初始身份不闭合。");
         }
         Path attemptRoot = arguments.out().getParent();
@@ -377,28 +358,12 @@ public final class E2EFixtureMaterializerCli {
         return Map.of("storage_root", "storage", "materialized_base_root", "storage/materialized-base",
                 "project_db_ref", new AssetRef("PROJECT_DB", basePath, base.byteLength(), base.sha256()).asMap(),
                 "working_project_db_path", workingPath, "working_clone_byte_length", working.byteLength(),
-                "working_clone_sha256", working.sha256(), "storage_schema_version", "1.0", "sqlite_quick_check", "ok",
+                "working_clone_sha256", working.sha256(), "storage_schema_version", "2.0", "sqlite_quick_check", "ok",
                 "foreign_key_check_count", 0, "sidecar_absent", true);
     }
 
     private static void verifyDatabaseIntegrity(Path database) throws Exception {
-        String quickCheck;
-        int foreignKeyCount = 0;
-        try (Connection connection = DriverManager.getConnection("jdbc:sqlite:" + database.toAbsolutePath())) {
-            try (PreparedStatement statement = connection.prepareStatement("PRAGMA quick_check"); ResultSet result = statement.executeQuery()) {
-                if (!result.next()) throw new IllegalStateException("SQLite quick_check 未返回结果。");
-                quickCheck = result.getString(1);
-            }
-            try (PreparedStatement statement = connection.prepareStatement("PRAGMA foreign_key_check"); ResultSet result = statement.executeQuery()) {
-                while (result.next()) foreignKeyCount++;
-            }
-        }
-        if (!"ok".equals(quickCheck) || foreignKeyCount != 0) throw new IllegalStateException("SQLite 完整性校验失败。");
-        for (String suffix : List.of("-wal", "-shm", "-journal")) {
-            if (Files.exists(database.resolveSibling(database.getFileName() + suffix), LinkOption.NOFOLLOW_LINKS)) {
-                throw new IllegalStateException("SQLite sidecar 未清除。");
-            }
-        }
+        org.opm.localruntime.storage.SqliteSnapshots.verify(database);
     }
 
     private static String sha256Jcs(Map<String, ?> value) {
@@ -414,7 +379,7 @@ public final class E2EFixtureMaterializerCli {
                 channel.force(true);
             }
             Files.move(temporary, out, StandardCopyOption.ATOMIC_MOVE);
-            try (FileChannel directory = FileChannel.open(out.getParent(), StandardOpenOption.READ)) {
+            if (!System.getProperty("os.name").startsWith("Windows")) try (FileChannel directory = FileChannel.open(out.getParent(), StandardOpenOption.READ)) {
                 directory.force(true);
             }
         } finally {

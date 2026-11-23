@@ -15,6 +15,111 @@
     }
   ],
   "paths": {
+    "/projects/{project_id}/models/{model_id}/draft/graph-analysis": {
+      "parameters": [
+        {
+          "name": "project_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "$ref": "../schemas/opm-draft-workspace-v02.schema.json#/$defs/StableId"
+          }
+        },
+        {
+          "name": "model_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "$ref": "../schemas/opm-draft-workspace-v02.schema.json#/$defs/StableId"
+          }
+        }
+      ],
+      "post": {
+        "operationId": "QueryGraphAnalysis",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "../schemas/opm-draft-workspace-v02.schema.json#/$defs/GraphAnalysisRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../schemas/opm-draft-workspace-v02.schema.json#/$defs/GraphAnalysisResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "草稿协议错误，映射见 HS-01D",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../schemas/opm-draft-workspace-v02.schema.json#/$defs/DraftError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "草稿协议错误，映射见 HS-01D",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../schemas/opm-draft-workspace-v02.schema.json#/$defs/DraftError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "草稿协议错误，映射见 HS-01D",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../schemas/opm-draft-workspace-v02.schema.json#/$defs/DraftError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "草稿协议错误，映射见 HS-01D",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../schemas/opm-draft-workspace-v02.schema.json#/$defs/DraftError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "草稿协议错误，映射见 HS-01D",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../schemas/opm-draft-workspace-v02.schema.json#/$defs/DraftError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "草稿协议错误，映射见 HS-01D",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../schemas/opm-draft-workspace-v02.schema.json#/$defs/DraftError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/projects/{project_id}/models/{model_id}/draft/mindmap": {
       "parameters": [
         {
@@ -1275,6 +1380,111 @@
         }
       }
     },
+    "/projects/{project_id}/models/{model_id}/draft/recovery-state": {
+      "parameters": [
+        {
+          "name": "project_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "$ref": "../schemas/opm-draft-workspace-v02.schema.json#/$defs/StableId"
+          }
+        },
+        {
+          "name": "model_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "$ref": "../schemas/opm-draft-workspace-v02.schema.json#/$defs/StableId"
+          }
+        }
+      ],
+      "post": {
+        "operationId": "QueryRecoveryState",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "../schemas/opm-draft-workspace-v02.schema.json#/$defs/RecoveryStateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../schemas/opm-draft-workspace-v02.schema.json#/$defs/RecoveryStateResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "草稿协议错误，映射见 HS-01D",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../schemas/opm-draft-workspace-v02.schema.json#/$defs/DraftError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "草稿协议错误，映射见 HS-01D",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../schemas/opm-draft-workspace-v02.schema.json#/$defs/DraftError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "草稿协议错误，映射见 HS-01D",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../schemas/opm-draft-workspace-v02.schema.json#/$defs/DraftError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "草稿协议错误，映射见 HS-01D",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../schemas/opm-draft-workspace-v02.schema.json#/$defs/DraftError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "草稿协议错误，映射见 HS-01D",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../schemas/opm-draft-workspace-v02.schema.json#/$defs/DraftError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "草稿协议错误，映射见 HS-01D",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../schemas/opm-draft-workspace-v02.schema.json#/$defs/DraftError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/projects/{project_id}/models/{model_id}/draft/method-summary": {
       "parameters": [
         {
@@ -1369,6 +1579,119 @@
           },
           "503": {
             "description": "草稿协议错误，映射见 HS-01D",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../schemas/opm-draft-workspace-v02.schema.json#/$defs/DraftError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projects/{project_id}/models/{model_id}/revisions/{revision_id}/graph-analysis": {
+      "parameters": [
+        {
+          "name": "project_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "$ref": "../schemas/opm-draft-workspace-v02.schema.json#/$defs/StableId"
+          }
+        },
+        {
+          "name": "model_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "$ref": "../schemas/opm-draft-workspace-v02.schema.json#/$defs/StableId"
+          }
+        },
+        {
+          "name": "revision_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "$ref": "../schemas/opm-draft-workspace-v02.schema.json#/$defs/StableId"
+          }
+        }
+      ],
+      "post": {
+        "operationId": "QueryRevisionGraphAnalysis",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "../schemas/opm-draft-workspace-v02.schema.json#/$defs/GraphAnalysisRevisionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "固定版本图谱",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../schemas/opm-draft-workspace-v02.schema.json#/$defs/GraphAnalysisResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "查询失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../schemas/opm-draft-workspace-v02.schema.json#/$defs/DraftError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "查询失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../schemas/opm-draft-workspace-v02.schema.json#/$defs/DraftError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "查询失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../schemas/opm-draft-workspace-v02.schema.json#/$defs/DraftError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "查询失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../schemas/opm-draft-workspace-v02.schema.json#/$defs/DraftError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "查询失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../schemas/opm-draft-workspace-v02.schema.json#/$defs/DraftError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "查询失败",
             "content": {
               "application/json": {
                 "schema": {

@@ -6,6 +6,9 @@ import { createBuiltInControlDecoratorRegistry, createBuiltInRelationRegistry } 
 import { buildRelationRenderSpec } from "./relation-renderer";
 import type { RelationCellSpec, RelationRenderSpec } from "./relation-render-spec";
 import type { RelationPreviewRenderSpec } from "./relation-preview-render-spec";
+import { routeRelations } from "./relation-routing";
+import { registerBezierConnector } from "./bezier-connector";
+import { relationTerminal } from "./x6-relation-adapter";
 
 export class RelationPreviewRenderError extends Error {
   readonly code = "OPD_RELATION_PREVIEW_RENDER_SPEC_INVALID";
@@ -31,7 +34,7 @@ export function buildCreateRelationPreview(
   }
   const candidateId = `candidate.relation.${option.option_id}`;
   const relation = relationFromOption(candidateId, option, parameters);
-  return sanitize(candidateId, option, buildRelationRenderSpec(relation, { nodes }, relationDefinitions, controlDecorators));
+  return sanitize(candidateId, option, routeRelations([buildRelationRenderSpec(relation, { nodes }, relationDefinitions, controlDecorators)], [relation], nodes)[0]!);
 }
 
 export function buildControlRelationPreview(
@@ -48,10 +51,11 @@ export function buildControlRelationPreview(
     controlCapability: option.capability_ref.capability_id,
     controlSegment: "PROCESS_INPUT",
   };
-  return sanitize(candidateId, option, buildRelationRenderSpec(relation, { nodes }, relationDefinitions, controlDecorators));
+  return sanitize(candidateId, option, routeRelations([buildRelationRenderSpec(relation, { nodes }, relationDefinitions, controlDecorators)], [relation], nodes)[0]!);
 }
 
 export function addRelationPreviewRenderSpec(graph: Graph, spec: RelationPreviewRenderSpec) {
+  registerBezierConnector();
   const existingCellIds = new Set(graph.getCells().map((cell) => cell.id));
   spec.cells.forEach((cell) => {
     if (cell.kind === "node") {
@@ -71,17 +75,23 @@ export function addRelationPreviewRenderSpec(graph: Graph, spec: RelationPreview
     const line = previewLineAttrs(spec, cell);
     const current = existingCellIds.has(cell.id) ? graph.getCellById(cell.id) : undefined;
     if (current?.isEdge()) {
+      current.setSource(relationTerminal(cell.source, cell.sourceAnchor));
+      current.setTarget(relationTerminal(cell.target, cell.targetAnchor));
+      current.setVertices(cell.vertices ? [...cell.vertices] : []);
+      if (cell.connector) current.setConnector(cell.connector as never);
+      if (cell.router) current.setRouter(cell.router as never); else current.removeRouter();
       current.setLabels(previewLabels(cell));
       current.attr({ line: line as never });
       return;
     }
     graph.addEdge({
       id: cell.id,
-      source: cell.source,
-      target: cell.target,
+      source: relationTerminal(cell.source, cell.sourceAnchor),
+      target: relationTerminal(cell.target, cell.targetAnchor),
       zIndex: 3,
       vertices: cell.vertices,
       router: cell.router,
+      connector: cell.connector,
       labels: previewLabels(cell),
       attrs: { line },
     });
@@ -90,8 +100,8 @@ export function addRelationPreviewRenderSpec(graph: Graph, spec: RelationPreview
 
 function previewLabels(cell: Extract<RelationCellSpec, { kind: "edge" }>) {
   return cell.labels.map((label) => ({
-    position: label.position,
-    attrs: { label: { text: label.text, fill: "#2f7abf", fontSize: label.fontSize, fontWeight: label.fontWeight } },
+    position: { distance: label.position, offset: -14 },
+    attrs: { body: { fill: "#fff", stroke: "none" }, label: { text: label.text, fill: "#2f7abf", fontSize: label.fontSize, fontWeight: label.fontWeight } },
   }));
 }
 
@@ -143,6 +153,8 @@ function sanitize(candidateId: string, option: WorkbenchCapabilityOption, commit
       id: idMap.get(cell.id) ?? `${candidateId}.cell`,
       source: idMap.get(cell.source) ?? cell.source,
       target: idMap.get(cell.target) ?? cell.target,
+      router: cell.router ? { ...cell.router, args: { ...cell.router.args, excludeNodes: Array.isArray(cell.router.args.excludeNodes)
+        ? cell.router.args.excludeNodes.map(id => idMap.get(String(id)) ?? id) : [] } } : undefined,
       data: {},
       line: { ...cell.line, captureAnchor: undefined, findingHighlighted: undefined },
     };

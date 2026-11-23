@@ -30,16 +30,19 @@ export function toContexts(data: { process_tree: NavigationNodeWire[]; object_fo
   const all = nodes.length ? nodes : [{ context_id: fallbackId, label: fallbackId, context_kind: "SYSTEM_DIAGRAM", has_children: false }];
   const ordered: RuntimeContext[] = [];
   const seen = new Set<string>();
+  const compare = (a: NavigationNodeWire, b: NavigationNodeWire) =>
+    Number(b.context_kind === "SYSTEM_DIAGRAM") - Number(a.context_kind === "SYSTEM_DIAGRAM")
+    || a.label.localeCompare(b.label, "zh-CN", { numeric: true }) || a.context_id.localeCompare(b.context_id);
   function visit(node: NavigationNodeWire, depth: number) {
     if (seen.has(node.context_id)) return;
     seen.add(node.context_id);
     ordered.push({ id: node.context_id, label: node.label, kind: node.context_kind,
       parentId: node.parent_context_id, refineeId: node.refinee_element_id, depth });
-    all.filter(item => item.parent_context_id === node.context_id).sort((a, b) => a.context_id.localeCompare(b.context_id))
+    all.filter(item => item.parent_context_id === node.context_id).sort(compare)
       .forEach(item => visit(item, depth + 1));
   }
-  all.filter(item => !item.parent_context_id).sort((a, b) => a.context_id.localeCompare(b.context_id)).forEach(item => visit(item, 0));
-  all.filter(item => !seen.has(item.context_id)).sort((a, b) => a.context_id.localeCompare(b.context_id)).forEach(item => visit(item, 0));
+  all.filter(item => !item.parent_context_id).sort(compare).forEach(item => visit(item, 0));
+  all.filter(item => !seen.has(item.context_id)).sort(compare).forEach(item => visit(item, 0));
   return ordered;
 }
 
@@ -49,6 +52,9 @@ export function toNode(value: ProjectionConstructWire): OpdNode {
     id: value.target_id,
     occurrenceId: value.occurrence_id,
     label: value.label ?? value.target_id,
+    domainTypeLabel: value.domain_type_label,
+    remark: value.remark,
+    appearance: value.layout.appearance,
     kind: value.construct_role === "PROCESS_NODE" ? "process" : value.construct_role === "ATTRIBUTE_NODE" ? "attribute" : value.construct_role === "OPERATION_NODE" ? "operation" : value.construct_role === "STATE_NODE" || value.construct_role === "FEATURE_STATE_NODE" ? "state" : "object",
     x: value.layout.x,
     y: value.layout.y,
@@ -63,6 +69,7 @@ export function toNode(value: ProjectionConstructWire): OpdNode {
     stateRoles: value.state_roles,
     explicitness: value.explicitness,
     foldState: value.fold_state,
+    edgeRoutes: value.layout.edge_routes,
   };
 }
 
@@ -84,6 +91,8 @@ export function toConsumption(value: ProjectionConstructWire, nodes: OpdNode[]):
       symbolRef: value.symbol_ref ?? "symbol.link.procedural",
       layoutRef: value.layout_ref ?? value.occurrence_id,
       capabilityId: value.capability_id,
+      layout: value.layout,
+      edgeRoutes: value.layout.edge_routes,
       endpoints: ordered.map((endpoint) => ({ role: endpoint.role, targetId: endpoint.target_id, targetKind: endpoint.target_kind, ordinal: endpoint.ordinal })),
       duration: value.modifiers?.find((modifier) => modifier.modifier_id === "duration")?.value,
       controlCapability: value.modifiers?.find((modifier) => modifier.modifier_id === "control.capability")?.value,
@@ -102,6 +111,8 @@ export function toConsumption(value: ProjectionConstructWire, nodes: OpdNode[]):
     sourceOccurrenceId: value.source_occurrence_id ?? value.source_id,
     targetOccurrenceId: value.target_occurrence_id ?? value.process_id,
     symbolRef: value.symbol_ref ?? "symbol.consumption.v1",
+    layout: value.layout,
+    edgeRoutes: value.layout.edge_routes,
     layoutRef: value.layout_ref ?? value.occurrence_id,
   }];
 }

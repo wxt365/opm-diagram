@@ -1,37 +1,57 @@
-import { watch, onMounted, onBeforeUnmount, type Ref, type ComputedRef } from "vue";
-import type { RouteLocationNormalizedLoaded, Router } from "vue-router";
-import { parseWorkbenchLocation, workbenchLocationQuery } from "@/app/workbenchLocation";
+import { onMounted, onBeforeUnmount, type Ref } from "vue";
+import { useDraftStatePolling } from "./useDraftStatePolling";
+import type { WorkbenchLocation, WorkbenchNavigation } from "@/workbench/internal";
+function workbenchLocationQuery(mode: "HEAD" | "EXACT", revision: string, context: string) {
+  return mode === "HEAD" ? { context } : { revision, context };
+}
 import type { useWorkbenchRuntimeStore } from "@/stores/workbenchRuntime";
 
 interface WorkbenchNavigationDependencies {
-  store: Pick<ReturnType<typeof useWorkbenchRuntimeStore>, "draftToken" | "saving" | "saveDraft" | "isReadonly" | "pollDraftState" | "leaveWorkbench" | "workbench" | "load" | "setViewportZoom" | "undoLayout" | "redoLayout">;
-  route: RouteLocationNormalizedLoaded;
-  router: Router;
+  store: Pick<ReturnType<typeof useWorkbenchRuntimeStore>, "layoutDirty" | "draftToken" | "draftSaveState" | "pendingDelivery" | "saving" | "saveDraft" | "isReadonly" | "pollDraftState" | "leaveWorkbench" | "workbench" | "load" | "setViewportZoom" | "undo" | "redo">;
+  route: WorkbenchLocation;
+  router: WorkbenchNavigation;
+  root: Ref<HTMLElement | undefined>;
+  globalShortcuts?: boolean;
+  canUseModelHistory?: () => boolean;
+  hasUnsavedAnalysis?: () => boolean;
+  hasPendingInputs?: () => boolean;
+  requestHistory?: (redo: boolean) => Promise<void>;
   finishInputs: () => Promise<boolean>;
-  projectId: ComputedRef<string>;
-  modelId: ComputedRef<string>;
-  canvasLocationKey: Ref<number>;
-  canvasInteractionTool: Ref<"select" | "pan">;
 }
 
 /** 统一保存快捷键、离开清理与 HEAD/EXACT 导航，保持迟到响应保护。 */
-export function useWorkbenchNavigation({ store, route, router, finishInputs, projectId, modelId, canvasLocationKey, canvasInteractionTool }: WorkbenchNavigationDependencies) {
+export function useWorkbenchNavigation({ store, route, router, finishInputs, root, globalShortcuts, canUseModelHistory = () => true, hasUnsavedAnalysis = () => false, hasPendingInputs = () => false, requestHistory }: WorkbenchNavigationDependencies) {
   let savePreparing = false;
-  let saveStateTimer: ReturnType<typeof setInterval> | undefined;
-  async function requestSave() {
-    if (savePreparing || !store.draftToken || store.saving) return;
+  useDraftStatePolling(
+    () => !!store.draftToken && store.workbench.resourceState === "ready" && (!store.isReadonly || store.pendingDelivery),
+    () => store.saving || store.pendingDelivery || !!store.draftSaveState?.dirty_since
+      || !!store.draftSaveState?.pending_manual_target || (!!store.draftSaveState && store.draftSaveState.in_flight !== "NONE"),
+    () => store.pollDraftState(),
+  );
+  function beforeUnload(event: BeforeUnloadEvent) {
+    if (!store.layoutDirty && !hasUnsavedAnalysis() && !hasPendingInputs()) return;
+    event.preventDefault(); event.returnValue = "";
+  }
+  async function requestSave(): Promise<string | null> {
+    if (savePreparing || !store.draftToken || store.saving) return null;
     savePreparing = true;
     const location = route.fullPath;
-    try { if (await finishInputs() && route.fullPath === location) await store.saveDraft(); } finally { savePreparing = false; }
+    try {
+      if (await finishInputs() && route.fullPath === location) return await store.saveDraft();
+      return null;
+    } finally { savePreparing = false; }
   }
   function saveKey(event: KeyboardEvent) {
+    if (event.target instanceof Element && event.target.closest(".opm-workbench") && !root.value?.contains(event.target)) return;
+    if (!globalShortcuts && (!root.value || !(event.target instanceof Node) || !root.value.contains(event.target))) return;
     if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
     const target = event.target;
     const editing = target instanceof HTMLElement && (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName));
     const key = event.key.toLowerCase();
     if ((key === "z" || key === "y") && !editing) {
+      if (!canUseModelHistory()) return;
       event.preventDefault();
-      if (!event.isComposing && !event.repeat && !store.isReadonly) void (event.shiftKey || key === "y" ? store.redoLayout() : store.undoLayout());
+      if (!event.isComposing && !event.repeat && !store.isReadonly) void runHistory(event.shiftKey || key === "y");
       return;
     }
     if (key !== "s") return;
@@ -39,11 +59,16 @@ export function useWorkbenchNavigation({ store, route, router, finishInputs, pro
     if (event.isComposing || event.repeat || store.isReadonly) return;
     void requestSave();
   }
+  async function runHistory(redo: boolean) {
+    if (requestHistory) return requestHistory(redo);
+    const location = route.fullPath;
+    if (await finishInputs() && route.fullPath === location) await (redo ? store.redo() : store.undo());
+  }
   onMounted(() => {
     window.addEventListener("keydown", saveKey);
-    saveStateTimer = setInterval(() => { void store.pollDraftState(); }, 2000);
+    window.addEventListener("beforeunload", beforeUnload);
   });
-  onBeforeUnmount(() => { window.removeEventListener("keydown", saveKey); clearInterval(saveStateTimer); store.leaveWorkbench(); });
+  onBeforeUnmount(() => { window.removeEventListener("keydown", saveKey); window.removeEventListener("beforeunload", beforeUnload); store.leaveWorkbench(); });
   function openVersion(revision: string) {
     void router.push({ query: workbenchLocationQuery(revision === "head" ? "HEAD" : "EXACT", revision, store.workbench.activeContextId), hash: "" });
   }
@@ -67,27 +92,6 @@ export function useWorkbenchNavigation({ store, route, router, finishInputs, pro
       store.workbench.commandFeedback = "无法访问剪贴板，请允许浏览器复制后重试。";
     }
   }
-
-  let canonicalLocation = "";
-  let navigationSequence = 0;
-  watch(() => route.fullPath, async (fullPath) => {
-    const sequence = ++navigationSequence;
-    if (fullPath === canonicalLocation) { canonicalLocation = ""; return; }
-    canonicalLocation = "";
-    if (!projectId.value || !modelId.value) return;
-    const { context, revision } = parseWorkbenchLocation(route.query);
-    canvasLocationKey.value += 1;
-    canvasInteractionTool.value = "select";
-    store.setViewportZoom(100);
-    const loaded = await store.load(projectId.value, modelId.value, context, revision);
-    if (!loaded || sequence !== navigationSequence || route.fullPath !== fullPath) return;
-    const target = { path: route.path, query: workbenchLocationQuery(store.workbench.locationMode, store.workbench.revision, store.workbench.activeContextId), hash: "" };
-    const canonical = router.resolve(target).fullPath;
-    if (canonical !== fullPath) {
-      canonicalLocation = canonical;
-      await router.replace(target);
-    }
-  }, { immediate: true });
 
   return { requestSave, openVersion, openContext, copyPermalink };
 }

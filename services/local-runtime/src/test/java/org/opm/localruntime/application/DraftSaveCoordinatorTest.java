@@ -3,6 +3,7 @@ package org.opm.localruntime.application;
 import org.junit.jupiter.api.Test;
 import org.opm.localruntime.api.generated.DraftSaveContract.*;
 import org.opm.localruntime.storage.DraftJournalRepository.Snapshot;
+import org.opm.localruntime.storage.DraftJournalRepository.StateSnapshot;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -31,7 +32,10 @@ class DraftSaveCoordinatorTest {
         volatile Snapshot snapshot = new Snapshot(token(0), "{}", "b".repeat(64), null, null, token(0), null);
         final List<String> events = new java.util.concurrent.CopyOnWriteArrayList<>();
         Runnable checkpointHook = () -> { }, pinHook = () -> { }; boolean failAuto; int history;
-        public Snapshot read() { return snapshot; }
+        public StateSnapshot readState() {
+            var current = snapshot;
+            return new StateSnapshot(current.token(), current.dirtySince(), current.deadline(), current.checkpointToken(), current.lastManualRevision());
+        }
         void edit(long seq, Instant now) {
             String dirty = snapshot.dirtySince() == null ? time(now) : snapshot.dirtySince();
             snapshot = new Snapshot(token(seq), "{}", "b".repeat(64), dirty, time(Instant.parse(dirty).plusSeconds(10)), snapshot.checkpointToken(), snapshot.lastManualRevision());
@@ -73,7 +77,8 @@ class DraftSaveCoordinatorTest {
         var backend = new Backend(); var time = new Time(); backend.edit(1, time.now); time.advance(10);
         var entered = new CountDownLatch(1); var release = new CountDownLatch(1);
         backend.pinHook = () -> { entered.countDown(); try { assertTrue(release.await(5, TimeUnit.SECONDS)); } catch (InterruptedException e) { throw new RuntimeException(e); } };
-        try (var coordinator = coordinator(backend, time); var executor = java.util.concurrent.Executors.newSingleThreadExecutor()) {
+        var executor = java.util.concurrent.Executors.newSingleThreadExecutor();
+        try (var coordinator = coordinator(backend, time)) {
             var request = new PinRequest("pin.running", token(1), "PERMALINK"); var pin = coordinator.requestPin(request);
             var running = executor.submit(coordinator::poll);
             try {
@@ -84,7 +89,7 @@ class DraftSaveCoordinatorTest {
                 release.countDown(); running.get(5, TimeUnit.SECONDS); assertEquals("revision.pin", pin.join().revision_id());
                 assertEquals("NONE", coordinator.state().in_flight()); assertEquals(List.of("PIN:pin.running"), backend.events);
             } finally { release.countDown(); }
-        }
+        } finally { executor.shutdownNow(); }
     }
 
     @Test void continuousEditingKeepsFirstDeadlineAndSavesThreeTimesInThirtySeconds() {
@@ -132,7 +137,8 @@ class DraftSaveCoordinatorTest {
         var backend = new Backend(); var time = new Time(); backend.edit(1, time.now); time.advance(10);
         var entered = new CountDownLatch(1); var release = new CountDownLatch(1);
         backend.checkpointHook = () -> { entered.countDown(); try { assertTrue(release.await(5, TimeUnit.SECONDS)); } catch (InterruptedException e) { throw new RuntimeException(e); } };
-        try (var coordinator = coordinator(backend, time); var executor = java.util.concurrent.Executors.newSingleThreadExecutor()) {
+        var executor = java.util.concurrent.Executors.newSingleThreadExecutor();
+        try (var coordinator = coordinator(backend, time)) {
             var automatic = executor.submit(coordinator::poll);
             try {
                 assertTrue(entered.await(5, TimeUnit.SECONDS)); assertEquals("AUTO", coordinator.state().in_flight());
@@ -141,7 +147,7 @@ class DraftSaveCoordinatorTest {
                 release.countDown(); automatic.get(5, TimeUnit.SECONDS); coordinator.poll();
                 assertEquals("save.after", manual.join().save_id()); assertEquals(List.of("AUTO", "save.after"), backend.events);
             } finally { release.countDown(); }
-        }
+        } finally { executor.shutdownNow(); }
     }
 
     @Test void autoBackoffUsesOneTwoFourEightTenSecondsAndManualBypassesIt() {
@@ -187,12 +193,13 @@ class DraftSaveCoordinatorTest {
     @Test void executorRunsCoreAndCloseCancelsQueuedWorkWithoutClosingTheHostExecutor() throws Exception {
         var backend = new Backend(); var time = new Time(); backend.edit(1, time.now); time.advance(11);
         var reached = new CountDownLatch(1); backend.checkpointHook = reached::countDown;
-        try (var executor = java.util.concurrent.Executors.newSingleThreadScheduledExecutor()) {
+        var executor = java.util.concurrent.Executors.newSingleThreadScheduledExecutor();
+        try {
             var coordinator = coordinator(backend, time); coordinator.start(executor);
             try { assertTrue(reached.await(3, TimeUnit.SECONDS)); }
             finally { coordinator.close(); }
             assertFalse(executor.isShutdown()); assertTrue(coordinator.requestManual(request("save.closed", 1)).isCompletedExceptionally());
-        }
+        } finally { executor.shutdownNow(); }
         var pendingBackend = new Backend(); var pendingTime = new Time();
         var coordinator = coordinator(pendingBackend, pendingTime); var pending = coordinator.requestManual(request("save.pending", 0));
         coordinator.close(); coordinator.poll(); assertTrue(pending.isCompletedExceptionally()); assertTrue(pendingBackend.events.isEmpty());

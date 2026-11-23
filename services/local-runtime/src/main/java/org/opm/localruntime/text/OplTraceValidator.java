@@ -23,7 +23,7 @@ final class OplTraceValidator {
         for (int index = 0; index < sentences.size(); index++) {
             OplSentence sentence = sentences.get(index);
             OplTextTrace trace = traces.get(index);
-            if (trace.sentenceIds().size() != 1 || !sentence.sentenceId().equals(trace.sentenceIds().getFirst())) {
+            if (trace.sentenceIds().size() != 1 || !sentence.sentenceId().equals(trace.sentenceIds().get(0))) {
                 throw incomplete("Trace order must match generated sentence order");
             }
             validateSentenceTokens(sentence, activeWrite);
@@ -49,7 +49,7 @@ final class OplTraceValidator {
         for (int index = 0; index < sentences.size(); index++) {
             OplSentence sentence = sentences.get(index);
             OplTextTrace trace = traces.get(index);
-            SemanticRevision.Fact fact = facts.get(sentence.inputFactIds().getFirst());
+            SemanticRevision.Fact fact = facts.get(sentence.inputFactIds().get(0));
             SemanticRevision.Context context = contexts.get(trace.contextId());
             if (fact == null || context == null || !artifact.contextId().equals(trace.contextId())
                     || !sentence.inputFactIds().equals(trace.factIds())) {

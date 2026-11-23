@@ -26,7 +26,7 @@
           v-model="projectSearch"
           data-testid="p01-search"
           type="search"
-          placeholder="搜索项目或模型"
+          placeholder="搜索项目名称"
         >
       </label>
       <span class="toolbar-count">{{ store.projects.length }} 个项目</span>
@@ -158,7 +158,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 
 import { useDialogFocus } from "@/shared/composables/useDialogFocus";
@@ -170,6 +170,8 @@ const projectName = ref("智能仓储系统");
 const projectDescription = ref("仓储作业与设备协同建模");
 const projectSearch = ref("");
 const isDialogOpen = ref(false);
+let active = true;
+onBeforeUnmount(() => { active = false; });
 const defaultProfileLabel = computed(() => {
   const binding = window.__OPM_ACTIVE_PROFILE_BINDING__;
   if (!binding?.profile_id || !binding.profile_version) return "本地默认 Profile（版本未提供）";
@@ -198,8 +200,11 @@ function openDialog() {
 }
 
 async function submitProject() {
+  if (store.isCreatingProject) return;
+  const location = router.currentRoute.value.fullPath;
   try {
     const project = await store.createProject(projectName.value, projectDescription.value);
+    if (!active || location !== router.currentRoute.value.fullPath) return;
     closeDialog();
     await router.push(`/projects/${project.id}`);
   } catch {

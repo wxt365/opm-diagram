@@ -9,6 +9,17 @@ import { consumptionDefinition } from "./procedural/consumption.definition";
 const context = { nodes: [node("object.input", "object", 80, 80), node("process.transform", "process", 400, 80), node("object.output", "object", 680, 80)] };
 
 describe("Capability 级 Relation Registry", () => {
+  it("单成员结构关系的三角靠近所属对象，不为单支线绕远形成大主干", () => {
+    const spec = buildRelationRenderSpec({ ...relation("CAP-ISO-STRUCT-005"),
+      endpoints: [endpoint("WHOLE", "object.input", 0), endpoint("PART", "object.output", 1)] },
+    context, createBuiltInRelationRegistry(), createBuiltInControlDecoratorRegistry());
+    const triangle = spec.cells.find(cell => cell.kind === "node")!;
+    if (triangle.kind !== "node") throw new Error("missing triangle");
+    expect(triangle.x + triangle.width / 2).toBeGreaterThan(240);
+    expect(triangle.x + triangle.width / 2).toBeLessThanOrEqual(288);
+    expect(triangle.width).toBe(16);
+    expect(spec.cells.find(cell => cell.kind === "edge" && cell.id.endsWith("member.0"))).toMatchObject({ vertices: [] });
+  });
   it.each([[400, 80, 270], [-240, 80, 90], [80, 400, 0], [80, -240, 180]])("展示—特征在布局 %s,%s 下使用双层三角且尖端连接 owner", (x, y, angle) => {
     const spec = buildRelationRenderSpec({
       ...relation("CAP-ISO-STRUCT-006"),

@@ -28,9 +28,8 @@ class NewDraftModelTest {
         var second = data(domain.createModel(project, modelRequest(domain, "second")));
         String model = first.get("model_id").toString(), other = second.get("model_id").toString();
         assertEquals(first, data(domain.createModel(project, modelRequest(domain, "first"))));
-        var database = factory.databasePath(project);
-        assertEquals("8", scalar(database, "SELECT count(*) FROM flyway_schema_history WHERE success=1"));
-        assertEquals("2", scalar(database, "SELECT count(*) FROM sqlite_master WHERE type='table' AND name IN ('mindmap_document', 'mindmap_conversion')"));
+        var database = factory.snapshot(project);
+        assertEquals(database.getFileName().toString().equals("project.db") ? "1" : "6", scalar(database, "SELECT count(*) FROM flyway_schema_history WHERE success"));
         assertInstanceOf(ProjectDatabaseOpenResult.Ready.class, factory.open(project));
         assertEquals("2", scalar(database, "SELECT count(*) FROM draft_stream"));
         var repository = new DraftJournalRepository(database, Clock.systemUTC());
@@ -67,34 +66,36 @@ class NewDraftModelTest {
     @Test void failedModeInsertionRollsBackTheWholeModelAndRetryCreatesOnlyOne() throws Exception {
         var factory = ProjectDatabaseFactory.journaledDrafts(temporary); var domain = new LocalApiService(factory);
         String project = data(domain.createProject(Map.of("request_id", "request.project", "command_id", "command.project", "name", "回滚"))).get("project_id").toString();
-        var database = factory.databasePath(project);
-        execute(database, "CREATE TRIGGER test_fail_mode BEFORE INSERT ON model_save_mode BEGIN SELECT RAISE(ABORT,'test failure'); END");
+        var database = factory.snapshot(project);
+        execute(database, factory.store() instanceof SqliteStore ? "CREATE TRIGGER test_fail_mode BEFORE INSERT ON model_save_mode BEGIN SELECT RAISE(ABORT, 'test failure'); END" : "CREATE OR REPLACE FUNCTION fn_test_fail_mode() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'test failure'; RETURN NEW; END $$; CREATE TRIGGER test_fail_mode BEFORE INSERT ON model_save_mode FOR EACH ROW EXECUTE FUNCTION fn_test_fail_mode()");
         assertThrows(ApiException.class, () -> domain.createModel(project, modelRequest(domain, "rollback")));
         for (String table : java.util.List.of("model_catalog", "model_head", "revision_document", "draft_content", "draft_stream", "draft_checkpoint", "model_save_mode"))
             assertEquals("0", scalar(database, "SELECT count(*) FROM " + table), table);
         assertEquals("1", scalar(database, "SELECT count(*) FROM idempotency_record"));
-        execute(database, "DROP TRIGGER test_fail_mode");
+        execute(database, factory.store() instanceof SqliteStore ? "DROP TRIGGER test_fail_mode" : "DROP TRIGGER test_fail_mode ON model_save_mode");
         domain.createModel(project, modelRequest(domain, "rollback"));
         assertEquals("1", scalar(database, "SELECT count(*) FROM model_save_mode"));
     }
 
-    @Test void newFactoryDoesNotImplicitlyUpgradeLegacyProjects() throws Exception {
-        var legacy = new ProjectDatabaseFactory(temporary);
-        assertInstanceOf(ProjectDatabaseOpenResult.Ready.class, legacy.open("project.legacy"));
-        assertFalse(legacy.usesJournaledDrafts());
-        assertInstanceOf(ProjectDatabaseOpenResult.RecoveryRequired.class, ProjectDatabaseFactory.journaledDrafts(temporary).open("project.legacy"));
-        assertEquals("2", scalar(legacy.databasePath("project.legacy"), "SELECT count(*) FROM flyway_schema_history WHERE success=1"));
-        assertEquals("0", scalar(legacy.databasePath("project.legacy"), "SELECT count(*) FROM sqlite_master WHERE name='model_save_mode'"));
+    @Test void factoriesShareOneMigratedSchemaWithoutCreatingModelRows() throws Exception {
+        var legacy=new ProjectDatabaseFactory(temporary);assertInstanceOf(ProjectDatabaseOpenResult.Ready.class,legacy.open("project.legacy"));
+        assertFalse(legacy.usesJournaledDrafts());assertInstanceOf(ProjectDatabaseOpenResult.Ready.class,ProjectDatabaseFactory.journaledDrafts(temporary).open("project.legacy"));
+        assertEquals(legacy.store() instanceof SqliteStore ? "1" : "6",scalar(legacy.snapshot("project.legacy"),"SELECT count(*) FROM flyway_schema_history WHERE success"));
+        assertEquals("0",scalar(legacy.snapshot("project.legacy"),"SELECT count(*) FROM model_save_mode"));
     }
-
-    private Map<String, Object> modelRequest(LocalApiService service, String suffix) {
-        return Map.of("request_id", "request." + suffix, "command_id", "command." + suffix, "name", suffix, "binding", service.activeProfileRuleBinding());
+    private Map<String,Object> modelRequest(LocalApiService service,String suffix) {
+        return Map.of("request_id","request."+suffix,"command_id","command."+suffix,
+                "name",suffix,"binding",service.activeProfileRuleBinding());
     }
-    @SuppressWarnings("unchecked") private static Map<String, Object> data(Map<String, Object> value) { return (Map<String, Object>) value.get("data"); }
-    private static String scalar(Path database, String sql) throws Exception {
-        try (var connection = DriverManager.getConnection("jdbc:sqlite:" + database); var statement = connection.createStatement(); var rows = statement.executeQuery(sql)) { assertTrue(rows.next()); return rows.getString(1); }
+    @SuppressWarnings("unchecked") private static Map<String,Object> data(Map<String,Object> value) {
+        return (Map<String,Object>)value.get("data");
     }
-    private static void execute(Path database, String sql) throws Exception {
-        try (var connection = DriverManager.getConnection("jdbc:sqlite:" + database); var statement = connection.createStatement()) { statement.execute(sql); }
+    private static String scalar(Path database,String sql)throws Exception {
+        try(var connection=SqliteTestSupport.connection(database);var statement=connection.createStatement();var rows=statement.executeQuery(sql)) {
+            assertTrue(rows.next());return rows.getString(1);
+        }
+    }
+    private static void execute(Path database,String sql)throws Exception {
+        try(var connection=SqliteTestSupport.connection(database);var statement=connection.createStatement()){statement.execute(sql);}
     }
 }

@@ -1,3 +1,4 @@
+import { localLayout } from './helpers/local-layout';
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
 test.use({ baseURL: process.env.OPM_PLACEMENT_BASE ?? "http://127.0.0.1:5176" });
@@ -37,7 +38,7 @@ test("真实画布自动布局预览、取消、确认、失败恢复及保存�
     await page.getByRole("button", { name: "收起底部面板 / Collapse bottom panel", exact: true }).click();
     for (const [index, item] of [owner, process, output].entries()) {
       await item.click({ position: { x: 20, y: 14 } }); const box = (await item.boundingBox())!;
-      await edit(page, () => drag(page, item, Math.round(([450, 800, 600][index]! - box.x) / 16) * 16,
+      await localLayout(page, () => drag(page, item, Math.round(([450, 800, 600][index]! - box.x) / 16) * 16,
         Math.round(([450, 650, 900][index]! - box.y) / 16) * 16));
     }
     await owner.click({ position: { x: 20, y: 14 } }); await edit(page, () => page.getByTestId("p03-tool-attribute").click());
@@ -81,11 +82,11 @@ test("真实画布自动布局预览、取消、确认、失败恢复及保存�
     expect(await geometry(nodes)).toEqual(before); expect(await edgeGeometry(page)).toEqual(beforeEdges); expect(requests).toHaveLength(count);
     await preview(page); await page.keyboard.press("Escape"); await expect(page.getByTestId("opd-auto-preview")).not.toBeVisible();
     expect(await geometry(nodes)).toEqual(before); expect(requests).toHaveLength(count);
-    await preview(page); await edit(page, () => page.getByTestId("opd-auto-apply").click());
-    await expect(page.getByTestId("opd-auto-preview")).not.toBeVisible(); expect(requests).toHaveLength(count + 1);
-    expect(requests.at(-1)!.command.command_type).toBe("UPDATE_LAYOUT_BATCH"); expect(await geometry(nodes)).toEqual(right);
-    await edit(page, () => page.getByTestId("opd-undo-layout").click()); expect(await geometry(nodes)).toEqual(before); expect(await edgeGeometry(page)).toEqual(beforeEdges);
-    await edit(page, () => page.getByTestId("opd-redo-layout").click()); expect(await geometry(nodes)).toEqual(right);
+    await preview(page); await localLayout(page, () => page.getByTestId("opd-auto-apply").click());
+    await expect(page.getByTestId("opd-auto-preview")).not.toBeVisible(); expect(requests).toHaveLength(count);
+    expect(await geometry(nodes)).toEqual(right);
+    await localLayout(page, () => page.getByTestId("opd-undo-layout").click()); expect(await geometry(nodes)).toEqual(before); expect(await edgeGeometry(page)).toEqual(beforeEdges);
+    await localLayout(page, () => page.getByTestId("opd-redo-layout").click()); expect(await geometry(nodes)).toEqual(right);
     // 再次布局已经符合当前方向：无预览、无请求。
     const stable = requests.length; await preview(page, false);
     await expect(page.getByTestId("p03-command-feedback")).toContainText("已符合该自动布局"); expect(requests).toHaveLength(stable);
@@ -96,24 +97,37 @@ test("真实画布自动布局预览、取消、确认、失败恢复及保存�
     await preview(page, false); await expect(page.getByTestId("opd-auto-preview")).not.toBeVisible();
     // 改为另一方向预览后切换版本，旧预览必须消失。
     // 当前已是横向规则，直接预览会零变化；通过真实拖动建立不同初始几何。
-    await output.click({ position: { x: 20, y: 14 } }); await edit(page, () => drag(page, output, 0, 64));
+    await output.click({ position: { x: 20, y: 14 } }); await localLayout(page, () => drag(page, output, 0, 64));
     await preview(page);
     const versions = await page.getByTestId("p03-version-select").locator("option").evaluateAll(options => options.map(option => (option as HTMLOptionElement).value));
-    await page.getByTestId("p03-version-select").selectOption(versions[1]!); await expect(page.getByTestId("p03-readonly-banner")).toBeVisible();
+    await page.getByTestId("p03-version-select").selectOption(versions[1]!);
+    await page.getByTestId('layout-leave-discard').click();
+    await expect(page.getByTestId("p03-readonly-banner")).toBeVisible();
     await expect(page.getByTestId("opd-auto-preview")).not.toBeVisible(); await expect(page.getByTestId("opd-layout-menu-toggle")).toHaveCount(0);
     await page.getByTestId("p03-return-head").click(); await expect(page.getByTestId("hs-save")).toBeEnabled();
-    await owner.locator('[data-testid^="p03-feature-toggle-"]').click();
-    // 拒绝应用时恢复服务器已确认坐标，待确认队列使用已有恢复入口。
+    const featureToggle = owner.locator('[data-testid^="p03-feature-toggle-"]');
+    const wasExpanded = (await featureToggle.getAttribute("aria-label"))?.startsWith("收起");
+    // The restored State link crosses this control: use a real click, without force.
+    await featureToggle.click();
+    await expect(featureToggle).toHaveAttribute("aria-label", wasExpanded ? "展开所属特征 / Expand features" : "收起所属特征 / Collapse features");
+    // HEAD preserves an explicit local expansion; leave features visible for geometry checks.
+    if (wasExpanded) await featureToggle.click();
+    await expect(feature).toBeVisible();
+    // 布局应用只改本地；保存被拒绝时保留本地几何，经原收据恢复。
+    await output.click({ position: { x: 20, y: 14 } }); await localLayout(page, () => drag(page, output, 0, 64));
     const rejectedBefore = await geometry(nodes), rejectedSeq = await editSeq(page); await preview(page);
+    await page.getByTestId('opd-auto-direction').selectOption('down');
     await page.route(`**/models/${modelId}/draft/commands`, route => route.fulfill({ status: 422, contentType: "application/json",
       body: JSON.stringify({ code: "DRAFT_EDIT_REJECTED", message: "自动布局拒绝验证", retryable: false, reason_code: null }) }), { times: 1 });
-    await page.getByTestId("opd-auto-apply").click(); await expect(page.getByTestId("p03-command-feedback")).toContainText("自动布局拒绝验证");
-    await expect(page.getByTestId("opd-auto-preview")).not.toBeVisible(); expect(await geometry(nodes)).toEqual(rejectedBefore); expect(await editSeq(page)).toBe(rejectedSeq);
+    await localLayout(page, () => page.getByTestId("opd-auto-apply").click());
+    const rejectedLocal = await geometry(nodes);
+    await page.getByTestId("hs-save").click(); await expect(page.getByTestId("p03-workbench")).toContainText("自动布局拒绝验证");
+    await expect(page.getByTestId("opd-auto-preview")).not.toBeVisible(); expect(await geometry(nodes)).toEqual(rejectedLocal); expect(await editSeq(page)).toBe(rejectedSeq);
     await page.getByTestId("hs-retry-delivery").click(); await expect(page.getByTestId("hs-save")).toBeEnabled();
-    await expect(feature).toBeVisible(); expect(await geometry(nodes)).toEqual(right);
+    await expect(feature).toBeVisible(); expect(await geometry(nodes)).toEqual(rejectedLocal);
     expect(await page.getByTestId("p03-opl-sentence").allTextContents()).toEqual(opl);
     // 窄屏通过选择一个节点并移动制造新布局，预览控件均可见且不越界。
-    await output.click({ position: { x: 20, y: 14 } }); await edit(page, () => drag(page, output, 0, 64));
+    await output.click({ position: { x: 20, y: 14 } }); await localLayout(page, () => drag(page, output, 0, 64));
     await page.setViewportSize({ width: 390, height: 844 }); await preview(page);
     await page.getByTestId("opd-auto-direction").selectOption("down");
     const bar = page.getByTestId("opd-auto-preview"), bounds = (await bar.boundingBox())!;

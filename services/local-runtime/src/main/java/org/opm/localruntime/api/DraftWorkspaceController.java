@@ -12,7 +12,7 @@ public final class DraftWorkspaceController {
     private final DraftWorkspaceService service;
     public DraftWorkspaceController(DraftWorkspaceService service) { this.service = service; }
 
-    @PostMapping(value = "/{operation:open|projection|text|navigation|findings|relation-catalog|capabilities|commands|receipts|operation-history|method-summary|plan-preview|mindmap}", consumes = "application/json", produces = "application/json")
+    @PostMapping(value = "/{operation:open|canvas|details|projection|text|navigation|findings|relation-catalog|capabilities|commands|receipts|operation-history|recovery-state|method-summary|plan-preview|mindmap}", consumes = "application/json", produces = "application/json")
     public JsonNode execute(@PathVariable String project, @PathVariable String model, @PathVariable String operation, @RequestBody String raw) {
         var type = switch (operation) {
             case "mindmap" -> MindmapRequest;
@@ -23,6 +23,7 @@ public final class DraftWorkspaceController {
             case "receipts" -> DraftReceiptRequest;
             case "relation-catalog" -> DraftRelationCatalogRequest;
             case "operation-history" -> OperationHistoryRequest;
+            case "recovery-state" -> RecoveryStateRequest;
             case "method-summary" -> MethodSummaryRequest;
             default -> DraftQueryRequest;
         };

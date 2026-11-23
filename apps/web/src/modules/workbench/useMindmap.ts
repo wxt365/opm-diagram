@@ -1,6 +1,8 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
-import { localRuntimeApi } from '@/shared/api/localRuntimeApi';
+import { useWorkbenchServices } from '@/workbench/services';
+import { localRuntimeApi as defaultRuntimeApi } from '@/shared/api/localRuntimeApi';
 import type { DraftToken, MindmapDocument, MindmapResult } from '@/shared/api/generated/draftWorkspaceContract';
+import { randomUuid } from '@/shared/platform/browserCrypto';
 
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value));
 function checkResponse(value: MindmapResult, requestId: string, saved?: MindmapDocument) {
@@ -9,17 +11,27 @@ function checkResponse(value: MindmapResult, requestId: string, saved?: MindmapD
 }
 
 export function useMindmap(props: { projectId: string; modelId: string; token: DraftToken | null; readonly: boolean; generating?: boolean }, changed: (result: MindmapResult) => void, invalidate: () => void = () => {}) {
+  const localRuntimeApi = useWorkbenchServices()?.api ?? defaultRuntimeApi;
   const document = ref<MindmapDocument | null>(null), result = ref<MindmapResult | null>(null), error = ref(''), loading = ref(false), saving = ref(false), dirty = ref(false);
   const past = ref<MindmapDocument[]>([]), future = ref<MindmapDocument[]>([]); let version = 0, changes = 0, timer: ReturnType<typeof setTimeout> | undefined;
-  const saveLabel = computed(() => saving.value ? '正在保存分析…' : dirty.value ? '分析未保存' : document.value ? '分析已保存' : loading.value ? '正在读取分析…' : '分析未读取');
-  async function load(force = false) {
+  const saveLabel = computed(() => saving.value ? '正在保存分析…' : dirty.value ? '分析未保存' : loading.value ? '正在读取分析…' : document.value ? '分析已保存' : '分析未读取');
+  async function load(force = false, preserveHistory = false) {
     if (!props.token || props.readonly) return;
+    // OPEN 不能使在途 SAVE 的版本失效，否则旧请求无法结束 saving 状态。
+    if (saving.value) return;
     if (dirty.value && !force) { error.value = '分析有未保存的修改，请保存后重新读取。'; return; }
     const sequence = ++version; loading.value = true; error.value = '';
     try {
-      const requestId = `request.mindmap.${crypto.randomUUID()}`;
+      const requestId = `request.mindmap.${randomUuid()}`;
       const value = await localRuntimeApi.draftQuery(props.projectId, props.modelId, 'mindmap', { request_id: requestId, action: 'OPEN', draft_token: props.token });
-      if (sequence !== version) return; checkResponse(value, requestId); result.value = value; document.value = clone(value.document); dirty.value = false; past.value = []; future.value = []; changed(value);
+      if (sequence !== version) return;
+      checkResponse(value, requestId);
+      if (!preserveHistory) past.value = [];
+      if (document.value?.id === value.document.id && document.value.revision !== value.document.revision && preserveHistory) {
+        past.value = [...past.value.slice(-39), clone(document.value)];
+      }
+      if (!preserveHistory || document.value?.revision !== value.document.revision) future.value = [];
+      result.value = value; document.value = clone(value.document); dirty.value = false; changed(value);
     } catch (cause) { if (sequence === version) error.value = cause instanceof Error ? cause.message : '读取脑图失败。'; }
     finally { if (sequence === version) loading.value = false; }
   }
@@ -42,7 +54,7 @@ export function useMindmap(props: { projectId: string; modelId: string; token: D
     if (!document.value || !props.token || props.readonly) return false;
     const sequence = version, captured = changes, sent = clone(document.value); saving.value = true; error.value = '';
     try {
-      const requestId = `request.mindmap.${crypto.randomUUID()}`;
+      const requestId = `request.mindmap.${randomUuid()}`;
       const value = await localRuntimeApi.draftQuery(props.projectId, props.modelId, 'mindmap', { request_id: requestId, action: 'SAVE', draft_token: props.token, document: sent, expected_revision: sent.revision });
       if (sequence !== version) return false;
       checkResponse(value, requestId, sent);

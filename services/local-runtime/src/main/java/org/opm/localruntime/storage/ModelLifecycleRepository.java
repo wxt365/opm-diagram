@@ -14,8 +14,9 @@ import java.util.UUID;
 public final class ModelLifecycleRepository {
     private static final String OPERATION = "API-PRJ-013";
     private static final ObjectMapper JSON = new ObjectMapper();
-    private final Path database;
-    public ModelLifecycleRepository(Path database) { this.database = database; }
+    private final ProjectScope database;
+    public ModelLifecycleRepository(ProjectScope database) { this.database = database; }
+    public ModelLifecycleRepository(Path snapshot) { this(SqliteSnapshots.scope(snapshot)); }
     public static final class Failure extends RuntimeException {
         private final String code;
         public Failure(String code, String message) { super(message); this.code = code; }
@@ -24,8 +25,8 @@ public final class ModelLifecycleRepository {
 
     public Map<String, String> change(String project, String model, String command, String digest,
                                       String action, String expectedState, String confirmationName) {
-        try (var connection = SqliteConnectionFactory.create(database).getConnection()) {
-            execute(connection, "BEGIN IMMEDIATE");
+        try (var connection = ProjectConnectionFactory.create(database).getConnection()) {
+            JdbcDialect.begin(connection, true); ProjectConnectionFactory.lockProject(connection);
             try {
                 try (var statement = connection.prepareStatement("SELECT request_digest,result_json FROM idempotency_record WHERE operation_id=? AND aggregate_id=? AND command_id=?")) {
                     statement.setString(1, OPERATION); statement.setString(2, model); statement.setString(3, command);
@@ -68,19 +69,16 @@ public final class ModelLifecycleRepository {
     }
 
     private static void purge(Connection connection, String model) throws SQLException {
-        execute(connection, "PRAGMA defer_foreign_keys=ON");
+        execute(connection, JdbcDialect.sqlite(connection) ? "PRAGMA defer_foreign_keys=ON" : "SET CONSTRAINTS ALL DEFERRED");
         update(connection, "INSERT INTO model_purge_authorization(model_id) VALUES (?)", model);
-        Set<String> tables = new HashSet<>();
-        try (var statement = connection.createStatement(); var rows = statement.executeQuery("SELECT name FROM sqlite_master WHERE type='table'")) {
-            while (rows.next()) tables.add(rows.getString(1));
-        }
+        Set<String> tables = new HashSet<>(JdbcDialect.tables(connection));
         if (tables.contains("draft_checkpoint_overlay")) update(connection,
                 "DELETE FROM draft_checkpoint_overlay WHERE checkpoint_id IN (SELECT checkpoint_id FROM draft_checkpoint WHERE model_id=?)", model);
         update(connection, "DELETE FROM background_task WHERE input_revision_id IN (SELECT revision_id FROM revision_document WHERE model_id=?)", model);
-        update(connection, "DELETE FROM background_task WHERE task_type='VALIDATE_MODEL' AND input_revision_id IS NULL AND json_extract(request_json,'$.model_id')=?", model);
+        update(connection, "DELETE FROM background_task WHERE task_type='VALIDATE_MODEL' AND input_revision_id IS NULL AND " + JdbcDialect.jsonText(connection, "request_json", "model_id") + "=?", model);
         update(connection, "DELETE FROM operation_record WHERE model_id=? OR input_revision_id IN (SELECT revision_id FROM revision_document WHERE model_id=?) OR result_revision_id IN (SELECT revision_id FROM revision_document WHERE model_id=?)", model, model, model);
-        update(connection, "DELETE FROM idempotency_record WHERE operation_id <> 'API-PRJ-013' AND (aggregate_id=? OR result_revision_id IN (SELECT revision_id FROM revision_document WHERE model_id=?) OR (operation_id='API-PRJ-007' AND json_extract(result_json,'$.model_id')=?))", model, model, model);
-        for (String table : java.util.List.of("draft_retention", "draft_receipt", "draft_savepoint", "draft_journal", "draft_checkpoint", "model_save_mode", "draft_stream", "draft_content",
+        update(connection, "DELETE FROM idempotency_record WHERE operation_id <> 'API-PRJ-013' AND (aggregate_id=? OR result_revision_id IN (SELECT revision_id FROM revision_document WHERE model_id=?) OR (operation_id='API-PRJ-007' AND " + JdbcDialect.jsonText(connection, "result_json", "model_id") + "=?))", model, model, model);
+        for (String table : java.util.List.of("mindmap_conversion", "mindmap_document", "draft_retention", "draft_receipt", "draft_savepoint", "draft_journal", "draft_checkpoint", "model_save_mode", "draft_stream", "draft_content",
                 "element_index", "fact_endpoint_index", "occurrence_index", "finding_index", "text_trace_index", "named_snapshot", "baseline", "revision_parent", "model_head", "revision_document")) {
             if (tables.contains(table)) update(connection, "DELETE FROM " + table + " WHERE model_id=?", model);
         }

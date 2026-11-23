@@ -34,7 +34,8 @@ describe("OPL 面板导出", () => {
     const content = await new Promise<string>(resolve => {
       const reader = new FileReader(); reader.onload = () => resolve(reader.result as string); reader.readAsText(blob);
     });
-    expect(content).toBe("打包 consumes 包装材料.\n复核 changes 包裹 from 待检 to 合格.\n");
+    expect(content).toBe("打包 消耗 包装材料。\n复核 改变 包裹 从 待检 到 合格。\n");
+    expect(wrapper.findAll('[data-testid="p03-opl-sentence"]').map(line => line.text())).toEqual(content.trim().split("\n"));
     expect(document.querySelector('a[download]')).toBeNull();
     wrapper.unmount();
   });
@@ -109,6 +110,24 @@ describe("问题面板", () => {
 describe("操作历史面板", () => {
   beforeEach(() => { setActivePinia(createPinia()); });
   afterEach(() => { vi.restoreAllMocks(); });
+  it("历史记录保留状态和刷新，但不展示撤销或重做入口", async () => {
+    vi.spyOn(localRuntimeApi, "operationHistory").mockResolvedValue({ items: [], next_before: null });
+    const { store, wrapper: initialWrapper } = setup();
+    initialWrapper.unmount();
+    store.workbench.bottomTab = "history";
+    await new Promise(resolve => setTimeout(resolve, 0));
+    store.operationHistory.items = [{ record_id: "history.latest", title: "删除关系", operation: "DELETE_CONSTRUCT", occurred_at: "2026-11-09T00:00:00Z",
+      status: "DURABLE", context_id: "context.1", context_name: "订单履约", revision_id: null, detail_available: true, recovery_action: "UNDO" }];
+    const wrapper = mount(WorkbenchBottomPanel, { props: { store } });
+    expect(wrapper.text()).toContain('删除关系'); expect(wrapper.text()).toContain('已记录');
+    expect(wrapper.find('[data-testid="p03-history-restore"]').exists()).toBe(false);
+    expect(wrapper.get('[data-testid="p03-history-refresh"]').exists()).toBe(true);
+    store.operationHistory.items[0]!.recovery_action = "REDO";
+    store.operationHistory.items[0]!.status = 'UNDONE';
+    await wrapper.vm.$nextTick(); expect(wrapper.text()).toContain('已撤销');
+    expect(wrapper.find('[data-testid="p03-history-restore"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
   it("中文记录和时间、旧详情边界、保存版本操作及失败重试", async () => {
     const query = vi.spyOn(localRuntimeApi, "operationHistory").mockResolvedValue({ items: [], next_before: null });
     const { store, wrapper } = setup();

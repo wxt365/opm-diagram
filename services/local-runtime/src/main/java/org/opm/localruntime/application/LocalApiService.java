@@ -62,6 +62,7 @@ public class LocalApiService {
     private final ProjectDatabaseFactory databaseFactory;
     private final org.opm.localruntime.storage.LocalApiRepository repository;
     private final LocalCatalogService catalogService;
+    private final EmbeddedWorkspaceService embeddedWorkspaceService;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final SemanticRevisionReader revisionReader = new SemanticRevisionReader();
     private final SemanticRevisionJsonWriter revisionWriter = new SemanticRevisionJsonWriter();
@@ -92,6 +93,7 @@ public class LocalApiService {
         this.profilePackageAssembler = new ProfilePackageAssembler(profilePackageLoader, e2eFaultPort);
         this.repository = new org.opm.localruntime.storage.LocalApiRepository(databaseFactory);
         this.catalogService = new LocalCatalogService(databaseFactory, repository, profilePackageAssembler);
+        this.embeddedWorkspaceService = new EmbeddedWorkspaceService(catalogService, repository);
     }
 
     public Map<String, String> activeProfileRuleBinding() {
@@ -109,6 +111,13 @@ public class LocalApiService {
     public Map<String, Object> listModels(String requestId, String projectId) { return catalogService.listModels(requestId, projectId); }
     public Map<String, Object> listModels(String requestId, String projectId, String archiveState) { return catalogService.listModels(requestId, projectId, archiveState); }
     public synchronized Map<String, Object> createModel(String projectId, Map<String, Object> request) { return catalogService.createModel(projectId, request); }
+    public synchronized Map<String, Object> ensureEmbeddedWorkspace(Map<String, Object> request) {
+        return embeddedWorkspaceService.ensure(request, activeProfileRuleBinding());
+    }
+
+    public com.fasterxml.jackson.databind.node.ObjectNode embeddedModelTemplate() {
+        return catalogService.embeddedModelTemplate();
+    }
     synchronized Map<String, Object> createTransferredModel(String projectId, Map<String, Object> request, com.fasterxml.jackson.databind.node.ObjectNode document) {
         return catalogService.createTransferredModel(projectId, request, document);
     }
@@ -126,7 +135,7 @@ public class LocalApiService {
         try (Connection connection = repository.projectConnection(projectId);
              PreparedStatement statement = connection.prepareStatement("""
                      SELECT m.name, h.draft_head_revision_id,
-                            (SELECT b.revision_id FROM baseline b WHERE b.model_id = m.model_id ORDER BY b.created_at DESC, b.baseline_id DESC LIMIT 1)
+                            (SELECT b.revision_id FROM baseline b WHERE b.model_id = m.model_id ORDER BY b.created_at DESC, b.baseline_id DESC LIMIT 1), m.description
                      FROM model_catalog m LEFT JOIN model_head h ON h.model_id = m.model_id
                      WHERE m.model_id = ? AND m.project_id = ? AND m.status = 'ACTIVE'
                      """)) {
@@ -141,6 +150,7 @@ public class LocalApiService {
                         ? requestedContext : revision.rootContextId();
                 Map<String, Object> model = new LinkedHashMap<>();
                 model.put("model_id", modelId); model.put("project_id", projectId); model.put("name", result.getString(1));
+                model.put("description", result.getString(4) == null ? "" : result.getString(4));
                 model.put("head_revision", head);
                 model.put("profile_id", revision.profileBinding().profile().id());
                 model.put("profile_version", revision.profileBinding().profile().version());
@@ -163,9 +173,12 @@ public class LocalApiService {
     }
 
     public Map<String, Object> projection(String requestId, String projectId, String modelId, String contextId, String revisionId) {
-        SemanticRevision revision = revision(projectId, modelId, revisionId);
+        var view = revisionView(projectId, modelId, revisionId);
+        SemanticRevision revision = view.revision();
+        var data = projectionData(revision, contextId);
+        OpdProjectionQuery.addRemarks(data, view.document());
         return queryResult(requestId, revisionId, revision.profileBinding().profile().version(), revision.profileBinding().ruleSet().version(),
-                freshness(projectId, modelId, revisionId), projectionData(revision, contextId), false);
+                freshness(projectId, modelId, revisionId), data, false);
     }
 
     // 给定语义视图的纯查询；草稿调用不读取历史 HEAD 或索引。
@@ -298,7 +311,7 @@ public class LocalApiService {
         SemanticRevision candidate = applyP0Command(projectId, modelId, current.revision(), required(request, "command_type"), requiredMap(request, "payload"));
         CandidateRevisionCommand command = new CandidateRevisionCommand(projectId, modelId, commandId, baseRevisionId, current.revision(), candidate,
                 binding(current.revision()), grammar(current.revision()), requestDigest, "P0_EDIT", Instant.now());
-        CommitResult result = new CandidateRevisionCommitter(new SqliteRevisionCommitRepository(databaseFactory.databasePath(projectId), e2eFaultPort, visualCommonCommitFaultPort), profilePackageAssembler, e2eFaultPort).commit(command);
+        CommitResult result = new CandidateRevisionCommitter(new SqliteRevisionCommitRepository(databaseFactory.databaseScope(projectId), e2eFaultPort, visualCommonCommitFaultPort), profilePackageAssembler, e2eFaultPort).commit(command);
         if (result instanceof CommitResult.Rejected rejected) throw rejected(rejected.code());
         String committed = result instanceof CommitResult.Committed value ? value.committedRevisionId() : ((CommitResult.Replayed) result).committedRevisionId();
         List<String> traces = result instanceof CommitResult.Committed value ? value.traceIds() : List.of();
@@ -309,9 +322,9 @@ public class LocalApiService {
         SemanticRevision revision = revision(projectId, modelId, revisionId);
         context(revision, contextId);
         OplGenerationResult generated = textGenerationService.generate(revision, contextId, profilePackageAssembler.assemble(revision.profileBinding()));
-        List<Map<String, Object>> sentences = generated.artifact().paragraphs().getFirst().sentences().stream()
+        List<Map<String, Object>> sentences = generated.artifact().paragraphs().get(0).sentences().stream()
                 .map(sentence -> Map.<String, Object>of("sentence_id", sentence.sentenceId(), "text", sentence.text(), "ordinal", sentence.ordinal())).toList();
-        List<Map<String, Object>> traces = generated.traces().stream().map(trace -> Map.<String, Object>of("sentence_id", trace.sentenceIds().getFirst(), "fact_ids", trace.factIds(), "occurrence_ids", trace.occurrenceIds())).toList();
+        List<Map<String, Object>> traces = generated.traces().stream().map(trace -> Map.<String, Object>of("sentence_id", trace.sentenceIds().get(0), "fact_ids", trace.factIds(), "occurrence_ids", trace.occurrenceIds())).toList();
         return queryResult(requestId, revisionId, revision.profileBinding().profile().version(), revision.profileBinding().ruleSet().version(), freshness(projectId, modelId, revisionId),
                 Map.of("artifact_id", generated.artifact().artifactId(), "modality", "OPL", "sentences", sentences, "traces", traces), false);
     }
@@ -483,7 +496,7 @@ public class LocalApiService {
     }
 
     public Map<String, Object> task(String requestId, String taskId) {
-        for (Path database : repository.projectDatabases()) {
+        for (var database : repository.projectDatabases()) {
             try (Connection connection = repository.connection(database);
                  PreparedStatement statement = connection.prepareStatement("SELECT task_id, state, stage, progress, input_revision_id, cancellable, result_json, created_at, started_at, finished_at, request_json FROM background_task WHERE task_id = ?")) {
                 statement.setString(1, taskId);
@@ -491,7 +504,7 @@ public class LocalApiService {
                     if (result.next()) {
                         String input = result.getString(5);
                         if (input == null) input = required(map(result.getString(11)), "input_revision");
-                        Map<String, Object> descriptor = taskDescriptor(result.getString(1), input, result.getString(2), result.getString(3), result.getObject(4, Integer.class), result.getInt(6) == 1,
+                        Map<String, Object> descriptor = taskDescriptor(result.getString(1), input, result.getString(2), result.getString(3), result.getObject(4)==null?null:result.getInt(4), result.getInt(6) == 1,
                                 map(result.getString(7)), result.getString(8), result.getString(9), result.getString(10));
                         return queryResult(requestId, input, PROFILE_VERSION, RULE_VERSION, "historical", descriptor, false);
                     }
@@ -541,6 +554,10 @@ public class LocalApiService {
     }
 
     private SemanticRevision revision(String projectId, String modelId, String revisionId) {
+        return revisionView(projectId, modelId, revisionId).revision();
+    }
+    private record RevisionView(SemanticRevision revision, com.fasterxml.jackson.databind.JsonNode document) { }
+    private RevisionView revisionView(String projectId, String modelId, String revisionId) {
         requireActiveModel(projectId, modelId);
         try (Connection connection = repository.projectConnection(projectId);
              PreparedStatement statement = connection.prepareStatement("SELECT document_json FROM revision_document WHERE model_id = ? AND revision_id = ?")) {
@@ -550,14 +567,16 @@ public class LocalApiService {
             try (ResultSet result = statement.executeQuery()) {
                 if (result.next()) {
                     if (saved.isPresent()) throw new ApiException(ApiErrorCode.PERSISTENCE_FAILED, 503, false, "保存历史身份冲突");
-                    return readRevision(result.getString(1));
+                    String raw = result.getString(1);
+                    return new RevisionView(readRevision(raw), org.opm.localruntime.storage.DraftJsonDelta.read(raw));
                 }
             }
             if (saved.isEmpty()) throw notFound("修订不存在");
             try {
                 var history = saved.get();
-                return org.opm.localruntime.semantic.DraftSemanticView.read(org.opm.localruntime.semantic.SaveContentDigestV1.read(history.contentDocument()),
-                        history.entry().revisionId(), history.entry().sequence());
+                var document = org.opm.localruntime.semantic.SaveContentDigestV1.read(history.contentDocument());
+                return new RevisionView(org.opm.localruntime.semantic.DraftSemanticView.read(document,
+                        history.entry().revisionId(), history.entry().sequence()), document);
             } catch (RuntimeException exception) { throw new ApiException(ApiErrorCode.PERSISTENCE_FAILED, 503, false, "保存历史语义视图无效"); }
         } catch (org.opm.localruntime.storage.DraftJournalRepository.Failure exception) {
             throw new ApiException(ApiErrorCode.PERSISTENCE_FAILED, 503, false, "保存历史完整性校验失败");

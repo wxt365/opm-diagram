@@ -9,6 +9,33 @@ import static org.opm.localruntime.application.SemanticViewSupport.*;
 
 /** 将已提供的语义视图投影为 OPD；不访问数据库、HEAD 或草稿会话。 */
 final class OpdProjectionQuery {
+    static void addRemarks(Map<String, Object> projection, com.fasterxml.jackson.databind.JsonNode document) {
+        var remarks = new java.util.HashMap<String, String>();
+        for (String collection : List.of("elements", "features", "states")) for (var item : document.path(collection)) {
+            String key = switch (collection) { case "elements" -> "element_id"; case "features" -> "feature_id"; default -> "state_id"; };
+            if (item.has("remark")) remarks.put(item.path(key).asText(), item.get("remark").asText());
+        }
+        @SuppressWarnings("unchecked") var constructs = (List<Map<String, Object>>) projection.get("constructs");
+        for (var construct : constructs) {
+            var remark = remarks.get(construct.get("target_id"));
+            if (remark != null) construct.put("remark", remark);
+        }
+        var appearances = new java.util.HashMap<String, com.fasterxml.jackson.databind.JsonNode>();
+        for (var layout : document.path("layouts")) if (layout.has("appearance"))
+            appearances.put(layout.path("layout_id").asText(), layout.get("appearance"));
+        var layoutIds = new java.util.HashMap<String, String>();
+        for (var occurrence : document.path("occurrences"))
+            layoutIds.put(occurrence.path("occurrence_id").asText(), occurrence.path("layout_id").asText());
+        for (var construct : constructs) {
+            var appearance = appearances.get(layoutIds.get(construct.get("occurrence_id")));
+            if (appearance == null) continue;
+            @SuppressWarnings("unchecked") var original = (Map<String, Object>) construct.get("layout");
+            var layout = new LinkedHashMap<>(original);
+            var colors = new LinkedHashMap<String, String>();
+            appearance.fields().forEachRemaining(field -> colors.put(field.getKey(), field.getValue().asText()));
+            layout.put("appearance", colors); construct.put("layout", layout);
+        }
+    }
     Map<String, Object> projectionData(SemanticRevision revision, String contextId) {
         SemanticRevision.Context context = context(revision, contextId);
         Map<String, String> labels = labels(revision);
@@ -39,7 +66,9 @@ final class OpdProjectionQuery {
             construct.put("capability_id", projectionCapability(revision, occurrence));
             construct.put("construct_role", occurrence.constructRole());
             construct.put("label", labels.getOrDefault(occurrence.targetId(), occurrence.targetId()));
-            construct.put("layout", Map.of("x", layout.x(), "y", layout.y(), "width", layout.width(), "height", layout.height(), "z_order", layout.zOrder()));
+            var geometry = new LinkedHashMap<String, Object>(Map.of("x", layout.x(), "y", layout.y(), "width", layout.width(), "height", layout.height(), "z_order", layout.zOrder()));
+            if (!layout.edgeRoutes().isEmpty()) geometry.put("edge_routes", layout.edgeRoutes());
+            construct.put("layout", geometry);
             if (occurrence.targetKind() == SemanticRevision.TargetKind.FEATURE) {
                 SemanticRevision.Feature feature = features.get(occurrence.targetId());
                 if (feature == null) throw domain("Context Feature 不存在");

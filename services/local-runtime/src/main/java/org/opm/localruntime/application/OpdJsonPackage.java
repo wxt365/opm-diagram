@@ -70,7 +70,7 @@ final class OpdJsonPackage {
     }
     static SemanticRevision validate(ObjectNode document) {
         try {
-            if (!Set.of("0.2", "0.3", "0.4", "0.5").contains(document.path("schema_version").asText())) invalid("OPD JSON 只支持语义版本 0.2、0.3、0.4 或 0.5");
+            if (!Set.of("0.2", "0.3", "0.4", "0.5", "0.6", "0.7").contains(document.path("schema_version").asText())) invalid("OPD JSON 只支持语义版本 0.2 至 0.7");
             var identity = document.path("model_header").path("identity_namespace");
             if (!identity.isObject() || !identity.path("namespace").isTextual() || identity.path("namespace").asText().isBlank()
                     || !identity.path("local_name").isTextual() || identity.path("local_name").asText().isBlank()) invalid("OPD 模型身份格式无效");
@@ -79,6 +79,19 @@ final class OpdJsonPackage {
             return revision;
         } catch (ApiException exception) { throw exception; }
         catch (RuntimeException exception) { invalid("OPD 语义数据格式无效"); return null; }
+    }
+    static void validateText(SemanticRevision revision, org.opm.localruntime.text.TextGenerationAssets assets) {
+        var text = new org.opm.localruntime.text.OplTextGenerationService();
+        for (var context : revision.contexts()) {
+            try {
+                var generated = text.generate(revision, context.id(), assets);
+                text.validateActiveWriteEvidence(revision, assets, generated);
+            } catch (org.opm.localruntime.text.OplGenerationException exception) {
+                throw new ApiException(ApiErrorCode.TEXT_GENERATION_BLOCKED, 422, false,
+                        "子图「" + context.name().localName() + "」（" + context.id() + "）无法生成 OPL ["
+                                + exception.code() + "]：" + exception.getMessage());
+            }
+        }
     }
     private static void keep(ObjectNode document, String collection, String field, Set<String> ids) {
         JsonNode source = document.path(collection); ArrayNode target = document.putArray(collection);

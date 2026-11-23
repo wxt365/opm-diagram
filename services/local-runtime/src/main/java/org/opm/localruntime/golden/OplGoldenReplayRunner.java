@@ -78,13 +78,13 @@ public final class OplGoldenReplayRunner {
         String expectation = goldenCase.required("expectation").asText();
         OplGoldenReplayReportWriter.ObservedStatus expectedStatus = "PASS".equals(expectation)
                 ? OplGoldenReplayReportWriter.ObservedStatus.PASS_MATCHED : OplGoldenReplayReportWriter.ObservedStatus.BLOCKED_MATCHED;
-        boolean deterministic = attempts.getFirst().observedStatus() == attempts.get(1).observedStatus()
-                && same(attempts.getFirst().artifactSha256(), attempts.get(1).artifactSha256())
-                && same(attempts.getFirst().traceSha256(), attempts.get(1).traceSha256())
-                && same(attempts.getFirst().errorCode(), attempts.get(1).errorCode())
-                && attempts.getFirst().transaction().equals(attempts.get(1).transaction());
+        boolean deterministic = attempts.get(0).observedStatus() == attempts.get(1).observedStatus()
+                && same(attempts.get(0).artifactSha256(), attempts.get(1).artifactSha256())
+                && same(attempts.get(0).traceSha256(), attempts.get(1).traceSha256())
+                && same(attempts.get(0).errorCode(), attempts.get(1).errorCode())
+                && attempts.get(0).transaction().equals(attempts.get(1).transaction());
         if (!deterministic) {
-            attempts = List.of(attempts.getFirst(), failed(2, attempts.get(1).stages(), "REPLAY_NONDETERMINISTIC", attempts.get(1).transaction()));
+            attempts = List.of(attempts.get(0), failed(2, attempts.get(1).stages(), "REPLAY_NONDETERMINISTIC", attempts.get(1).transaction()));
         }
         OplGoldenReplayReportWriter.ObservedStatus status = deterministic && attempts.stream().allMatch(item -> item.observedStatus() == expectedStatus)
                 ? expectedStatus : OplGoldenReplayReportWriter.ObservedStatus.FAILED;
@@ -96,11 +96,11 @@ public final class OplGoldenReplayRunner {
         List<OplGoldenReplayReportWriter.AtomicAttempt> attempts = List.of(
                 runAtomicAttempt(profileRoot, atomicCase, workRoot.resolve(caseId).resolve("1"), 1),
                 runAtomicAttempt(profileRoot, atomicCase, workRoot.resolve(caseId).resolve("2"), 2));
-        boolean deterministic = attempts.getFirst().observedStatus() == attempts.get(1).observedStatus()
-                && attempts.getFirst().commitCode().equals(attempts.get(1).commitCode())
-                && attempts.getFirst().detailCode().equals(attempts.get(1).detailCode())
-                && attempts.getFirst().transaction().equals(attempts.get(1).transaction())
-                && attempts.getFirst().actualMutation().equals(attempts.get(1).actualMutation());
+        boolean deterministic = attempts.get(0).observedStatus() == attempts.get(1).observedStatus()
+                && attempts.get(0).commitCode().equals(attempts.get(1).commitCode())
+                && attempts.get(0).detailCode().equals(attempts.get(1).detailCode())
+                && attempts.get(0).transaction().equals(attempts.get(1).transaction())
+                && attempts.get(0).actualMutation().equals(attempts.get(1).actualMutation());
         OplGoldenReplayReportWriter.ObservedStatus status = deterministic
                 && attempts.stream().allMatch(item -> item.observedStatus() == OplGoldenReplayReportWriter.ObservedStatus.BLOCKED_MATCHED)
                 ? OplGoldenReplayReportWriter.ObservedStatus.BLOCKED_MATCHED : OplGoldenReplayReportWriter.ObservedStatus.FAILED;
@@ -607,7 +607,7 @@ public final class OplGoldenReplayRunner {
         }
         String document;
         Set<TraceIndexTuple> storedTraceTuples;
-        try (Connection connection = DriverManager.getConnection("jdbc:sqlite:" + database.toAbsolutePath())) {
+        try (Connection connection = org.opm.localruntime.storage.SqliteSnapshots.connection(database)) {
             document = text(connection, "SELECT document_json FROM revision_document WHERE revision_id = ?", candidate.revisionId());
             storedTraceTuples = readTraceIndexTuples(connection, candidate.revisionId());
         }
@@ -716,7 +716,7 @@ public final class OplGoldenReplayRunner {
     }
 
     private Snapshot snapshot(Path database, String modelId) throws Exception {
-        try (Connection connection = DriverManager.getConnection("jdbc:sqlite:" + database.toAbsolutePath())) {
+        try (Connection connection = org.opm.localruntime.storage.SqliteSnapshots.connection(database)) {
             return new Snapshot(count(connection, "revision_document"), count(connection, "revision_parent"), count(connection, "text_trace_index"),
                     count(connection, "finding_index"), count(connection, "operation_record"), count(connection, "idempotency_record"),
                     text(connection, "SELECT draft_head_revision_id FROM model_head WHERE model_id = ?", modelId),

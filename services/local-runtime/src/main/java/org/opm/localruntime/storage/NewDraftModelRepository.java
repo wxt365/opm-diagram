@@ -26,12 +26,12 @@ public final class NewDraftModelRepository {
             }
         }
         var document = SaveContentDigestV1.read(raw);
-        var request = new DraftPreparationRequest(projectId, modelId, revisionId, HybridSavePreparation.hash(raw),
+        var request = new DraftPreparationRequest(projectId, modelId, revisionId, StorageDigests.hash(raw),
                 document.at("/profile_binding/binding_digest/digest").asText(), id("draft"), id("checkpoint"),
                 new DateTimeFormatterBuilder().appendInstant(3).toFormatter().format(Instant.parse(now)));
-        var source = PreparedDraftRepository.source(connection, request, newRefinementModel);
-        PreparedDraftRepository.seed(connection, request, source, ignored -> { });
-        try (var statement = connection.prepareStatement("INSERT INTO model_save_mode VALUES (?,'JOURNALED_DRAFT_V2',?)")) {
+        var source = DraftSeedRepository.source(connection, request, newRefinementModel);
+        DraftSeedRepository.seed(connection, request, source, ignored -> { });
+        try (var statement = connection.prepareStatement("INSERT INTO model_save_mode(model_id,mode,active_draft_id) VALUES (?,'JOURNALED_DRAFT_V2',?)")) {
             statement.setString(1, modelId); statement.setString(2, request.draft_id());
             if (statement.executeUpdate() != 1) throw new IllegalStateException("草稿模式初始化失败");
         }

@@ -7,12 +7,12 @@ export default defineConfig({
   testDir: ".",
   testMatch: "**/*.spec.ts",
   // 大图测试使用独立页面和 Vite 端口，由性能配置单独执行。
-  testIgnore: "**/workbench-performance.spec.ts",
+  testIgnore: ["**/workbench-performance.spec.ts", "**/workbench-component.spec.ts", "**/workbench-connected.spec.ts"],
   fullyParallel: false,
   workers: 1,
   timeout: 120_000,
   use: {
-    baseURL: "http://127.0.0.1:5176",
+    baseURL: process.env.OPM_E2E_BASE_URL ?? "http://127.0.0.1:5176",
   },
   webServer: useExternalServers ? undefined : [
     {

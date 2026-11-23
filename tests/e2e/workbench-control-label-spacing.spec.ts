@@ -146,10 +146,10 @@ async function moveNode(page: Page, node: Locator, x: number, y: number) {
 }
 
 async function setZoom(page: Page, zoom: number) {
-  const output = page.getByTestId("p03-zoom-output");
+  const output = page.getByTestId("p03-zoom-output").filter({ visible: true });
   let current = Number((await output.inputValue()).replace("%", ""));
   while (current !== zoom) {
-    await page.getByTestId(current < zoom ? "p03-zoom-in" : "p03-zoom-out").click();
+    await page.getByTestId(current < zoom ? "p03-zoom-in" : "p03-zoom-out").filter({ visible: true }).click();
     current += current < zoom ? 10 : -10;
     await expect(output).toHaveValue(`${current}%`);
   }

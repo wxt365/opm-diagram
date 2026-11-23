@@ -10,7 +10,7 @@ describe("布局工具菜单", () => {
       await wrapper.get("button").trigger("click"); await flushPromises();
       const menu = document.querySelector('[data-testid="opd-layout-menu"]')!;
       expect(menu.textContent).toContain("基准对象（最后选中）");
-      expect(menu.querySelectorAll("button")).toHaveLength(9);
+      expect(menu.querySelectorAll("button")).toHaveLength(10);
       (menu.querySelector(`[data-testid="opd-layout-${action}"]`) as HTMLButtonElement).click();
       await flushPromises(); expect(wrapper.emitted("arrange")?.at(-1)).toEqual([action]);
       expect(document.querySelector('[data-testid="opd-layout-menu"]')).toBeNull();
@@ -36,6 +36,15 @@ describe("布局工具菜单", () => {
     expect(wrapper.emitted("autoLayout")).toEqual([[]]);
     expect(document.querySelector('[data-testid="opd-layout-menu"]')).toBeNull();
     wrapper.unmount();
+  });
+  it("全模型整理与撤销使用独立入口", async () => {
+    const wrapper = mount(LayoutToolMenu, { attachTo: document.body, props: { disabled: false, state, canUndoModel: true } });
+    await wrapper.get("button").trigger("click"); await flushPromises();
+    (document.querySelector('[data-testid="model-layout-auto"]') as HTMLButtonElement).click(); await flushPromises();
+    expect(wrapper.emitted("modelLayout")).toEqual([[]]);
+    await wrapper.get("button").trigger("click"); await flushPromises();
+    (document.querySelector('[data-testid="model-layout-undo"]') as HTMLButtonElement).click(); await flushPromises();
+    expect(wrapper.emitted("undoModel")).toEqual([[]]); wrapper.unmount();
   });
   it("键盘打开聚焦首项，方向键和首尾导航跳过禁用项，Escape 返回触发按钮", async () => {
     const wrapper = mount(LayoutToolMenu, { attachTo: document.body, props: { disabled: false, autoLayoutDisabled: true, state: { ...state, count: 2, canDistribute: false } } });

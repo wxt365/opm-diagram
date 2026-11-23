@@ -16,9 +16,10 @@
   </div>
 </template>
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useDialogFocus } from "@/shared/composables/useDialogFocus";
 import { localRuntimeApi, type OpdJsonPackageWire } from "@/shared/api/localRuntimeApi";
+import { randomUuid } from "@/shared/platform/browserCrypto";
 const props = defineProps<{ projectId: string }>();
 const emit = defineEmits<{ close: []; imported: [model: string, context: string] }>();
 const packageFile = ref<OpdJsonPackageWire>(), name = ref(""), error = ref(""), busy = ref(false), reading = ref(false);
@@ -28,6 +29,9 @@ const fileInput = ref<HTMLInputElement>();
 const { closeDialog, onDialogKeydown, setDialogElement } = useDialogFocus(computed(() => true), () => { if (!busy.value) emit("close"); });
 onMounted(async () => { await nextTick(); fileInput.value?.focus(); });
 onBeforeUnmount(() => { generation++; });
+watch(() => props.projectId, () => {
+  generation++; packageFile.value = undefined; name.value = ''; error.value = ''; busy.value = false; reading.value = false; commandId = ''; requestName = '';
+});
 async function readFile(event: Event) {
   const file = (event.target as HTMLInputElement).files?.[0], current = ++generation;
   packageFile.value = undefined; error.value = ""; commandId = ""; reading.value = false;
@@ -49,11 +53,13 @@ async function readFile(event: Event) {
 }
 async function submit() {
   if (busy.value || !packageFile.value || !name.value.trim()) return;
-  if (!commandId || requestName !== name.value.trim()) { commandId = `command.opd-import.${crypto.randomUUID().replaceAll("-", "")}`; requestName = name.value.trim(); }
+  if (!commandId || requestName !== name.value.trim()) { commandId = `command.opd-import.${randomUuid().replaceAll("-", "")}`; requestName = name.value.trim(); }
   busy.value = true; error.value = "";
-  try { const model = await localRuntimeApi.importOpdJson(props.projectId, requestName, packageFile.value, commandId); emit("imported", model.model_id, model.context_id); }
-  catch (cause) { error.value = cause instanceof Error ? cause.message : "导入失败，请重试"; }
-  finally { busy.value = false; }
+  const current = ++generation, projectId = props.projectId;
+  try { const model = await localRuntimeApi.importOpdJson(projectId, requestName, packageFile.value, commandId);
+    if (current === generation && projectId === props.projectId) emit("imported", model.model_id, model.context_id); }
+  catch (cause) { if (current === generation) error.value = cause instanceof Error ? cause.message : "导入失败，请重试"; }
+  finally { if (current === generation) busy.value = false; }
 }
 </script>
 <style scoped>

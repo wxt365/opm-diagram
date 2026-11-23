@@ -23,13 +23,32 @@ public final class OplGoldenReplayDatabaseInitializer {
 
     public Path initialize(Path storageRoot, SemanticRevision base, Path baseFixture) {
         try {
-            ProjectDatabaseFactory factory = new ProjectDatabaseFactory(storageRoot);
-            resetAttemptDatabase(factory.databasePath(PROJECT_ID));
+            ProjectDatabaseFactory factory = new ProjectDatabaseFactory(storageRoot, org.opm.localruntime.storage.SqliteSnapshots.tools(storageRoot), false);
+            if (factory.databaseScope(PROJECT_ID).exists()) {
+                try (var connection = factory.databaseScope(PROJECT_ID).getConnection(); var query = connection.createStatement();
+                     var rows = query.executeQuery("SELECT document_json FROM revision_document")) {
+                    if (!rows.next() || !Files.readString(baseFixture).equals(rows.getString(1)) || rows.next())
+                        throw new IllegalStateException("Golden replay 拒绝覆盖不同的已有项目");
+                    for (String table : java.util.List.of("operation_record", "revision_parent", "text_trace_index")) {
+                        try (var check = connection.createStatement(); var count = check.executeQuery("SELECT COUNT(*) FROM " + table)) {
+                            if (!count.next() || count.getInt(1) != 0) throw new IllegalStateException("Golden replay 拒绝覆盖已经修改的项目");
+                        }
+                    }
+                    try (var check = connection.prepareStatement("SELECT draft_head_revision_id,head_sequence FROM model_head WHERE model_id=?")) {
+                        check.setString(1, base.modelId());
+                        try (var head = check.executeQuery()) {
+                            if (!head.next() || !base.revisionId().equals(head.getString(1)) || base.revisionSequence() != head.getInt(2))
+                                throw new IllegalStateException("Golden replay 既有项目的 head 不匹配");
+                        }
+                    }
+                    return factory.snapshot(PROJECT_ID);
+                }
+            }
+
             ProjectDatabaseOpenResult opened = factory.open(PROJECT_ID);
             if (!(opened instanceof ProjectDatabaseOpenResult.Ready ready)) throw new IllegalStateException("Golden replay database migration requires recovery");
             byte[] document = Files.readAllBytes(baseFixture);
-            try (Connection connection = DriverManager.getConnection("jdbc:sqlite:" + ready.database().databasePath().toAbsolutePath())) {
-                connection.createStatement().execute("PRAGMA foreign_keys = ON");
+            try (Connection connection = ready.database().databaseScope().getConnection()) {
                 connection.setAutoCommit(false);
                 insertProject(connection, base);
                 insertModel(connection, base);
@@ -38,17 +57,10 @@ public final class OplGoldenReplayDatabaseInitializer {
                 insertHead(connection, base);
                 connection.commit();
             }
-            return ready.database().databasePath();
+            return org.opm.localruntime.storage.SqliteSnapshots.write(storageRoot, ready.database().databaseScope());
         } catch (Exception exception) {
             throw new IllegalStateException("Cannot initialize Golden replay base Revision", exception);
         }
-    }
-
-    /** workRoot 仅承载本次 replay attempt，启动前必须去除上次遗留的 SQLite 状态。 */
-    private void resetAttemptDatabase(Path database) throws Exception {
-        Files.deleteIfExists(database);
-        Files.deleteIfExists(database.resolveSibling(database.getFileName() + "-wal"));
-        Files.deleteIfExists(database.resolveSibling(database.getFileName() + "-shm"));
     }
 
     private void insertProject(Connection connection, SemanticRevision base) throws Exception {

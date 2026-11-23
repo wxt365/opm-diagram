@@ -10,8 +10,8 @@ export const inject = ['agents', 'sessionPersistence', 'tools'];
 export class ModelingSdkServer extends HarnessSdkJsonRpcServer {
   async createSession(sessionId) {
     const agentOptions = { provider: this.provider, model: this.model, maxTokens: this.maxTokens };
-    const setup = agentCtx => { agentCtx.tools.restrict({ allow: sessionId.startsWith('review.')
-      ? ['read_review_model', 'submit_review'] : sessionId.startsWith('analysis.') ? ['read_analysis', 'save_analysis'] : ['read_model', 'get_capabilities', 'propose_change', 'stage_change', 'revise_plan'] }); };
+    const setup = agentCtx => { agentCtx.tools.restrict({ allow: process.env.OPM_SCENE_TOOLS ? process.env.OPM_SCENE_TOOLS.split(',') : sessionId.startsWith('review.')
+      ? ['read_review_model', 'submit_review'] : sessionId.startsWith('analysis.') ? ['read_analysis', 'save_analysis', 'apply_analysis_edits'] : ['read_model', 'get_capabilities', 'propose_change', 'stage_change', 'revise_plan', 'stage_subdiagram', 'finish_repair', 'finish_generation'] }); };
     const existing = await this.ctx.sessionPersistence.stat(sessionId);
     const handle = existing
       ? await this.ctx.agents.resume({ resumeSessionId: sessionId, agentOptions, setup })
@@ -22,6 +22,9 @@ export class ModelingSdkServer extends HarnessSdkJsonRpcServer {
 export function apply(ctx) {
   const transport = new JsonRpcLineTransport(process.stdin, process.stdout);
   const server = new ModelingSdkServer(ctx, transport, { maxTokensAsSuccess: false });
+  ctx.on('agent/assistant-stream', ({ agent, frame }) => {
+    transport.notify('opm.assistant-stream', { sessionId: String(agent.session.id), frame });
+  });
   let exitTask;
   transport.onRequest(async (method, params) => {
     if (method === 'initialize') await ctx.get('loader')?.await();

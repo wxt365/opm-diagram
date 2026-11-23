@@ -13,7 +13,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-
 class VisualCommonFixtureMaterializerTest {
 
     private static final long EPOCH = 1782864000L;
@@ -31,7 +30,7 @@ class VisualCommonFixtureMaterializerTest {
             assertTrue(Files.isRegularFile(root.resolve("attestation.json")), subject);
             assertEquals(1, result.indexCounts().get("revision_document"), subject);
             assertEquals(0, result.indexCounts().get("text_trace_index"), subject);
-            try (var connection = DriverManager.getConnection("jdbc:sqlite:" + result.databasePath())) {
+            try (var connection = org.opm.localruntime.storage.SqliteTestSupport.connection(result.databasePath())) {
                 assertCount(connection, "project_metadata", 1); assertCount(connection, "model_catalog", 1);
                 assertCount(connection, "model_head", 1); assertCount(connection, "revision_parent", 0);
                 assertCount(connection, "finding_index", "FINDING_FOCUS".equals(subject) ? 1 : 0);
@@ -64,7 +63,7 @@ class VisualCommonFixtureMaterializerTest {
         assertEquals(first.baseTreeSha256(), second.baseTreeSha256());
         assertTrue(Files.isRegularFile(first.databasePath()));
         assertTrue(Files.isRegularFile(second.databasePath()));
-        try (var connection = DriverManager.getConnection("jdbc:sqlite:" + first.databasePath())) {
+        try (var connection = org.opm.localruntime.storage.SqliteTestSupport.connection(first.databasePath())) {
             connection.createStatement().executeUpdate("UPDATE project_metadata SET description = 'attempt mutation'");
         }
         assertFalse(sha256(first.databasePath()).equals(sha256(second.databasePath())));

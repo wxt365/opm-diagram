@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import ProjectDetailView from "./ProjectDetailView.vue";
 import { DraftDelivery } from "@/shared/api/draftDelivery";
+import { useProjectModelStore } from '@/stores/projectModel';
 
 describe("ProjectDetailView", () => {
   beforeEach(() => {
@@ -23,6 +24,140 @@ describe("ProjectDetailView", () => {
     vi.unstubAllGlobals();
     delete window.__OPM_LOCAL_SESSION__;
     delete window.__OPM_ACTIVE_PROFILE_BINDING__;
+  });
+
+  it('创建已确认但数量查询挂起时仍立即进入工作台', async () => {
+    const router = createRouter({ history: createMemoryHistory(), routes: [
+      { path: '/projects/:projectId', component: ProjectDetailView },
+      { path: '/projects/:projectId/models/:modelId/workbench', component: { template: '<div />' } },
+    ] }); await router.push('/projects/project.test');
+    let created = false, complete!: (value: Response) => void, writes = 0;
+    vi.stubGlobal('fetch', vi.fn(async (path: string, init?: RequestInit) => {
+      if (init?.method === 'POST') { created = true; writes++; return response(201, { data: model() }); }
+      if (path.includes('workspace-session')) return response(200, { data: { model: model() } });
+      if (path.includes('/models?')) return response(200, { data: [] });
+      if (created) return await new Promise<Response>(resolve => { complete = resolve; });
+      return response(200, { data: project() });
+    }));
+    const w = mount(ProjectDetailView, { global: { plugins: [router] } }); await flushPromises();
+    try {
+      await w.get('[data-testid="p02-create-model"]').trigger('click'); await w.get('form').trigger('submit'); await flushPromises();
+      expect(router.currentRoute.value.path).toBe('/projects/project.test/models/model.created/workbench');
+      expect(useProjectModelStore().isCreatingModel).toBe(false); expect(writes).toBe(1);
+    } finally { complete(response(200, { data: { ...project(), model_count: 1 } })); await flushPromises(); w.unmount(); }
+  });
+
+  it('离开后重新挂载同一项目，旧打开错误消失且可重新打开', async () => {
+    const router = createRouter({ history: createMemoryHistory(), routes: [
+      { path: '/projects/:projectId', component: ProjectDetailView },
+      { path: '/projects/:projectId/models/:modelId/workbench', component: { template: '<div />' } },
+    ] }); await router.push('/projects/project.test');
+    let fail = true;
+    vi.stubGlobal('fetch', vi.fn(async (path: string) => {
+      if (path.includes('workspace-session')) return fail ? response(503, { error: { code: 'FAILED', message: '旧打开失败', retryable: true } })
+        : response(200, { data: { model: model() } });
+      return response(200, { data: path.includes('/models?') ? [model()] : project() });
+    }));
+    const first = mount(ProjectDetailView, { global: { plugins: [router] } }); await flushPromises();
+    await first.get('[data-testid="p02-open-model.created"]').trigger('click'); await flushPromises();
+    expect(first.get('[data-testid="p02-workspace-error"]').text()).toContain('旧打开失败'); first.unmount();
+    const second = mount(ProjectDetailView, { global: { plugins: [router] } }); await flushPromises();
+    expect(second.find('[data-testid="p02-workspace-error"]').exists()).toBe(false);
+    fail = false; await second.get('[data-testid="p02-open-model.created"]').trigger('click'); await flushPromises();
+    expect(router.currentRoute.value.path).toContain('/model.created/workbench'); second.unmount();
+  });
+
+  it('数量读取失败独立提示，重试保留回收站且不再创建', async () => {
+    const router = createRouter({ history: createMemoryHistory(), routes: [{ path: '/projects/:projectId', component: ProjectDetailView }] });
+    await router.push('/projects/project.test');
+    let created = false, failSummary = true, writes = 0;
+    vi.stubGlobal('fetch', vi.fn(async (path: string, init?: RequestInit) => {
+      if (init?.method === 'POST') { created = true; writes++; return response(201, { data: model() }); }
+      if (path.includes('/models?')) return response(200, { data: [] });
+      if (created && failSummary) return response(503, { error: { code: 'FAILED', message: '数量读取失败', retryable: true } });
+      return response(200, { data: { ...project(), model_count: created ? 1 : 0 } });
+    }));
+    const w = mount(ProjectDetailView, { global: { plugins: [router] } }); await flushPromises();
+    await w.get('[data-testid="p02-trash-tab"]').trigger('click'); await flushPromises();
+    await useProjectModelStore().createModel('project.test', '新模型'); await flushPromises();
+    expect(w.get('[data-testid="p02-project-summary-error"]').text()).toContain('模型已创建');
+    failSummary = false; await w.get('[data-testid="p02-project-summary-error"] button').trigger('click'); await flushPromises();
+    expect(w.find('[data-testid="p02-project-summary-error"]').exists()).toBe(false);
+    expect(useProjectModelStore().modelArchiveState).toBe('ARCHIVED'); expect(useProjectModelStore().project?.modelCount).toBe(1);
+    expect(w.text()).toContain('回收站为空'); expect(writes).toBe(1); w.unmount();
+  });
+
+  it.each([false, true])('模型打开失败在列表显示并可重试，无需重新创建，刚创建=%s', async created => {
+    const router = createRouter({ history: createMemoryHistory(), routes: [
+      { path: '/projects/:projectId', component: ProjectDetailView },
+      { path: '/projects/:projectId/models/:modelId/workbench', component: { template: '<div />' } },
+    ] }); await router.push('/projects/project.test');
+    let attempts = 0;
+    const fetchMock = vi.fn(async (path: string, init?: RequestInit) => {
+      if (init?.method === 'POST') return response(201, { data: model() });
+      if (path.includes('workspace-session')) return ++attempts === 1
+        ? response(503, { error: { code: 'UNAVAILABLE', message: '打开失败，请重试', retryable: true } })
+        : response(200, { data: { model: model() } });
+      return response(200, { data: path.includes('/models?') ? (created ? [] : [model()]) : project() });
+    }); vi.stubGlobal('fetch', fetchMock);
+    const w = mount(ProjectDetailView, { global: { plugins: [router] } }); await flushPromises();
+    if (created) { await w.get('[data-testid="p02-create-model"]').trigger('click'); await w.get('form').trigger('submit'); }
+    else await w.get('[data-testid="p02-open-model.created"]').trigger('click');
+    await flushPromises();
+    expect(w.get('[data-testid="p02-workspace-error"]').text()).toContain('打开失败');
+    expect(w.find('[data-testid="p02-open-model.created"]').exists()).toBe(true);
+    await w.get('[data-testid="p02-workspace-error"] button').trigger('click'); await flushPromises();
+    expect(router.currentRoute.value.path).toBe('/projects/project.test/models/model.created/workbench');
+    expect(fetchMock.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(created ? 1 : 0); w.unmount();
+  });
+
+  it('同页连续打开以最新选择为准，旧成功不覆盖新失败或跳转', async () => {
+    const router = createRouter({ history: createMemoryHistory(), routes: [
+      { path: '/projects/:projectId', component: ProjectDetailView },
+      { path: '/projects/:projectId/models/:modelId/workbench', component: { template: '<div />' } },
+    ] }); await router.push('/projects/project.test');
+    let complete!: (value: Response) => void;
+    vi.stubGlobal('fetch', vi.fn(async (path: string) => {
+      if (path.includes('/model.created/workspace-session')) return await new Promise<Response>(resolve => { complete = resolve; });
+      if (path.includes('/model.next/workspace-session')) return response(503, { error: { code: 'FAILED', message: '新模型打开失败', retryable: true } });
+      return response(200, { data: path.includes('/models?') ? [model(), { ...model(), model_id: 'model.next' }] : project() });
+    }));
+    const w = mount(ProjectDetailView, { global: { plugins: [router] } }); await flushPromises();
+    await w.get('[data-testid="p02-open-model.created"]').trigger('click');
+    await w.get('[data-testid="p02-open-model.next"]').trigger('click'); await flushPromises();
+    complete(response(200, { data: { model: model() } })); await flushPromises();
+    expect(router.currentRoute.value.path).toBe('/projects/project.test');
+    expect(w.get('[data-testid="p02-workspace-error"]').text()).toContain('新模型打开失败'); w.unmount();
+  });
+
+  it.each(['create', 'open'] as const)('切换项目后旧 %s 响应不触发错误跳转', async operation => {
+    const router = createRouter({ history: createMemoryHistory(), routes: [
+      { path: '/projects/:projectId', component: ProjectDetailView },
+      { path: '/projects/:projectId/models/:modelId/workbench', component: { template: '<div />' } },
+    ] }); await router.push('/projects/project.test');
+    let complete!: (value: Response) => void;
+    vi.stubGlobal('fetch', vi.fn(async (path: string, init?: RequestInit) => {
+      if (init?.method === 'POST' || path.includes('workspace-session')) return await new Promise<Response>(resolve => { complete = resolve; });
+      return response(200, { data: path.includes('/models?') ? (operation === 'open' && !path.includes('project.b') ? [model()] : [])
+        : { ...project(), project_id: path.includes('project.b') ? 'project.b' : 'project.test' } });
+    }));
+    const w = mount(ProjectDetailView, { global: { plugins: [router] } }); await flushPromises();
+    if (operation === 'create') {
+      await w.get('[data-testid="p02-create-model"]').trigger('click'); await w.get('form').trigger('submit');
+    } else await w.get('[data-testid="p02-open-model.created"]').trigger('click');
+    await router.push('/projects/project.b'); await flushPromises();
+    complete(response(200, { data: operation === 'create' ? model() : { model: model() } })); await flushPromises();
+    expect(router.currentRoute.value.path).toBe('/projects/project.b');
+    expect(useProjectModelStore().models).toEqual([]); expect(useProjectModelStore().project?.modelCount).toBe(0); w.unmount();
+  });
+
+  it('回收站不提供新建模型入口', async () => {
+    const router = createRouter({ history: createMemoryHistory(), routes: [{ path: '/projects/:projectId', component: ProjectDetailView }] });
+    await router.push('/projects/project.test');
+    vi.stubGlobal('fetch', vi.fn(async (path: string) => response(200, { data: path.includes('/models?') ? [] : project() })));
+    const w = mount(ProjectDetailView, { global: { plugins: [router] } }); await flushPromises();
+    await w.get('[data-testid="p02-trash-tab"]').trigger('click'); await flushPromises();
+    expect(w.find('[data-testid="p02-create-model"]').exists()).toBe(false); w.unmount();
   });
 
   it("OV02 使用对话框语义并在取消后回到触发控件", async () => {
@@ -72,10 +207,14 @@ describe("ProjectDetailView", () => {
 
     await wrapper.get('[data-testid="p02-create-model"]').trigger("click");
     await wrapper.get('[data-testid="ov02-model-name"]').setValue("真实模型");
+    await wrapper.get('[data-testid="ov02-model-goal"]').setValue("仅梳理原料加工的对象、过程和状态");
     await wrapper.get("form").trigger("submit.prevent");
     await flushPromises();
 
     expect(router.currentRoute.value.path).toBe("/projects/project.test/models/model.created/workbench");
+    const create = vi.mocked(fetch).mock.calls.find(([, init]) => init?.method === "POST");
+    expect(JSON.parse(String(create?.[1]?.body))).toMatchObject({ description: "仅梳理原料加工的对象、过程和状态" });
+    expect(wrapper.find('input[name="model-method"]').exists()).toBe(false);
   });
 
   it("取消不提交，移入回收站、恢复及名称确认后永久删除", async () => {

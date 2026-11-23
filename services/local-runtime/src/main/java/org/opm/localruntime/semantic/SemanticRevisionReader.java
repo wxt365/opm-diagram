@@ -76,10 +76,10 @@ public final class SemanticRevisionReader {
 
     private void requireSupportedSchemaVersion(JsonNode node, String scope) {
         String schemaVersion = requiredText(node, "schema_version", scope);
-        if (!"0.1".equals(schemaVersion) && !"0.2".equals(schemaVersion) && !"0.3".equals(schemaVersion) && !"0.4".equals(schemaVersion) && !"0.5".equals(schemaVersion)) {
-            throw new SemanticReadException(scope + " field schema_version must be 0.1, 0.2, 0.3, 0.4 or 0.5");
+        if (!java.util.Set.of("0.1", "0.2", "0.3", "0.4", "0.5", "0.6", "0.7").contains(schemaVersion)) {
+            throw new SemanticReadException(scope + " field schema_version must be 0.1 through 0.7");
         }
-        if ("0.3".equals(schemaVersion) || "0.4".equals(schemaVersion) || "0.5".equals(schemaVersion)) requiredArray(node, "refinement_edges", scope);
+        if (java.util.Set.of("0.3", "0.4", "0.5", "0.6", "0.7").contains(schemaVersion)) requiredArray(node, "refinement_edges", scope);
     }
 
     private List<SemanticRevision.RefinementEdge> refinementEdges(JsonNode nodes) {
@@ -251,9 +251,24 @@ public final class SemanticRevisionReader {
                     requiredFiniteDouble(node, "y", "layout"),
                     requiredFiniteDouble(node, "width", "layout"),
                     requiredFiniteDouble(node, "height", "layout"),
-                    requiredInteger(node, "z_order", "layout")));
+                    requiredInteger(node, "z_order", "layout"), edgeRoutes(node.get("edge_routes"))));
         }
         return result;
+    }
+
+    private List<SemanticRevision.EdgeRoute> edgeRoutes(JsonNode nodes) {
+        if (nodes == null) return List.of();
+        if (!nodes.isArray()) throw new IllegalArgumentException("edge_routes must be an array");
+        var routes = new ArrayList<SemanticRevision.EdgeRoute>();
+        for (var node : nodes) {
+            var points = new ArrayList<SemanticRevision.RoutePoint>();
+            if (!node.path("points").isArray()) throw new IllegalArgumentException("route points must be an array");
+            for (var point : node.get("points")) points.add(new SemanticRevision.RoutePoint(
+                    requiredFiniteDouble(point, "x", "route point"), requiredFiniteDouble(point, "y", "route point")));
+            routes.add(new SemanticRevision.EdgeRoute(requiredText(node, "segment", "route"), requiredText(node, "style", "route"),
+                    requiredText(node, "mode", "route"), points));
+        }
+        return routes;
     }
 
     private List<SemanticRevision.StatePresentation> statePresentations(JsonNode nodes) {
